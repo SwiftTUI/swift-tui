@@ -75,10 +75,17 @@ package struct TerminalInputDrainResult: Equatable, Sendable {
   }
 }
 
+/// Reads one chunk. Zero bytes from a nonzero request is end of file; a
+/// request for no bytes transfers nothing and is not (POSIX read(2): nbyte 0
+/// "shall return zero and have no other results"), so it returns `.bytes([])`
+/// without reading.
 package func readTerminalInputChunk(
   from fileDescriptor: Int32,
   maxBytes: Int
 ) -> TerminalInputReadResult {
+  guard maxBytes > 0 else {
+    return .bytes([])
+  }
   var bytesRead = 0
   let buffer = unsafe [UInt8](unsafeUninitializedCapacity: maxBytes) { buf, count in
     bytesRead = unsafe platformRead(fileDescriptor, buf.baseAddress, maxBytes)
@@ -104,6 +111,11 @@ package func drainAvailableTerminalInput(
   from fileDescriptor: Int32,
   maxBytesPerRead: Int
 ) -> TerminalInputDrainResult {
+  // A non-positive budget can drain nothing; it neither finishes the stream
+  // nor repeats empty reads.
+  guard maxBytesPerRead > 0 else {
+    return TerminalInputDrainResult(bytes: [], shouldFinish: false)
+  }
   var input: [UInt8] = []
 
   while true {

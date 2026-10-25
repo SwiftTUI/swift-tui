@@ -82,17 +82,32 @@ struct AdversarialSetHReleaseContractTests {
   }
 
   #if canImport(Darwin) || canImport(Glibc)
-    // read(2) with nbyte == 0 returns 0 without transferring data; the chunk
-    // reader maps every zero to end of file.
+    // read(2) with nbyte == 0 returns 0 without transferring data; that is
+    // not end of file (STUI-1227).
     @Test func setH076ZeroByteReadIsNotEndOfFile() throws {
       let pipe = try SetHPipe()
       defer { pipe.closeAll() }
       let result = readTerminalInputChunk(from: pipe.readEnd, maxBytes: 0)
-      setHKnown(
-        "STUI-1227: setH076: readTerminalInputChunk(maxBytes: 0) reports .endOfFile on an open pipe; every bytesRead == 0 maps to end of file (TerminalInputStreamReading.swift:88-94); contract: POSIX read(2) with nbyte 0 transfers nothing and is not end of file; adjacent: none"
-      ) {
-        #expect(result != .endOfFile, "\(result)")
-      }
+      #expect(result != .endOfFile, "\(result)")
+    }
+
+    // FW3-A neighbors (STUI-1227, setH076): a zero return for a nonzero
+    // request stays end of file, and a zero budget neither finishes the
+    // drain nor consumes pending input.
+    @Test func wave3a03ZeroReturnForNonzeroRequestIsEndOfFile() throws {
+      let pipe = try SetHPipe()
+      defer { pipe.closeAll() }
+      pipe.closeWrite()
+      #expect(readTerminalInputChunk(from: pipe.readEnd, maxBytes: 8) == .endOfFile)
+    }
+
+    @Test func wave3a04ZeroBudgetDrainLeavesInputPending() throws {
+      let pipe = try SetHPipe()
+      defer { pipe.closeAll() }
+      try pipe.send([0x41])
+      let drained = drainAvailableTerminalInput(from: pipe.readEnd, maxBytesPerRead: 0)
+      #expect(drained == TerminalInputDrainResult(bytes: [], shouldFinish: false))
+      #expect(readTerminalInputChunk(from: pipe.readEnd, maxBytes: 1) == .bytes([0x41]))
     }
 
     @Test func setH077ChunkReadErrnoClassification() throws {

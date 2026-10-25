@@ -90,8 +90,8 @@
               sortKey: sortKey(for: socketPath, identifier: identifier)
             )
           )
-        } else {
-          // Remove stale socket
+        } else if isSocketEntry(socketPath) {
+          // Remove stale socket; any other entry with the suffix is not ours.
           _ = sceneUnlink(socketPath)
         }
       }
@@ -210,6 +210,16 @@
 
       let result = sceneConnect(fd, &addr)
       return result == 0
+    }
+
+    /// Whether the directory entry itself is a socket; `lstat(2)` does not
+    /// follow a symbolic link, so a link named `*.sock` is never removed.
+    private static func isSocketEntry(_ path: String) -> Bool {
+      var fileStatus = stat()
+      let result = path.withCString { cPath in
+        unsafe lstat(cPath, &fileStatus)
+      }
+      return result == 0 && fileStatus.st_mode & mode_t(S_IFMT) == mode_t(S_IFSOCK)
     }
 
     private static func sortKey(for path: String, identifier: String) -> InstanceSortKey {

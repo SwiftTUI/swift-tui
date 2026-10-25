@@ -20,9 +20,9 @@
 
   @Suite("Adversarial set H: POSIX terminal controller", .serialized)
   struct AdversarialSetHTerminalPOSIXTests {
-    // Raw mode writes c_cc.16 and c_cc.17 by position. Those are Darwin's
-    // VMIN/VTIME; on glibc they are VEOL2 and a reserved slot, so the test
-    // compares every control character against cfmakeraw's own result.
+    // Raw mode is cfmakeraw plus VMIN/VTIME at the platform's indices
+    // (Darwin 16/17, glibc 6/5; on glibc 16 is VEOL2), so every other control
+    // character must equal cfmakeraw's own result (STUI-1227).
     @Test func setH001RawModeLeavesOtherControlCharactersUntouched() throws {
       try withSetHPTY { pty in
         var reference = try setHAttributes(pty.slave)
@@ -36,22 +36,9 @@
         #expect(controls[Int(VMIN)] == 1)
         #expect(controls[Int(VTIME)] == 0)
         for index in controls.indices where index != Int(VMIN) && index != Int(VTIME) {
-          let check = {
-            #expect(
-              controls[index] == expected[index],
-              "c_cc[\(index)] = \(controls[index]), cfmakeraw leaves \(expected[index])")
-          }
-          #if os(Linux)
-            if index == 16 {
-              setHKnown(
-                "STUI-1227: setH001: on Linux enterRawMode sets c_cc[16] (VEOL2) to 1; the positional c_cc.16/c_cc.17 writes are Darwin's VMIN/VTIME indices (TerminalPOSIXController.swift:99-102); contract: termios(3)/cfmakeraw raw mode changes only VMIN/VTIME; adjacent setA1076 (VMIN/VTIME only), no STUI"
-              ) { check() }
-            } else {
-              check()
-            }
-          #else
-            check()
-          #endif
+          #expect(
+            controls[index] == expected[index],
+            "c_cc[\(index)] = \(controls[index]), cfmakeraw leaves \(expected[index])")
         }
       }
     }
@@ -118,21 +105,31 @@
         try controller.read(from: pipe.readEnd, maxBytes: 1, timeoutMilliseconds: 0) == [0x41])
     }
 
-    // The protocol takes an Int timeout; the POSIX arm converts it with
-    // Int32(_). A value above Int32.max is representable at the seam but
-    // traps inside the conversion.
+    // The protocol takes an Int timeout and poll(2) an int; a value above
+    // Int32.max clamps to the longest finite wait instead of trapping
+    // (STUI-1227).
     @Test func setH009ReadTimeoutBeyondInt32Traps() async {
-      await setHKnown(
-        "STUI-1227: setH009: read(timeoutMilliseconds: Int(Int32.max) + 1) traps; Int32(timeoutMilliseconds) is unchecked (TerminalPOSIXController.swift:247-251); contract: poll(2) takes int milliseconds, an Int timeout must clamp or reject, never trap; adjacent STUI-723 (unchecked numeric conversion class)"
-      ) {
-        await #expect(processExitsWith: .success) {
-          let pipe = try SetHPipe()
-          defer { pipe.closeAll() }
-          try pipe.send([0x41])
-          let bytes = try POSIXTerminalController().read(
-            from: pipe.readEnd, maxBytes: 1, timeoutMilliseconds: Int(Int32.max) + 1)
-          #expect(bytes == [0x41])
-        }
+      await #expect(processExitsWith: .success) {
+        let pipe = try SetHPipe()
+        defer { pipe.closeAll() }
+        try pipe.send([0x41])
+        let bytes = try POSIXTerminalController().read(
+          from: pipe.readEnd, maxBytes: 1, timeoutMilliseconds: Int(Int32.max) + 1)
+        #expect(bytes == [0x41])
+      }
+    }
+
+    // FW3-A neighbor (STUI-1227, setH009): below Int32.min the timeout keeps
+    // poll(2)'s negative (infinite) meaning instead of trapping; with input
+    // pending the read returns at once.
+    @Test func wave3a02ReadTimeoutBelowInt32MinReadsAvailableData() async {
+      await #expect(processExitsWith: .success) {
+        let pipe = try SetHPipe()
+        defer { pipe.closeAll() }
+        try pipe.send([0x42])
+        let bytes = try POSIXTerminalController().read(
+          from: pipe.readEnd, maxBytes: 1, timeoutMilliseconds: Int.min)
+        #expect(bytes == [0x42])
       }
     }
 

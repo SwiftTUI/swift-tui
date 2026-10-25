@@ -1,8 +1,9 @@
 // Adversarial set H, pass 1 (F6 platform edges): the SwiftTUIPlatformIO
 // facade, PTY primitives and attach discovery (setH021–setH036, setH075).
-// The Glibc arm of the facade has no SIGPIPE suppression, discovery unlinks
-// whatever it cannot connect to, and the PTY helpers answer platform errnos;
-// each case names its contract in the F6 brief.
+// Pass 1 found that the Glibc arm of the facade had no SIGPIPE suppression
+// and that discovery unlinked whatever it could not connect to (both
+// repaired, STUI-1227); the PTY helpers answer platform errnos. Each case
+// names its contract in the F6 brief.
 //
 // Excluded from Windows builds like the other attach tests: the subsystem's
 // POSIX half builds empty there.
@@ -30,39 +31,14 @@
     private let setHDescriptorLimit = RLIMIT_NOFILE
   #endif
 
-  /// Keeps an unmarked reproduction path (`SWIFTTUI_SETH_UNMARKED=1`) while
-  /// limiting each guard to its exact reproduced assertion.
-  private func setHKnown(_ comment: Comment, _ body: () throws -> Void) rethrows {
-    if ProcessInfo.processInfo.environment["SWIFTTUI_SETH_UNMARKED"] == "1" {
-      try body()
-    } else {
-      withKnownIssue(comment) { try body() }
-    }
-  }
-
-  private func setHKnown(_ comment: Comment, _ body: () async throws -> Void) async rethrows {
-    if ProcessInfo.processInfo.environment["SWIFTTUI_SETH_UNMARKED"] == "1" {
-      try await body()
-    } else {
-      await withKnownIssue(comment) { try await body() }
-    }
-  }
-
   @Suite("Adversarial set H: platform facade", .serialized)
   struct AdversarialSetHPlatformFacadeTests {
     // sceneWrite tries send(MSG_NOSIGNAL) and falls back to write(2) for
     // anything that is not a socket. Darwin's sceneOpen installs
-    // F_SETNOSIGPIPE on the descriptor it opens; the Glibc arm is a no-op.
+    // F_SETNOSIGPIPE on the descriptor it opens; the other POSIX arms block
+    // SIGPIPE around the write, so every arm returns EPIPE (STUI-1227).
     @Test func setH021FacadeWriteToClosedFIFOReaderRaisesSIGPIPEOnLinux() async {
-      #if os(Linux)
-        await setHKnown(
-          "STUI-1227: setH021: on Linux a sceneWrite to a facade-opened FIFO whose reader closed kills the process with SIGPIPE; the Glibc sceneConfigureNoSigPipe is a no-op and sceneWrite falls back to write(2) for non-sockets (PlatformPOSIX.swift:28-36, 105-118); contract: facade arms agree on an error return (Darwin F_SETNOSIGPIPE; PlatformWindows.swift:12-14); adjacent: none"
-        ) {
-          await setH021ClosedFIFOWrite()
-        }
-      #else
-        await setH021ClosedFIFOWrite()
-      #endif
+      await setH021ClosedFIFOWrite()
     }
 
     private func setH021ClosedFIFOWrite() async {
@@ -86,6 +62,89 @@
         #expect(failure == EPIPE)
       }
     }
+
+    // FW3-A neighbors (STUI-1227, setH021): a facade write that fails with
+    // EPIPE leaves the caller's signal mask and pending set as it found them,
+    // keeps a SIGPIPE that was already pending, and leaves the process-wide
+    // default SIGPIPE in place for plain writers.
+    @Test func wave3a05FacadeEPIPELeavesSignalMaskAndPendingSetUnchanged() async {
+      await #expect(processExitsWith: .success) {
+        var pipeSignal = setHSIGPIPESet()
+        _ = unsafe pthread_sigmask(SIG_UNBLOCK, &pipeSignal, nil)
+        let fifo = try SetHClosedFIFO()
+        defer { fifo.remove() }
+        let written = [UInt8(0x41)].withUnsafeBytes {
+          unsafe sceneWrite(fifo.writer, $0.baseAddress, 1)
+        }
+        let failure = errno
+        #expect(written == -1)
+        #expect(failure == EPIPE)
+        var mask = sigset_t()
+        _ = unsafe pthread_sigmask(SIG_BLOCK, nil, &mask)
+        #expect(unsafe sigismember(&mask, SIGPIPE) == 0)
+        var pending = sigset_t()
+        _ = unsafe sigpending(&pending)
+        #expect(unsafe sigismember(&pending, SIGPIPE) == 0)
+      }
+    }
+
+    #if os(Linux)
+      // Linux only: Darwin's pthread_kill refuses workqueue threads (ENOTSUP),
+      // so an exit-test body there cannot pend a thread-directed signal, and
+      // the Darwin arm never changes the mask.
+      @Test func wave3a06PendingSIGPIPEBeforeFacadeWriteStaysPending() async {
+        await #expect(processExitsWith: .success) {
+          var pipeSignal = setHSIGPIPESet()
+          var original = sigset_t()
+          try #require(unsafe pthread_sigmask(SIG_BLOCK, &pipeSignal, &original) == 0)
+          defer { _ = unsafe pthread_sigmask(SIG_SETMASK, &original, nil) }
+          try #require(pthread_kill(pthread_self(), SIGPIPE) == 0)
+          let fifo = try SetHClosedFIFO()
+          defer { fifo.remove() }
+          let written = [UInt8(0x41)].withUnsafeBytes {
+            unsafe sceneWrite(fifo.writer, $0.baseAddress, 1)
+          }
+          let failure = errno
+          #expect(written == -1)
+          #expect(failure == EPIPE)
+          var mask = sigset_t()
+          _ = unsafe pthread_sigmask(SIG_BLOCK, nil, &mask)
+          #expect(unsafe sigismember(&mask, SIGPIPE) == 1)
+          var pending = sigset_t()
+          _ = unsafe sigpending(&pending)
+          #expect(unsafe sigismember(&pending, SIGPIPE) == 1)
+          var delivered: Int32 = 0
+          #expect(unsafe sigwait(&pipeSignal, &delivered) == 0)
+          #expect(delivered == SIGPIPE)
+        }
+      }
+    #endif
+
+    #if os(Linux)
+      // Linux directs a write's SIGPIPE to the writing thread, so the plain
+      // write ends the child before `pause()`; the wait only keeps a missing
+      // signal from passing as a normal exit (the alarm bounds it).
+      @Test func wave3a07LaterPlainWriterStillReceivesDefaultSIGPIPE() async {
+        await #expect(processExitsWith: .signal(SIGPIPE)) {
+          _ = signal(SIGPIPE, SIG_DFL)
+          var pipeSignal = setHSIGPIPESet()
+          _ = unsafe pthread_sigmask(SIG_UNBLOCK, &pipeSignal, nil)
+          _ = alarm(10)
+          let fifo = try SetHClosedFIFO()
+          let written = [UInt8(0x41)].withUnsafeBytes {
+            unsafe sceneWrite(fifo.writer, $0.baseAddress, 1)
+          }
+          let failure = errno
+          fifo.remove()
+          try #require(written == -1 && failure == EPIPE)
+          var descriptors: [Int32] = [-1, -1]
+          try #require(unsafe pipe(&descriptors) == 0)
+          _ = close(descriptors[0])
+          _ = [UInt8(0x41)].withUnsafeBytes { unsafe write(descriptors[1], $0.baseAddress, 1) }
+          while true { _ = pause() }
+        }
+      }
+    #endif
 
     @Test func setH022FacadeWriteToClosedSocketPeerReportsEPIPE() async {
       await #expect(processExitsWith: .success) {
@@ -214,8 +273,8 @@
       #expect(instances.isEmpty)
     }
 
-    // Discovery keeps every "*.sock" name and treats a failed connection as a
-    // stale socket to unlink, without asking whether the entry is a socket.
+    // Discovery unlinks a non-connectable "*.sock" entry only when lstat(2)
+    // reports a socket; a regular file with the suffix survives (STUI-1227).
     @Test func setH031DiscoveryUnlinksRegularSockNamedFile() throws {
       let appName = "setH031-\(UUID().uuidString)"
       let directory = "/tmp/swifttui/\(appName)"
@@ -225,11 +284,7 @@
       try Data("keep".utf8).write(to: URL(fileURLWithPath: file))
       let instances = SocketClient.discoverInstances(appName: appName)
       #expect(instances.isEmpty)
-      setHKnown(
-        "STUI-1227: setH031: discoverInstances unlinks a regular file named note.sock; every non-connectable *.sock entry is treated as a stale socket and unlinked without a socket-type check (SocketClient.swift:78-96); contract: only stale sockets are removed; adjacent STUI-860 (discovery socket protocol)"
-      ) {
-        #expect(FileManager.default.fileExists(atPath: file))
-      }
+      #expect(FileManager.default.fileExists(atPath: file))
     }
 
     @Test func setH032DiscoveryIgnoresSockNamedDirectory() throws {
@@ -243,6 +298,42 @@
       var information = stat()
       #expect(unsafe stat(nested, &information) == 0)
       #expect(information.st_mode & S_IFMT == S_IFDIR)
+    }
+
+    // FW3-A neighbors (STUI-1227, setH031): a stale bound socket is still
+    // removed; a symlink named *.sock is neither removed nor followed.
+    @Test func wave3a08DiscoveryStillRemovesStaleSocket() throws {
+      let appName = "wave3a08-\(UUID().uuidString)"
+      let directory = "/tmp/swifttui/\(appName)"
+      try FileManager.default.createDirectory(atPath: directory, withIntermediateDirectories: true)
+      defer { try? FileManager.default.removeItem(atPath: directory) }
+      let path = directory + "/stale.sock"
+      let descriptor = sceneSocket()
+      try #require(descriptor >= 0)
+      var address = try #require(sceneSocketAddress(for: path))
+      try #require(sceneBind(descriptor, &address) == 0)
+      sceneClose(descriptor)
+      var information = stat()
+      try #require(unsafe lstat(path, &information) == 0)
+      try #require(information.st_mode & S_IFMT == S_IFSOCK)
+      #expect(SocketClient.discoverInstances(appName: appName).isEmpty)
+      #expect(unsafe lstat(path, &information) == -1)
+    }
+
+    @Test func wave3a09DiscoveryKeepsSockNamedSymlink() throws {
+      let appName = "wave3a09-\(UUID().uuidString)"
+      let directory = "/tmp/swifttui/\(appName)"
+      try FileManager.default.createDirectory(atPath: directory, withIntermediateDirectories: true)
+      defer { try? FileManager.default.removeItem(atPath: directory) }
+      let target = directory + "/target.txt"
+      try Data("keep".utf8).write(to: URL(fileURLWithPath: target))
+      let link = directory + "/link.sock"
+      try #require(unsafe symlink(target, link) == 0)
+      #expect(SocketClient.discoverInstances(appName: appName).isEmpty)
+      var information = stat()
+      #expect(unsafe lstat(link, &information) == 0)
+      #expect(information.st_mode & S_IFMT == S_IFLNK)
+      #expect(FileManager.default.fileExists(atPath: target))
     }
 
     @Test func setH033RequestToMissingSocketFailsFast() {
@@ -317,6 +408,37 @@
         #expect(signal.description == name)
       }
       #expect(Set(expected.map { $0.0.rawValue }).count == 16)
+    }
+  }
+
+  private func setHSIGPIPESet() -> sigset_t {
+    var set = sigset_t()
+    _ = unsafe sigemptyset(&set)
+    _ = unsafe sigaddset(&set, SIGPIPE)
+    return set
+  }
+
+  /// A facade-opened FIFO writer whose only reader has closed.
+  private struct SetHClosedFIFO {
+    let directory: URL
+    let writer: Int32
+
+    init() throws {
+      directory = FileManager.default.temporaryDirectory
+        .appendingPathComponent("setHFIFO-\(UUID().uuidString)", isDirectory: true)
+      try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+      let path = directory.appendingPathComponent("fifo").path
+      try #require(path.withCString { unsafe mkfifo($0, 0o600) } == 0)
+      let reader = sceneOpen(path, O_RDONLY | O_NONBLOCK)
+      try #require(reader >= 0)
+      writer = sceneOpen(path, O_WRONLY)
+      try #require(writer >= 0)
+      sceneClose(reader)
+    }
+
+    func remove() {
+      sceneClose(writer)
+      try? FileManager.default.removeItem(at: directory)
     }
   }
 #endif

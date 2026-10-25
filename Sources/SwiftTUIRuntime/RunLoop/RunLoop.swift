@@ -500,20 +500,25 @@ public final class RunLoop<State: Equatable & Sendable, Content: View>:
     let usesRawTerminalMode = runtimeConfiguration.output == .tui
     let terminalCommandSurface =
       presentationSurface as? any TerminalCommandPresentationSurface
-    if usesRawTerminalMode {
-      try terminalCommandSurface?.enableRawMode()
-      synchronizeInputCapabilities()
-      if terminalCommandSurface != nil {
-        activateTerminalHandoffSession()
-      }
-    }
+    // Installed before raw-mode entry can throw, so a failed entry retires the
+    // session too. A surface whose entry failed rolls back its own partial
+    // state and is not asked to leave a mode it never entered.
+    var enteredRawTerminalMode = false
     defer {
       isSessionActive = false
       hasPendingProgrammaticTermination = false
       lifecycleCoordinator.shutdown()
       deactivateTerminalHandoffSession()
-      if usesRawTerminalMode {
+      if enteredRawTerminalMode {
         try? terminalCommandSurface?.disableRawMode()
+      }
+    }
+    if usesRawTerminalMode {
+      try terminalCommandSurface?.enableRawMode()
+      enteredRawTerminalMode = true
+      synchronizeInputCapabilities()
+      if terminalCommandSurface != nil {
+        activateTerminalHandoffSession()
       }
     }
 

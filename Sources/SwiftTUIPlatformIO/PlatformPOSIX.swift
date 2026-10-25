@@ -102,6 +102,11 @@
     unsafe read(fileDescriptor, buffer, count)
   }
 
+  /// A closed peer fails the write with EPIPE instead of raising SIGPIPE.
+  /// Sockets use `MSG_NOSIGNAL`. Darwin relies on the `F_SETNOSIGPIPE` that
+  /// the facade installs when it opens, accepts or configures a descriptor;
+  /// the other POSIX arms block SIGPIPE in the calling thread for the
+  /// `write(2)` alone (see `sceneWriteSuppressingSIGPIPE`).
   @inline(__always)
   package func sceneWrite(
     _ fileDescriptor: Int32,
@@ -114,8 +119,47 @@
         return sent
       }
     #endif
-    return unsafe write(fileDescriptor, buffer, count)
+    #if canImport(Darwin)
+      return unsafe write(fileDescriptor, buffer, count)
+    #else
+      return sceneWriteSuppressingSIGPIPE {
+        unsafe write(fileDescriptor, buffer, count)
+      }
+    #endif
   }
+
+  #if !canImport(Darwin)
+    /// POSIX write(2) sends SIGPIPE to the calling thread on EPIPE. Block it in
+    /// this thread for the one syscall, consume only a signal the write itself
+    /// generated (one already pending stays pending), and restore the caller's
+    /// mask and errno. The process-wide disposition never changes, so other
+    /// writers keep default SIGPIPE. Same technique as the runtime's
+    /// `terminalWriteSuppressingSIGPIPE` and libpq's `pq_block_sigpipe`.
+    /// https://pubs.opengroup.org/onlinepubs/9799919799/functions/write.html
+    private func sceneWriteSuppressingSIGPIPE(_ operation: () -> Int) -> Int {
+      var blocked = sigset_t()
+      var original = sigset_t()
+      var pending = sigset_t()
+      _ = unsafe sigemptyset(&blocked)
+      _ = unsafe sigaddset(&blocked, SIGPIPE)
+      let maskError = unsafe pthread_sigmask(SIG_BLOCK, &blocked, &original)
+      guard maskError == 0 else {
+        errno = maskError
+        return -1
+      }
+      _ = unsafe sigpending(&pending)
+      let wasPending = unsafe sigismember(&pending, SIGPIPE) == 1
+      let result = operation()
+      let writeError = errno
+      if result < 0, writeError == EPIPE, !wasPending {
+        var timeout = timespec(tv_sec: 0, tv_nsec: 0)
+        while unsafe sigtimedwait(&blocked, nil, &timeout) < 0 && errno == EINTR {}
+      }
+      _ = unsafe pthread_sigmask(SIG_SETMASK, &original, nil)
+      errno = writeError
+      return result
+    }
+  #endif
 
   @inline(__always)
   package func sceneAccess(

@@ -42,12 +42,67 @@ import Testing
       let issue = RuntimeIssue(severity: .warning, code: "setC172.pipeOwner", message: "redirected")
       RuntimeIssueSink.standardError(to: redirected[1]).report(issue)
       let received = readAvailable(redirected[0])
-      setCKnown(
-        "STUI-1210: a non-terminal presentation owner silences diagnostics to every destination including redirected pipes; DiagnosticScreenOwnership.allowsDiagnosticWrite returns false whenever any owner's device is unknown (DiagnosticScreenOwnership.swift:53) before the non-tty branch; contract: CHANGELOG 0.19.0 'stream framework runtime issues to redirected stderr while protecting every active presentation terminal' (STUI-1089)"
-      ) {
-        #expect(allowed)
-        #expect(received.contains("setC172.pipeOwner"), "\(received)")
+      // STUI-1210: a pipe owner is not a terminal to protect (STUI-1089 contract).
+      #expect(allowed)
+      #expect(received.contains("setC172.pipeOwner"), "\(received)")
+    }
+
+    // FW3-A neighbors (STUI-1210): a pipe-owned presentation admits every
+    // other non-terminal destination, but not its own stream, not a terminal
+    // (the pipe may feed one), not a closed descriptor, and not anything while
+    // an owner of unknown kind is active.
+    @Test func wave3a10PipeOwnerAllowsRedirectedFile() throws {
+      var owner: [Int32] = [-1, -1]
+      try #require(unsafe pipe(&owner) == 0)
+      defer { for fd in owner { _ = close(fd) } }
+      let path = NSTemporaryDirectory() + "wave3a10-" + UUID().uuidString + ".log"
+      let file = path.withCString { unsafe open($0, O_RDWR | O_CREAT | O_TRUNC, 0o600) }
+      try #require(file >= 0)
+      defer {
+        _ = close(file)
+        _ = path.withCString { unsafe unlink($0) }
       }
+      DiagnosticScreenOwnership.acquire(owner[1])
+      defer { DiagnosticScreenOwnership.release(owner[1]) }
+      #expect(DiagnosticScreenOwnership.allowsDiagnosticWrite(to: file))
+    }
+
+    @Test func wave3a11PipeOwnerRefusesItsOwnStream() throws {
+      var owner: [Int32] = [-1, -1]
+      try #require(unsafe pipe(&owner) == 0)
+      let alias = dup(owner[1])
+      defer { for fd in owner + [alias] { _ = close(fd) } }
+      try #require(alias >= 0)
+      DiagnosticScreenOwnership.acquire(owner[1])
+      defer { DiagnosticScreenOwnership.release(owner[1]) }
+      #expect(!DiagnosticScreenOwnership.allowsDiagnosticWrite(to: owner[1]))
+      #expect(!DiagnosticScreenOwnership.allowsDiagnosticWrite(to: alias))
+    }
+
+    @Test func wave3a12PipeOwnerRefusesTerminalsAndInvalidDescriptors() throws {
+      var owner: [Int32] = [-1, -1]
+      try #require(unsafe pipe(&owner) == 0)
+      var controller: Int32 = -1
+      var viewer: Int32 = -1
+      try #require(unsafe openpty(&controller, &viewer, nil, nil, nil) == 0)
+      defer { for fd in owner + [controller, viewer] { _ = close(fd) } }
+      DiagnosticScreenOwnership.acquire(owner[1])
+      defer { DiagnosticScreenOwnership.release(owner[1]) }
+      #expect(!DiagnosticScreenOwnership.allowsDiagnosticWrite(to: viewer))
+      #expect(!DiagnosticScreenOwnership.allowsDiagnosticWrite(to: -1))
+    }
+
+    @Test func wave3a13UnknownOwnerStillSilencesRedirectedPipe() throws {
+      var owner: [Int32] = [-1, -1]
+      try #require(unsafe pipe(&owner) == 0)
+      var redirected: [Int32] = [-1, -1]
+      try #require(unsafe pipe(&redirected) == 0)
+      defer { for fd in owner + redirected { _ = close(fd) } }
+      DiagnosticScreenOwnership.acquire(owner[1])
+      defer { DiagnosticScreenOwnership.release(owner[1]) }
+      DiagnosticScreenOwnership.acquire()
+      defer { DiagnosticScreenOwnership.release() }
+      #expect(!DiagnosticScreenOwnership.allowsDiagnosticWrite(to: redirected[1]))
     }
 
     @Test func setC173BalancedOwnershipCounts() throws {

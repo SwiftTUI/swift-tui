@@ -48,6 +48,11 @@ import Synchronization
     func write(_ output: String, to fileDescriptor: Int32) throws
     /// Implementations that can block must honor the shared shutdown deadline.
     func write(_ output: String, to fileDescriptor: Int32, budget: TerminalWriteBudget) throws
+    /// Reads at most `maxBytes` once input is ready, or returns `[]` when
+    /// `timeoutMilliseconds` passes first (and at once when `maxBytes` is not
+    /// positive). The POSIX arm hands the timeout to poll(2), clamped to its
+    /// `int` range, so a negative value waits indefinitely there; the Windows
+    /// arm treats a negative value as zero.
     func read(
       from fileDescriptor: Int32,
       maxBytes: Int,
@@ -96,10 +101,13 @@ import Synchronization
 
       var rawAttributes = currentAttributes
       unsafe cfmakeraw(&rawAttributes)
-      // VMIN = 1, VTIME = 0: the platform-dependent c_cc tuple indices are
-      // part of what "raw mode" means here and must not leak to callers.
-      rawAttributes.c_cc.16 = 1
-      rawAttributes.c_cc.17 = 0
+      // VMIN = 1, VTIME = 0 at the platform's own indices (Darwin 16/17;
+      // glibc and bionic 6/5, where 16 is VEOL2). The c_cc tuple has no
+      // named elements, so write through its bytes; cc_t is one byte.
+      withUnsafeMutableBytes(of: &rawAttributes.c_cc) { controls in
+        unsafe controls[Int(VMIN)] = 1
+        unsafe controls[Int(VTIME)] = 0
+      }
 
       guard unsafe tcsetattr(input, TCSAFLUSH, &rawAttributes) == 0 else {
         throw TerminalHostError.failedToSetAttributes(errno: errno)
@@ -244,10 +252,13 @@ import Synchronization
         events: Int16(POLLIN),
         revents: 0
       )
+      // poll(2) takes an int. Clamping keeps every in-range value, turns a
+      // longer wait into the longest finite one and keeps a more negative
+      // value negative (poll's infinite wait), instead of trapping.
       let ready = unsafe terminalPlatformPoll(
         &descriptor,
         1,
-        Int32(timeoutMilliseconds)
+        Int32(clamping: timeoutMilliseconds)
       )
 
       guard ready > 0 else {

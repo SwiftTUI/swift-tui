@@ -52,17 +52,9 @@ struct AdversarialSetESessionLifetimeTests {
         }
       }
       let result = await runner.value
-      if id == 81 {
-        setEKnown("STUI-1182: failed raw-mode entry must retire session bookkeeping") {
-          #expect(!loop.isSessionActive)
-        }
-        setEKnown("STUI-1182: an ended session must refuse termination requests") {
-          #expect(!loop.runtimeRequestTerminationAction()())
-        }
-      } else {
-        #expect(!loop.isSessionActive)
-        #expect(!loop.runtimeRequestTerminationAction()())
-      }
+      // STUI-1182: a failed raw-mode entry (81) retires the session too.
+      #expect(!loop.isSessionActive)
+      #expect(!loop.runtimeRequestTerminationAction()())
       #expect(loop.lifecycleCoordinator.activeTaskCount == 0)
       #expect(loop.lifecycleCoordinator.activeTaskDescriptors.isEmpty)
       #expect(surface.enables == 1)
@@ -90,6 +82,42 @@ struct AdversarialSetESessionLifetimeTests {
       await cleanup()
       throw error
     }
+  }
+
+  // FW3-A neighbor (STUI-1182): a termination request that the run loop
+  // accepts while raw-mode entry is still in progress must not outlive the
+  // failed entry, and the surface is not asked to leave a mode it never entered.
+  @Test func wave3a01TerminationAcceptedDuringFailedRawEntryIsRetired() async {
+    let probe = SetESessionProbe()
+    let surface = SetESessionSurface(kind: 81)
+    let input = InjectedTerminalInputReader(mouseFlushScheduling: .manual)
+    let signals = InProcessSignalReader()
+    let identity = testIdentity("setE", "wave3a01")
+    let loop = RunLoop(
+      rootIdentity: identity, presentationSurface: surface, terminalInputReader: input,
+      signalReader: signals, scheduler: FrameScheduler(),
+      stateContainer: StateContainer(initialState: 0, invalidationIdentities: [identity]),
+      focusTracker: FocusTracker(invalidationIdentities: [identity]),
+      viewBuilder: { _, _ in SetESessionContent(kind: 81, probe: probe) })
+    var acceptedDuringEntry: Bool?
+    surface.onEnable = { acceptedDuringEntry = loop.runtimeRequestTerminationAction()() }
+    defer { surface.onEnable = nil }
+    input.finish()
+    signals.finish()
+    do {
+      _ = try await loop.run()
+      Issue.record("expected the configured raw-mode entry error")
+    } catch {
+      #expect(error as? SetESessionError == .planned(81))
+    }
+    #expect(acceptedDuringEntry == true)
+    #expect(!loop.isSessionActive)
+    #expect(!loop.hasPendingProgrammaticTermination)
+    #expect(!loop.runtimeRequestTerminationAction()())
+    #expect(surface.enables == 1)
+    #expect(surface.disables == 0)
+    #expect(probe.started == 0)
+    #expect(loop.lifecycleCoordinator.activeTaskCount == 0)
   }
 }
 
@@ -133,9 +161,12 @@ private final class SetESessionSurface: PresentationSurface {
   var enables = 0
   var disables = 0
   var presentations = 0
+  /// Runs inside raw-mode entry, before a configured failure (FW3-A neighbor).
+  var onEnable: (@MainActor () -> Void)?
   init(kind: Int) { self.kind = kind }
   func enableRawMode() throws {
     enables += 1
+    if let onEnable { MainActor.assumeIsolated { onEnable() } }
     if kind == 81 { throw SetESessionError.planned(kind) }
   }
   func disableRawMode() throws {
