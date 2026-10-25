@@ -666,6 +666,10 @@
       "category": "core-rendering",
       "reason": "Core phase products, extraction, layout, rasterization or commit contracts; Graph is a supported dependency."
     },
+    "Tests/SwiftTUICoreTests/Wave3HuntFBRasterTests.swift": {
+      "category": "core-rendering",
+      "reason": "Core phase products, extraction, layout, rasterization or commit contracts; Graph is a supported dependency."
+    },
     "Tests/SwiftTUIGraphTests/AnchorTypesTests.swift": {
       "category": "graph",
       "reason": "Graph state, identity and reconciliation; existing ownership retained."
@@ -2957,6 +2961,10 @@
     "Tests/SwiftTUITests/Wave3HuntFATests.swift": {
       "category": "runtime-integration",
       "reason": "Campaign two wave-3 regression hunt part FA: POSIX read edges and redirected diagnostics, scroll-hosted table widths, clip-mask morphs, projected-binding names, wholly offscreen lazy stacks, invalidation summaries and departure ordering (STUI-1167) through the stress run loop and one-shot renderer."
+    },
+    "Tests/SwiftTUITests/Wave3HuntFBRuntimeTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Campaign two wave-3 regression hunt part FB: collection bands, row selectors, pending far edges, snapshot state continuity, centre rounding, far paths, trims and capability detection (STUI-1167) through the stress run loop and one-shot renderer."
     },
     "Tests/SwiftTUITests/WindowedLineGenerationTests.swift": {
       "category": "runtime-integration",
