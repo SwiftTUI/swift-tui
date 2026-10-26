@@ -526,7 +526,9 @@ extension View {
   /// setting `isPresented` back to `false` and then calling `onDismiss`.
   /// Passing `nil`, or a duration that is not positive, arms no deadline, so
   /// the toast stays visible until the binding is cleared (see
-  /// <doc:Dismissal-Is-Data>).
+  /// <doc:Dismissal-Is-Data>). An infinite duration behaves like `nil`, NaN
+  /// like a duration that is not positive, and a finite duration of 2^62
+  /// seconds or more, too long to schedule, also arms no deadline.
   ///
   /// `style` is the only styling path for a toast: there is no toast
   /// environment key and no `toastStyle(_:)` modifier, because a toast's tone
@@ -541,7 +543,9 @@ extension View {
   ///     ``AnyToastStyle/danger``, or a custom ``ToastStyle`` wrapped in
   ///     ``AnyToastStyle``.
   ///   - duration: How many seconds the toast stays visible, or `nil` to stay
-  ///     until dismissed. Defaults to three seconds.
+  ///     until dismissed. Defaults to three seconds. A value that is not
+  ///     positive, NaN, infinity, or 2^62 seconds or more also stays until
+  ///     dismissed.
   ///   - onDismiss: Called after the toast leaves the screen.
   public func toast<S: StringProtocol>(
     _ message: S,
@@ -573,7 +577,9 @@ extension View {
   ///     when the toast dismisses itself.
   ///   - style: A custom ``ToastStyle`` value.
   ///   - duration: How many seconds the toast stays visible, or `nil` to stay
-  ///     until dismissed. Defaults to three seconds.
+  ///     until dismissed. Defaults to three seconds. A value that is not
+  ///     positive, NaN, infinity, or 2^62 seconds or more also stays until
+  ///     dismissed.
   ///   - onDismiss: Called after the toast leaves the screen.
   public func toast<S: StringProtocol, Style: ToastStyle>(
     _ message: S,
@@ -599,8 +605,9 @@ extension View {
   /// terminal's bottom leading corner, takes no focus, and blocks no input.
   /// After `duration` seconds it dismisses itself, clearing `isPresented` and
   /// then calling `onDismiss`; `nil`, or a duration that is not positive, arms
-  /// no deadline, so the toast stays until the binding is cleared. The content
-  /// keeps the state and scope it was authored in.
+  /// no deadline, so the toast stays until the binding is cleared. Infinity,
+  /// NaN and a finite duration of 2^62 seconds or more also arm no deadline.
+  /// The content keeps the state and scope it was authored in.
   ///
   /// - Parameters:
   ///   - isPresented: Whether the toast is visible. The framework clears it
@@ -610,7 +617,9 @@ extension View {
   ///     ``AnyToastStyle/danger``, or a custom ``ToastStyle`` wrapped in
   ///     ``AnyToastStyle``.
   ///   - duration: How many seconds the toast stays visible, or `nil` to stay
-  ///     until dismissed. Defaults to three seconds.
+  ///     until dismissed. Defaults to three seconds. A value that is not
+  ///     positive, NaN, infinity, or 2^62 seconds or more also stays until
+  ///     dismissed.
   ///   - onDismiss: Called after the toast leaves the screen.
   ///   - toastContent: The content the bar renders beside the style's icon.
   public func toast<ToastContent: View>(
@@ -643,7 +652,9 @@ extension View {
   ///     when the toast dismisses itself.
   ///   - style: A custom ``ToastStyle`` value.
   ///   - duration: How many seconds the toast stays visible, or `nil` to stay
-  ///     until dismissed. Defaults to three seconds.
+  ///     until dismissed. Defaults to three seconds. A value that is not
+  ///     positive, NaN, infinity, or 2^62 seconds or more also stays until
+  ///     dismissed.
   ///   - onDismiss: Called after the toast leaves the screen.
   ///   - toastContent: The content the bar renders beside the style's icon.
   public func toast<ToastContent: View, Style: ToastStyle>(
@@ -833,10 +844,10 @@ private struct ToastPresentationView: View {
     // Keyed on duration so replacing the active deadline (nil<->finite,
     // shorter/longer) cancels the running sleep and arms the current one.
     .task(id: item.duration) {
-      guard let duration = item.duration, duration > 0 else {
+      guard let delay = toastAutoDismissDelay(seconds: item.duration) else {
         return
       }
-      try? await Task.sleep(for: .seconds(duration))
+      try? await Task.sleep(for: delay)
       guard !Task.isCancelled else {
         return
       }
@@ -852,6 +863,20 @@ private struct ToastPresentationView: View {
       toastBody
     }
   }
+}
+
+/// The deadline a toast declared with `duration` seconds arms, or `nil` for
+/// none (STUI-758): `nil`, zero, a negative value and NaN arm none, as
+/// documented, and so do infinity and a finite value of
+/// `SaturatingConversion.durationBoundSeconds` (2^62) seconds or more, which
+/// `Duration` cannot hold. Any other value is exactly `.seconds(duration)`.
+package func toastAutoDismissDelay(seconds duration: Double?) -> Duration? {
+  guard let duration, duration > 0,
+    duration < Double(SaturatingConversion.durationBoundSeconds)
+  else {
+    return nil
+  }
+  return .seconds(duration)
 }
 
 /// Aggregate stack placement stays coordinator-owned; each row restores its

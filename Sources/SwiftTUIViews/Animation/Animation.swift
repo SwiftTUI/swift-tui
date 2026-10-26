@@ -137,7 +137,7 @@ public struct Animation: Equatable, Hashable, Sendable {
   public func delay(_ delay: Duration) -> Animation {
     Animation(
       curve: curve,
-      delay: delayDuration + delay,
+      delay: SaturatingConversion.adding(delayDuration, delay),
       speed: speedMultiplier,
       repeatBehavior: repeatBehavior,
       logicalDuration: logicalDuration
@@ -360,7 +360,7 @@ public struct Animation: Equatable, Hashable, Sendable {
     let adjustedSingleSecs =
       speedMultiplier > 0 ? singleSecs / speedMultiplier : singleSecs
     let totalSecs = adjustedSingleSecs * Double(iterationCount)
-    return delayDuration + Self.duration(seconds: totalSecs)
+    return SaturatingConversion.adding(delayDuration, Self.duration(seconds: totalSecs))
   }
 
   /// The nominal duration of one full iteration, used by the repeat
@@ -382,14 +382,19 @@ public struct Animation: Equatable, Hashable, Sendable {
     }
   }
 
+  /// `seconds` as a `Duration`, saturating instead of trapping: an infinite
+  /// iteration (an undamped spring with no natural frequency) or a total
+  /// multiplied by `repeatCount(.max)` reaches the conversion bound.
   private static func duration(seconds: Double) -> Duration {
-    .seconds(seconds)
+    SaturatingConversion.duration(seconds: seconds)
   }
 
+  /// `elapsed` after the delay, scaled by the speed. A NaN speed holds the
+  /// start, and an infinite or huge one saturates instead of trapping.
   private func adjustedTime(_ elapsed: Duration) -> Duration {
     let delayed = elapsed - delayDuration
     guard speedMultiplier != 1.0 else { return delayed }
-    return delayed * speedMultiplier
+    return SaturatingConversion.duration(delayed, scaledBy: speedMultiplier)
   }
 
   static func durationSeconds(_ duration: Duration) -> Double {

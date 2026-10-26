@@ -247,8 +247,8 @@ package enum PlacedAnimationOverlaySampling {
     )
     return .init(
       identity: travel.matchedIdentity,
-      dx: rect.origin.x - fromBounds.origin.x,
-      dy: rect.origin.y - fromBounds.origin.y,
+      dx: SaturatingConversion.subtracting(rect.origin.x, fromBounds.origin.x),
+      dy: SaturatingConversion.subtracting(rect.origin.y, fromBounds.origin.y),
       size: travel.properties.contains(.size) ? rect.size : nil
     )
   }
@@ -293,8 +293,10 @@ package enum PlacedAnimationOverlaySampling {
       result.offsets.append(
         .init(
           identity: key.identity,
-          dx: Int((Double(start.x) * (1.0 - progress)).rounded()),
-          dy: Int((Double(start.y) * (1.0 - progress)).rounded())
+          dx: SaturatingConversion.int(
+            Double(start.x) * (1.0 - progress), rounding: .toNearestOrAwayFromZero),
+          dy: SaturatingConversion.int(
+            Double(start.y) * (1.0 - progress), rounding: .toNearestOrAwayFromZero)
         )
       )
     }
@@ -351,8 +353,8 @@ package enum PlacedAnimationOverlaySampling {
       result.offsets.append(
         .init(
           identity: key.identity,
-          dx: rect.origin.x - toBounds.origin.x,
-          dy: rect.origin.y - toBounds.origin.y,
+          dx: SaturatingConversion.subtracting(rect.origin.x, toBounds.origin.x),
+          dy: SaturatingConversion.subtracting(rect.origin.y, toBounds.origin.y),
           size: properties.contains(.size) ? rect.size : nil
         )
       )
@@ -410,6 +412,14 @@ package enum PlacedAnimationOverlaySampling {
     anchor: UnitPoint,
     progress: Double
   ) -> CellRect {
+    // A non-finite anchor or progress (a custom curve may return NaN) has no
+    // interpolated rect; the destination stands in instead of trapping.
+    guard anchor.x.isFinite, anchor.y.isFinite, progress.isFinite else {
+      return to
+    }
+    func rounded(_ value: Double) -> Int {
+      SaturatingConversion.int(value, rounding: .toNearestOrAwayFromZero)
+    }
     func anchorPoint(_ rect: CellRect) -> (x: Double, y: Double) {
       (
         Double(rect.origin.x) + anchor.x * Double(rect.size.width),
@@ -427,19 +437,21 @@ package enum PlacedAnimationOverlaySampling {
       tracksPosition ? fromAnchor.y + (toAnchor.y - fromAnchor.y) * progress : toAnchor.y
     let width =
       tracksSize
-      ? Double(from.size.width) + Double(to.size.width - from.size.width) * progress
+      ? Double(from.size.width)
+        + Double(SaturatingConversion.subtracting(to.size.width, from.size.width)) * progress
       : Double(to.size.width)
     let height =
       tracksSize
-      ? Double(from.size.height) + Double(to.size.height - from.size.height) * progress
+      ? Double(from.size.height)
+        + Double(SaturatingConversion.subtracting(to.size.height, from.size.height)) * progress
       : Double(to.size.height)
 
-    let roundedWidth = Int(width.rounded())
-    let roundedHeight = Int(height.rounded())
+    let roundedWidth = rounded(width)
+    let roundedHeight = rounded(height)
     return CellRect(
       origin: CellPoint(
-        x: Int((anchorX - anchor.x * Double(roundedWidth)).rounded()),
-        y: Int((anchorY - anchor.y * Double(roundedHeight)).rounded())
+        x: rounded(anchorX - anchor.x * Double(roundedWidth)),
+        y: rounded(anchorY - anchor.y * Double(roundedHeight))
       ),
       size: CellSize(width: max(roundedWidth, 0), height: max(roundedHeight, 0))
     )

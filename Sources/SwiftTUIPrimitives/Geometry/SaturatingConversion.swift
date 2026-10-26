@@ -80,6 +80,72 @@ package enum SaturatingConversion {
   }
 }
 
+/// Overflow-free conversions into `Duration` for caller-supplied seconds,
+/// speeds and sums.
+///
+/// `Duration.seconds(_: Double)` and `Duration * Double` trap for NaN,
+/// infinity and magnitudes past their attosecond range, and
+/// `Duration.components` traps past `Int64.max` seconds. These conversions
+/// saturate at `durationBound` instead, and NaN converts to zero.
+extension SaturatingConversion {
+  /// The longest duration a conversion produces: 2^62 seconds, about 146
+  /// billion years. It is half of `Int64`'s range, so a bounded duration keeps
+  /// readable `components`, and adding one to another bounded duration or to a
+  /// clock's current instant stays representable.
+  package static let durationBound = Duration.seconds(durationBoundSeconds)
+
+  /// `durationBound` in whole seconds.
+  package static let durationBoundSeconds: Int64 = 1 << 62
+
+  /// `Duration.seconds(seconds)`, saturating at ±`durationBound`. NaN
+  /// converts to zero. Inside the bound the result is exactly
+  /// `.seconds(seconds)`.
+  package static func duration(seconds: Double) -> Duration {
+    guard !seconds.isNaN else {
+      return .zero
+    }
+    let limit = Double(durationBoundSeconds)
+    if seconds >= limit {
+      return durationBound
+    }
+    if seconds <= -limit {
+      return .zero - durationBound
+    }
+    return .seconds(seconds)
+  }
+
+  /// `duration * factor`, saturating at ±`durationBound`. A NaN product
+  /// (a NaN factor, or zero times infinity) converts to zero. Inside the bound
+  /// the result is exactly `duration * factor`.
+  package static func duration(_ duration: Duration, scaledBy factor: Double) -> Duration {
+    // `Duration / Duration` is a `Double` quotient and cannot trap.
+    let seconds = duration / .seconds(1) * factor
+    guard !seconds.isNaN else {
+      return .zero
+    }
+    let limit = Double(durationBoundSeconds)
+    if seconds >= limit {
+      return durationBound
+    }
+    if seconds <= -limit {
+      return .zero - durationBound
+    }
+    return duration * factor
+  }
+
+  /// `lhs + rhs` with each operand and the sum clamped to ±`durationBound`.
+  /// Equal to `lhs + rhs` whenever the operands and the sum are inside the
+  /// bound.
+  package static func adding(_ lhs: Duration, _ rhs: Duration) -> Duration {
+    clamped(clamped(lhs) + clamped(rhs))
+  }
+
+  /// `duration` clamped to ±`durationBound`.
+  package static func clamped(_ duration: Duration) -> Duration {
+    min(max(duration, .zero - durationBound), durationBound)
+  }
+}
+
 /// Clipping of continuous line segments before their endpoints are converted
 /// to integers.
 package enum SegmentClipping {

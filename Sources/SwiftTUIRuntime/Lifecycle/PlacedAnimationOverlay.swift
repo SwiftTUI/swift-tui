@@ -227,11 +227,11 @@ package func translatePlacedNodesByIdentity(
     var inheritedDX = dx
     var inheritedDY = dy
     if let delta = offsets[node.identity], applied.insert(node.identity).inserted {
-      let localDX = delta.dx - (offsetsAreAbsolute ? dx : 0)
-      let localDY = delta.dy - (offsetsAreAbsolute ? dy : 0)
+      let localDX = SaturatingConversion.subtracting(delta.dx, offsetsAreAbsolute ? dx : 0)
+      let localDY = SaturatingConversion.subtracting(delta.dy, offsetsAreAbsolute ? dy : 0)
       translateBounds(&node, dx: localDX, dy: localDY)
-      inheritedDX += localDX
-      inheritedDY += localDY
+      inheritedDX = SaturatingConversion.adding(inheritedDX, localDX)
+      inheritedDY = SaturatingConversion.adding(inheritedDY, localDY)
       if let size = delta.size {
         resizeBounds(&node, to: size)
       }
@@ -301,27 +301,35 @@ private func applyScale(
   let target = scaledTransitionRect(node.bounds, scale: scale.scale, anchor: scale.anchor)
   translateBounds(
     &node,
-    dx: target.origin.x - node.bounds.origin.x,
-    dy: target.origin.y - node.bounds.origin.y
+    dx: SaturatingConversion.subtracting(target.origin.x, node.bounds.origin.x),
+    dy: SaturatingConversion.subtracting(target.origin.y, node.bounds.origin.y)
   )
   resizeBounds(&node, to: target.size)
 }
 
+/// `rect` scaled by `scale` about `anchor` (STUI-790). A non-finite scale or
+/// anchor leaves the rect unchanged; the scaled extent and origin saturate
+/// through `SaturatingConversion.int(_:rounding:)`, which equals
+/// `Int(value.rounded())` inside its bound, and the origin is computed from
+/// the saturated extent, so the anchor point stays fixed.
 package func scaledTransitionRect(
   _ rect: CellRect,
   scale: Double,
   anchor: UnitPoint
 ) -> CellRect {
-  guard scale.isFinite else { return rect }
+  guard scale.isFinite, anchor.x.isFinite, anchor.y.isFinite else { return rect }
+  func rounded(_ value: Double) -> Int {
+    SaturatingConversion.int(value, rounding: .toNearestOrAwayFromZero)
+  }
   let magnitude = abs(scale)
-  let width = max(Int((Double(rect.size.width) * magnitude).rounded()), 0)
-  let height = max(Int((Double(rect.size.height) * magnitude).rounded()), 0)
+  let width = max(rounded(Double(rect.size.width) * magnitude), 0)
+  let height = max(rounded(Double(rect.size.height) * magnitude), 0)
   let anchorX = Double(rect.origin.x) + anchor.x * Double(rect.size.width)
   let anchorY = Double(rect.origin.y) + anchor.y * Double(rect.size.height)
   return CellRect(
     origin: CellPoint(
-      x: Int((anchorX - anchor.x * Double(width)).rounded()),
-      y: Int((anchorY - anchor.y * Double(height)).rounded())
+      x: rounded(anchorX - anchor.x * Double(width)),
+      y: rounded(anchorY - anchor.y * Double(height))
     ),
     size: CellSize(width: width, height: height)
   )
@@ -333,13 +341,13 @@ private func resizeCoextensive(
   to target: CellRect
 ) {
   node.bounds = target
-  let widthDelta = target.size.width - original.size.width
-  let heightDelta = target.size.height - original.size.height
+  let widthDelta = SaturatingConversion.subtracting(target.size.width, original.size.width)
+  let heightDelta = SaturatingConversion.subtracting(target.size.height, original.size.height)
   node.contentBounds = CellRect(
     origin: node.contentBounds.origin,
     size: CellSize(
-      width: max(node.contentBounds.size.width + widthDelta, 0),
-      height: max(node.contentBounds.size.height + heightDelta, 0)
+      width: max(SaturatingConversion.adding(node.contentBounds.size.width, widthDelta), 0),
+      height: max(SaturatingConversion.adding(node.contentBounds.size.height, heightDelta), 0)
     )
   )
   node.drawMetadata.clipsToBounds = true
@@ -401,28 +409,16 @@ private func translateBounds(
   dy: Int
 ) {
   let delta = CellPoint(x: dx, y: dy)
-  node.bounds = CellRect(
-    origin: CellPoint(
-      x: node.bounds.origin.x + delta.x,
-      y: node.bounds.origin.y + delta.y
-    ),
-    size: node.bounds.size
-  )
+  func translated(_ point: CellPoint) -> CellPoint {
+    CellPoint(
+      x: SaturatingConversion.adding(point.x, delta.x),
+      y: SaturatingConversion.adding(point.y, delta.y))
+  }
+  node.bounds = CellRect(origin: translated(node.bounds.origin), size: node.bounds.size)
   node.contentBounds = CellRect(
-    origin: CellPoint(
-      x: node.contentBounds.origin.x + delta.x,
-      y: node.contentBounds.origin.y + delta.y
-    ),
-    size: node.contentBounds.size
-  )
+    origin: translated(node.contentBounds.origin), size: node.contentBounds.size)
   if let clip = node.clipBounds {
-    node.clipBounds = CellRect(
-      origin: CellPoint(
-        x: clip.origin.x + delta.x,
-        y: clip.origin.y + delta.y
-      ),
-      size: clip.size
-    )
+    node.clipBounds = CellRect(origin: translated(clip.origin), size: clip.size)
   }
   var children = node.children
   for i in children.indices {

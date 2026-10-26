@@ -25,8 +25,11 @@ enum AnimationTransitionOverlay {
     }
     if target.hasOffsetEffect {
       let targetOffset = target.resolvedOffset(edgeBasis: edgeBasis)
-      result.offsetX = Int((Double(targetOffset.x) * progress).rounded())
-      result.offsetY = Int((Double(targetOffset.y) * progress).rounded())
+      // A spring overshoots past 1, so an extreme offset saturates.
+      result.offsetX = SaturatingConversion.int(
+        Double(targetOffset.x) * progress, rounding: .toNearestOrAwayFromZero)
+      result.offsetY = SaturatingConversion.int(
+        Double(targetOffset.y) * progress, rounding: .toNearestOrAwayFromZero)
     }
     if let targetScale = target.scale
       ?? startScale.map({

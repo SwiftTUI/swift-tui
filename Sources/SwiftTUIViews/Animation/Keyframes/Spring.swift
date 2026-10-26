@@ -52,7 +52,9 @@ public struct Spring: Hashable, Sendable {
     self.damping = damping
     bounce = 1 - solver.dampingRatio
     let seconds = 2 * Double.pi / max(solver.naturalFrequency, 1e-9)
-    duration = .seconds(seconds)
+    // A negative or NaN stiffness or mass has a NaN natural frequency, which
+    // `max` keeps; the period saturates instead of trapping (NaN is zero).
+    duration = SaturatingConversion.duration(seconds: seconds)
   }
 
   /// A smooth spring with no bounce.
@@ -86,7 +88,7 @@ public struct Spring: Hashable, Sendable {
   /// zero velocity, by the same criterion ``Animation/spring(duration:bounce:)``
   /// completes on.
   public var settlingDuration: Duration {
-    .seconds(solver.settlingDuration)
+    SaturatingConversion.duration(seconds: solver.settlingDuration)
   }
 
   // MARK: - Evaluation
