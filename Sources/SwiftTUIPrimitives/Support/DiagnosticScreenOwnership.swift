@@ -24,6 +24,11 @@ package enum DiagnosticScreenOwnership {
     /// A valid descriptor that is not a terminal (a pipe, file or socket),
     /// identified by its file.
     case stream(device: UInt64, inode: UInt64)
+    /// A socket on macOS, identified by the kernel's handle for it. Darwin's
+    /// `fstat(2)` reports `st_dev`/`st_ino` 0/0 for every inet socket, so the
+    /// file identity cannot tell two of them apart; every descriptor of one
+    /// socket (a `dup`) shares its handle.
+    case socket(handle: UInt64)
     /// No descriptor, a terminal without a concrete device (`/dev/tty`,
     /// `/dev/console`), a failed query, or a host without POSIX terminals.
     /// It might be a terminal, so it stays protected.
@@ -71,10 +76,9 @@ package enum DiagnosticScreenOwnership {
       #if canImport(Darwin) || canImport(Glibc) || canImport(Android) || canImport(Musl)
         if isatty(descriptor) == 0 {
           var info = stat()
-          guard unsafe fstat(descriptor, &info) == 0 else { return false }
-          let destination = Owner.stream(
-            device: UInt64(truncatingIfNeeded: info.st_dev),
-            inode: UInt64(truncatingIfNeeded: info.st_ino))
+          guard unsafe fstat(descriptor, &info) == 0,
+            let destination = streamIdentity(of: descriptor, info)
+          else { return false }
           return !owners.contains(destination)
         }
       #endif
@@ -92,9 +96,7 @@ package enum DiagnosticScreenOwnership {
       var info = stat()
       guard unsafe fstat(descriptor, &info) == 0 else { return .unknown }
       guard isatty(descriptor) == 1 else {
-        return .stream(
-          device: UInt64(truncatingIfNeeded: info.st_dev),
-          inode: UInt64(truncatingIfNeeded: info.st_ino))
+        return streamIdentity(of: descriptor, info) ?? .unknown
       }
       // /dev/tty is a controlling-terminal indirection, not a unique device.
       // Conservatively protect it unless a concrete terminal path is known.
@@ -110,4 +112,28 @@ package enum DiagnosticScreenOwnership {
       return .unknown
     #endif
   }
+
+  #if canImport(Darwin) || canImport(Glibc) || canImport(Android) || canImport(Musl)
+    /// The identity of a non-terminal descriptor whose `fstat(2)` is `info`,
+    /// or `nil` when it cannot be established. Linux's sockfs gives every
+    /// socket its own inode, so the file identity serves there. macOS asks
+    /// libproc for the socket's kernel handle (the one lsof reports). Other
+    /// Apple platforms have no libproc and keep the file identity, which
+    /// conservatively treats every inet socket as one file.
+    private static func streamIdentity(of descriptor: Int32, _ info: stat) -> Owner? {
+      #if os(macOS)
+        if info.st_mode & mode_t(S_IFMT) == mode_t(S_IFSOCK) {
+          var socketInfo = socket_fdinfo()
+          let size = Int32(MemoryLayout<socket_fdinfo>.size)
+          let filled = unsafe proc_pidfdinfo(
+            getpid(), descriptor, PROC_PIDFDSOCKETINFO, &socketInfo, size)
+          guard filled == size else { return nil }
+          return .socket(handle: socketInfo.psi.soi_so)
+        }
+      #endif
+      return .stream(
+        device: UInt64(truncatingIfNeeded: info.st_dev),
+        inode: UInt64(truncatingIfNeeded: info.st_ino))
+    }
+  #endif
 }
