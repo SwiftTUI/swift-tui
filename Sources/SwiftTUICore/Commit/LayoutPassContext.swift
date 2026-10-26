@@ -108,7 +108,8 @@ package final class LayoutPassContext: Sendable {
     /// context rather than on the layout proxy makes the memo's lifetime
     /// exactly one pass — no stale answer can survive into a later frame.
     var customLayoutSpacingMemo: [Identity: Spacing] = [:]
-    var customLayoutAlignmentMemo: [CustomLayoutAlignmentMemoKey: Int?] = [:]
+    var customLayoutAlignmentMemo: [CustomLayoutAlignmentMemoKey: (value: Int, isHalfCell: Bool)?] =
+      [:]
     var workMetrics: LayoutWorkMetrics
     var workerCustomLayoutCacheUpdates: [WorkerCustomLayoutCacheUpdate]
     var layoutDependentRealizations: [LayoutDependentContentRealization]
@@ -421,15 +422,17 @@ package final class LayoutPassContext: Sendable {
     state.withLock { $0.customLayoutSpacingMemo[identity] = spacing }
   }
 
-  /// The memoized explicit-alignment answer for `key` in this pass. The
-  /// outer optional is presence; the inner is the hook's answer (`nil` =
-  /// "use the guide's default").
-  package func customLayoutAlignmentMemo(for key: CustomLayoutAlignmentMemoKey) -> Int?? {
+  /// The memoized explicit-alignment answer for `key` in this pass, as an
+  /// exact guide position. The outer optional is presence; the inner is the
+  /// hook's answer (`nil` = "use the guide's default").
+  package func customLayoutAlignmentMemo(
+    for key: CustomLayoutAlignmentMemoKey
+  ) -> (value: Int, isHalfCell: Bool)?? {
     state.withLock { $0.customLayoutAlignmentMemo[key] }
   }
 
   package func recordCustomLayoutAlignmentMemo(
-    _ value: Int?,
+    _ value: (value: Int, isHalfCell: Bool)?,
     for key: CustomLayoutAlignmentMemoKey
   ) {
     state.withLock { $0.customLayoutAlignmentMemo[key] = value }

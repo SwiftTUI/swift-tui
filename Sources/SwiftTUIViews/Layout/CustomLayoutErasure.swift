@@ -599,9 +599,9 @@ final class LayoutWorkerProxy<L: Layout>: WorkerCustomLayoutProxy,
     passContext?.recordCustomPlacementChildMeasureRequests(node.children.count)
 
     return node.children.map { child in
+      let recordedPlacement = placementRecorder.placement(for: child.identity)
       var placement =
-        placementRecorder.placement(for: child.identity)
-        ?? defaultPlacement(in: bounds, proposal: measured.proposal)
+        recordedPlacement ?? defaultPlacement(in: bounds, proposal: measured.proposal)
       let declaresViewport = placement.viewportContext != nil
       if declaresViewport {
         placement.viewportContext?.scrollIdentity = node.identity
@@ -674,15 +674,22 @@ final class LayoutWorkerProxy<L: Layout>: WorkerCustomLayoutProxy,
         placement.exactSize.map {
           ViewDimensions(width: $0.width, height: $0.height)
         } ?? engine.viewDimensions(for: child, measured: childMeasurement, passContext: passContext)
+      // A subview the layout never placed is centred in its bounds by the
+      // frame rule, as `ZStack` centres it: the odd cell of an uneven split
+      // falls after it.
+      let origin =
+        recordedPlacement == nil
+        ? engine.alignedOrigin(for: childDimensions, in: bounds, alignment: .center)
+        : placedOrigin(
+          for: childDimensions,
+          at: placement.position,
+          anchor: placement.anchor
+        )
       var placed = engine.place(
         child,
         measured: childMeasurement,
         in: LayoutRect(
-          origin: placedOrigin(
-            for: childDimensions,
-            at: placement.position,
-            anchor: placement.anchor
-          ),
+          origin: origin,
           size: placement.exactSize ?? childMeasurement.measuredSize
         ),
         viewportContext: placement.viewportContext,

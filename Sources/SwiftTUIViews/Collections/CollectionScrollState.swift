@@ -337,8 +337,10 @@ package struct CollectionScrollCurrency {
       return setAnchorRow(rowIndex)
     }
     let targetLines = geometry.lineRange(forRow: rowIndex)
+    // Nearest line, ties toward the top: an odd remainder under `.center`
+    // falls below the row, as in every centring container.
     let offsetLines = SaturatingConversion.int(
-      Double(max(0, visible - targetLines.count)) * anchor.y, rounding: .toNearestOrAwayFromZero)
+      Double(max(0, visible - targetLines.count)) * anchor.y - 0.5, rounding: .up)
     return setAnchorLine(max(0, targetLines.lowerBound - offsetLines))
   }
 }

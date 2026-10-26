@@ -372,8 +372,8 @@ extension LayoutEngine {
           measured: childMeasurement,
           bounds: CellRect(
             origin: .init(
-              x: bounds.origin.x + x - childSize.width / 2,
-              y: bounds.origin.y + y - childSize.height / 2
+              x: bounds.origin.x + Self.positionedOffset(centre: x, length: childSize.width),
+              y: bounds.origin.y + Self.positionedOffset(centre: y, length: childSize.height)
             ),
             size: childSize
           )
@@ -646,5 +646,19 @@ extension LayoutEngine {
       )
     }
     return stored.translated(by: bounds.origin)
+  }
+}
+
+extension LayoutEngine {
+  /// The origin offset of a child of `length` cells whose centre is
+  /// positioned at `centre` (`.position(x:y:)`). An odd length's exact centre
+  /// is half a cell past `length / 2`, so its origin would be half a cell in;
+  /// the one centring rule (`alignedOffset`) moves a child that starts half a
+  /// cell into a gap toward the leading or top edge and keeps the truncation
+  /// toward zero otherwise, as `centredOffset(length:in:)` does in a span of
+  /// `2 * centre` cells.
+  package static func positionedOffset(centre: Int, length: Int) -> Int {
+    let offset = centre - length / 2
+    return offset - (length % 2 != 0 && offset > 0 ? 1 : 0)
   }
 }

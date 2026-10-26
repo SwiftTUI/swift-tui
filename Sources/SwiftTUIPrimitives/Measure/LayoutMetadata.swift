@@ -148,19 +148,20 @@ package struct LayoutMetadata: Sendable {
     let horizontalGuideStorage = horizontalAlignmentGuideStorage
     let verticalGuideStorage = verticalAlignmentGuideStorage
 
-    // A guide closure reads its base in the centre-rounding mode of the
-    // dimensions the guide is read from, so a guide computed from the centre
-    // (`{ $0[.center] }`) keeps the centre's half cell.
+    // A guide closure runs once on its base's public values. Its value is
+    // half a cell past its integer when it read a half-cell value, so a guide
+    // computed from the centre (`{ $0[.center] }`) keeps the centre's half
+    // cell (`ViewDimensions.evaluatingGuide(_:)`).
     return
       base
-      .overridingHorizontalGuides(modeAware: { alignment, roundsUp in
+      .overridingHorizontalGuides(positions: { alignment in
         horizontalGuideStorage[alignment.key].map { computeValue in
-          computeValue(base.roundingDefaultCentreUp(roundsUp))
+          ViewDimensions.evaluatingGuide { computeValue(base) }
         }
       })
-      .overridingVerticalGuides(modeAware: { alignment, roundsUp in
+      .overridingVerticalGuides(positions: { alignment in
         verticalGuideStorage[alignment.key].map { computeValue in
-          computeValue(base.roundingDefaultCentreUp(roundsUp))
+          ViewDimensions.evaluatingGuide { computeValue(base) }
         }
       })
   }

@@ -3,44 +3,85 @@
 /// Where a stack's or ZStack's children align on one axis.
 ///
 /// `leading` is the greatest child guide value and `trailing` the greatest
-/// remainder of a child past its guide, so the container spans
-/// `leading + trailing` cells. A guide's exact position can sit half a cell
-/// past its integer value (`ViewDimensions.halfCellPosition(of:)`): the
-/// default centre of an odd length, and any guide computed from it. The line
-/// is the greatest exact position, so it sits half a cell past `leading` when
-/// a child whose value is `leading` is half a cell past it.
+/// remainder of a placed child past the line, so the container spans
+/// `leading + trailing` cells, the union of its placed children. A guide's
+/// exact position can sit half a cell past its integer value
+/// (`ViewDimensions.halfCellPosition(of:)`): the default centre of an odd
+/// length, and any guide computed from it. The line is the greatest exact
+/// position, so it sits half a cell past `leading` when a child whose value is
+/// `leading` is half a cell past it.
 package struct AlignmentLine: Equatable, Sendable {
-  package var leading: Int
-  package var trailing: Int
+  package private(set) var leading: Int
   /// Whether the line's exact position is half a cell past `leading`.
-  package var isHalfCell: Bool
+  package private(set) var isHalfCell: Bool
+  /// The greatest remainder past an integer line. A half-cell child on an
+  /// integer line moves one cell toward leading
+  /// (`offset(guideValue:isHalfCell:)`), so its remainder is one less than
+  /// `length - value`.
+  private var remainderPastIntegerLine: Int
+  /// The greatest remainder past a half-cell line, where no child moves.
+  private var remainderPastHalfCellLine: Int
+  /// The line of no children: the identity of `merged(with:)`. It reads as
+  /// `leading` and `trailing` 0.
+  private var isEmpty: Bool
 
   package init(leading: Int, trailing: Int, isHalfCell: Bool) {
-    self.leading = leading
-    self.trailing = trailing
-    self.isHalfCell = isHalfCell
+    self.init(
+      leading: leading, isHalfCell: isHalfCell,
+      remainderPastIntegerLine: trailing, remainderPastHalfCellLine: trailing, isEmpty: false)
   }
 
-  /// The line through children with these guide positions and lengths.
+  private init(
+    leading: Int, isHalfCell: Bool, remainderPastIntegerLine: Int,
+    remainderPastHalfCellLine: Int, isEmpty: Bool
+  ) {
+    self.leading = leading
+    self.isHalfCell = isHalfCell
+    self.remainderPastIntegerLine = remainderPastIntegerLine
+    self.remainderPastHalfCellLine = remainderPastHalfCellLine
+    self.isEmpty = isEmpty
+  }
+
+  /// The line through children with these guide positions and lengths. No
+  /// children give the empty line.
   package init(guides: [(value: Int, isHalfCell: Bool, length: Int)]) {
-    let leading = guides.map(\.value).max() ?? 0
+    guard let leading = guides.map(\.value).max() else {
+      self.init(
+        leading: 0, isHalfCell: false, remainderPastIntegerLine: 0,
+        remainderPastHalfCellLine: 0, isEmpty: true)
+      return
+    }
     self.init(
       leading: leading,
-      trailing: guides.map { $0.length - $0.value }.max() ?? 0,
-      isHalfCell: guides.contains { $0.value == leading && $0.isHalfCell })
+      isHalfCell: guides.contains { $0.value == leading && $0.isHalfCell },
+      remainderPastIntegerLine: guides.map {
+        $0.length - $0.value - ($0.isHalfCell ? 1 : 0)
+      }.max() ?? 0,
+      remainderPastHalfCellLine: guides.map { $0.length - $0.value }.max() ?? 0,
+      isEmpty: false)
+  }
+
+  /// The greatest remainder of a placed child past the line.
+  package var trailing: Int {
+    isHalfCell ? remainderPastHalfCellLine : remainderPastIntegerLine
   }
 
   package var extent: Int { leading + trailing }
 
   /// The line through the union of the children behind `self` and `other`,
-  /// as a windowed product accumulates measured runs.
+  /// as a windowed product accumulates measured runs. The empty line is its
+  /// identity.
   package func merged(with other: AlignmentLine) -> AlignmentLine {
+    if isEmpty { return other }
+    if other.isEmpty { return self }
     let leading = max(leading, other.leading)
     return AlignmentLine(
       leading: leading,
-      trailing: max(trailing, other.trailing),
       isHalfCell: (self.leading == leading && isHalfCell)
-        || (other.leading == leading && other.isHalfCell))
+        || (other.leading == leading && other.isHalfCell),
+      remainderPastIntegerLine: max(remainderPastIntegerLine, other.remainderPastIntegerLine),
+      remainderPastHalfCellLine: max(remainderPastHalfCellLine, other.remainderPastHalfCellLine),
+      isEmpty: false)
   }
 
   /// The offset from the container's leading or top edge of a child whose
@@ -97,6 +138,19 @@ extension LayoutEngine {
     let startsHalfCellIn =
       child.isHalfCell && !reference.isHalfCell && reference.value > child.value
     return reference.value - child.value - (startsHalfCellIn ? 1 : 0)
+  }
+
+  /// The exact offset that puts the child's exact guide on the reference's,
+  /// before `alignedOffset` rounds it: `reference - child` in half cells, as
+  /// an integer value (rounded down) and whether it is half a cell past it.
+  package static func exactAlignedOffset(
+    child: (value: Int, isHalfCell: Bool),
+    reference: (value: Int, isHalfCell: Bool)
+  ) -> (value: Int, isHalfCell: Bool) {
+    (
+      reference.value - child.value - (child.isHalfCell && !reference.isHalfCell ? 1 : 0),
+      reference.isHalfCell != child.isHalfCell
+    )
   }
 
   package func alignedOrigin(
@@ -242,9 +296,12 @@ extension LayoutEngine {
       return plain
     }
     let engine = self
+    // The handle answers exact positions: the layout's answer is user code,
+    // classified by what it read like an `alignmentGuide` closure, so a
+    // forwarded subview centre keeps its half cell.
     return
       plain
-      .overridingHorizontalGuides { guide in
+      .overridingHorizontalGuides(positions: { guide in
         handle.explicitAlignment(
           engine: engine,
           node: node,
@@ -252,8 +309,8 @@ extension LayoutEngine {
           horizontalGuide: guide,
           passContext: passContext
         )
-      }
-      .overridingVerticalGuides { guide in
+      })
+      .overridingVerticalGuides(positions: { guide in
         handle.explicitAlignment(
           engine: engine,
           node: node,
@@ -261,7 +318,7 @@ extension LayoutEngine {
           verticalGuide: guide,
           passContext: passContext
         )
-      }
+      })
   }
 
   package func simpleAlignedCoordinate(
@@ -434,16 +491,23 @@ extension LayoutEngine {
             offsetY: insets.top
           )
         case .frame(_, _, let alignment), .flexibleFrame(_, _, _, _, _, _, let alignment):
-          let childOrigin = alignedOrigin(
-            for: child,
-            in: CellRect(origin: .zero, size: levelMeasured.measuredSize),
-            alignment: alignment
+          // The child's exact guide sits on the frame's (SwiftUI), so its
+          // guides propagate from the exact origin. Placement rounds that
+          // origin (`alignedOrigin`); propagating the rounded one would report
+          // a guide half a cell off the frame's own.
+          let reference = ViewDimensions(
+            width: levelMeasured.measuredSize.width,
+            height: levelMeasured.measuredSize.height
           )
           baseDimensions = propagatedViewDimensions(
             size: levelMeasured.measuredSize,
             from: child,
-            offsetX: childOrigin.x,
-            offsetY: childOrigin.y
+            exactOffsetX: Self.exactAlignedOffset(
+              child: child.halfCellPosition(of: alignment.horizontal),
+              reference: reference.halfCellPosition(of: alignment.horizontal)),
+            exactOffsetY: Self.exactAlignedOffset(
+              child: child.halfCellPosition(of: alignment.vertical),
+              reference: reference.halfCellPosition(of: alignment.vertical))
           )
         case .offset, .decoration:
           baseDimensions = propagatedViewDimensions(
@@ -502,16 +566,44 @@ extension LayoutEngine {
     offsetX: Int,
     offsetY: Int
   ) -> ViewDimensions {
-    // The child's guides are read in the centre-rounding mode the wrapper's
-    // guide is read in, so a propagated guide keeps its half cell.
+    propagatedViewDimensions(
+      size: size,
+      from: childDimensions,
+      exactOffsetX: (offsetX, false),
+      exactOffsetY: (offsetY, false)
+    )
+  }
+
+  /// A wrapper's dimensions with the child's explicit guides translated by
+  /// exact offsets, so a propagated guide keeps its exact position.
+  package func propagatedViewDimensions(
+    size: CellSize,
+    from childDimensions: ViewDimensions,
+    exactOffsetX: (value: Int, isHalfCell: Bool),
+    exactOffsetY: (value: Int, isHalfCell: Bool)
+  ) -> ViewDimensions {
     ViewDimensions(width: size.width, height: size.height)
-      .overridingHorizontalGuides(modeAware: { alignment, roundsUp in
-        childDimensions.roundingDefaultCentreUp(roundsUp).explicitValue(for: alignment)
-          .map { $0 + offsetX }
+      .overridingHorizontalGuides(positions: { alignment in
+        childDimensions.explicitPosition(for: alignment).map {
+          Self.translated($0, by: exactOffsetX)
+        }
       })
-      .overridingVerticalGuides(modeAware: { alignment, roundsUp in
-        childDimensions.roundingDefaultCentreUp(roundsUp).explicitValue(for: alignment)
-          .map { $0 + offsetY }
+      .overridingVerticalGuides(positions: { alignment in
+        childDimensions.explicitPosition(for: alignment).map {
+          Self.translated($0, by: exactOffsetY)
+        }
       })
+  }
+
+  /// An exact guide position moved by an exact offset.
+  private static func translated(
+    _ position: (value: Int, isHalfCell: Bool),
+    by offset: (value: Int, isHalfCell: Bool)
+  ) -> (value: Int, isHalfCell: Bool) {
+    (
+      SaturatingConversion.adding(
+        position.value + offset.value, position.isHalfCell && offset.isHalfCell ? 1 : 0),
+      position.isHalfCell != offset.isHalfCell
+    )
   }
 }

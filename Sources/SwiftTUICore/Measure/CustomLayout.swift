@@ -409,16 +409,19 @@ package final class CustomLayoutHandle: CustomLayoutToken {
     explicitHorizontalAlignmentHandler != nil || explicitVerticalAlignmentHandler != nil
   }
 
-  /// The container's own value for `guide` in its zero-origin bounds, or
-  /// `nil` for the guide's default. Memoized per identity, proposal, and
-  /// guide on the pass context.
+  /// The container's own value for `guide` in its zero-origin bounds as an
+  /// exact position, or `nil` for the guide's default. The layout's answer is
+  /// user code, run once and classified like an `alignmentGuide` closure
+  /// (`ViewDimensions.evaluatingGuide(_:)`): it is half a cell past its value
+  /// when the layout read a half-cell guide value, such as a subview's odd
+  /// centre. Memoized per identity, proposal, and guide on the pass context.
   package func explicitAlignment(
     engine: LayoutEngine,
     node: ResolvedNode,
     measured: MeasuredNode,
     horizontalGuide guide: HorizontalAlignment,
     passContext: LayoutPassContext?
-  ) -> Int? {
+  ) -> (value: Int, isHalfCell: Bool)? {
     guard let explicitHorizontalAlignmentHandler else {
       return nil
     }
@@ -431,7 +434,9 @@ package final class CustomLayoutHandle: CustomLayoutToken {
     if let memo = passContext?.customLayoutAlignmentMemo(for: key) {
       return memo
     }
-    let answer = explicitHorizontalAlignmentHandler(engine, node, measured, guide, passContext)
+    let answer = ViewDimensions.evaluatingOptionalGuide {
+      explicitHorizontalAlignmentHandler(engine, node, measured, guide, passContext)
+    }
     passContext?.recordCustomLayoutAlignmentMemo(answer, for: key)
     return answer
   }
@@ -442,7 +447,7 @@ package final class CustomLayoutHandle: CustomLayoutToken {
     measured: MeasuredNode,
     verticalGuide guide: VerticalAlignment,
     passContext: LayoutPassContext?
-  ) -> Int? {
+  ) -> (value: Int, isHalfCell: Bool)? {
     guard let explicitVerticalAlignmentHandler else {
       return nil
     }
@@ -455,7 +460,9 @@ package final class CustomLayoutHandle: CustomLayoutToken {
     if let memo = passContext?.customLayoutAlignmentMemo(for: key) {
       return memo
     }
-    let answer = explicitVerticalAlignmentHandler(engine, node, measured, guide, passContext)
+    let answer = ViewDimensions.evaluatingOptionalGuide {
+      explicitVerticalAlignmentHandler(engine, node, measured, guide, passContext)
+    }
     passContext?.recordCustomLayoutAlignmentMemo(answer, for: key)
     return answer
   }
