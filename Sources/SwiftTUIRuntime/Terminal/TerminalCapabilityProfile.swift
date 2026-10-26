@@ -185,8 +185,10 @@ public struct TerminalCapabilityProfile: Equatable, Sendable {
   /// its own value, an ssh session into Windows) and is honored the way the
   /// POSIX arm honors it; `WT_SESSION` marks Windows Terminal, which adds
   /// the OSC 8 hyperlinks and synchronized-output handling bare conhost
-  /// lacks. Kept platform-independent (and `package`-visible) so both arms
-  /// stay exercisable from every platform's test run.
+  /// lacks, unless a nonempty `TERM_PROGRAM` names another emulator that
+  /// inherited the marker. Kept platform-independent (and
+  /// `package`-visible) so both arms stay exercisable from every platform's
+  /// test run.
   package static func detectWindowsConsole(
     environment: [String: String],
     isTTY: Bool
@@ -226,9 +228,13 @@ public struct TerminalCapabilityProfile: Equatable, Sendable {
       colorLevel = .trueColor
     }
 
+    // A nonempty TERM_PROGRAM names the emulator and outranks a WT_SESSION
+    // inherited from an outer Windows Terminal, as on the POSIX arm
+    // (`identifiesHyperlinkEmulator`); an empty one names nothing.
     let isWindowsTerminal =
       environment["WT_SESSION"] != nil
       && (term.isEmpty || isGenericXterm(term))
+      && (environment["TERM_PROGRAM"] ?? "").isEmpty
     var profile = Self(
       glyphLevel: glyphLevel,
       colorLevel: colorLevel,

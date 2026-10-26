@@ -214,7 +214,12 @@ import SwiftTUICore
       guard let handle = unsafe win32Handle(for: fileDescriptor) else {
         return []
       }
-      guard unsafe WaitForSingleObject(handle, DWORD(max(0, timeoutMilliseconds))) == WAIT_OBJECT_0
+      // WaitForSingleObject takes a DWORD in which DWORD.max is INFINITE.
+      // Clamping keeps every in-range value, treats a negative value as zero
+      // and turns a longer wait into the longest finite one, instead of
+      // trapping (the POSIX arm clamps to poll(2)'s int the same way).
+      let wait = min(DWORD(clamping: timeoutMilliseconds), DWORD.max - 1)
+      guard unsafe WaitForSingleObject(handle, wait) == WAIT_OBJECT_0
       else {
         return []
       }

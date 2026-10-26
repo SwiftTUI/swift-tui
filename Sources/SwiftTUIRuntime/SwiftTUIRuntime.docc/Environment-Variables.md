@@ -51,7 +51,7 @@ Beyond that family, the framework consults these standard variables:
 | `COLORFGBG` | Selects the light/dark terminal appearance when the terminal reports its palette this way, which changes the resolved theme. |
 | `TERM_PROGRAM` | Drives the sub-cell pointer-precision compatibility matrix (`xterm.js`, `foot`, `kitty`, `wezterm`, `iTerm.app`, …), and refines a generic xterm `TERM` (WezTerm, Ghostty, iTerm2; `vscode` for hyperlinks only). |
 | `VTE_VERSION` | VTE's version number (`7600` is 0.76.0). 5000 or later on a generic xterm `TERM` enables OSC 8 hyperlinks. |
-| `WT_SESSION` | Windows Terminal's session marker. It enables OSC 8 hyperlinks on a generic xterm `TERM` (WSL) and, on Windows, hyperlinks and synchronized output for the console. |
+| `WT_SESSION` | Windows Terminal's session marker. It enables OSC 8 hyperlinks on a generic xterm `TERM` (WSL) and, on Windows, hyperlinks and synchronized output for the console. A nonempty `TERM_PROGRAM` outranks it on both. |
 | `LC_TERMINAL` | iTerm2's terminal identifier; consulted alongside `TERM_PROGRAM` for pointer precision. |
 | `TMUX` | Suppresses pixel-mouse probing inside tmux (the kitty-keyboard probe is also skipped there). |
 | `HOME` | The install location for `SwiftTUIArguments` completion scripts; installation fails when it is empty. |
