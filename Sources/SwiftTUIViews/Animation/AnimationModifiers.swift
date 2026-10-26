@@ -29,6 +29,8 @@ extension View {
   /// Common usage is stripping animation from a specific subtree,
   /// `.transaction { $0.disablesAnimations = true }`, or giving every change
   /// in it one curve, `.transaction { $0.animation = .easeInOut }`.
+  /// Modifiers added after this one, such as `opacity(_:)` or
+  /// `offset(x:y:)`, animate under the transaction outside it.
   public func transaction(
     _ transform: @escaping @Sendable (inout Transaction) -> Void
   ) -> some View {

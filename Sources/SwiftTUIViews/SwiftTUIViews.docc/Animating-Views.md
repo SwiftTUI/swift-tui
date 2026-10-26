@@ -101,6 +101,14 @@ so only when a value changes (the whole-transaction sibling of
 binding whose writes animate, so a control can animate the state it sets:
 `Toggle("Wide", isOn: $wide.animation(.snappy))`.
 
+A transaction modifier covers only the modifiers inside it. In
+`content.transaction { $0.disablesAnimations = true }.opacity(level)`, the
+opacity, like an `offset(x:y:)` or `clipShape(_:)` added after the
+transaction modifier, animates under the transaction outside it, while
+`content` snaps. Environment styles such as `foregroundStyle(_:)` added
+after it are read by the content inside, so they follow the edited
+transaction.
+
 The scoped forms narrow an animation to the modifiers inside a closure.
 ``View/animation(_:body:)`` hands the closure a ``PlaceholderContentView``
 standing in for the modified view; modifiers applied to it animate, while

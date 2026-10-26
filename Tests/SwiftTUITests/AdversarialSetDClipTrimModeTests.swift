@@ -10,7 +10,7 @@ import Testing
 // scoping, reduced motion, wide glyphs and hit testing. Brief 06. The mask
 // fixture follows PathAnimationIntegrationTests.swift:326-433. Wave 4 adds
 // neighbours for the repaired masks (w4fk, STUI-1318/1319) and for the
-// transaction modifier (w4fl, STUI-1326).
+// transaction modifier and opacity scope (w4fl, STUI-1326/1325).
 
 /// A rectangle covering `fraction` of the width; every fraction has the same
 /// element topology (four lines and a close), so it interpolates, and
@@ -78,6 +78,17 @@ private enum SetDMaskMode: Sendable {
   case continuityTransaction
   case nilAnimationTransaction
   case maskOutsideAnimatingTransaction
+  // Wave 4 FL (STUI-1325): `opacity(_:)` merged outside a transaction.
+  case opacityOutsideDisablingTransaction
+  case opacityInsideDisablingTransaction
+  case opacityOutsideDisablingTransactionWithInnerOffset
+  case opacityOutsideDisablingTransactionReducedMotion
+  case opacityOutsideInnerValueAnimation
+  case opacityOutsideAnimatingTransaction
+  case twoOpacitiesOutsideDisablingTransaction
+  case constantOuterOpacityOverAnimatingTransaction
+  case opacityInScopedDisablingBody
+  case opacityInScopedAnimatingBody
 }
 
 private struct SetDMaskRoot: View {
@@ -166,6 +177,36 @@ private struct SetDMaskRoot: View {
     case .maskOutsideAnimatingTransaction:
       rows("#").opacity(fraction).transaction { $0.animation = .linear(duration: .seconds(1)) }
         .clipShape(SetDMaskShape(fraction: fraction))
+    case .opacityOutsideDisablingTransaction:
+      rows("#").transaction { $0.disablesAnimations = true }.opacity(fraction)
+    case .opacityInsideDisablingTransaction:
+      rows("#").opacity(fraction).transaction { $0.disablesAnimations = true }
+    case .opacityOutsideDisablingTransactionWithInnerOffset:
+      glyph.transaction { $0.disablesAnimations = true }.opacity(fraction).topLeading
+    case .opacityOutsideDisablingTransactionReducedMotion:
+      rows("#").transaction { $0.disablesAnimations = true }.opacity(fraction)
+        .environment(\.accessibilityReduceMotion, true)
+    case .opacityOutsideInnerValueAnimation:
+      VStack(alignment: .leading, spacing: 0) {
+        glyph.animation(.linear(duration: .seconds(1)), value: fraction).opacity(fraction)
+      }
+      .topLeading
+    case .opacityOutsideAnimatingTransaction:
+      glyph.transaction { $0.animation = .linear(duration: .seconds(1)) }.opacity(fraction)
+        .topLeading
+    case .twoOpacitiesOutsideDisablingTransaction:
+      rows("#").transaction { $0.disablesAnimations = true }.opacity(fraction).opacity(0.5)
+    case .constantOuterOpacityOverAnimatingTransaction:
+      rows("#").opacity(fraction).transaction { $0.animation = .linear(duration: .seconds(1)) }
+        .opacity(1)
+    case .opacityInScopedDisablingBody:
+      rows("#").transaction({ $0.disablesAnimations = true }) { content in
+        content.opacity(fraction)
+      }
+    case .opacityInScopedAnimatingBody:
+      rows("#").animation(.linear(duration: .seconds(1))) { content in
+        content.opacity(fraction)
+      }
     }
   }
 
@@ -218,6 +259,11 @@ private enum SetDMask {
       ForEach(0..<4, id: \.self) { _ in Text(String(repeating: "#", count: 20)) }
     }
     return firstGlyph(render(rows.opacity(opacity)))?.fg
+  }
+
+  /// The foreground of the static glyph at `opacity`.
+  static func glyphForeground(opacity: Double) -> Color? {
+    firstGlyph(render(glyph(offset: 0).opacity(opacity).topLeading))?.fg
   }
 
   static func near(_ lhs: Color?, _ rhs: Color?) -> Bool {
@@ -668,6 +714,130 @@ struct AdversarialSetDClipTrimModeTests {
     #expect(SetDMask.lastPaintedX(result.mid) == 19, "mid \(SetDMask.lastPaintedX(result.mid))")
   }
 
+  // Wave 4 FL (STUI-1325): `opacity(_:)` merges into the content's node, and
+  // animates under the transaction where it is applied, like a clip mask.
+
+  @Test("w4fl10: an opacity outside a disabling .transaction fades")
+  func w4fl10OpacityOutsideDisablingTransactionFades() async throws {
+    let midway = SetDMask.rowsForeground(opacity: 0.625)
+    let final = SetDMask.rowsForeground(opacity: 1)
+    try #require(midway != nil && !SetDMask.near(midway, final), "\(String(describing: midway))")
+    let result = try await SetDMask.reveal(
+      "w4fl10", start: 0.25, mode: .opacityOutsideDisablingTransaction,
+      sampleAt: .milliseconds(500))
+    #expect(result.slots.contains(.opacity), "\(result.slots)")
+    let mid = SetDMask.firstGlyph(result.mid)?.fg
+    #expect(
+      SetDMask.near(mid, midway), "mid \(String(describing: mid)) of \(String(describing: midway))")
+    #expect(SetDMask.near(SetDMask.firstGlyph(result.end)?.fg, final))
+  }
+
+  @Test("w4fl11: an opacity inside a disabling .transaction snaps")
+  func w4fl11OpacityInsideDisablingTransactionSnaps() async throws {
+    let final = SetDMask.rowsForeground(opacity: 1)
+    let result = try await SetDMask.reveal(
+      "w4fl11", start: 0.25, mode: .opacityInsideDisablingTransaction,
+      sampleAt: .milliseconds(500))
+    #expect(!result.slots.contains(.opacity), "\(result.slots)")
+    #expect(SetDMask.near(SetDMask.firstGlyph(result.mid)?.fg, final))
+  }
+
+  @Test("w4fl12: an outer opacity fades while an offset inside a disabling .transaction snaps")
+  func w4fl12OuterOpacityFadesWhileInnerOffsetSnaps() async throws {
+    let final = SetDMask.glyphColumn(offset: 16)
+    let midway = SetDMask.glyphForeground(opacity: 0.625)
+    try #require(!SetDMask.near(midway, SetDMask.glyphForeground(opacity: 1)))
+    let result = try await SetDMask.reveal(
+      "w4fl12", start: 0.25, mode: .opacityOutsideDisablingTransactionWithInnerOffset,
+      sampleAt: .milliseconds(500))
+    #expect(result.slots.contains(.opacity), "\(result.slots)")
+    #expect(!result.slots.contains(.offset), "the offset keeps the inner transaction")
+    let mid = SetDMask.firstGlyph(result.mid)
+    #expect(mid?.x == final)
+    #expect(SetDMask.near(mid?.fg, midway), "mid \(String(describing: mid?.fg))")
+  }
+
+  @Test("w4fl13: reduce motion snaps an opacity outside a disabling .transaction")
+  func w4fl13ReducedMotionSnapsAnOuterOpacity() async throws {
+    let final = SetDMask.rowsForeground(opacity: 1)
+    let result = try await SetDMask.reveal(
+      "w4fl13", start: 0.25, mode: .opacityOutsideDisablingTransactionReducedMotion,
+      sampleAt: .milliseconds(500))
+    #expect(result.slots.isEmpty, "\(result.slots)")
+    #expect(SetDMask.near(SetDMask.firstGlyph(result.mid)?.fg, final))
+  }
+
+  @Test("w4fl14: an opacity outside an inner .animation(value:) snaps on a plain write")
+  func w4fl14OpacityOutsideInnerValueAnimationSnaps() async throws {
+    let midway = SetDMask.glyphColumn(offset: 10)
+    let opaque = SetDMask.glyphForeground(opacity: 1)
+    let result = try await SetDMask.reveal(
+      "w4fl14", start: 0.25, mode: .opacityOutsideInnerValueAnimation,
+      sampleAt: .milliseconds(500), write: { $0.wrappedValue = 1 })
+    #expect(result.slots.contains(.offset), "the inner value animation fires: \(result.slots)")
+    #expect(!result.slots.contains(.opacity), "the opacity outside it snaps: \(result.slots)")
+    let mid = SetDMask.firstGlyph(result.mid)
+    #expect(mid?.x == midway)
+    #expect(SetDMask.near(mid?.fg, opaque), "mid \(String(describing: mid?.fg))")
+  }
+
+  @Test("w4fl15: an opacity outside an animating .transaction snaps on a plain write")
+  func w4fl15OpacityOutsideAnimatingTransactionSnaps() async throws {
+    let midway = SetDMask.glyphColumn(offset: 10)
+    let opaque = SetDMask.glyphForeground(opacity: 1)
+    let result = try await SetDMask.reveal(
+      "w4fl15", start: 0.25, mode: .opacityOutsideAnimatingTransaction,
+      sampleAt: .milliseconds(500), write: { $0.wrappedValue = 1 })
+    #expect(result.slots.contains(.offset), "the content inside animates: \(result.slots)")
+    #expect(!result.slots.contains(.opacity), "the opacity outside snaps: \(result.slots)")
+    let mid = SetDMask.firstGlyph(result.mid)
+    #expect(mid?.x == midway)
+    #expect(SetDMask.near(mid?.fg, opaque), "mid \(String(describing: mid?.fg))")
+  }
+
+  @Test("w4fl16: two opacities outside a disabling .transaction fade as one product")
+  func w4fl16TwoOpacitiesOutsideDisablingTransactionFade() async throws {
+    let midway = SetDMask.rowsForeground(opacity: 0.3125)
+    try #require(!SetDMask.near(midway, SetDMask.rowsForeground(opacity: 0.5)))
+    let result = try await SetDMask.reveal(
+      "w4fl16", start: 0.25, mode: .twoOpacitiesOutsideDisablingTransaction,
+      sampleAt: .milliseconds(500))
+    #expect(result.slots.contains(.opacity), "\(result.slots)")
+    let mid = SetDMask.firstGlyph(result.mid)?.fg
+    #expect(
+      SetDMask.near(mid, midway), "mid \(String(describing: mid)) of \(String(describing: midway))")
+  }
+
+  @Test("w4fl17: a constant outer opacity keeps an inner opacity's animating transaction")
+  func w4fl17ConstantOuterOpacityKeepsAnInnerAnimatedOne() async throws {
+    let midway = SetDMask.rowsForeground(opacity: 0.625)
+    let result = try await SetDMask.reveal(
+      "w4fl17", start: 0.25, mode: .constantOuterOpacityOverAnimatingTransaction,
+      sampleAt: .milliseconds(500), write: { $0.wrappedValue = 1 })
+    #expect(result.curves[.opacity] == .linear(duration: .seconds(1)), "\(result.curves)")
+    let mid = SetDMask.firstGlyph(result.mid)?.fg
+    #expect(
+      SetDMask.near(mid, midway), "mid \(String(describing: mid)) of \(String(describing: midway))")
+  }
+
+  @Test("w4fl18: an opacity in a disabling scoped transaction body snaps")
+  func w4fl18OpacityInScopedDisablingBodySnaps() async throws {
+    let final = SetDMask.rowsForeground(opacity: 1)
+    let result = try await SetDMask.reveal(
+      "w4fl18", start: 0.25, mode: .opacityInScopedDisablingBody, sampleAt: .milliseconds(500))
+    #expect(!result.slots.contains(.opacity), "\(result.slots)")
+    #expect(SetDMask.near(SetDMask.firstGlyph(result.mid)?.fg, final))
+  }
+
+  @Test("w4fl19: an opacity in an animating scoped body fades on a plain write")
+  func w4fl19OpacityInScopedAnimatingBodyFades() async throws {
+    let midway = SetDMask.rowsForeground(opacity: 0.625)
+    let result = try await SetDMask.reveal(
+      "w4fl19", start: 0.25, mode: .opacityInScopedAnimatingBody, sampleAt: .milliseconds(500),
+      write: { $0.wrappedValue = 1 })
+    #expect(result.slots.contains(.opacity), "\(result.slots)")
+    #expect(SetDMask.near(SetDMask.firstGlyph(result.mid)?.fg, midway))
+  }
 }
 
 @MainActor

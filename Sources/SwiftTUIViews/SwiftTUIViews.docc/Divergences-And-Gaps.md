@@ -769,12 +769,19 @@ are omitted even when SwiftUI exposes a corresponding API.
   stay unchanged; `contentShape` controls interaction separately. Frames
   containing shape masks and images rasterize afresh to preserve ordering of
   split image placements; cell-only masks support incremental rasterization.
-- **Consecutive clip masks share one animation scope.** *Provisional.* A
-  `clipShape(_:)` mask animates under the transaction in effect where
-  `clipShape` is applied, not under a `transaction(_:)` or
-  `animation(_:value:)` applied to the content inside it. Consecutive
-  `clipShape` masks share one animated value, so when a transaction modifier
-  separates two of them, the outermost mask's transaction decides for both.
+- **Consecutive clip masks or opacities share one animation scope.**
+  *Provisional.* A `clipShape(_:)` mask or an `opacity(_:)` animates under
+  the transaction in effect where the modifier is applied, not under a
+  `transaction(_:)` or `animation(_:value:)` applied to the content inside
+  it. Both merge into the content's node, which holds one animated value for
+  its masks and one for its opacity. Consecutive `clipShape` masks share
+  their value, so when a transaction modifier separates two of them, the
+  outermost mask's transaction decides for both. Consecutive opacities
+  multiply into their value, and the innermost opacity's transaction decides
+  for the product, so an opacity applied around content that already has an
+  opacity under another transaction follows that inner transaction. Control
+  styles wrap their labels in an opacity of their own, which therefore never
+  takes over the timing of an opacity in the label.
 - **Compatible paths morph their anchor and control points.** *Ratified.*
   `Path` conforms to `Animatable`. Paths with identical ordered element kinds
   and finite coordinates interpolate inside an animation transaction;
