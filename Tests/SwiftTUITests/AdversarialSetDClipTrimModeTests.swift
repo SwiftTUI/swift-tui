@@ -8,7 +8,9 @@ import Testing
 // Campaign two, F2 pass 2 (STUI-1283), setD151–setD160: clip masks (animated
 // since STUI-1218) and trimmed shapes under frame elision, transaction
 // scoping, reduced motion, wide glyphs and hit testing. Brief 06. The mask
-// fixture follows PathAnimationIntegrationTests.swift:326-433.
+// fixture follows PathAnimationIntegrationTests.swift:326-433. Wave 4 adds
+// neighbours for the repaired masks (w4fk, STUI-1318/1319) and for the
+// transaction modifier (w4fl, STUI-1326).
 
 /// A rectangle covering `fraction` of the width; every fraction has the same
 /// element topology (four lines and a close), so it interpolates, and
@@ -66,6 +68,16 @@ private enum SetDMaskMode: Sendable {
   case insideTransactionDisabled
   case scopedBodyDisabled
   case scopedBodyAnimated
+  // Wave 4 FL (STUI-1326): `.transaction { $0.animation = … }`.
+  case offsetUnderAnimatingTransaction
+  case opacityUnderAnimatingTransaction
+  case offsetUnderAnimatingTransactionReducedMotion
+  case innerDisablingUnderAnimatingTransaction
+  case fillingTransaction
+  case assigningTransaction
+  case continuityTransaction
+  case nilAnimationTransaction
+  case maskOutsideAnimatingTransaction
 }
 
 private struct SetDMaskRoot: View {
@@ -118,8 +130,47 @@ private struct SetDMaskRoot: View {
       rows("#").animation(.linear(duration: .seconds(1))) { content in
         content.clipShape(SetDMaskShape(fraction: fraction))
       }
+    case .offsetUnderAnimatingTransaction:
+      glyph.transaction { $0.animation = .linear(duration: .seconds(1)) }.topLeading
+    case .opacityUnderAnimatingTransaction:
+      rows("#").opacity(fraction).transaction { $0.animation = .linear(duration: .seconds(1)) }
+    case .offsetUnderAnimatingTransactionReducedMotion:
+      glyph.transaction { $0.animation = .linear(duration: .seconds(1)) }.topLeading
+        .environment(\.accessibilityReduceMotion, true)
+    case .innerDisablingUnderAnimatingTransaction:
+      VStack(alignment: .leading, spacing: 0) {
+        glyph.transaction { $0.disablesAnimations = true }
+        glyph
+      }
+      .transaction { $0.animation = .linear(duration: .seconds(1)) }.topLeading
+    // The next four sit one container below the body root, where a transform
+    // observes the enclosing `withAnimation` (brief OBS-A).
+    case .fillingTransaction:
+      VStack(alignment: .leading, spacing: 0) {
+        glyph.transaction {
+          if $0.animation == nil { $0.animation = .linear(duration: .seconds(1)) }
+        }
+      }
+      .topLeading
+    case .assigningTransaction:
+      VStack(alignment: .leading, spacing: 0) {
+        glyph.transaction { $0.animation = .linear(duration: .seconds(1)) }
+      }
+      .topLeading
+    case .continuityTransaction:
+      VStack(alignment: .leading, spacing: 0) { glyph.transaction { $0.isContinuous = true } }
+        .topLeading
+    case .nilAnimationTransaction:
+      VStack(alignment: .leading, spacing: 0) { glyph.transaction { $0.animation = nil } }
+        .topLeading
+    case .maskOutsideAnimatingTransaction:
+      rows("#").opacity(fraction).transaction { $0.animation = .linear(duration: .seconds(1)) }
+        .clipShape(SetDMaskShape(fraction: fraction))
     }
   }
+
+  /// One glyph offset by `16 × fraction` columns (4 at 0.25, 10 at 0.625).
+  private var glyph: some View { SetDMask.glyph(offset: Int(fraction * 16)) }
 
   private func rows(_ glyph: String) -> some View {
     VStack(spacing: 0) {
@@ -130,8 +181,51 @@ private struct SetDMaskRoot: View {
   private func capture() { log.fraction = $fraction }
 }
 
+extension View {
+  /// Pins the view to the surface's top-leading corner, so an offset glyph
+  /// stays on the 20-column surface.
+  fileprivate var topLeading: some View {
+    frame(width: 20, height: 4, alignment: .topLeading)
+  }
+}
+
 @MainActor
 private enum SetDMask {
+  static func glyph(offset: Int) -> some View {
+    Text("#").offset(x: offset, y: 0)
+  }
+
+  static func render(_ view: some View) -> RasterSurface {
+    DefaultRenderer().render(view, proposal: .init(width: 20, height: 4)).rasterSurface
+  }
+
+  /// The column and foreground of the first painted cell on `row`.
+  static func firstGlyph(_ raster: RasterSurface?, row: Int = 0) -> (x: Int, fg: Color?)? {
+    guard let cells = raster?.cells, row < cells.count,
+      let x = cells[row].firstIndex(where: { !$0.isContinuation && $0.character != " " })
+    else { return nil }
+    return (x, cells[row][x].style?.foregroundColor)
+  }
+
+  /// The column of the static glyph at `offset`.
+  static func glyphColumn(offset: Int) -> Int {
+    firstGlyph(render(glyph(offset: offset).topLeading))?.x ?? -1
+  }
+
+  /// The foreground of the static rows at `opacity`.
+  static func rowsForeground(opacity: Double) -> Color? {
+    let rows = VStack(spacing: 0) {
+      ForEach(0..<4, id: \.self) { _ in Text(String(repeating: "#", count: 20)) }
+    }
+    return firstGlyph(render(rows.opacity(opacity)))?.fg
+  }
+
+  static func near(_ lhs: Color?, _ rhs: Color?) -> Bool {
+    guard let lhs, let rhs else { return lhs == nil && rhs == nil }
+    return abs(lhs.red - rhs.red) < 0.01 && abs(lhs.green - rhs.green) < 0.01
+      && abs(lhs.blue - rhs.blue) < 0.01 && abs(lhs.alpha - rhs.alpha) < 0.01
+  }
+
   static func lastPaintedX(_ raster: RasterSurface?) -> Int {
     guard let row = raster?.cells.first else { return -1 }
     return row.lastIndex { !$0.isContinuation && $0.character != " " } ?? -1
@@ -187,7 +281,8 @@ private enum SetDMask {
       withAnimation(.linear(duration: .seconds(1))) { binding.wrappedValue = 1 }
     }
   ) async throws -> (
-    mid: RasterSurface?, end: RasterSurface?, elided: Int, slots: Set<AnimatableSlot>
+    mid: RasterSurface?, end: RasterSurface?, elided: Int, slots: Set<AnimatableSlot>,
+    curves: [AnimatableSlot: Animation]
   ) {
     let log = SetDMaskLog()
     let (loop, surface, scheduler, root) = Self.loop(name, start: start, mode: mode, log: log)
@@ -204,12 +299,17 @@ private enum SetDMask {
       let started = clock.now
       write(binding)
       _ = try await loop.renderPendingFramesAsync(renderedFrames: &rendered, eventPump: nil)
+      let debug = loop.renderer.internalAnimationController.debugStateSnapshot()
       let slots = Set(
-        loop.renderer.internalAnimationController.debugStateSnapshot().activeAnimationKeys
+        debug.activeAnimationKeys
           .compactMap { key -> AnimatableSlot? in
             guard case .property(let slot) = key.scope else { return nil }
             return slot
           })
+      var curves: [AnimatableSlot: Animation] = [:]
+      for (key, box) in debug.activeAnimationBoxesByKey {
+        if case .property(let slot) = key.scope { curves[slot] = box.unwrap(as: Animation.self) }
+      }
       @MainActor func advance(to target: MonotonicInstant) async throws {
         var turns = 0
         while let wake = scheduler.nextWakeInstant(after: clock.now), wake < target, turns < 256 {
@@ -226,7 +326,7 @@ private enum SetDMask {
       try await advance(to: started.advanced(by: sample))
       let mid = surface.raster
       try await advance(to: started.advanced(by: .milliseconds(1_100)))
-      return (mid, surface.raster, loop.renderer.elidedFrameCount, slots)
+      return (mid, surface.raster, loop.renderer.elidedFrameCount, slots, curves)
     }
   }
 }
@@ -452,6 +552,122 @@ struct AdversarialSetDClipTrimModeTests {
       "mid \(SetDMask.lastPaintedX(result.mid)) of \(expected)")
     #expect(SetDMask.lastPaintedX(result.end) == 19)
   }
+
+  // Wave 4 FL (STUI-1326): `.transaction { $0.animation = … }` registers its
+  // curve as the scoped `transaction(_:body:)` form does, so a plain write
+  // under it animates. Nothing here registers a curve by hand.
+
+  @Test("w4fl01: a plain write under .transaction { $0.animation = … } moves an offset")
+  func w4fl01PlainWriteUnderAnimatingTransactionMovesAnOffset() async throws {
+    let midway = SetDMask.glyphColumn(offset: 10)
+    let final = SetDMask.glyphColumn(offset: 16)
+    try #require(midway >= 0 && midway < final, "static columns \(midway), \(final)")
+    let result = try await SetDMask.reveal(
+      "w4fl01", start: 0.25, mode: .offsetUnderAnimatingTransaction, sampleAt: .milliseconds(500),
+      write: { $0.wrappedValue = 1 })
+    #expect(result.curves[.offset] == .linear(duration: .seconds(1)), "\(result.curves)")
+    let mid = SetDMask.firstGlyph(result.mid)?.x
+    #expect(mid == midway, "mid \(String(describing: mid)) of \(midway)")
+    #expect(SetDMask.firstGlyph(result.end)?.x == final)
+  }
+
+  @Test("w4fl02: a plain write under .transaction { $0.animation = … } fades an opacity")
+  func w4fl02PlainWriteUnderAnimatingTransactionFadesOpacity() async throws {
+    let midway = SetDMask.rowsForeground(opacity: 0.625)
+    let final = SetDMask.rowsForeground(opacity: 1)
+    try #require(midway != nil && !SetDMask.near(midway, final), "\(String(describing: midway))")
+    let result = try await SetDMask.reveal(
+      "w4fl02", start: 0.25, mode: .opacityUnderAnimatingTransaction,
+      sampleAt: .milliseconds(500), write: { $0.wrappedValue = 1 })
+    #expect(result.slots.contains(.opacity), "\(result.slots)")
+    let mid = SetDMask.firstGlyph(result.mid)?.fg
+    #expect(
+      SetDMask.near(mid, midway), "mid \(String(describing: mid)) of \(String(describing: midway))")
+    #expect(SetDMask.near(SetDMask.firstGlyph(result.end)?.fg, final))
+  }
+
+  @Test("w4fl03: reduce motion snaps a plain write under an animating .transaction")
+  func w4fl03ReducedMotionSnapsAnAnimatingTransaction() async throws {
+    let final = SetDMask.glyphColumn(offset: 16)
+    let result = try await SetDMask.reveal(
+      "w4fl03", start: 0.25, mode: .offsetUnderAnimatingTransactionReducedMotion,
+      sampleAt: .milliseconds(500), write: { $0.wrappedValue = 1 })
+    #expect(result.slots.isEmpty, "\(result.slots)")
+    #expect(SetDMask.firstGlyph(result.mid)?.x == final)
+  }
+
+  @Test("w4fl04: an inner disabling .transaction snaps under an animating one; its sibling moves")
+  func w4fl04InnerDisablingTransactionSnapsUnderAnAnimatingOne() async throws {
+    let midway = SetDMask.glyphColumn(offset: 10)
+    let final = SetDMask.glyphColumn(offset: 16)
+    let result = try await SetDMask.reveal(
+      "w4fl04", start: 0.25, mode: .innerDisablingUnderAnimatingTransaction,
+      sampleAt: .milliseconds(500), write: { $0.wrappedValue = 1 })
+    #expect(SetDMask.firstGlyph(result.mid, row: 0)?.x == final, "the inner transaction snaps")
+    let sibling = SetDMask.firstGlyph(result.mid, row: 1)?.x
+    #expect(sibling == midway, "the sibling animates: \(String(describing: sibling)) of \(midway)")
+  }
+
+  @Test("w4fl05: a transform that keeps an inherited animation leaves withAnimation's curve")
+  func w4fl05OuterWithAnimationWinsWhenTheTransformKeepsIt() async throws {
+    let outer = try await SetDMask.reveal(
+      "w4fl05a", start: 0.25, mode: .fillingTransaction, sampleAt: .milliseconds(500),
+      write: { binding in
+        withAnimation(.linear(duration: .seconds(4))) { binding.wrappedValue = 1 }
+      })
+    #expect(outer.curves[.offset] == .linear(duration: .seconds(4)), "\(outer.curves)")
+    let midway = SetDMask.glyphColumn(offset: 10)
+    let plain = try await SetDMask.reveal(
+      "w4fl05b", start: 0.25, mode: .fillingTransaction, sampleAt: .milliseconds(500),
+      write: { $0.wrappedValue = 1 })
+    #expect(plain.curves[.offset] == .linear(duration: .seconds(1)), "\(plain.curves)")
+    #expect(SetDMask.firstGlyph(plain.mid)?.x == midway)
+  }
+
+  @Test("w4fl06: an animation the transform assigns wins over an enclosing withAnimation")
+  func w4fl06AssignedAnimationWinsOverWithAnimation() async throws {
+    let midway = SetDMask.glyphColumn(offset: 10)
+    let result = try await SetDMask.reveal(
+      "w4fl06", start: 0.25, mode: .assigningTransaction, sampleAt: .milliseconds(500),
+      write: { binding in
+        withAnimation(.linear(duration: .seconds(4))) { binding.wrappedValue = 1 }
+      })
+    #expect(result.curves[.offset] == .linear(duration: .seconds(1)), "\(result.curves)")
+    #expect(SetDMask.firstGlyph(result.mid)?.x == midway)
+  }
+
+  @Test("w4fl07: a transform that edits only metadata keeps withAnimation's curve")
+  func w4fl07MetadataOnlyTransformKeepsTheOuterCurve() async throws {
+    let result = try await SetDMask.reveal(
+      "w4fl07", start: 0.25, mode: .continuityTransaction, sampleAt: .milliseconds(500),
+      write: { binding in
+        withAnimation(.linear(duration: .seconds(4))) { binding.wrappedValue = 1 }
+      })
+    #expect(result.curves[.offset] == .linear(duration: .seconds(4)), "\(result.curves)")
+  }
+
+  @Test("w4fl08: .transaction { $0.animation = nil } snaps a withAnimation write")
+  func w4fl08NilAnimationTransformSnaps() async throws {
+    let final = SetDMask.glyphColumn(offset: 16)
+    let result = try await SetDMask.reveal(
+      "w4fl08", start: 0.25, mode: .nilAnimationTransaction, sampleAt: .milliseconds(500),
+      write: { binding in
+        withAnimation(.linear(duration: .seconds(4))) { binding.wrappedValue = 1 }
+      })
+    #expect(result.slots.isEmpty, "\(result.slots)")
+    #expect(SetDMask.firstGlyph(result.mid)?.x == final)
+  }
+
+  @Test("w4fl09: a mask outside an animating .transaction snaps while the content inside fades")
+  func w4fl09MaskOutsideAnAnimatingTransactionSnaps() async throws {
+    let result = try await SetDMask.reveal(
+      "w4fl09", start: 0.25, mode: .maskOutsideAnimatingTransaction, sampleAt: .milliseconds(500),
+      write: { $0.wrappedValue = 1 })
+    #expect(result.slots.contains(.opacity), "the content inside animates: \(result.slots)")
+    #expect(!result.slots.contains(.clipShapePaths), "the mask outside snaps: \(result.slots)")
+    #expect(SetDMask.lastPaintedX(result.mid) == 19, "mid \(SetDMask.lastPaintedX(result.mid))")
+  }
+
 }
 
 @MainActor

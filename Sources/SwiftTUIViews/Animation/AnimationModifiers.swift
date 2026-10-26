@@ -26,8 +26,9 @@ extension View {
   /// Applies a transformation to the current transaction for this
   /// subtree.
   ///
-  /// Common usage is stripping animation from a specific subtree:
-  /// `.transaction { $0.animationRequest = .disabled }`.
+  /// Common usage is stripping animation from a specific subtree,
+  /// `.transaction { $0.disablesAnimations = true }`, or giving every change
+  /// in it one curve, `.transaction { $0.animation = .easeInOut }`.
   public func transaction(
     _ transform: @escaping @Sendable (inout Transaction) -> Void
   ) -> some View {
@@ -275,11 +276,15 @@ public struct TransactionModifier: IterativePrimitiveViewModifier, Sendable {
     transform(&transaction)
 
     var childContext = context
-    if context.environmentValues.renderingReduceMotion {
-      childContext.transaction.animationRequest = .disabled
-    } else {
-      childContext.transaction.animationRequest = transaction.request
-    }
+    // Register an assigned curve exactly as the scoped `transaction(_:body:)`
+    // form does: the controller drops an `.animate` request whose box has no
+    // registration, so without it `.transaction { $0.animation = … }`
+    // animated nothing on a plain write (STUI-1326). Reduce motion disables.
+    childContext.transaction.animationRequest =
+      ValueGatedTransactionSupport.registeredRequest(
+        for: transaction,
+        reduceMotion: context.environmentValues.renderingReduceMotion
+      )
     childContext.transaction.isContinuous = transaction.isContinuous
     childContext.transaction.customValues = transaction.customValues
     childContext.transaction.tracksVelocity = transaction.tracksVelocity
