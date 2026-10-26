@@ -132,7 +132,9 @@ struct LogPane: View {
 ## Scroll From Code
 
 ``ScrollViewReader`` hands its content a ``ScrollViewProxy`` whose commands
-address the first scroll view in the reader's scope. Mark targets with
+address the first scroll view in the reader's scope, even a disabled one. A
+`.disabled` `ScrollView` still follows the proxy; disabling stops only the
+wheel, the keyboard and dragging. Mark targets with
 `id(_:)`, then reach them with ``ScrollViewProxy``'s `scrollTo(_:anchor:)`. A
 `nil` anchor reveals the target with the smallest possible movement; `.top`,
 `.center`, or `.bottom` align it to the viewport, clamped at the content

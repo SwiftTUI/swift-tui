@@ -427,7 +427,7 @@ extension RunLoop {
     let scrollPositionChanged = localScrollPositionRegistry.sync(
       focusedIdentity: focusTracker.currentFocusIdentity,
       focusRegions: renderedArtifacts.semanticSnapshot.focusRegions,
-      scrollRoutes: renderedArtifacts.semanticSnapshot.scrollRoutes,
+      scrollRoutes: renderedArtifacts.semanticSnapshot.commandScrollRoutes,
       scrollTargets: renderedArtifacts.semanticSnapshot.scrollTargets,
       accessibilityNodes: renderedArtifacts.semanticSnapshot.accessibilityNodes
     )

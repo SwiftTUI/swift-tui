@@ -1011,3 +1011,119 @@ extension W4ScrollModel {
     return result
   }
 }
+
+// MARK: - Wave 4 (W4-FB): disabled scroll views (STUI-1317)
+
+extension Wave4ScrollCommandRepairTests {
+  // STUI-1317: the reader's first scroll view is disabled. Programmatic
+  // commands address it, and it moves; a later view does not.
+  @Test(arguments: [false, true])
+  func wave4b20ProxyMovesADisabledFirstScrollView(withSecond: Bool) throws {
+    let first = W4ScrollModel()
+    let second = W4ScrollModel()
+    let h = try StressRuntimeHarness(
+      rootIdentity: testIdentity("wave4b20", withSecond ? "two" : "one"),
+      size: .init(width: 30, height: 8)
+    ) {
+      W4DisabledFirstRoot(first: first, second: second, withSecond: withSecond)
+    }
+    defer { h.shutdown() }
+    try #require(h.frame.contains("a0"), "\(h.frame)")
+    _ = try h.clickText("jump")
+    #expect(second.offset == .zero, "\(second.offset)")
+    #expect(first.offset.y == 25, "\(first.offset)")
+    #expect(h.frame.contains("a29"), "\(h.frame)")
+  }
+
+  // A disabled List before an enabled ScrollView: the command addresses the
+  // List and does not move the later view. (A disabled collection registers
+  // no scroll position, so the List itself stays put.)
+  @Test func wave4b22ProxyDoesNotSkipADisabledFirstList() throws {
+    let second = W4ScrollModel()
+    let h = try StressRuntimeHarness(
+      rootIdentity: testIdentity("wave4b22"), size: .init(width: 30, height: 8)
+    ) {
+      ScrollViewReader { proxy in
+        VStack(alignment: .leading, spacing: 0) {
+          Button("jump") { _ = proxy.scrollTo(edge: .bottom) }
+          HStack(alignment: .top, spacing: 1) {
+            List(setDRows(30, prefix: "a", digits: 2)) { Text($0.id) }
+              .frame(width: 10, height: 5)
+              .disabled(true)
+            ScrollView(.vertical, position: second.binding) {
+              VStack(alignment: .leading, spacing: 0) {
+                ForEach(0..<30, id: \.self) { Text("b\($0)") }
+              }
+            }
+            .frame(width: 8, height: 5)
+          }
+        }
+      }
+    }
+    defer { h.shutdown() }
+    try #require(h.frame.contains("b0"), "\(h.frame)")
+    _ = try h.clickText("jump")
+    #expect(second.offset == .zero, "\(second.offset)")
+  }
+
+  // Control: interactive input still honours `.disabled`. The wheel and the
+  // keyboard do not move a disabled scroll view, and it publishes no
+  // interactive scroll route or focus region.
+  @Test func wave4b21DisabledScrollViewIgnoresInteractiveInput() throws {
+    let first = W4ScrollModel()
+    let second = W4ScrollModel()
+    let h = try StressRuntimeHarness(
+      rootIdentity: testIdentity("wave4b21"), size: .init(width: 30, height: 8)
+    ) {
+      W4DisabledFirstRoot(first: first, second: second, withSecond: true)
+    }
+    defer { h.shutdown() }
+    let snapshot = h.runLoop.latestSemanticSnapshot
+    try #require(snapshot.scrollRoutes.count == 1, "\(snapshot.scrollRoutes.map(\.identity))")
+    let disabledCell = try #require(h.point(forText: "a2"))
+    #expect(
+      h.runLoop.handle(
+        .input(.mouse(.init(kind: .scrolled(deltaX: 0, deltaY: 3), location: disabledCell))))
+        == nil)
+    _ = try h.render()
+    #expect(first.offset == .zero, "\(first.offset)")
+    #expect(
+      !h.runLoop.focusTracker.focusRegions.contains {
+        $0.rect.contains(disabledCell.containingCell)
+      }
+    )
+    for _ in 0..<3 { _ = try h.pressKey(.init(.tab)) }
+    _ = try h.pressKey(.init(.end))
+    #expect(first.offset == .zero, "\(first.offset)")
+  }
+}
+
+private struct W4DisabledFirstRoot: View {
+  let first: W4ScrollModel
+  let second: W4ScrollModel
+  let withSecond: Bool
+  var body: some View {
+    ScrollViewReader { proxy in
+      VStack(alignment: .leading, spacing: 0) {
+        Button("jump") { _ = proxy.scrollTo(edge: .bottom) }
+        HStack(alignment: .top, spacing: 1) {
+          ScrollView(.vertical, position: first.binding) {
+            VStack(alignment: .leading, spacing: 0) {
+              ForEach(0..<30, id: \.self) { Text("a\($0)") }
+            }
+          }
+          .frame(width: 8, height: 5)
+          .disabled(true)
+          if withSecond {
+            ScrollView(.vertical, position: second.binding) {
+              VStack(alignment: .leading, spacing: 0) {
+                ForEach(0..<30, id: \.self) { Text("b\($0)") }
+              }
+            }
+            .frame(width: 8, height: 5)
+          }
+        }
+      }
+    }
+  }
+}

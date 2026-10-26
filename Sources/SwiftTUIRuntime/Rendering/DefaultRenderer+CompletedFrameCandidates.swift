@@ -230,7 +230,7 @@ extension DefaultRenderer {
     overlayHasTransientDecoration: Bool
   ) {
     draft.graphDraft.commitScrollGeometry(
-      scrollRoutes: artifacts.semanticSnapshot.scrollRoutes,
+      scrollRoutes: artifacts.semanticSnapshot.commandScrollRoutes,
       scrollTargets: artifacts.semanticSnapshot.scrollTargets,
       resolvedScrollPositionRegistry: draft.resolveContext.localScrollPositionRegistry
     )

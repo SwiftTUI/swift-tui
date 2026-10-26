@@ -141,6 +141,8 @@ struct AdversarialSetDScrollEdgeModeTests {
     #expect(offset.value.y == 15, "\(offset.value)")
   }
 
+  // STUI-1317 (repaired in wave 4): a disabled scroll view keeps its route
+  // for programmatic commands.
   @Test("setD136: a reader's proxy does not move a later scroll view past a disabled first one")
   func setD136ProxyAddressesFirstScrollViewEvenWhenDisabled() throws {
     let first = SetDOffsetBox()
@@ -170,11 +172,7 @@ struct AdversarialSetDScrollEdgeModeTests {
     defer { h.shutdown() }
     try #require(h.frame.contains("a0") && h.frame.contains("b0"), "\(h.frame)")
     try h.clickText("jump")
-    setDKnown(
-      "NEW-4: scrollTo(edge:) from a reader whose first scroll view is disabled scrolls the next scroll view instead; a disabled scroll view publishes no route, so firstRoute(matching:) skips it (Semantics.swift:85-90, 255-256; LocalScrollPositionRegistry.swift:1087-1103); contract: ScrollViewReader.swift:45-51, Scrolling.md:134-140"
-    ) {
-      #expect(second.value == .zero, "the second view moved: \(second.value)")
-    }
+    #expect(second.value == .zero, "the second view moved: \(second.value)")
   }
 
   @Test("setD137: End then Home in one batch leaves a lazy view at its start")

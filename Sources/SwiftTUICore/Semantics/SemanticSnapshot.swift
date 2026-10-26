@@ -127,6 +127,17 @@ public struct SemanticSnapshot: Equatable, Sendable {
   public var focusRegions: [FocusRegion]
   public var navigationRoutes: [NavigationRoute]
   public var scrollRoutes: [ScrollRoute]
+  /// Every scroll route in frame order, including scroll views that
+  /// `.disabled` keeps out of ``scrollRoutes``. Programmatic commands
+  /// (`ScrollViewReader`'s proxy) address the first route of their scope in
+  /// this list; interactive input reads ``scrollRoutes``, so only it honours
+  /// `.disabled` (STUI-1317).
+  package var programmaticScrollRoutes: [ScrollRoute] = []
+  /// The routes the scroll registry addresses. A snapshot built without
+  /// extraction carries only ``scrollRoutes``.
+  package var commandScrollRoutes: [ScrollRoute] {
+    programmaticScrollRoutes.isEmpty ? scrollRoutes : programmaticScrollRoutes
+  }
   package var scrollTargets: [ScrollTarget]
   public var selectionRoutes: [SelectionRoute]
   public var namedCoordinateSpaces: [NamedCoordinateSpace: CellRect]
