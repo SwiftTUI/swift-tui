@@ -25,11 +25,11 @@ struct AdversarialSetCDynamicScrollTests {
     try #require(h.frame.contains("row 19"), "\(h.frame)")
     _ = try h.clickText("Append")
     _ = try h.render()
-    setCKnown(setCNEW10) {
-      #expect(
-        h.frame.contains("row 24"),
-        "scrollTo(edge:) returned \(String(describing: model.lastResult))\n\(h.frame)")
-    }
+    // STUI-1305 (repaired in wave 4): the edge re-resolves after the layout
+    // that adds the rows.
+    #expect(
+      h.frame.contains("row 24"),
+      "scrollTo(edge:) returned \(String(describing: model.lastResult))\n\(h.frame)")
   }
 
   @Test func setC226FarEdgeAfterAppendFromTopRevealsNewRows() throws {
@@ -54,9 +54,7 @@ struct AdversarialSetCDynamicScrollTests {
     try #require(h.frame.contains("row 19"), "\(h.frame)")
     _ = try h.clickText("Append")
     _ = try h.render()
-    setCKnown(setCNEW10) {
-      #expect(h.frame.contains("row 24"), "\(h.frame)")
-    }
+    #expect(h.frame.contains("row 24"), "\(h.frame)")
   }
 
   @Test func setC228TrailingEdgeAfterAppendAtTrailingRevealsNewColumns() throws {
@@ -69,9 +67,7 @@ struct AdversarialSetCDynamicScrollTests {
     try #require(h.frame.contains("c19"), "\(h.frame)")
     _ = try h.clickText("Append")
     _ = try h.render()
-    setCKnown(setCNEW10) {
-      #expect(h.frame.contains("c24"), "\(h.frame)")
-    }
+    #expect(h.frame.contains("c24"), "\(h.frame)")
   }
 
   // MARK: Data-backed lists
@@ -116,12 +112,14 @@ struct AdversarialSetCDynamicScrollTests {
     try #require(h.frame.contains("row 00"))
     _ = try h.clickText("Append")
     _ = try h.render()
-    setCKnown(setCNEW11) {
-      #expect(h.frame.contains("row 20"), "\(h.frame)")
-    }
+    // STUI-1306 (repaired in wave 4): an unresolved target retries after the
+    // next resolve.
+    #expect(h.frame.contains("row 20"), "\(h.frame)")
   }
 
-  // Probe: no contract covers a reveal of a row inserted by the same action.
+  // Observation O2, repaired with STUI-1306 (wave 4): an eager ScrollView
+  // reveals an identified row that the same action inserted, as a data List
+  // does (Scrolling.md:134-140, 166-171).
   @Test func setC232EagerScrollToAppendedIDObservation() throws {
     let model = SetCDynModel()
     let h = try StressRuntimeHarness(
@@ -130,9 +128,9 @@ struct AdversarialSetCDynamicScrollTests {
     defer { h.shutdown() }
     _ = try h.clickText("Append")
     _ = try h.render()
-    print(
-      "setC232 observation: result=\(String(describing: model.lastResult))"
-        + " revealed=\(h.frame.contains("row 24"))")
+    #expect(
+      h.frame.contains("row 24"),
+      "scrollTo(_:anchor:) returned \(String(describing: model.lastResult))\n\(h.frame)")
   }
 
   // MARK: Stored offsets outside the content range
@@ -499,19 +497,3 @@ private struct SetCTextInScrollRoot: View {
     }.scrollIndicators(.hidden)
   }
 }
-
-private let setCNEW10 = Comment(
-  rawValue:
-    "NEW-10: a far-edge command issued by the action that grows the content "
-    + "leaves the new rows hidden when the view already sits at the old edge; "
-    + "scrollToEdge resolves the edge against the previous frame's extent, "
-    + "returns false and records no pending far edge "
-    + "(LocalScrollPositionRegistry.swift:533-544); contract: "
-    + "Scrolling.md:132-140; adjacent STUI-1171, STUI-1243")
-private let setCNEW11 = Comment(
-  rawValue:
-    "NEW-11: proxy.scrollTo(id) for a data List row appended by the same "
-    + "action does not reveal the row; the List's registered reveal closure "
-    + "resolves the ID against the rows and indexed source captured at the "
-    + "previous resolve (List.swift:251-273); contract: Collections.md:193-194, "
-    + "Scrolling.md:169-171")

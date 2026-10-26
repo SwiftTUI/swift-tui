@@ -86,22 +86,16 @@ struct AdversarialSetDScrollEdgeModeTests {
     return (h, offset)
   }
 
+  // STUI-1305 (repaired in wave 4), setD131–setD135: a far edge issued by
+  // the action that appends re-resolves after the next layout.
   @Test("setD131: append plus scrollTo(edge: .bottom) at the bottom shows the new last row")
   func setD131AppendAndBottomEdgeAtBottom() throws {
     let (h, offset) = try appendLog("131", start: 20, at: 14)
     defer { h.shutdown() }
     try #require(h.frame.contains("l19") && offset.value.y == 14, "\(h.frame)")
     try h.clickText("append")
-    setDKnown(
-      "NEW-3: appending content and issuing a far-edge command in one action at the current edge leaves the new last row hidden; scrollToEdge computes the edge from the previous frame's route and returns before recording a pending edge when it equals the offset (LocalScrollPositionRegistry.swift:535-537); contract: Scrolling.md:134-140, 92dc2e5a; adjacent STUI-1171"
-    ) {
-      #expect(h.frame.contains("l20"), "\(h.frame)")
-    }
-    setDKnown(
-      "NEW-3: appending content and issuing a far-edge command in one action at the current edge leaves the new last row hidden; scrollToEdge computes the edge from the previous frame's route and returns before recording a pending edge when it equals the offset (LocalScrollPositionRegistry.swift:535-537); contract: Scrolling.md:134-140, 92dc2e5a; adjacent STUI-1171"
-    ) {
-      #expect(offset.value.y == 15, "\(offset.value)")
-    }
+    #expect(h.frame.contains("l20"), "\(h.frame)")
+    #expect(offset.value.y == 15, "\(offset.value)")
   }
 
   @Test("setD132: append plus scrollTo(edge: .bottom) at the first overflow shows the new row")
@@ -110,16 +104,8 @@ struct AdversarialSetDScrollEdgeModeTests {
     defer { h.shutdown() }
     try #require(h.frame.contains("l5") && !h.frame.contains("l6"), "\(h.frame)")
     try h.clickText("append")
-    setDKnown(
-      "NEW-3: appending content and issuing a far-edge command in one action at the current edge leaves the new last row hidden; scrollToEdge computes the edge from the previous frame's route and returns before recording a pending edge when it equals the offset (LocalScrollPositionRegistry.swift:535-537); contract: Scrolling.md:134-140, 92dc2e5a; adjacent STUI-1171"
-    ) {
-      #expect(h.frame.contains("l6"), "\(h.frame)")
-    }
-    setDKnown(
-      "NEW-3: appending content and issuing a far-edge command in one action at the current edge leaves the new last row hidden; scrollToEdge computes the edge from the previous frame's route and returns before recording a pending edge when it equals the offset (LocalScrollPositionRegistry.swift:535-537); contract: Scrolling.md:134-140, 92dc2e5a; adjacent STUI-1171"
-    ) {
-      #expect(offset.value.y == 1, "\(offset.value)")
-    }
+    #expect(h.frame.contains("l6"), "\(h.frame)")
+    #expect(offset.value.y == 1, "\(offset.value)")
   }
 
   @Test(
@@ -141,16 +127,8 @@ struct AdversarialSetDScrollEdgeModeTests {
       h.runLoop.latestSemanticSnapshot.scrollRoutes.first?.identity, "no scroll route")
     try h.focus(scroll)
     try h.keys([.character("a"), .end])
-    setDKnown(
-      "NEW-3: appending content and issuing a far-edge command in one action at the current edge leaves the new last row hidden; scrollToEdge computes the edge from the previous frame's route and returns before recording a pending edge when it equals the offset (LocalScrollPositionRegistry.swift:535-537); contract: Scrolling.md:134-140, 92dc2e5a; adjacent STUI-1171"
-    ) {
-      #expect(h.frame.contains("l20"), "\(h.frame)")
-    }
-    setDKnown(
-      "NEW-3: appending content and issuing a far-edge command in one action at the current edge leaves the new last row hidden; scrollToEdge computes the edge from the previous frame's route and returns before recording a pending edge when it equals the offset (LocalScrollPositionRegistry.swift:535-537); contract: Scrolling.md:134-140, 92dc2e5a; adjacent STUI-1171"
-    ) {
-      #expect(offset.value.y == 15, "\(offset.value)")
-    }
+    #expect(h.frame.contains("l20"), "\(h.frame)")
+    #expect(offset.value.y == 15, "\(offset.value)")
   }
 
   @Test("setD135: lazy append plus scrollTo(edge: .bottom) at the bottom shows the new last row")
@@ -159,16 +137,8 @@ struct AdversarialSetDScrollEdgeModeTests {
     defer { h.shutdown() }
     try #require(h.frame.contains("l19") && offset.value.y == 14, "\(h.frame)")
     try h.clickText("append")
-    setDKnown(
-      "NEW-3: appending content and issuing a far-edge command in one action at the current edge leaves the new last row hidden; scrollToEdge computes the edge from the previous frame's route and returns before recording a pending edge when it equals the offset (LocalScrollPositionRegistry.swift:535-537); contract: Scrolling.md:134-140, 92dc2e5a; adjacent STUI-1171"
-    ) {
-      #expect(h.frame.contains("l20"), "\(h.frame)")
-    }
-    setDKnown(
-      "NEW-3: appending content and issuing a far-edge command in one action at the current edge leaves the new last row hidden; scrollToEdge computes the edge from the previous frame's route and returns before recording a pending edge when it equals the offset (LocalScrollPositionRegistry.swift:535-537); contract: Scrolling.md:134-140, 92dc2e5a; adjacent STUI-1171"
-    ) {
-      #expect(offset.value.y == 15, "\(offset.value)")
-    }
+    #expect(h.frame.contains("l20"), "\(h.frame)")
+    #expect(offset.value.y == 15, "\(offset.value)")
   }
 
   @Test("setD136: a reader's proxy does not move a later scroll view past a disabled first one")

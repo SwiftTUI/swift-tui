@@ -647,3 +647,367 @@ private final class SetCScrollBox {
     .init(get: { self.selection }, set: { self.selection = $0 })
   }
 }
+
+// MARK: - Wave 4 (W4-FB): pending scroll commands
+
+/// Wave-4 repair group W4-FB (STUI-1169): proxy and key scroll commands that
+/// the content of the same action decides (STUI-1263, STUI-1264, STUI-1305,
+/// STUI-1306). Extensions below add a reader whose first scroll view is
+/// disabled (STUI-1317) and centre anchors (STUI-1322). Contracts:
+/// `Scrolling.md:132-171, 206-210`, `Collections.md:193-194`,
+/// `ScrollViewReader.swift:45-51`. The brief and hypotheses are in the
+/// coordination root's
+/// docs/reports/evidence/2026-10-26-campaign-two-wave-4/fw-b/.
+@MainActor
+@Suite(.serialized)
+struct Wave4ScrollCommandRepairTests {
+  // A far-edge command that moves nothing, issued outside any action,
+  // resolves at the next layout and does not apply to a later growth.
+  @Test func wave4b01NoOpEdgeDoesNotStickToLaterGrowth() throws {
+    let model = W4ScrollModel()
+    let h = try StressRuntimeHarness(
+      rootIdentity: testIdentity("wave4b01"), size: .init(width: 24, height: 8)
+    ) { W4ModelRows(model: model) }
+    defer { h.shutdown() }
+    model.offset = .init(x: 0, y: 14)
+    _ = try h.renderAfterExternalMutation()
+    try #require(h.frame.contains("row 19"), "\(h.frame)")
+    #expect(try #require(model.proxy).scrollTo(edge: .bottom) == false)
+    _ = try h.render()
+    model.count = 25
+    _ = try h.renderAfterExternalMutation()
+    _ = try h.render()
+    #expect(model.offset.y == 14, "\(model.offset)")
+    #expect(!h.frame.contains("row 24"), "\(h.frame)")
+  }
+
+  // The edge command may precede the append in the action.
+  @Test func wave4b02EdgeBeforeAppendInOneActionRevealsNewRows() throws {
+    let model = W4ScrollModel()
+    let h = try StressRuntimeHarness(
+      rootIdentity: testIdentity("wave4b02"), size: .init(width: 24, height: 8)
+    ) { W4AppendRoot(model: model, edgeFirst: true) }
+    defer { h.shutdown() }
+    #expect(try #require(model.proxy).scrollTo(edge: .bottom))
+    _ = try h.render()
+    try #require(h.frame.contains("row 19") && model.offset.y == 14, "\(h.frame)")
+    _ = try h.clickText("Append")
+    _ = try h.render()
+    #expect(h.frame.contains("row 24"), "\(h.frame)")
+    #expect(model.offset.y == 19, "\(model.offset)")
+  }
+
+  // End at the bottom moves nothing; a later growth does not jump.
+  @Test func wave4b03EndKeyAtBottomDoesNotStickToLaterGrowth() throws {
+    let model = W4ScrollModel()
+    let h = try StressRuntimeHarness(
+      rootIdentity: testIdentity("wave4b03"), size: .init(width: 24, height: 8)
+    ) { W4ModelRows(model: model) }
+    defer { h.shutdown() }
+    let route = try #require(h.runLoop.latestSemanticSnapshot.scrollRoutes.first?.identity)
+    _ = try h.focus(route)
+    model.offset = .init(x: 0, y: 14)
+    _ = try h.renderAfterExternalMutation()
+    _ = try h.pressKey(.init(.end))
+    try #require(model.offset.y == 14, "\(model.offset)")
+    model.count = 25
+    _ = try h.renderAfterExternalMutation()
+    _ = try h.render()
+    #expect(model.offset.y == 14, "\(model.offset)")
+  }
+
+  // `scrollTo(_:)` for an ID nothing shows, outside any action, does not
+  // reveal a row that gains the ID in a later frame.
+  @Test func wave4b04UnresolvedIDDoesNotStickToLaterInsertion() throws {
+    let model = W4ScrollModel()
+    let h = try StressRuntimeHarness(
+      rootIdentity: testIdentity("wave4b04"), size: .init(width: 24, height: 8)
+    ) { W4ModelRows(model: model, identified: true) }
+    defer { h.shutdown() }
+    #expect(try #require(model.proxy).scrollTo(28, anchor: .top) == false)
+    _ = try h.render()
+    model.count = 30
+    _ = try h.renderAfterExternalMutation()
+    _ = try h.render()
+    #expect(model.offset.y == 0, "\(model.offset)")
+  }
+
+  // Bottom and then leading on one two-axis view: the vertical edge still
+  // refines (one pending edge per axis).
+  @Test func wave4b05BottomThenLeadingOnOneRouteKeepsTheBottom() throws {
+    let model = W4ScrollModel()
+    let h = try StressRuntimeHarness(
+      rootIdentity: testIdentity("wave4b05"), size: .init(width: 24, height: 10)
+    ) {
+      VStack(alignment: .leading, spacing: 0) {
+        HStack(spacing: 1) {
+          Button("right") { _ = model.proxy?.scrollTo(edge: .trailing) }
+          Button("mix") {
+            _ = model.proxy?.scrollTo(edge: .bottom)
+            _ = model.proxy?.scrollTo(edge: .leading)
+          }
+        }
+        W4TwoAxisLazy(model: model)
+      }
+    }
+    defer { h.shutdown() }
+    _ = try h.clickText("right")
+    _ = try h.render()
+    try #require(model.offset.x == 20 && !h.frame.contains("a0"), "\(model.offset)\n\(h.frame)")
+    _ = try h.clickText("mix")
+    #expect(model.offset.x == 0, "\(model.offset)")
+    #expect(h.frame.contains("a119"), "\(model.offset)\n\(h.frame)")
+  }
+
+  // Control: a later top edge in the same action wins over a bottom edge.
+  @Test func wave4b06BottomThenTopInOneActionEndsAtTop() throws {
+    let model = W4ScrollModel()
+    let h = try StressRuntimeHarness(
+      rootIdentity: testIdentity("wave4b06"), size: .init(width: 24, height: 10)
+    ) {
+      VStack(alignment: .leading, spacing: 0) {
+        Button("mix") {
+          _ = model.proxy?.scrollTo(edge: .bottom)
+          _ = model.proxy?.scrollTo(edge: .top)
+        }
+        W4VariableLazy(model: model)
+      }
+    }
+    defer { h.shutdown() }
+    _ = try h.clickText("mix")
+    #expect(model.offset.y == 0, "\(model.offset)")
+    #expect(h.frame.contains("a0"), "\(h.frame)")
+  }
+
+  // Control: an ID command after an edge command on the same view wins.
+  @Test func wave4b07EdgeThenIDOnOneViewLaterCommandWins() throws {
+    let model = W4ScrollModel()
+    let h = try StressRuntimeHarness(
+      rootIdentity: testIdentity("wave4b07"), size: .init(width: 24, height: 10)
+    ) {
+      VStack(alignment: .leading, spacing: 0) {
+        Button("mix") {
+          _ = model.proxy?.scrollTo(edge: .bottom)
+          _ = model.proxy?.scrollTo(5, anchor: .top)
+        }
+        W4VariableLazy(model: model)
+      }
+    }
+    defer { h.shutdown() }
+    _ = try h.clickText("mix")
+    _ = try h.render()
+    #expect(model.offset.y == 5, "\(model.offset)")
+    #expect(!h.frame.contains("a119"), "\(h.frame)")
+  }
+
+  // A data `Table` reveals a row the same action appended (STUI-1306's Table
+  // twin; `Collections.md:193-194`).
+  @Test(arguments: [false, true])
+  func wave4b08TableScrollToAppendedIDRevealsRow(existing: Bool) throws {
+    let model = W4ScrollModel()
+    let h = try StressRuntimeHarness(
+      rootIdentity: testIdentity("wave4b08", existing ? "existing" : "appended"),
+      size: .init(width: 24, height: 10)
+    ) { W4TableAppendRoot(model: model, appends: !existing) }
+    defer { h.shutdown() }
+    try #require(h.frame.contains("t00") && !h.frame.contains("t19"), "\(h.frame)")
+    _ = try h.clickText("Go")
+    _ = try h.render()
+    let target = existing ? "t19" : "t20"
+    #expect(h.frame.contains(target), "\(h.frame)")
+  }
+
+  // A lazy stack reveals an identified row the same action appended.
+  @Test func wave4b09LazyScrollToAppendedIDRevealsRow() throws {
+    let model = W4ScrollModel()
+    let h = try StressRuntimeHarness(
+      rootIdentity: testIdentity("wave4b09"), size: .init(width: 24, height: 8)
+    ) { W4AppendRoot(model: model, edgeFirst: false, lazyTarget: true) }
+    defer { h.shutdown() }
+    try #require(h.frame.contains("row 00"), "\(h.frame)")
+    _ = try h.clickText("Append")
+    _ = try h.render()
+    #expect(
+      h.frame.contains("row 24"), "result \(String(describing: model.lastResult))\n\(h.frame)")
+  }
+
+  // A body that issues an edge command on every evaluation converges: the
+  // command resolves in the frame that issued it and requests no frame.
+  @Test func wave4b10BodyIssuedEdgeCommandSettles() throws {
+    let model = W4ScrollModel()
+    let h = try StressRuntimeHarness(
+      rootIdentity: testIdentity("wave4b10"), size: .init(width: 24, height: 8)
+    ) { W4BodyEdgeRoot(model: model) }
+    defer { h.shutdown() }
+    _ = try h.renderAfterExternalMutation()
+    _ = try h.render()
+    #expect(!h.runLoop.scheduler.hasPendingFrame(at: .now()), "\(model.evaluations) evaluations")
+    let settled = model.evaluations
+    _ = try h.render()
+    #expect(model.evaluations == settled)
+  }
+}
+
+// MARK: Wave 4 fixtures: pending scroll commands
+
+@MainActor
+private final class W4ScrollModel {
+  var offset = ScrollCellOffset.zero
+  var proxy: ScrollViewProxy?
+  var count = 20
+  var lastResult: Bool?
+  var selection: String?
+  var evaluations = 0
+  var binding: Binding<ScrollCellOffset> { .init(get: { self.offset }, set: { self.offset = $0 }) }
+  var selectionBinding: Binding<String?> {
+    .init(get: { self.selection }, set: { self.selection = $0 })
+  }
+  func capture(_ proxy: ScrollViewProxy) -> Bool {
+    self.proxy = proxy
+    return true
+  }
+}
+
+private struct W4ModelRows: View {
+  let model: W4ScrollModel
+  var identified = false
+  var body: some View {
+    ScrollViewReader { proxy in
+      let _ = model.capture(proxy)
+      ScrollView(.vertical, position: model.binding) {
+        VStack(alignment: .leading, spacing: 0) {
+          ForEach(0..<model.count, id: \.self) { i in
+            if identified {
+              Text(setCRowLabel(i)).id(i)
+            } else {
+              Text(setCRowLabel(i))
+            }
+          }
+        }
+      }.scrollIndicators(.hidden).frame(width: 20, height: 6)
+    }
+  }
+}
+
+private struct W4AppendRoot: View {
+  let model: W4ScrollModel
+  let edgeFirst: Bool
+  var lazyTarget = false
+  @State private var count = 20
+
+  var body: some View {
+    ScrollViewReader { proxy in
+      let _ = model.capture(proxy)
+      VStack(alignment: .leading, spacing: 0) {
+        Button("Append") {
+          if lazyTarget {
+            count += 5
+            model.lastResult = proxy.scrollTo(24, anchor: .bottom)
+          } else if edgeFirst {
+            model.lastResult = proxy.scrollTo(edge: .bottom)
+            count += 5
+          } else {
+            count += 5
+            model.lastResult = proxy.scrollTo(edge: .bottom)
+          }
+        }
+        ScrollView(.vertical, position: model.binding) {
+          if lazyTarget {
+            LazyVStack(alignment: .leading, spacing: 0) {
+              ForEach(0..<count, id: \.self) { i in Text(setCRowLabel(i)).id(i) }
+            }
+          } else {
+            VStack(alignment: .leading, spacing: 0) {
+              ForEach(0..<count, id: \.self) { i in Text(setCRowLabel(i)) }
+            }
+          }
+        }.scrollIndicators(.hidden).frame(width: 20, height: 6)
+      }
+    }
+  }
+}
+
+private struct W4TwoAxisLazy: View {
+  let model: W4ScrollModel
+  var body: some View {
+    ScrollViewReader { proxy in
+      let _ = model.capture(proxy)
+      ScrollView([.horizontal, .vertical], position: model.binding) {
+        LazyVStack(alignment: .leading, spacing: 0) {
+          ForEach(0..<120, id: \.self) { i in
+            Text("a\(i)").frame(width: 40, height: i < 40 ? 1 : 3, alignment: .topLeading)
+          }
+        }
+      }.scrollIndicators(.hidden).frame(width: 20, height: 8)
+    }
+  }
+}
+
+private struct W4VariableLazy: View {
+  let model: W4ScrollModel
+  var body: some View {
+    ScrollViewReader { proxy in
+      let _ = model.capture(proxy)
+      ScrollView(.vertical, position: model.binding) {
+        LazyVStack(alignment: .leading, spacing: 0) {
+          ForEach(0..<120, id: \.self) { i in
+            Text("a\(i)").frame(height: i < 40 ? 1 : 3, alignment: .topLeading).id(i)
+          }
+        }
+      }.scrollIndicators(.hidden).frame(width: 20, height: 8)
+    }
+  }
+}
+
+private struct W4TableRow: Identifiable, Hashable, Sendable {
+  let id: Int
+  var label: String { id < 10 ? "t0\(id)" : "t\(id)" }
+}
+
+private struct W4TableAppendRoot: View {
+  let model: W4ScrollModel
+  let appends: Bool
+  @State private var rows = (0..<20).map { W4TableRow(id: $0) }
+
+  var body: some View {
+    ScrollViewReader { proxy in
+      let _ = model.capture(proxy)
+      VStack(alignment: .leading, spacing: 0) {
+        Button("Go") {
+          if appends {
+            let next = rows.count
+            rows.append(W4TableRow(id: next))
+            model.lastResult = proxy.scrollTo(next)
+          } else {
+            model.lastResult = proxy.scrollTo(19)
+          }
+        }
+        Table(rows, columns: [TableColumn("Name")]) { row in Text(row.label) }
+          .tableHeaders(.hidden).scrollIndicators(.hidden).frame(height: 8)
+      }
+    }
+  }
+}
+
+private struct W4BodyEdgeRoot: View {
+  let model: W4ScrollModel
+  var body: some View {
+    ScrollViewReader { proxy in
+      let _ = model.capture(proxy)
+      ScrollView(.vertical, position: model.binding) {
+        VStack(alignment: .leading, spacing: 0) {
+          let _ = model.record(proxy.scrollTo(edge: .bottom))
+          ForEach(0..<20, id: \.self) { i in Text(setCRowLabel(i)) }
+        }
+      }.scrollIndicators(.hidden).frame(width: 20, height: 6)
+    }
+  }
+}
+
+extension W4ScrollModel {
+  fileprivate func record(_ result: Bool) -> Bool {
+    evaluations += 1
+    lastResult = result
+    return result
+  }
+}

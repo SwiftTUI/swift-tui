@@ -94,18 +94,42 @@ package final class LocalScrollPositionRegistry: Equatable {
     let requestedAnchor: CollectionScrollAnchor
   }
   private var pendingCollectionTargets: [Identity: PendingCollectionTarget] = [:]
-  /// A far-edge command resolved against the extent the previous frame
-  /// measured. Lazy stacks estimate unrealized rows, so the frame that
-  /// realizes the edge can grow or shrink the content; the command is
-  /// re-resolved once that frame publishes its routes (see `sync`).
+  /// Far-edge commands resolved against the extent the previous frame
+  /// measured. Lazy stacks estimate unrealized rows, and the action that
+  /// issued the command may also have changed the content, so the frame that
+  /// lays out the edge can grow or shrink the extent; the command is
+  /// re-resolved once that frame publishes its routes (see `sync`). A route
+  /// owes at most one far edge per axis: bottom (`vertical`) and trailing
+  /// (`horizontal`) are independent, and top or leading cancels only its own
+  /// axis (STUI-1263).
   private struct PendingFarEdge {
-    let edge: Edge
+    var axes: AxisSet
     var requestedOffset: ScrollOffset
     var remainingRefinements: Int
   }
   private var pendingFarEdges: [Identity: PendingFarEdge] = [:]
   /// Bounds re-resolution for content whose extent depends on its own offset.
   private static let farEdgeRefinementLimit = 4
+  /// A `scrollTo(_:anchor:)` that matched nothing the previous frame placed
+  /// or a collection answered for. The action that issued it may have
+  /// inserted its target, so the next sync retries it once against that
+  /// frame's targets and registrations (STUI-1306). Keyed by the reader
+  /// scope, in issue order; a later command from the same scope replaces it.
+  private struct PendingUnresolvedTarget {
+    let scopeIdentity: Identity?
+    let query: ScrollTargetQuery
+    let anchor: UnitPoint?
+    /// The scope's first route and its offset when the command was issued.
+    /// Input that moves that route before the retry supersedes the command.
+    let routeIdentity: Identity?
+    let routeOffset: ScrollOffset?
+  }
+  private var pendingUnresolvedTargets: [PendingUnresolvedTarget] = []
+  /// Requests the frame whose sync resolves a deferred command: a far edge
+  /// that moved nothing against the previous extent, or an unresolved target.
+  /// The run loop installs its scheduler. Without a frame such a command
+  /// would wait for an unrelated later frame and then apply there.
+  package weak var deferredCommandInvalidator: (any Invalidating)?
   /// What each scroll route last auto-revealed (focused element + text cursor),
   /// keyed by the route identity. Lets `sync` reveal changed focus or cursor
   /// instead of enforcing a standing per-frame constraint
@@ -434,21 +458,51 @@ package final class LocalScrollPositionRegistry: Equatable {
     anchor: UnitPoint?,
     scopeIdentity: Identity?
   ) -> Bool {
+    removePendingUnresolvedTarget(scopeIdentity: scopeIdentity)
+    if let handled = resolveScrollTarget(query, anchor: anchor, scopeIdentity: scopeIdentity) {
+      return handled
+    }
+    // Nothing the previous frame placed, and no collection, matches. The
+    // action may have inserted the target: retry after the next layout.
+    let route = firstRoute(matching: scopeIdentity)
+    pendingUnresolvedTargets.append(
+      PendingUnresolvedTarget(
+        scopeIdentity: scopeIdentity, query: query, anchor: anchor,
+        routeIdentity: route?.identity,
+        routeOffset: route.flatMap { registrations[$0.identity]?.currentOffset() }))
+    requestDeferredCommandFrame(for: route?.identity ?? scopeIdentity)
+    return false
+  }
+
+  /// Resolves a target command against the latest published frame. Returns
+  /// nil when no placed target and no collection matches the query.
+  private func resolveScrollTarget(
+    _ query: ScrollTargetQuery,
+    anchor: UnitPoint?,
+    scopeIdentity: Identity?
+  ) -> Bool? {
     if let target = firstTarget(matching: query, scopeIdentity: scopeIdentity),
       let route = latestScrollRoutes.first(where: { $0.identity == target.scrollIdentity }),
       let registration = registrations[target.scrollIdentity]
     {
       pendingExplicitScrollRoutes.insert(route.identity)
+      // A later command on a route replaces its pending far edge.
+      pendingFarEdges.removeValue(forKey: route.identity)
       if let handled = registration.revealTarget?(query, anchor) {
         recordCollectionTarget(query, anchor: anchor, registration: registration, changed: handled)
         return handled
       }
       let original = registration.currentOffset()
+      // The target's rect is where the last published frame placed it, at
+      // the offset that frame laid out. An earlier command of the same
+      // action may already have moved the offset, so the rect is first
+      // carried to the current offset; the commands then compose in order.
       let changed = scrollTo(
         rect: target.rect,
         anchor: anchor,
         route: route,
-        registration: registration
+        registration: registration,
+        placedAt: lastSyncedPositions[route.identity]?.offset
       )
       if target.isEstimated {
         pendingLazyTargets[route.identity] = .init(
@@ -472,10 +526,58 @@ package final class LocalScrollPositionRegistry: Equatable {
         continue
       }
       pendingExplicitScrollRoutes.insert(route.identity)
+      pendingFarEdges.removeValue(forKey: route.identity)
       recordCollectionTarget(query, anchor: anchor, registration: registration, changed: handled)
       return handled
     }
-    return false
+    return nil
+  }
+
+  /// A relative or absolute command replaces every command still pending on
+  /// its route and scope: the later command wins.
+  private func supersedePendingCommands(on identity: Identity, scopeIdentity: Identity?) {
+    removePendingUnresolvedTarget(scopeIdentity: scopeIdentity)
+    pendingFarEdges.removeValue(forKey: identity)
+    pendingLazyTargets.removeValue(forKey: identity)
+    pendingCollectionTargets.removeValue(forKey: identity)
+  }
+
+  private func removePendingUnresolvedTarget(scopeIdentity: Identity?) {
+    guard !pendingUnresolvedTargets.isEmpty else { return }
+    pendingUnresolvedTargets.removeAll { $0.scopeIdentity == scopeIdentity }
+  }
+
+  /// Retries each unresolved target once, against the frame this sync
+  /// received. Input that moved the scope's route since the command
+  /// supersedes it; a target that still matches nothing is dropped.
+  private func retryUnresolvedTargets() -> Bool {
+    guard !pendingUnresolvedTargets.isEmpty else { return false }
+    let pending = pendingUnresolvedTargets
+    pendingUnresolvedTargets.removeAll(keepingCapacity: true)
+    var changed = false
+    for command in pending {
+      if let identity = command.routeIdentity, let offset = command.routeOffset,
+        let registration = registrations[identity], registration.currentOffset() != offset
+      {
+        continue
+      }
+      if resolveScrollTarget(
+        command.query, anchor: command.anchor, scopeIdentity: command.scopeIdentity)
+        == true
+      {
+        changed = true
+      }
+    }
+    return changed
+  }
+
+  /// See ``deferredCommandInvalidator``. A command issued while a view is
+  /// being evaluated needs no request: the sync of the frame being built
+  /// resolves it, and requesting another frame there would re-run the body
+  /// that issued the command on every frame.
+  private func requestDeferredCommandFrame(for identity: Identity?) {
+    guard let identity, ViewNodeContext.current == nil else { return }
+    deferredCommandInvalidator?.requestInvalidation(of: [identity])
   }
 
   private func recordCollectionTarget(
@@ -493,13 +595,28 @@ package final class LocalScrollPositionRegistry: Equatable {
       query: query, anchor: anchor, requestedAnchor: requestedAnchor)
   }
 
+  /// Scrolls `route` so that `targetRect` meets `anchor`, and reports whether
+  /// the offset moved. `placedOffset` is the offset of the frame that placed
+  /// the rect, when it may differ from the current one.
   private func scrollTo(
-    rect targetRect: CellRect,
+    rect placedRect: CellRect,
     anchor: UnitPoint?,
     route: ScrollRoute,
-    registration: ScrollPositionRegistrationSnapshot
+    registration: ScrollPositionRegistrationSnapshot,
+    placedAt placedOffset: ScrollOffset? = nil
   ) -> Bool {
     let currentOffset = registration.currentOffset()
+    var targetRect = placedRect
+    if let placedOffset {
+      let producer = registration.revealTarget != nil
+      let placed = layoutOffset(placedOffset, in: route, preservesProducerOffset: producer)
+      let current = layoutOffset(currentOffset, in: route, preservesProducerOffset: producer)
+      targetRect = CellRect(
+        origin: CellPoint(
+          x: SaturatingConversion.adding(placedRect.origin.x, placed.x - current.x),
+          y: SaturatingConversion.adding(placedRect.origin.y, placed.y - current.y)),
+        size: placedRect.size)
+    }
     let adjustedOffset = adjustedOffset(
       currentOffset,
       scrolling: targetRect,
@@ -526,25 +643,58 @@ package final class LocalScrollPositionRegistry: Equatable {
       return false
     }
     pendingExplicitScrollRoutes.insert(route.identity)
+    removePendingUnresolvedTarget(scopeIdentity: scopeIdentity)
+    // A later command on a route replaces its pending target refinements.
+    pendingLazyTargets.removeValue(forKey: route.identity)
+    pendingCollectionTargets.removeValue(forKey: route.identity)
     if let scrollToEdge = registration.scrollToEdge {
       return scrollToEdge(edge)
     }
 
     let currentOffset = registration.currentOffset()
     let next = edgeOffset(edge, from: currentOffset, in: route)
+    recordFarEdge(edge, on: route.identity, axes: registration.axes, from: currentOffset, to: next)
     guard next != currentOffset else {
+      // The previous extent puts the edge here, but the action that issued
+      // the command may have grown the content (STUI-1305). The pending
+      // edge re-resolves after the next layout, which this requests.
+      if pendingFarEdges[route.identity] != nil {
+        requestDeferredCommandFrame(for: route.identity)
+      }
       return false
     }
 
     registration.applyOffset(next)
-    if edge == .bottom || edge == .trailing {
-      pendingFarEdges[route.identity] = .init(
-        edge: edge, requestedOffset: next,
-        remainingRefinements: Self.farEdgeRefinementLimit)
-    } else {
-      pendingFarEdges.removeValue(forKey: route.identity)
-    }
     return true
+  }
+
+  /// Records a far-edge command on its own axis, or cancels that axis for a
+  /// near edge. A pending edge whose route has moved since its own command
+  /// was superseded and does not carry over.
+  private func recordFarEdge(
+    _ edge: Edge, on identity: Identity, axes routeAxes: AxisSet,
+    from currentOffset: ScrollOffset, to next: ScrollOffset
+  ) {
+    var pending = pendingFarEdges[identity].flatMap {
+      $0.requestedOffset == currentOffset ? $0 : nil
+    }
+    let axis: AxisSet = edge == .top || edge == .bottom ? .vertical : .horizontal
+    if edge == .bottom || edge == .trailing {
+      if routeAxes.contains(axis) {
+        pending =
+          pending ?? PendingFarEdge(axes: [], requestedOffset: next, remainingRefinements: 0)
+        pending?.axes.insert(axis)
+      }
+    } else {
+      pending?.axes.remove(axis)
+    }
+    guard var pending, !pending.axes.isEmpty else {
+      pendingFarEdges.removeValue(forKey: identity)
+      return
+    }
+    pending.requestedOffset = next
+    pending.remainingRefinements = Self.farEdgeRefinementLimit
+    pendingFarEdges[identity] = pending
   }
 
   /// Refines every pending far edge whose route this frame published, and
@@ -564,19 +714,84 @@ package final class LocalScrollPositionRegistry: Equatable {
         pendingFarEdges.removeValue(forKey: identity)
         continue
       }
-      let next = edgeOffset(pending.edge, from: pending.requestedOffset, in: route)
+      var next = pending.requestedOffset
+      if pending.axes.contains(.vertical) { next = edgeOffset(.bottom, from: next, in: route) }
+      if pending.axes.contains(.horizontal) { next = edgeOffset(.trailing, from: next, in: route) }
       guard next != pending.requestedOffset else {
         pendingFarEdges.removeValue(forKey: identity)
         continue
       }
       pendingFarEdges[identity] = .init(
-        edge: pending.edge, requestedOffset: next,
+        axes: pending.axes, requestedOffset: next,
         remainingRefinements: pending.remainingRefinements - 1)
       registration.applyOffset(next)
       refined = true
     }
     for identity in unvisited {
       pendingFarEdges.removeValue(forKey: identity)
+    }
+    return refined
+  }
+
+  /// Refines each command's estimated lazy target against the materialized
+  /// frame. Empty targets restore the pre-command viewport. A later input
+  /// offset supersedes the command instead of being overwritten by it.
+  private func refineLazyTargets(in scrollRoutes: [ScrollRoute]) -> Bool {
+    guard !pendingLazyTargets.isEmpty else { return false }
+    var unvisited = Set(pendingLazyTargets.keys)
+    var refined = false
+    for route in scrollRoutes where unvisited.remove(route.identity) != nil {
+      let identity = route.identity
+      guard let pending = pendingLazyTargets[identity],
+        let registration = registrations[identity],
+        registration.currentOffset() == pending.requestedOffset
+      else {
+        pendingLazyTargets.removeValue(forKey: identity)
+        continue
+      }
+      let target = firstTarget(matching: pending.query, scopeIdentity: identity)
+      guard target?.isEstimated != true else { continue }
+      pendingLazyTargets.removeValue(forKey: identity)
+      if let target {
+        if scrollTo(
+          rect: target.rect, anchor: pending.anchor, route: route,
+          registration: registration)
+        {
+          refined = true
+        }
+      } else if registration.currentOffset() != pending.originalOffset {
+        registration.applyOffset(pending.originalOffset)
+        refined = true
+      }
+    }
+    for identity in unvisited {
+      pendingLazyTargets.removeValue(forKey: identity)
+    }
+    return refined
+  }
+
+  /// Refines a collection target once the requested window has been
+  /// measured. Using its logical anchor avoids mistaking a height correction
+  /// for new input.
+  private func refineCollectionTargets(in scrollRoutes: [ScrollRoute]) -> Bool {
+    guard !pendingCollectionTargets.isEmpty else { return false }
+    var unvisited = Set(pendingCollectionTargets.keys)
+    var refined = false
+    for route in scrollRoutes where unvisited.remove(route.identity) != nil {
+      let identity = route.identity
+      guard let pending = pendingCollectionTargets[identity],
+        let registration = registrations[identity],
+        registration.currentCollectionAnchor() == pending.requestedAnchor
+      else {
+        pendingCollectionTargets.removeValue(forKey: identity)
+        continue
+      }
+      guard route.collectionScrollLayout?.anchor == pending.requestedAnchor else { continue }
+      pendingCollectionTargets.removeValue(forKey: identity)
+      if registration.revealTarget?(pending.query, pending.anchor) == true { refined = true }
+    }
+    for identity in unvisited {
+      pendingCollectionTargets.removeValue(forKey: identity)
     }
     return refined
   }
@@ -614,6 +829,7 @@ package final class LocalScrollPositionRegistry: Equatable {
     }
 
     pendingExplicitScrollRoutes.insert(route.identity)
+    supersedePendingCommands(on: route.identity, scopeIdentity: scopeIdentity)
     let currentOffset = registration.currentOffset()
     let next = clampedOffset(
       ScrollOffset(
@@ -645,6 +861,7 @@ package final class LocalScrollPositionRegistry: Equatable {
     }
 
     pendingExplicitScrollRoutes.insert(route.identity)
+    supersedePendingCommands(on: route.identity, scopeIdentity: scopeIdentity)
     let currentOffset = registration.currentOffset()
     let next = clampedOffset(
       ScrollOffset(
@@ -702,56 +919,19 @@ package final class LocalScrollPositionRegistry: Equatable {
 
     pendingExplicitScrollRoutes.formIntersection(scrollRoutes.map(\.identity))
 
-    // Refine a command's estimated target against the materialized frame.
-    // Empty targets restore the pre-command viewport. A later input offset
-    // supersedes this pending command instead of being overwritten by it.
-    for (identity, pending) in pendingLazyTargets {
-      guard let route = scrollRoutes.first(where: { $0.identity == identity }),
-        let registration = registrations[identity],
-        registration.currentOffset() == pending.requestedOffset
-      else {
-        pendingLazyTargets.removeValue(forKey: identity)
-        continue
-      }
-      let target = firstTarget(matching: pending.query, scopeIdentity: identity)
-      guard target?.isEstimated != true else { continue }
-      pendingLazyTargets.removeValue(forKey: identity)
-      if let target {
-        if scrollTo(
-          rect: target.rect, anchor: pending.anchor, route: route,
-          registration: registration)
-        {
-          return true
-        }
-      } else if registration.currentOffset() != pending.originalOffset {
-        registration.applyOffset(pending.originalOffset)
-        return true
-      }
-    }
-
-    // Re-resolve every far-edge command against the extent this frame
-    // measured, so the commands of one action share the eager rerender
-    // (STUI-1243). Routes are visited in frame order. Only while the route
-    // still holds the offset the command wrote: any other input (or a
-    // commit-time clamp) supersedes the command.
-    if refineFarEdges(in: scrollRoutes) {
-      return true
-    }
-
-    // Refine once the requested collection window has been measured. Using
-    // its logical anchor avoids mistaking a height correction for new input.
-    for (identity, pending) in pendingCollectionTargets {
-      guard let route = scrollRoutes.first(where: { $0.identity == identity }),
-        let registration = registrations[identity],
-        registration.currentCollectionAnchor() == pending.requestedAnchor
-      else {
-        pendingCollectionTargets.removeValue(forKey: identity)
-        continue
-      }
-      guard route.collectionScrollLayout?.anchor == pending.requestedAnchor else { continue }
-      pendingCollectionTargets.removeValue(forKey: identity)
-      if registration.revealTarget?(pending.query, pending.anchor) == true { return true }
-    }
+    // Refine every pending command against the frame this sync received,
+    // visiting routes in frame order, and only then report a change: all the
+    // commands of one action land in the same eager rerender, before the next
+    // commit's anchor preservation could supersede one of them (STUI-1243,
+    // STUI-1264). Each refinement holds only while its route keeps the offset
+    // or anchor the command wrote; any other input supersedes it.
+    var refined = refineLazyTargets(in: scrollRoutes)
+    if refineFarEdges(in: scrollRoutes) { refined = true }
+    if refineCollectionTargets(in: scrollRoutes) { refined = true }
+    // Last, so a retried target's own refinement waits for the frame that
+    // lays out the offset it writes.
+    if retryUnresolvedTargets() { refined = true }
+    if refined { return true }
 
     let explicitScrollRoutes = pendingExplicitScrollRoutes
     pendingExplicitScrollRoutes.removeAll(keepingCapacity: true)

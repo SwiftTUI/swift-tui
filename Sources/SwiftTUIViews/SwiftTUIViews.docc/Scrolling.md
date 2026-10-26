@@ -170,6 +170,15 @@ whether anything happened; discard it otherwise. Inside a data-backed ``List``
 or ``Table``, `scrollTo` reaches a row by ID even when that row is not
 currently realized.
 
+A command takes the content as the issuing action leaves it. The action that
+appends rows can also call `scrollTo(edge: .bottom)` or `scrollTo(_:anchor:)`
+with a new row's ID, in either order, and the view reaches the new content.
+The command resolves again after the next layout. Its result reports only the
+movement it made against the content already laid out, so it can be `false`
+for a command that moves on the next frame. Several commands in one action
+take effect in order. Edges on different axes combine, and a later command
+replaces an earlier one on the same axis.
+
 ## Control The Indicators
 
 Overflowing axes show scroll indicators by default. Tune them per axis with

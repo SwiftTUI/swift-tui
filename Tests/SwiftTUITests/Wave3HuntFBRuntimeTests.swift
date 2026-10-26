@@ -326,13 +326,8 @@ struct Wave3HuntFBScrollEdgeTests {
       #expect(
         h.frame.contains("a119"), "\(bottomFirst ? "bottom first" : "trailing first"):\n\(h.frame)")
     }
-    if bottomFirst {
-      w3fbKnown(
-        "NEW-2: proxy bottom then trailing on one two-axis lazy view in one action stops at a111-a113; the trailing command overwrites the route's pending far edge, so only x is refined (LocalScrollPositionRegistry.swift:519-547); contract: Scrolling.md:139-150, 206-210; adjacent STUI-1243"
-      ) { reachedBottom() }
-    } else {
-      reachedBottom()
-    }
+    // STUI-1263 (repaired in wave 4): a route owes one far edge per axis.
+    reachedBottom()
   }
 
   // w3fb012: three bottom edges in one action all refine.
@@ -433,13 +428,9 @@ struct Wave3HuntFBScrollEdgeTests {
     func reachedBottom() {
       #expect(h.frame.contains("a119"), "\(estimatedTarget ? "estimated" : "placed"):\n\(h.frame)")
     }
-    if estimatedTarget {
-      w3fbKnown(
-        "NEW-3: a far edge on lazy view a and a scrollTo(id) to an unplaced row of view b in one action leave a at a111/a112; the lazy-target loop refines and returns before refineFarEdges, and anchor preservation then supersedes a's pending edge (LocalScrollPositionRegistry.swift:708-737); contract: Scrolling.md:139-150, Divergences-And-Gaps.md:398-407; adjacent STUI-1243"
-      ) { reachedBottom() }
-    } else {
-      reachedBottom()
-    }
+    // STUI-1264 (repaired in wave 4): every pending command refines in one
+    // sync pass.
+    reachedBottom()
   }
 }
 
