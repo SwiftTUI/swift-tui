@@ -29,6 +29,10 @@ struct SubtreeRemovalPolicy: Sendable, Equatable {
   var consultsLifetimeAnchors: Bool
   /// Apply the parent-detached keep-guard at all.
   var appliesParentDetachedKeepGuard: Bool
+  /// Plan the removed root's own disappear and task-cancel events. Like the
+  /// anchor and keep-guard choices, this applies to the root it was chosen for
+  /// only; a descent always plans its nodes' events.
+  var emitsLifecycleEvents = true
 
   /// Every guard applies and nothing is spared for having been visited.
   static let ordinary = Self(
@@ -53,6 +57,21 @@ struct SubtreeRemovalPolicy: Sendable, Equatable {
     sparesVisitedDescendants: true,
     consultsLifetimeAnchors: false,
     appliesParentDetachedKeepGuard: true
+  )
+
+  /// The finalize-barrier reclaim of an absorbed chain-collapse interior
+  /// (`pruneAbsorbedShadowedNodes`): ``absorbingIntoCollapse`` without the
+  /// root's own lifecycle events. The interior never entered a committed tree
+  /// in its own right; the absorber committed its output and carries the same
+  /// lifecycle handler IDs, so the absorber's appearance and eventual removal
+  /// are the view's lifecycle. Planning the interior's disappear ran the
+  /// view's `onDisappear` at mount, before its `onAppear`, and its task
+  /// cancels resolve through the identity index to the absorber (STUI-1299).
+  static let reclaimingAbsorbedShadow = Self(
+    sparesVisitedDescendants: true,
+    consultsLifetimeAnchors: false,
+    appliesParentDetachedKeepGuard: true,
+    emitsLifecycleEvents: false
   )
 
   /// Barrier strand pruning: the census reachability walk already proved this
@@ -440,7 +459,8 @@ extension ViewGraph {
         snapshot.lifecycleMetadata
       }
 
-    let emitsOwnLifecycleEvents = node.participatesInStructuralLifecycle
+    let emitsOwnLifecycleEvents =
+      policy.emitsLifecycleEvents && node.participatesInStructuralLifecycle
 
     if emitsOwnLifecycleEvents {
       for task in lifecycleMetadata.tasks {

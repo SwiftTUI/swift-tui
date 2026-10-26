@@ -170,7 +170,9 @@ and reports `state.imperativeSeedFallback`, even if it wrote state before
 removal. In a running app its later writes are discarded, so they never seed
 a new mount; in a snapshot context they reach later snapshots, as above. A
 separately retained `Binding` retains its owner-specific fallback;
-it cannot write into a new mount. Member bindings preserve their source and
+it cannot write into a new mount. So does the appear or initial change a view
+still owes when the focus re-render of the frame that mounted it removed it:
+it runs against that owner's own retained value. Member bindings preserve their source and
 member path, so changing from one equal-valued member to another changes the
 binding's owner route.
 

@@ -561,7 +561,9 @@ public struct State<Value> {
   /// occupant node (the ratified focused-values category: dispatch context
   /// is runtime state). The refresh never crosses graph scopes and requires
   /// a live occupant. Committed removal cannot fall through to an unrelated
-  /// ambient owner. Only a projected Binding may retain the retired value.
+  /// ambient owner. Only a projected Binding, or a carried lifecycle handler of
+  /// the removed view (``CommittedOwnerHandlerScope``), may retain the retired
+  /// value.
   private func captureLocation(retainingRemovedOwner: Bool) -> DynamicStateLocation<Value>? {
     guard let binding = capture else {
       return nil
@@ -578,7 +580,7 @@ public struct State<Value> {
       return location(for: refreshedOwner, path: binding.path)
     }
     StateCaptureCensus.record(.captureMiss)
-    if retainingRemovedOwner {
+    if retainingRemovedOwner || CommittedOwnerHandlerScope.isActive {
       return location(
         for: binding.owner, path: binding.path,
         retiredOwnerIsSnapshot: binding.isSnapshotOwner)
