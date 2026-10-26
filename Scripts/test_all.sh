@@ -940,8 +940,16 @@ elif [ "$lane" = core ]; then
 
   run_function_step \
     "Run SwiftTUICLI tests" \
-    "$(swift_command_text test --filter SwiftTUICLITests)" \
-    run_swift test --filter SwiftTUICLITests
+    "$(swift_command_text test --filter SwiftTUICLITests --skip SwiftTUICLITests.AdversarialSetEAttachLifetimeTests)" \
+    run_swift test --filter SwiftTUICLITests --skip SwiftTUICLITests.AdversarialSetEAttachLifetimeTests
+
+  # Isolated for contention: the attach lifetime suite counts the process's
+  # open descriptors before and after each server, scan and request cycle,
+  # so a sibling suite opening sockets in the parallel lane reads as a leak.
+  run_function_step \
+    "Run SwiftTUICLI attach lifetime tests" \
+    "$(swift_command_text test --filter SwiftTUICLITests.AdversarialSetEAttachLifetimeTests)" \
+    run_swift test --filter SwiftTUICLITests.AdversarialSetEAttachLifetimeTests
 
   run_function_step \
     "Run SwiftTUIPTYPrimitives tests" \
@@ -1103,8 +1111,16 @@ if [ "$lane" = all ]; then
 
   run_function_step \
     "Run SwiftTUICLI tests" \
-    "$(swift_command_text test --filter SwiftTUICLITests)" \
-    run_swift test --filter SwiftTUICLITests
+    "$(swift_command_text test --filter SwiftTUICLITests --skip SwiftTUICLITests.AdversarialSetEAttachLifetimeTests)" \
+    run_swift test --filter SwiftTUICLITests --skip SwiftTUICLITests.AdversarialSetEAttachLifetimeTests
+
+  # Isolated for contention: the attach lifetime suite counts the process's
+  # open descriptors before and after each server, scan and request cycle,
+  # so a sibling suite opening sockets in the parallel lane reads as a leak.
+  run_function_step \
+    "Run SwiftTUICLI attach lifetime tests" \
+    "$(swift_command_text test --filter SwiftTUICLITests.AdversarialSetEAttachLifetimeTests)" \
+    run_swift test --filter SwiftTUICLITests.AdversarialSetEAttachLifetimeTests
 
   run_function_step \
     "Run SwiftTUIPTYPrimitives tests" \
