@@ -285,6 +285,21 @@ package final class LayoutPassContext: Sendable {
     }
   }
 
+  /// The innermost hint when `identity` holds its claim, read without
+  /// claiming. An exhaustive lazy product records it (`claimedHint`): the
+  /// stack claimed a hint it could not window, so the product is valid only
+  /// for that hint.
+  package func currentMeasureViewportHint(
+    claimedBy identity: Identity
+  ) -> MeasureViewportHint? {
+    state.withLock {
+      guard let last = $0.measureViewportHints.last, last.claimedBy == identity else {
+        return nil
+      }
+      return last.hint
+    }
+  }
+
   package func pushMeasureViewportHint(_ hint: MeasureViewportHint) {
     state.withLock {
       $0.measureViewportHints.append(.init(hint: hint, claimedBy: nil))

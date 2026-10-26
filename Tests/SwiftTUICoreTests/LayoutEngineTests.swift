@@ -1862,6 +1862,81 @@ struct LayoutEngineTests {
     passContext.popMeasureViewportHint()
   }
 
+  // STUI-1269: a lazy stack that claims a zero-length viewport hint cannot
+  // window it and measures exhaustively. That product depends on the
+  // viewport, so the proposal-keyed cache must not serve it to a later
+  // round under a finite hint: a serve skips the claim (and lets a later
+  // indexed container claim instead), while the fresh pass windows. The
+  // wrapper case pins that the dependence propagates to cached ancestors.
+  @Test(
+    "a lazy stack's vacuous-hint claim keeps its exhaustive product from being served",
+    arguments: [false, true])
+  func vacuousHintClaimIsNotServedFromTheCache(wrapped: Bool) throws {
+    let cache = MeasurementCache()
+    let engine = LayoutEngine(cache: cache)
+    let root = viewportDependenceFixture(wrapped: wrapped)
+    let proposal = ProposedSize(width: .finite(8), height: .unspecified)
+    let passContext = LayoutPassContext(retainedLayout: nil)
+    let vacuous = MeasureViewportHint(
+      axes: [.vertical], contentOffset: .zero, viewportSize: .init(width: 8, height: 0))
+    let finite = MeasureViewportHint(
+      axes: [.vertical], contentOffset: .zero, viewportSize: .init(width: 8, height: 5))
+
+    let first = passContext.withMeasureViewportHint(vacuous) {
+      engine.measure(root, proposal: proposal, passContext: passContext)
+    }
+    let firstLazy = try #require(lazyStackSnapshot(in: first))
+    #expect(firstLazy.measuredWindow == nil, "a zero-length viewport never windows")
+    #expect(first.consumesMeasureViewport)
+
+    let second = passContext.withMeasureViewportHint(finite) {
+      engine.measure(root, proposal: proposal, passContext: passContext)
+    }
+    let secondLazy = try #require(lazyStackSnapshot(in: second))
+    #expect(
+      secondLazy.measuredWindow != nil,
+      "the finite round was served the vacuous round's exhaustive product")
+    let coldContext = LayoutPassContext(retainedLayout: nil)
+    let cold = coldContext.withMeasureViewportHint(finite) {
+      LayoutEngine().measure(root, proposal: proposal, passContext: coldContext)
+    }
+    #expect(second.measuredSize == cold.measuredSize)
+    #expect(secondLazy.measuredWindow == lazyStackSnapshot(in: cold)?.measuredWindow)
+  }
+
+  // Neighbours of STUI-1269: products that consumed no claim stay
+  // proposal-keyed cache entries. With no hint in scope a lazy stack is
+  // exhaustive under any proposal-equal round; a claim-denied stack (another
+  // indexed container holds the hint) is denied again once that claimer
+  // claims, so serving it skips nothing.
+  @Test(
+    "lazy stacks that claimed no hint are still served from the cache",
+    arguments: [false, true])
+  func unclaimedLazyStackProductsStayCached(denied: Bool) throws {
+    let cache = MeasurementCache()
+    let engine = LayoutEngine(cache: cache)
+    let root = viewportDependenceFixture(wrapped: false)
+    let proposal = ProposedSize(width: .finite(8), height: .unspecified)
+    let passContext = LayoutPassContext(retainedLayout: nil)
+    let hint = MeasureViewportHint(
+      axes: [.vertical], contentOffset: .zero, viewportSize: .init(width: 8, height: 5))
+    if denied {
+      passContext.pushMeasureViewportHint(hint)
+      #expect(passContext.claimCurrentMeasureViewportHint(for: testIdentity("claimer")) == hint)
+    }
+    defer { if denied { passContext.popMeasureViewportHint() } }
+
+    let first = engine.measure(root, proposal: proposal, passContext: passContext)
+    let before = cache.metrics
+    let second = engine.measure(root, proposal: proposal, passContext: passContext)
+    let after = cache.metrics
+    #expect(lazyStackSnapshot(in: first)?.measuredWindow == nil)
+    #expect(!first.consumesMeasureViewport)
+    #expect(after.lookups - before.lookups == 1, "the stack itself was not served")
+    #expect(after.hits - before.hits == 1)
+    #expect(second == first)
+  }
+
   @Test("flexible frame resolves unspecified finite and infinite proposals")
   func flexibleFrameResolvesProposalKinds() {
     let engine = LayoutEngine()
@@ -2960,4 +3035,38 @@ struct PlacementMismatchDiagnosticsTests {
       }
     )
   }
+}
+
+/// Twenty unit rows whose second half is wider than the first: a window over
+/// the leading rows measures a narrower stack than the exhaustive product.
+private func viewportDependenceFixture(wrapped: Bool) -> ResolvedNode {
+  let rows = (0..<20).map { index in
+    leaf("vd-row-\(index)", size: .init(width: index < 10 ? 4 : 6, height: 1))
+  }
+  let lazy = ResolvedNode(
+    viewNodeID: testViewNodeID("vd-lazy"),
+    identity: testIdentity("vd-lazy"),
+    kind: .view("LazyVStack"),
+    layoutBehavior: .lazyStack(
+      axis: .vertical, spacing: 0, horizontalAlignment: .leading, verticalAlignment: .top),
+    indexedChildSource: TestIndexedChildSource(
+      identityRoot: testIdentity("vd-lazy"), children: rows)
+  )
+  guard wrapped else { return lazy }
+  return ResolvedNode(
+    viewNodeID: testViewNodeID("vd-wrapper"),
+    identity: testIdentity("vd-wrapper"),
+    kind: .view("Padding"),
+    children: [lazy],
+    layoutBehavior: .padding(.init(top: 0, leading: 1, bottom: 0, trailing: 1))
+  )
+}
+
+private func lazyStackSnapshot(in measured: MeasuredNode) -> LazyStackAllocationSnapshot? {
+  var pending = [measured]
+  while let node = pending.popLast() {
+    if let snapshot = node.containerAllocationSnapshot?.lazyStack { return snapshot }
+    pending.append(contentsOf: node.childMeasurements)
+  }
+  return nil
 }

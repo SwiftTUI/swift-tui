@@ -333,10 +333,12 @@ extension LayoutEngine {
         }
       }
       if let matching {
-        let viewport = mainDimension(of: context.hint.viewportSize, for: axis)
-        snapshot.correctedContentOffset = min(
-          max(0, matching.mainOffset - viewportOffset),
-          max(0, cursor - viewport))
+        // Preserve the anchor's viewport position. The stack does not know the
+        // scroll range: other content can follow it, so clamping to its own
+        // extent (`cursor - viewport`) snapped such content back on every
+        // re-render at an unchanged offset and undid focus reveals
+        // (STUI-1270). The applying scroll layout clamps to its content.
+        snapshot.correctedContentOffset = max(0, matching.mainOffset - viewportOffset)
       } else {
         snapshot.correctedContentOffset = 0
       }

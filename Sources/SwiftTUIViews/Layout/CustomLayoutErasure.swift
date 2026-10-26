@@ -646,9 +646,18 @@ final class LayoutWorkerProxy<L: Layout>: WorkerCustomLayoutProxy,
         var pending = [childMeasurement]
         while let candidate = pending.popLast() {
           if let snapshot = candidate.containerAllocationSnapshot?.lazyStack,
-            let corrected = snapshot.correctedContentOffset,
+            let anchored = snapshot.correctedContentOffset,
             snapshot.windowHint?.scrollIdentity == node.identity
           {
+            // The stack preserves its anchor without knowing the scroll range
+            // (content can follow it); clamp to this content's range here.
+            let contentLength =
+              snapshot.axis == .vertical
+              ? childMeasurement.measuredSize.height : childMeasurement.measuredSize.width
+            let viewportLength =
+              snapshot.axis == .vertical
+              ? viewport.viewportRect.size.height : viewport.viewportRect.size.width
+            let corrected = min(anchored, max(0, contentLength - viewportLength))
             let requested = viewport.contentOffset
             var offset = requested
             if snapshot.axis == .vertical {

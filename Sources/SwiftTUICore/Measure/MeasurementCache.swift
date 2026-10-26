@@ -82,6 +82,15 @@ package final class MeasurementCache: Sendable {
         return nil
       }
 
+      // A product whose measurement claimed a measure-viewport hint it could
+      // not window is valid only for that hint, and serving it would skip the
+      // claim: a later indexed container would then claim and window instead
+      // of it (STUI-1269). Keep the entry as a size baseline; never serve it.
+      guard !cached.node.consumesMeasureViewport else {
+        storage.misses += 1
+        return nil
+      }
+
       // Verify equivalence before touching LRU bookkeeping.  If the cached
       // entry is stale we evict it here so subsequent lookups don't keep
       // re-fetching and re-rejecting the same mismatching cache line.
@@ -146,6 +155,10 @@ package final class MeasurementCache: Sendable {
     // This cache is keyed by proposal, not by the ambient viewport. Keep
     // viewport-dependent products (including their wrappers) on the retained
     // path, where the consuming allocation can validate and claim its hint.
+    // An exhaustive lazy stack that claimed a hint it could not window (and its
+    // wrappers) is stored, because its size remains a baseline for the
+    // size-stability certificate (`storedBaselineSizes`), but `lookup` never
+    // serves it (STUI-1269).
     guard !node.isEstimateDerived, !node.containsWindowedMeasurement else { return }
     storage.withLock { storage in
       storage.stores += 1

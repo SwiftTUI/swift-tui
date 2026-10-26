@@ -167,6 +167,7 @@ package struct LazyStackAllocationSnapshot: Equatable, Sendable {
     var correctedContentOffset: Int?
     var exactElementIndices: Set<Int> = []
     var hint: MeasureViewportHint?
+    var claimedHint: MeasureViewportHint?
   }
   private final class WindowStorage: Equatable, Sendable {
     let value: WindowData
@@ -239,6 +240,25 @@ package struct LazyStackAllocationSnapshot: Equatable, Sendable {
     get { windowStorage?.value.hint }
     set { updateWindow { $0.hint = newValue } }
   }
+  /// The in-scope measure-viewport hint an EXHAUSTIVE product's measurement
+  /// claimed without windowing it: a zero-length viewport on the stack's axis
+  /// (a scroll layout's first, zero-height round) or the negative-gap
+  /// fallback. `nil` on windowed products (see ``windowHint``), on claim-denied
+  /// products and when no hint on the axis was in scope.
+  ///
+  /// Such a product still depends on the viewport: the same proposal under a
+  /// finite hint windows, and serving the product skips the claim, so a later
+  /// indexed container would claim and window instead (STUI-1269). It is
+  /// valid only for this hint, like a windowed product.
+  package var claimedHint: MeasureViewportHint? {
+    get { windowStorage?.value.claimedHint }
+    set { updateWindow { $0.claimedHint = newValue } }
+  }
+  /// Whether this product's measurement consumed a measure-viewport hint:
+  /// it windowed against one, or claimed one it could not window.
+  package var consumesMeasureViewport: Bool {
+    measuredWindow != nil || claimedHint != nil
+  }
 
   package init(
     axis: Axis,
@@ -297,6 +317,12 @@ package struct MeasuredNode: Equatable, Sendable {
   /// it. Wrappers must not turn windowed allocations into proposal-only cache
   /// entries, which would replay the old viewport's geometry and anchor correction.
   package private(set) var containsWindowedMeasurement = false
+  /// Whether this subtree's measurement consumed a measure-viewport hint:
+  /// ``containsWindowedMeasurement``, or an exhaustive lazy stack that claimed
+  /// a hint it could not window (``LazyStackAllocationSnapshot/claimedHint``).
+  /// Such a product is valid only for its hint, so no proposal-keyed reuse may
+  /// serve it: a serve would skip the claim (STUI-1269).
+  package private(set) var consumesMeasureViewport = false
   package private(set) var subtreeNodeCount: Int
 
   package init(
@@ -346,6 +372,10 @@ package struct MeasuredNode: Equatable, Sendable {
       containerAllocationSnapshot?.lazyStack?.measuredWindow != nil
       || containerAllocationSnapshot?.hostedCollection?.measuredWindow != nil
       || childMeasurements.contains { $0.containsWindowedMeasurement }
+    consumesMeasureViewport =
+      containsWindowedMeasurement
+      || containerAllocationSnapshot?.lazyStack?.claimedHint != nil
+      || childMeasurements.contains { $0.consumesMeasureViewport }
   }
 
   /// Explicit, iterative `==`.

@@ -31,14 +31,6 @@ func w3faKnown(_ comment: Comment, _ body: () throws -> Void) {
   }
 }
 
-func w3faKnownAsync(_ comment: Comment, _ body: () async throws -> Void) async {
-  if ProcessInfo.processInfo.environment["SWIFTTUI_W3HUNT_UNMARKED"] == "1" {
-    do { try await body() } catch { Issue.record(error) }
-  } else {
-    await withKnownIssue(comment) { try await body() }
-  }
-}
-
 // MARK: - FW3-A: POSIX edges and redirected diagnostics
 
 #if canImport(Darwin) || canImport(Glibc)
@@ -214,7 +206,7 @@ func w3faKnownAsync(_ comment: Comment, _ body: () async throws -> Void) async {
       #expect(DiagnosticScreenOwnership.allowsDiagnosticWrite(to: pair[0]))
       let allowed = DiagnosticScreenOwnership.allowsDiagnosticWrite(to: destination)
       w3faKnown(
-        "NEW-1: under an AF_INET socket presentation owner, runtime issues to a different AF_INET socket are refused as if it were the owner's own stream; mechanism: DiagnosticScreenOwnership identifies stream owners and destinations by st_dev/st_ino (DiagnosticScreenOwnership.swift:73-78, 89-112), and Darwin's fstat reports 0/0 for every inet socket, so Owner.stream(0, 0) matches any inet destination; contract: commit 3af7dd55 'allowed unless it is a stream owner's own file', fw3-a decision table; adjacent STUI-1210"
+        "STUI-1271: under an AF_INET socket presentation owner, runtime issues to a different AF_INET socket are refused as if it were the owner's own stream; mechanism: DiagnosticScreenOwnership identifies stream owners and destinations by st_dev/st_ino (DiagnosticScreenOwnership.swift:73-78, 89-112), and Darwin's fstat reports 0/0 for every inet socket, so Owner.stream(0, 0) matches any inet destination; contract: commit 3af7dd55 'allowed unless it is a stream owner's own file', fw3-a decision table; adjacent STUI-1210"
       ) {
         #expect(allowed)
       }
@@ -405,7 +397,7 @@ struct Wave3HuntFATableClipBindingTests {
       let element = log.namedCauses("W3FAElementReader")
       let positional = log.namedCauses("W3FAPositionalReader")
       w3faKnown(
-        "NEW-2: _printChanges/_logChanges name no property for a reader of a collection-element binding of a state (ForEach($items) row bindings and $items[0]): the state/exact cause carries property nil; mechanism: projectedElementBinding (ForEachBinding.swift:84-145) and Binding's positional Collection subscript (BindingCollection.swift:42-51) copy the transaction and value identity but not bindingSourceID, so bodyDebugStateSlot's derivationRoot (State.swift:847) has no source to peel; contract: Logging-And-Diagnostics.md:213-214, CHANGELOG.md:46-47; adjacent STUI-1131"
+        "STUI-1272: _printChanges/_logChanges name no property for a reader of a collection-element binding of a state (ForEach($items) row bindings and $items[0]): the state/exact cause carries property nil; mechanism: projectedElementBinding (ForEachBinding.swift:84-145) and Binding's positional Collection subscript (BindingCollection.swift:42-51) copy the transaction and value identity but not bindingSourceID, so bodyDebugStateSlot's derivationRoot (State.swift:847) has no source to peel; contract: Logging-And-Diagnostics.md:213-214, CHANGELOG.md:46-47; adjacent STUI-1131"
       ) {
         #expect(element == ["_value"], "\(element)")
         #expect(positional == ["_value"], "\(positional)")
@@ -472,20 +464,17 @@ struct Wave3HuntFALazyInvalidationTests {
   // (ScrollViewReader.swift:33-43; Scrolling.md:216-219).
   @Test func w3fa022ProxyScrollReachesAWhollyOffscreenClaimDeniedRow() async throws {
     // The first unmarked run trapped the whole process in this fixture's
-    // harness init (layout-shadow-divergence at the windowed first stack), so
-    // the armed launch runs in a child and the proxy contract runs disarmed.
-    await w3faKnownAsync(
-      "NEW-3: a scroll view below a header whose windowed lazy stack has rows wider than its first window traps at launch on the DEBUG layout-shadow oracle (measure divergence at the lazy stack: production width 10 over all 20 rows, shadow 9 over the window, proposal 40x0); mechanism: the scroll layout's zero-height first round makes the stack measure exhaustively and the hint-agnostic measurement cache (MeasurementCache.swift:4) serves that product to the finite rounds, while the fresh shadow windows; LayoutShadowOracle excludes only products carrying a measuredWindow, and the exhaustive product's cross-axis width differs; FW3-C recorded the cache asymmetry as placement-equivalent only; traps before and after fc86adcc; contract: SOUNDNESS-ORACLES.md layout-shadow-divergence, STUI-1231 (launch trap removed); adjacent STUI-1231"
-    ) {
-      await #expect(processExitsWith: .success) {
-        try await MainActor.run {
-          SoundnessProbeConfiguration.isEnabled = true
-          SoundnessProbeConfiguration.sampleEveryNFrames = 1
-          let h = try StressRuntimeHarness(
-            rootIdentity: testIdentity("w3fa022-armed"), size: .init(width: 40, height: 8)
-          ) { W3FATwoStacks(firstCount: 20, log: W3FAStackLog()) }
-          h.shutdown()
-        }
+    // harness init (layout-shadow-divergence at the windowed first stack,
+    // STUI-1269), so the armed launch runs in a child and the proxy contract
+    // runs disarmed.
+    await #expect(processExitsWith: .success) {
+      try await MainActor.run {
+        SoundnessProbeConfiguration.isEnabled = true
+        SoundnessProbeConfiguration.sampleEveryNFrames = 1
+        let h = try StressRuntimeHarness(
+          rootIdentity: testIdentity("w3fa022-armed"), size: .init(width: 40, height: 8)
+        ) { W3FATwoStacks(firstCount: 20, log: W3FAStackLog()) }
+        h.shutdown()
       }
     }
     let saved = SoundnessProbeConfiguration.isEnabled
@@ -514,6 +503,16 @@ struct Wave3HuntFALazyInvalidationTests {
   // Correction C1: the windowed control's focus expectations were dropped;
   // an unrealized windowed row falls back to the scroll view, which the same
   // paragraph also allows ("unavailable controls use normal fallback").
+  // Correction C4 (wave 4, fw-c, oracle): on 0.19.4 `secondFocus` was the
+  // scroll view, not the row. Focusing re-rendered at an unchanged offset, the
+  // windowed first stack's anchor correction snapped the content back to the
+  // top (STUI-1270), the row went offscreen and focus fell back before it was
+  // read, so the subject's two focus expectations compared the scroll view
+  // with itself. With the row really focused, scrolling it out of view
+  // unrealizes it and focus falls back as C1 found for the windowed control,
+  // so those expectations are dropped on C1's grounds. The case now checks
+  // that the subject is the row and that focusing and returning keep the
+  // wheel position (no snap back).
   @Test func w3fa023FocusedClaimDeniedRowSurvivesScrollingAway() throws {
     let log = W3FAStackLog()
     let h = try StressRuntimeHarness(
@@ -534,14 +533,14 @@ struct Wave3HuntFALazyInvalidationTests {
     _ = try h.focusText("second 1")
     let secondFocus = h.runLoop.focusTracker.currentFocusIdentity
     try #require(secondFocus != nil && secondFocus != firstFocus)
+    #expect(secondFocus?.path.contains("second 1") == true, "\(String(describing: secondFocus))")
+    #expect(h.frame.contains("second 4"), "focusing snapped back: \(h.frame)")
     try #require(
       try W3FALazy.wheel(h, deltaY: -1, until: { $0.contains("first 0") }), "\(h.frame)")
     #expect(!h.frame.contains("second"), "\(h.frame)")
-    let whileAway = h.runLoop.focusTracker.currentFocusIdentity
     try #require(try W3FALazy.wheel(h, until: { $0.contains("second 4") }), "\(h.frame)")
-    let afterReturn = h.runLoop.focusTracker.currentFocusIdentity
-    #expect(whileAway == secondFocus, "focus moved to \(String(describing: whileAway))")
-    #expect(afterReturn == secondFocus, "focus moved to \(String(describing: afterReturn))")
+    _ = try h.renderAfterExternalMutation()
+    #expect(h.frame.contains("second 4"), "a re-render snapped back: \(h.frame)")
   }
 
   // w3fa024: a viewport shrink that leaves a focused claim-denied row wholly
@@ -573,12 +572,10 @@ struct Wave3HuntFALazyInvalidationTests {
     try h.resize(width: 40, height: 6)
     let frame = h.frame
     let after = h.loop.focusTracker.currentFocusIdentity
-    w3faKnown(
-      "NEW-4: a viewport shrink that leaves a focused row of a claim-denied (exhaustive) lazy stack wholly below the viewport neither reveals it nor keeps its focus: focus falls back to the scroll view; mechanism: lazyStackVisibleChildRange returns 0..<0 for the wholly offscreen stack (LayoutEngine+StackLazyAllocation.swift:124-128, fc86adcc), so the focused row is no longer placed and the focus-sync reveal that realizes a windowed row from its allocation estimate does not reach it; 0.19.3 placed the row offscreen and kept focus (bisect); contract: Scrolling.md:216-219, ARCHITECTURE.md:115-116; adjacent STUI-1231"
-    ) {
-      #expect(frame.contains("second 2"), "\(frame)")
-      #expect(after == focus, "focus moved to \(String(describing: after))")
-    }
+    // STUI-1270: the reveal from the row's allocation estimate persists (the
+    // windowed first stack no longer clamps its anchor to its own extent).
+    #expect(frame.contains("second 2"), "\(frame)")
+    #expect(after == focus, "focus moved to \(String(describing: after))")
   }
 
   // w3fa025: a claim-denied LazyHStack wholly right of its viewport places no
