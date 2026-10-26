@@ -96,24 +96,27 @@ public struct ScrollView<Content: View>: PrimitiveView, IterativeResolvableView 
       let presentation = validatedScrollPresentation(
         style.presentation(for: configuration), configuration: configuration,
         styleLabel: style.description, identity: context.identity)
+      let binding = position
+      let intake = HandlerDescriptorIntake(
+        context: context,
+        fallbackAuthoringScope: interactionAuthoringScope
+      )
+      // Programmatic commands (`ScrollViewReader`) address a disabled scroll
+      // view too; only the interactive handlers below honour `.disabled`
+      // (STUI-1317).
+      intake.registerScrollPosition(
+        identity: context.identity,
+        axes: axes,
+        currentOffset: {
+          let current = binding.wrappedValue
+          return ScrollOffset(x: current.x, y: current.y)
+        },
+        applyOffset: { offset in
+          binding.wrappedValue = ScrollCellOffset(x: offset.x, y: offset.y)
+        },
+        bindingSourceID: binding.bindingSourceID
+      )
       if context.environmentValues.isEnabled {
-        let binding = position
-        let intake = HandlerDescriptorIntake(
-          context: context,
-          fallbackAuthoringScope: interactionAuthoringScope
-        )
-        intake.registerScrollPosition(
-          identity: context.identity,
-          axes: axes,
-          currentOffset: {
-            let current = binding.wrappedValue
-            return ScrollOffset(x: current.x, y: current.y)
-          },
-          applyOffset: { offset in
-            binding.wrappedValue = ScrollCellOffset(x: offset.x, y: offset.y)
-          },
-          bindingSourceID: binding.bindingSourceID
-        )
         let scrollCommandRegistry = context.scrollCommandRegistry
         let registerScrollKeyHandler: (Identity, ScrollIndicatorAxis?) -> Void = {
           identity, targetAxis in

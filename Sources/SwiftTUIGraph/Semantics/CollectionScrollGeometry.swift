@@ -17,6 +17,11 @@ package struct CollectionScrollGeometry: Equatable, Sendable {
   }
 
   private let rows: Rows
+  /// Estimates every row this geometry has not measured as hiding its
+  /// following separator, instead of at the drawn stride. Only movement
+  /// arithmetic builds such a geometry (see
+  /// ``estimatingUnmeasuredSeparatorsHidden()``); published layouts never do.
+  private var estimatesUnmeasuredSeparatorsHidden = false
 
   /// `hiddenSeparators` names rows whose FOLLOWING separator line is not
   /// drawn (a table row with `listRowSeparator(.hidden)`); it applies only to
@@ -77,6 +82,7 @@ package struct CollectionScrollGeometry: Equatable, Sendable {
       let last = measured.last
       let extraLines = last.map { $0.precedingExtraLines + $0.extraLines } ?? 0
       return count * span - (span - 1) + extraLines
+        - unmeasuredSeparatorLines(before: count - 1, measuredBefore: measured, span: span)
     case .materialized(_, let displayLineCount):
       return displayLineCount
     }
@@ -95,7 +101,9 @@ package struct CollectionScrollGeometry: Equatable, Sendable {
       let insertion = firstMeasuredRow(atOrAfter: index, in: measured)
       let previous = insertion > 0 ? measured[insertion - 1] : nil
       let extraLines = previous.map { $0.precedingExtraLines + $0.extraLines } ?? 0
-      let start = index * span + extraLines
+      let start =
+        index * span + extraLines
+        - (estimatesUnmeasuredSeparatorsHidden ? (index - insertion) * (span - 1) : 0)
       let height =
         insertion < measured.count && measured[insertion].index == index
         ? measured[insertion].height : 1
@@ -138,6 +146,34 @@ package struct CollectionScrollGeometry: Equatable, Sendable {
       return min(max(0, line(forRow: row) + offset), maximum)
     default: return nil
     }
+  }
+
+  /// This geometry with each row it has not measured estimated to hide its
+  /// following separator, as a table row with `listRowSeparator(.hidden)`
+  /// does. Measured rows keep their lines, so a row index means the same row
+  /// in both geometries, although line numbers differ before unmeasured
+  /// rows. A geometry without interleaved separators is returned unchanged.
+  package func estimatingUnmeasuredSeparatorsHidden() -> CollectionScrollGeometry {
+    guard case .indexed(_, let span, _) = rows, span > 1 else { return self }
+    var geometry = self
+    geometry.estimatesUnmeasuredSeparatorsHidden = true
+    return geometry
+  }
+
+  /// Whether every row in `rows` hides the separator that follows it: the
+  /// next row starts on the line after the row's last cell.
+  package func hidesFollowingSeparators(ofRows rows: ClosedRange<Int>) -> Bool {
+    guard rowSpan > 1, rows.lowerBound >= 0, rows.upperBound < lastRowIndex else { return false }
+    return rows.allSatisfy { line(forRow: $0 + 1) == lineRange(forRow: $0).upperBound }
+  }
+
+  /// The separator lines the estimate removes from the unmeasured rows before
+  /// `index`.
+  private func unmeasuredSeparatorLines(
+    before index: Int, measuredBefore measured: [MeasuredRow], span: Int
+  ) -> Int {
+    guard estimatesUnmeasuredSeparatorsHidden, index > 0 else { return 0 }
+    return (index - firstMeasuredRow(atOrAfter: index, in: measured)) * (span - 1)
   }
 
   private func firstMeasuredRow(atOrAfter index: Int, in measured: [MeasuredRow]) -> Int {

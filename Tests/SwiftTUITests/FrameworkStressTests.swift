@@ -3011,9 +3011,12 @@ enum FrameworkStressExpansionCase: String, CaseIterable, CustomStringConvertible
       #expect(counts.scrollPositions <= 1)
 
     case .disabledAncestorScrollViewSkipsHandlers:
+      // A disabled scroll view keeps its position registration, which
+      // programmatic commands address (STUI-1317); its key and pointer
+      // handlers, the interactive input, stay unregistered.
       #expect(counts.keyPressHandlers == 0)
       #expect(counts.pointerHandlers == 0)
-      #expect(counts.scrollPositions == 0)
+      #expect(counts.scrollPositions <= 1)
 
     case .keyCommandPanelRebinds:
       #expect(counts.keyCommands <= 1)
@@ -3861,9 +3864,11 @@ enum FrameworkStressAdditionalCase: String, CaseIterable, CustomStringConvertibl
     case .disabledKeyPressNestedNoLeak:
       #expect(harness.keyPressHandlerCount == 0)
     case .disabledNestedScrollViewSkipsHandlers:
+      // The scroll position stays registered for programmatic commands
+      // (STUI-1317); the interactive handlers do not.
       #expect(harness.keyPressHandlerCount == 0)
       #expect(harness.pointerHandlerCount == 0)
-      #expect(harness.scrollPositionRegistrationCount == 0)
+      #expect(harness.scrollPositionRegistrationCount == 1)
     case .focusedValueInsidePanelRebinds:
       #expect(harness.focusedValueRegistrationCount == 1)
       #expect(harness.focusRegionCount == 2)
@@ -3948,9 +3953,10 @@ enum FrameworkStressAdditionalCase: String, CaseIterable, CustomStringConvertibl
       #expect(counts.scrollPositions <= 1)
 
     case .disabledNestedScrollViewSkipsHandlers:
+      // See the per-harness check: the position registration is bounded.
       #expect(counts.keyPressHandlers == 0)
       #expect(counts.pointerHandlers == 0)
-      #expect(counts.scrollPositions == 0)
+      #expect(counts.scrollPositions <= 1)
 
     case .preferenceObserverNestedPanelRebinds:
       #expect(counts.preferenceObservers <= 1)

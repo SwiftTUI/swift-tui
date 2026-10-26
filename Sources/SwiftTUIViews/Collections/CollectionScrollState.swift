@@ -94,9 +94,14 @@ package struct CollectionScrollCurrency {
 
   /// The largest anchor row that still fills the window. The geometry counts
   /// the known row heights; layout also accounts for interleaved chrome and
-  /// whole-row fitting at the bottom of the viewport.
+  /// whole-row fitting at the bottom of the viewport. While the stored anchor
+  /// selects a window the layout has not measured, a projected geometry
+  /// (``projectedGeometry()``) is the better estimate of the content's end.
   private var maxAnchorRow: Int {
-    registry?.collectionMaximumAnchorRow(scopeIdentity: identity)
+    if layout?.anchor != storedAnchor, let projected = projectedGeometry() {
+      return projected.maxAnchorRow(viewportLineCount: visibleLineCount)
+    }
+    return registry?.collectionMaximumAnchorRow(scopeIdentity: identity)
       ?? geometry.maxAnchorRow(viewportLineCount: visibleLineCount)
   }
 
@@ -114,9 +119,9 @@ package struct CollectionScrollCurrency {
   }
 
   /// The rows the window shows, by each row's real line span: tall rows and
-  /// hidden table separators included. Interaction bands and review pages
-  /// size from this. `visibleLineCount / rowSpan` halves the rows of a table
-  /// that hides its separators (STUI-1239).
+  /// hidden table separators included. Interaction bands size from this, and
+  /// review pages from ``pageRowCount``. `visibleLineCount / rowSpan` halves
+  /// the rows of a table that hides its separators (STUI-1239).
   ///
   /// When the published layout measured the window that the stored anchor
   /// still selects, its geometry is exact. Otherwise this frame places a
@@ -148,6 +153,86 @@ package struct CollectionScrollCurrency {
     return count > 0 ? (effectiveAnchorRow, count) : nil
   }
 
+  /// The rows a page moves by, plus the row of overlap: the rows the window
+  /// shows (STUI-1262). When the layout measured the window the stored anchor
+  /// selects, this is the exact ``visibleRowCount``. Otherwise the window is
+  /// estimated from the movement geometry rather than bounded, because a page
+  /// that over-counts skips rows where a band that over-counts is harmless.
+  package var pageRowCount: Int {
+    let lines = visibleLineCount
+    guard lines > 0, geometry.rowCount > 0 else { return 0 }
+    if let layout, layout.anchor == storedAnchor { return visibleRowCount }
+    let window = movementWindow()
+    let geometry = window.geometry
+    let last = geometry.row(
+      atOrBeforeLine: min(window.anchorLine + lines, geometry.displayLineCount) - 1)
+    return max(1, last - geometry.row(atOrAfterLine: window.anchorLine) + 1)
+  }
+
+  /// A collection whose measured layout shows every one of its lines has no
+  /// window of its own to move. Inside a `ScrollView` the enclosing scroll
+  /// layout owns the viewport (`Collections.md:154-156`), so the
+  /// collection's scroll commands decline and leave the key or wheel to that
+  /// scroll view (STUI-1273).
+  private var showsEveryLine: Bool {
+    guard let layout else { return false }
+    return layout.visibleLines.lowerBound <= 0
+      && layout.visibleLines.upperBound >= layout.geometry.displayLineCount
+  }
+
+  /// The geometry page and reveal arithmetic estimates unmeasured rows with.
+  /// Rows the layout has not measured are estimated at the table's drawn
+  /// stride of two lines. When every visible row of the measured window hides
+  /// its separator, a row that has not been measured is estimated to hide its
+  /// separator as well, so keys applied before a frame measures their rows
+  /// move as far as the same keys one frame at a time (STUI-1316). Nil keeps
+  /// the published geometry: a list, a table with drawn or mixed separators,
+  /// or no layout yet.
+  private func projectedGeometry() -> CollectionScrollGeometry? {
+    guard minimumRowLineSpan < estimatedGeometry.rowSpan, let layout,
+      !layout.visibleLines.isEmpty
+    else { return nil }
+    let geometry = layout.geometry
+    let first = geometry.row(atOrAfterLine: layout.visibleLines.lowerBound)
+    let last = min(
+      geometry.row(atOrBeforeLine: layout.visibleLines.upperBound - 1), geometry.lastRowIndex - 1)
+    guard first <= last, geometry.hidesFollowingSeparators(ofRows: first...last) else {
+      return nil
+    }
+    return geometry.estimatingUnmeasuredSeparatorsHidden()
+  }
+
+  /// The window's first row and line in the geometry movement arithmetic
+  /// uses. A projected geometry numbers lines differently before unmeasured
+  /// rows, so a measured window is carried over through its first row, and an
+  /// unmeasured one is placed from the stored anchor directly.
+  private func movementWindow() -> (
+    geometry: CollectionScrollGeometry, anchorRow: Int, anchorLine: Int
+  ) {
+    guard let projected = projectedGeometry() else {
+      return (geometry, effectiveAnchorRow, currentOffset().y)
+    }
+    let row = effectiveAnchorRow
+    if let layout, layout.anchor == storedAnchor {
+      let lineOffset = layout.visibleLines.lowerBound - layout.geometry.line(forRow: row)
+      return (projected, row, max(0, projected.line(forRow: row) + lineOffset))
+    }
+    return (projected, row, windowTop(in: projected, maxAnchorRow: maxAnchorRow))
+  }
+
+  /// The first display line of the window the stored anchor selects, laid
+  /// out over `geometry`.
+  private func windowTop(in geometry: CollectionScrollGeometry, maxAnchorRow: Int) -> Int {
+    switch storedAnchor {
+    case .start: return 0
+    case .end: return max(0, geometry.displayLineCount - visibleLineCount)
+    case .row(let index): return geometry.line(forRow: min(index, maxAnchorRow))
+    case .position:
+      return geometry.positionedOffset(for: storedAnchor, capacity: visibleLineCount) ?? 0
+    case nil: return windowMetrics(viewportLineCount, geometry).offset
+    }
+  }
+
   /// Capture the initial window before selection starts following it.
   @discardableResult
   package func pinCurrentAnchor() -> Bool {
@@ -160,16 +245,7 @@ package struct CollectionScrollCurrency {
     if let layout, layout.anchor == storedAnchor {
       return ScrollOffset(y: layout.visibleLines.lowerBound)
     }
-    let offset: Int
-    switch storedAnchor {
-    case .start: offset = 0
-    case .end: offset = max(0, geometry.displayLineCount - visibleLineCount)
-    case .row(let index): offset = geometry.line(forRow: min(index, maxAnchorRow))
-    case .position:
-      offset = geometry.positionedOffset(for: storedAnchor, capacity: visibleLineCount) ?? 0
-    case nil: offset = windowMetrics(viewportLineCount, geometry).offset
-    }
-    return ScrollOffset(y: offset)
+    return ScrollOffset(y: windowTop(in: geometry, maxAnchorRow: maxAnchorRow))
   }
 
   package func applyOffset(_ offset: ScrollOffset) {
@@ -216,7 +292,7 @@ package struct CollectionScrollCurrency {
   /// the scroll.
   @discardableResult
   package func scroll(byRows rows: Int) -> Bool {
-    guard rows != 0 else {
+    guard rows != 0, !showsEveryLine else {
       return false
     }
     // A footer-only end window is one position beyond the final row. Count
@@ -248,10 +324,13 @@ package struct CollectionScrollCurrency {
       // keypress still moves rather than reading as inert.
       return scroll(byRows: pages)
     }
+    guard !showsEveryLine else { return false }
     // Preserve a line of overlap where whole-row fitting permits it. Round
     // toward the current page so a tall row is not skipped between pages.
-    let current = effectiveAnchorRow
-    let offset = currentOffset().y
+    let window = movementWindow()
+    let geometry = window.geometry
+    let current = window.anchorRow
+    let offset = window.anchorLine
     let startsAfterLastRow =
       offset >= geometry.lineRange(forRow: geometry.lastRowIndex).upperBound
     if pages < 0, !startsAfterLastRow, offset > geometry.line(forRow: current) {
@@ -272,6 +351,7 @@ package struct CollectionScrollCurrency {
 
   @discardableResult
   package func scroll(toEdge edge: Edge) -> Bool {
+    guard !showsEveryLine else { return false }
     switch edge {
     case .top:
       return setAnchor(.start)
@@ -300,9 +380,11 @@ package struct CollectionScrollCurrency {
       // reveals precisely once geometry syncs.
       return false
     }
+    let window = movementWindow()
+    let geometry = window.geometry
     let target = min(max(0, rowIndex), geometry.lastRowIndex)
     let targetLines = geometry.lineRange(forRow: target)
-    let anchorLine = currentOffset().y
+    let anchorLine = window.anchorLine
     let contextLimit = max(0, (visibleLines - targetLines.count) / 2)
     let firstContextRow = max(0, target - max(0, margin))
     let lastContextRow = min(geometry.lastRowIndex, target + max(0, margin))

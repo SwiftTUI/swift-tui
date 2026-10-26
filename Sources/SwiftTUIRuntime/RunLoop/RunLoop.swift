@@ -312,6 +312,8 @@ public final class RunLoop<State: Equatable & Sendable, Content: View>:
       )
     )
     registerMemoryMetricProviders()
+    // A scroll command that defers to the next layout requests that frame.
+    localScrollPositionRegistry.deferredCommandInvalidator = scheduler
     nativePreferenceObserver = NativeAccessibilityPreferenceObserver(surface: presentationSurface) {
       [weak self] in
       self?.scheduler.requestExternalWake(reason: "accessibilityPreferences")

@@ -41,14 +41,12 @@ struct Wave3HuntFBCollectionTests {
   // table move by the rows the window shows, less one row of overlap, each.
   @Test func w3fb001ReviewPagesBeforeOneFrameMoveByVisibleRowsOnDrawnTable() throws {
     let outcome = try W3FB.reviewTwoPagesBeforeOneFrame("w3fb001", hidden: false)
-    w3fbKnown(
-      "NEW-1: two review Next page actions before one frame on a drawn-separator table move 10 then 21 rows (position 32, expected 21, 11 rows visible); after reveal moves the stored anchor, CollectionScrollCurrency.visibleRowCount takes the one-line-per-row bound (CollectionScrollState.swift:126-135; CollectionAccessibilityNavigation.swift:112-115); contract: wave3e04, Accessibility.md:142-148; adjacent STUI-1239"
-    ) {
-      // Contract: wave3e04 (the repair's own), Accessibility.md:142-148.
-      #expect(
-        outcome.value == .number(Double(1 + 2 * (outcome.visible - 1))),
-        "\(outcome.visible) visible rows; value \(String(describing: outcome.value))")
-    }
+    // STUI-1262 (repaired in wave 4): the second page sizes from the rows the
+    // estimated window holds, not the band's one-line-per-row bound.
+    // Contract: wave3e04 (the repair's own), Accessibility.md:142-148.
+    #expect(
+      outcome.value == .number(Double(1 + 2 * (outcome.visible - 1))),
+      "\(outcome.visible) visible rows; value \(String(describing: outcome.value))")
   }
 
   // w3fb002: the same with hidden separators, where one line holds one row.
@@ -326,13 +324,8 @@ struct Wave3HuntFBScrollEdgeTests {
       #expect(
         h.frame.contains("a119"), "\(bottomFirst ? "bottom first" : "trailing first"):\n\(h.frame)")
     }
-    if bottomFirst {
-      w3fbKnown(
-        "NEW-2: proxy bottom then trailing on one two-axis lazy view in one action stops at a111-a113; the trailing command overwrites the route's pending far edge, so only x is refined (LocalScrollPositionRegistry.swift:519-547); contract: Scrolling.md:139-150, 206-210; adjacent STUI-1243"
-      ) { reachedBottom() }
-    } else {
-      reachedBottom()
-    }
+    // STUI-1263 (repaired in wave 4): a route owes one far edge per axis.
+    reachedBottom()
   }
 
   // w3fb012: three bottom edges in one action all refine.
@@ -433,13 +426,9 @@ struct Wave3HuntFBScrollEdgeTests {
     func reachedBottom() {
       #expect(h.frame.contains("a119"), "\(estimatedTarget ? "estimated" : "placed"):\n\(h.frame)")
     }
-    if estimatedTarget {
-      w3fbKnown(
-        "NEW-3: a far edge on lazy view a and a scrollTo(id) to an unplaced row of view b in one action leave a at a111/a112; the lazy-target loop refines and returns before refineFarEdges, and anchor preservation then supersedes a's pending edge (LocalScrollPositionRegistry.swift:708-737); contract: Scrolling.md:139-150, Divergences-And-Gaps.md:398-407; adjacent STUI-1243"
-      ) { reachedBottom() }
-    } else {
-      reachedBottom()
-    }
+    // STUI-1264 (repaired in wave 4): every pending command refines in one
+    // sync pass.
+    reachedBottom()
   }
 }
 

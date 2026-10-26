@@ -38,6 +38,7 @@ package struct SemanticExtractor: Sendable {
     // walk these resolve to `SemanticSnapshot.activeCommandScopePath`.
     var commandHostScopePaths: [[Identity]] = []
     var scrollRoutes: [ScrollRoute] = []
+    var programmaticScrollRoutes: [ScrollRoute] = []
     var selectionRoutes: [SelectionRoute] = []
     var namedCoordinateSpaces: [NamedCoordinateSpace: CellRect] = [:]
     var hitTestOrder = 0
@@ -252,34 +253,37 @@ package struct SemanticExtractor: Sendable {
           )
         }
 
-        if interactionsEnabled, let scrollRole = node.semanticMetadata.scrollRole {
-          let anchorOffset = node.children.first?.placementMetadata.scrollAnchorCorrection
-          scrollRoutes.append(
-            ScrollRoute(
-              identity: node.identity,
-              viewNodeID: node.viewNodeID,
-              viewportRect: node.scrollViewportRect ?? node.bounds,
-              contentBounds: node.contentBounds,
-              structuralHostChain: context.structuralHostChain
-            )
+        if let scrollRole = node.semanticMetadata.scrollRole {
+          var route = ScrollRoute(
+            identity: node.identity,
+            viewNodeID: node.viewNodeID,
+            viewportRect: node.scrollViewportRect ?? node.bounds,
+            contentBounds: node.contentBounds,
+            structuralHostChain: context.structuralHostChain
           )
-          scrollRoutes[scrollRoutes.count - 1].reducesMotion =
-            node.environmentSnapshot.style.renderingReduceMotion
-          scrollRoutes[scrollRoutes.count - 1].scrollAnchorCorrection = anchorOffset
-          scrollRoutes[scrollRoutes.count - 1].collectionScrollPosition =
+          route.reducesMotion = node.environmentSnapshot.style.renderingReduceMotion
+          route.scrollAnchorCorrection =
+            node.children.first?.placementMetadata.scrollAnchorCorrection
+          route.collectionScrollPosition =
             node.hostedTableVisibleLayout?.scrollPosition
             ?? node.hostedListVisibleLayout?.scrollPosition
-          scrollRoutes[scrollRoutes.count - 1].collectionMaximumAnchorRow =
+          route.collectionMaximumAnchorRow =
             node.hostedTableVisibleLayout?.maximumAnchorRow
             ?? node.hostedListVisibleLayout?.maximumAnchorRow
-          scrollRoutes[scrollRoutes.count - 1].collectionScrollLayout =
+          route.collectionScrollLayout =
             node.hostedTableVisibleLayout?.scrollMetadata?.navigation
             ?? node.hostedListVisibleLayout?.scrollMetadata?.navigation
-          scrollRoutes[scrollRoutes.count - 1].collectionInteractionRows =
+          route.collectionInteractionRows =
             node.semanticMetadata.hostedCollectionContainer?.interactionRows
-          selectionRoutes.append(
-            SelectionRoute(identity: node.identity, role: scrollRole)
-          )
+          // A disabled scroll view still answers programmatic commands; only
+          // interactive input honours `.disabled` (STUI-1317).
+          programmaticScrollRoutes.append(route)
+          if interactionsEnabled {
+            scrollRoutes.append(route)
+            selectionRoutes.append(
+              SelectionRoute(identity: node.identity, role: scrollRole)
+            )
+          }
         }
       },
       postVisit: { node, context, nextHitTestOrder in
@@ -374,6 +378,7 @@ package struct SemanticExtractor: Sendable {
     snapshot.mountedModalScopePaths = Set(modalNodes.map(\.scope))
     snapshot.paragraphs = paragraphs
     snapshot.accessibilityActionRegions = accessibilityActionRegions
+    snapshot.programmaticScrollRoutes = programmaticScrollRoutes
     return snapshot
   }
 

@@ -1166,7 +1166,11 @@ extension FrameworkStressGestureScrollTests {
 
     _ = try harness.clickText("Center grid target")
 
-    #expect(position.value == ScrollCellOffset(x: 8, y: 6))
+    // The 4-wide target centres exactly in the 12-column viewport (x 8). In
+    // the 4-line viewport the 1-line target leaves 3 spare lines; the extra
+    // one goes below it, as frames centre, so the row lands on line 1 (y 7,
+    // STUI-1322; it was y 6 while each anchor point rounded on its own).
+    #expect(position.value == ScrollCellOffset(x: 8, y: 7))
   }
 }
 
