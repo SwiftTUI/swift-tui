@@ -1046,6 +1046,34 @@
       "category": "runtime-integration",
       "reason": "Adversarial set C pass 2: runtime root environment signature changes through a host-geometry presentation surface (STUI-1104 neighbors)."
     },
+    "Tests/SwiftTUITests/AdversarialSetCCapabilityTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Adversarial set C pass 3: terminal capability refinement across environment combinations (STUI-1224/1225/1247 neighbors)."
+    },
+    "Tests/SwiftTUITests/AdversarialSetCCrossRepairTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Adversarial set C pass 3: pointer callbacks, trimmed content shapes, tab dormancy and centre rounding across campaign-two repairs (STUI-1128/1244/1233/1212 neighbors)."
+    },
+    "Tests/SwiftTUITests/AdversarialSetCDynamicScrollTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Adversarial set C pass 3: far-edge, arrow and proxy scroll commands under changing content (STUI-1170/1171/1180/1243 neighbors)."
+    },
+    "Tests/SwiftTUITests/AdversarialSetCLayoutBoundsTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Adversarial set C pass 3: integer extremes in public layout arguments through exit tests (FW-E STUI-741 class)."
+    },
+    "Tests/SwiftTUITests/AdversarialSetCNumericAPITests.swift": {
+      "category": "runtime-integration",
+      "reason": "Adversarial set C pass 3: Double-to-Duration conversions in spring, keyframe, toast and scale-transition APIs."
+    },
+    "Tests/SwiftTUITests/AdversarialSetCPresentationStateTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Adversarial set C pass 3: retired writes, initial onChange and task departure across sheet, popover, alert, navigation and tabs (STUI-1173/1174/1233/1226 neighbors)."
+    },
+    "Tests/SwiftTUITests/AdversarialSetCTableDataTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Adversarial set C pass 3: table bands, eligibility and high-water widths under data changes (STUI-1172/1209/1230/1239/1240 neighbors)."
+    },
     "Tests/SwiftTUITests/AdversarialSetCTableTests.swift": {
       "category": "runtime-integration",
       "reason": "Adversarial set C pass 2: table column budgets, separators and high-water widths (dead-code removal #66 neighbors)."
