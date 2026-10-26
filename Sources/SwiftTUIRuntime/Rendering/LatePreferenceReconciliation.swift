@@ -344,6 +344,18 @@ struct LatePreferenceReconciliationStage {
     canonicalResolved: ResolvedNode
   ) -> FrameTailInput {
     let presented = projectResolvedPresentation(canonicalResolved)
+    let layoutPassContext = LayoutPassContext(
+      customLayoutCacheStore: input.layoutPassContext.customLayoutCacheStore,
+      retainedLayout: input.retained.retainedLayout,
+      invalidatedIdentities: input.layoutPassContext.invalidatedIdentities,
+      customLayoutCompatibilityDepthLimit:
+        LayoutPassContext.mainActorCustomLayoutCompatibilityDepthLimit,
+      retainedValidationRecorder:
+        input.layoutPassContext.retainedValidationRecorder == nil ? nil : .init()
+    )
+    // The relayout reports the same frame: the dispatch-time issues it
+    // already drained belong in the new pass's channel too.
+    input.imperativeRuntimeIssues.record(into: layoutPassContext)
     return FrameTailInput(
       generation: input.generation,
       canonicalResolved: canonicalResolved,
@@ -351,20 +363,13 @@ struct LatePreferenceReconciliationStage {
       proposal: input.proposal,
       rootIdentity: input.rootIdentity,
       retained: input.retained,
-      layoutPassContext: LayoutPassContext(
-        customLayoutCacheStore: input.layoutPassContext.customLayoutCacheStore,
-        retainedLayout: input.retained.retainedLayout,
-        invalidatedIdentities: input.layoutPassContext.invalidatedIdentities,
-        customLayoutCompatibilityDepthLimit:
-          LayoutPassContext.mainActorCustomLayoutCompatibilityDepthLimit,
-        retainedValidationRecorder:
-          input.layoutPassContext.retainedValidationRecorder == nil ? nil : .init()
-      ),
+      layoutPassContext: layoutPassContext,
       graphAnimationInputToken: input.graphAnimationInputToken,
       evaluatedNodeIDs: input.evaluatedNodeIDs,
       animationRedrawIdentities: input.animationRedrawIdentities,
       animationSegmentTargetIdentities: input.animationSegmentTargetIdentities,
-      verifyLayoutShadow: input.verifyLayoutShadow
+      verifyLayoutShadow: input.verifyLayoutShadow,
+      imperativeRuntimeIssues: input.imperativeRuntimeIssues
     )
   }
 }
@@ -393,9 +398,7 @@ func layoutRuntimeIssues(
   // Lazy rows may resolve styles during layout, after the frame-head drain.
   // Consume their diagnostics into this pass so they neither disappear from
   // this frame nor leak into an unrelated renderer's next frame.
-  for issue in ImperativeRuntimeIssueQueue.drain() {
-    input.layoutPassContext.recordRuntimeIssue(issue)
-  }
+  input.imperativeRuntimeIssues.drainQueue(into: input.layoutPassContext)
   return input.layoutPassContext.runtimeIssues + rootRuntimeIssues(in: resolved)
 }
 

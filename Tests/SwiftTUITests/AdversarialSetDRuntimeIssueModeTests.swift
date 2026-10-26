@@ -151,14 +151,87 @@ struct AdversarialSetDRuntimeIssueModeTests {
       view, context: context, proposal: .init(width: 20, height: 2))
     renderer.abortPreparedFrameHeadForCancellationTesting(draft)
     let next = renderer.render(view, context: context, proposal: .init(width: 20, height: 2))
-    setDKnown(
-      "NEW-12: a dispatch-time runtime issue queued before an aborted frame head is never reported; the head drains the imperative queue into the discarded draft's layout context, and an aborted or cancelled draft reports its runtimeIssues, which are always empty (DefaultRendererFrameHeadCoordinator.swift:124-131, 160-175; DefaultRenderer.swift:495-503); contract: ImperativeRuntimeIssueQueue.swift:1-11, Logging-And-Diagnostics.md:118-131"
-    ) {
-      #expect(
-        next.diagnostics.runtime.issues.contains { $0.code == "setD.queued" },
-        "\(next.diagnostics.runtime.issues.map(\.code))")
-    }
+    // STUI-1323 (repaired): an abandoned head returns what it drained.
+    #expect(
+      next.diagnostics.runtime.issues.contains { $0.code == "setD.queued" },
+      "\(next.diagnostics.runtime.issues.map(\.code))")
     _ = ImperativeRuntimeIssueQueue.drain()
+  }
+
+  // STUI-1323 neighbours: a requeued issue keeps its place ahead of newer
+  // ones and is reported once; a dropped completed frame reports its issues,
+  // so it returns nothing to the queue.
+  @Test("setD173: a requeued issue keeps its order and is reported once")
+  func setD173RequeuedIssueKeepsItsOrderAndReportsOnce() {
+    _ = ImperativeRuntimeIssueQueue.drain()
+    defer { _ = ImperativeRuntimeIssueQueue.drain() }
+    let renderer = DefaultRenderer()
+    let view = Text("requeued")
+    let context = ResolveContext(identity: testIdentity("setD", "173b"))
+    let proposal = ProposedSize(width: 20, height: 2)
+    _ = renderer.render(view, context: context, proposal: proposal)
+    ImperativeRuntimeIssueQueue.record(
+      RuntimeIssue(severity: .warning, code: "setD.first", message: "before the abort"))
+    let draft = renderer.prepareFrameHeadForCancellationTesting(
+      view, context: context, proposal: proposal)
+    renderer.abortPreparedFrameHeadForCancellationTesting(draft)
+    ImperativeRuntimeIssueQueue.record(
+      RuntimeIssue(severity: .warning, code: "setD.second", message: "after the abort"))
+    let next = renderer.render(view, context: context, proposal: proposal)
+    let codes = next.diagnostics.runtime.issues.map(\.code).filter { $0.hasPrefix("setD.") }
+    #expect(codes == ["setD.first", "setD.second"], "\(codes)")
+    let after = renderer.render(view, context: context, proposal: proposal)
+    #expect(!after.diagnostics.runtime.issues.contains { $0.code.hasPrefix("setD.") })
+  }
+
+  @Test("setD173: a dropped completed frame does not requeue its issues")
+  func setD173DroppedFrameDoesNotRequeue() async {
+    _ = ImperativeRuntimeIssueQueue.drain()
+    defer { _ = ImperativeRuntimeIssueQueue.drain() }
+    let renderer = DefaultRenderer()
+    let view = Text("dropped")
+    let context = ResolveContext(identity: testIdentity("setD", "173c"))
+    let proposal = ProposedSize(width: 20, height: 2)
+    _ = renderer.render(view, context: context, proposal: proposal)
+    ImperativeRuntimeIssueQueue.record(
+      RuntimeIssue(severity: .warning, code: "setD.dropped", message: "reported by the drop"))
+    let draft = renderer.prepareFrameHeadForCancellationTesting(
+      view, context: context, proposal: proposal)
+    let dropped = await renderer.discardPreparedFrameTailForReconciliationTesting(
+      draft,
+      decision: .dropVisualOnly(eligibility: FrameDropEligibility(decision: .canDropVisualOnly)))
+    #expect(dropped)
+    #expect(!ImperativeRuntimeIssueQueue.pending.contains { $0.code == "setD.dropped" })
+  }
+
+  // A late-preference relayout lays the same frame out again from a fresh
+  // layout context; the queued issue the head drained still reports with it
+  // (BoundedReconciliationTests' converging toolbar relayouts once).
+  @Test("setD173: a frame that relayouts for late preferences reports a queued issue")
+  func setD173RelayoutFrameReportsQueuedIssue() {
+    _ = ImperativeRuntimeIssueQueue.drain()
+    defer { _ = ImperativeRuntimeIssueQueue.drain() }
+    let panel =
+      Panel(id: "setD173d") {
+        GeometryReader { proxy in
+          Text("body \(proxy.size.height)")
+            .toolbarItem(
+              .init(
+                title: proxy.size.height == 6 ? "First pass" : "Settled",
+                icon: nil, position: .bottom, isEnabled: true, action: {}))
+        }
+      }
+      .toolbar().toolbarStyle(DefaultBottomToolbarStyle())
+      .frame(width: 30, height: 6)
+    ImperativeRuntimeIssueQueue.record(
+      RuntimeIssue(severity: .warning, code: "setD.relayout", message: "queued before a relayout"))
+    let artifacts = DefaultRenderer().render(
+      panel, context: .init(identity: testIdentity("setD", "173d")),
+      proposal: .init(width: 30, height: 6))
+    #expect(artifacts.rasterSurface.lines.joined().contains("Settled"), "no relayout happened")
+    #expect(
+      artifacts.diagnostics.runtime.issues.contains { $0.code == "setD.relayout" },
+      "\(artifacts.diagnostics.runtime.issues.map(\.code))")
   }
 
   @Test("setD174: without an abort the next render reports a queued issue")
