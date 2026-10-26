@@ -301,11 +301,12 @@ struct TerminalCellTextRenderer {
       appendCode(5)
       appendCode(ansi256Code(for: color))
     case .trueColor:
+      let bytes = directColorBytes(for: color)
       appendCode(isBackground ? 48 : 38)
       appendCode(2)
-      appendCode(colorByte(color.red))
-      appendCode(colorByte(color.green))
-      appendCode(colorByte(color.blue))
+      appendCode(bytes.red)
+      appendCode(bytes.green)
+      appendCode(bytes.blue)
     }
   }
 
@@ -330,11 +331,12 @@ struct TerminalCellTextRenderer {
       appendCode("5")
       appendCode(String(ansi256Code(for: color)))
     case .trueColor:
+      let bytes = directColorBytes(for: color)
       appendCode("58")
       appendCode("2")
-      appendCode(String(colorByte(color.red)))
-      appendCode(String(colorByte(color.green)))
-      appendCode(String(colorByte(color.blue)))
+      appendCode(String(bytes.red))
+      appendCode(String(bytes.green))
+      appendCode(String(bytes.blue))
     }
   }
 

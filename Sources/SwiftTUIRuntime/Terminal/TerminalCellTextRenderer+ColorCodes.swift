@@ -7,9 +7,10 @@ import SwiftTUICore
 // `Color` into a concrete palette code: nearest-ANSI-16 matching with a small
 // delta-E cache, and the ANSI-256 6×6×6 cube mapping.
 //
-// `backgroundCode`, `closestANSI16ForegroundCode`, `ansi256Code`, and
-// `colorByte` are file-internal rather than `private` so the SGR assembler can
-// reach them; the cache and palette stay `private` to this file.
+// `backgroundCode`, `closestANSI16ForegroundCode`, `ansi256Code`,
+// `directColorBytes`, and `colorByte` are file-internal rather than `private`
+// so the SGR assembler can reach them; the cache and palette stay `private` to
+// this file.
 extension TerminalCellTextRenderer {
   func backgroundCode(
     forForegroundCode code: Int
@@ -27,6 +28,19 @@ extension TerminalCellTextRenderer {
     _ component: Double
   ) -> Int {
     Int(min(1, max(0, component)) * 255)
+  }
+
+  /// The `38;2`/`48;2`/`58;2` components of `color`. Direct-colour
+  /// parameters are sRGB display values, so a colour in another profile
+  /// (Display P3, linear sRGB from compositing) converts to sRGB first, with
+  /// the same per-channel clip the 256-colour cube applies (STUI-1320). An
+  /// sRGB colour is not converted: its components reach ``colorByte(_:)``
+  /// unchanged.
+  func directColorBytes(
+    for color: Color
+  ) -> (red: Int, green: Int, blue: Int) {
+    let srgb = color.converted(to: .sRGB, gamutMapping: .clip)
+    return (colorByte(srgb.red), colorByte(srgb.green), colorByte(srgb.blue))
   }
 
   /// Cache for recent ANSI16 color lookups. The deltaE computation is
