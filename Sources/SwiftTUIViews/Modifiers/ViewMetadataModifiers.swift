@@ -494,11 +494,17 @@ public struct DrawMetadataModifier: IterativePrimitiveViewModifier, Sendable, Eq
   ) -> ResolveWork<[ResolvedNode]> {
     return content.resolveWork(in: context).map { completed in
       var node = completed
+      let opacityIsInnermost = node.drawMetadata.baseStyle.explicitOpacity == nil
       node.drawMetadata = node.drawMetadata.merging(metadata)
       if !metadata.shapeClips.isEmpty {
         // The mask belongs to this modifier's scope, not the content's
         // (STUI-1319).
         node.recordClipShapeAnimationScope(context.transaction)
+      }
+      if opacityIsInnermost, metadata.baseStyle.explicitOpacity != nil {
+        // So does the opacity, unless the content already carries one: the
+        // innermost opacity decides the shared slot (STUI-1325).
+        node.recordOpacityAnimationScope(context.transaction)
       }
       return [node]
 

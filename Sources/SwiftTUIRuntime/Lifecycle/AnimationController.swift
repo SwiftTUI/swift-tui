@@ -2183,27 +2183,30 @@ package final class AnimationController: Sendable {
         }
       }
     }
-    // `clipShape` merges its mask into the clipped content's node; when the
-    // two scopes differ the modifier recorded its own (STUI-1319), so the mask
-    // slot animates under the transaction where `clipShape` was applied.
-    if !node.transactionSnapshot.customValues.isEmpty,
-      let scope = node.transactionSnapshot.customValues[
-        ObjectIdentifier(ClipShapeAnimationScopeKey.self)]?.unwrap(
-          as: ScopedStyleAnimationIntent.self),
-      snapshot[.clipShapePaths] != nil || previous?[.clipShapePaths] != nil
-    {
-      var clipSnapshot = node.transactionSnapshot
-      clipSnapshot.animationRequest = scope.request
-      clipSnapshot.animationBatchID = scope.batchID
-      let clipTransaction = Self.effectiveTransaction(
-        of: clipSnapshot, frameSegment: frameSegment, inherited: transaction)
-      // A clip scope that inherits nothing must not fall back to the node's
-      // own request; `.disabled` snaps exactly as `.inherit` does.
-      let request =
-        reducesMotion || clipTransaction.animationRequest == .inherit
-        ? AnimationRequest.disabled : clipTransaction.animationRequest
-      styleIntents[.clipShapePaths] = ScopedStyleAnimationIntent(
-        isScoped: true, request: request, batchID: clipTransaction.animationBatchID)
+    // `clipShape` and `opacity` merge into the content's node; when a
+    // modifier's scope differs from the node's own it recorded it (STUI-1319,
+    // STUI-1325), so that slot animates under the transaction where the
+    // modifier was applied.
+    if !node.transactionSnapshot.customValues.isEmpty {
+      for (slot, key) in Self.drawMetadataScopeKeys {
+        guard
+          let scope = node.transactionSnapshot.customValues[key]?.unwrap(
+            as: ScopedStyleAnimationIntent.self),
+          snapshot[slot] != nil || previous?[slot] != nil
+        else { continue }
+        var scopeSnapshot = node.transactionSnapshot
+        scopeSnapshot.animationRequest = scope.request
+        scopeSnapshot.animationBatchID = scope.batchID
+        let scopeTransaction = Self.effectiveTransaction(
+          of: scopeSnapshot, frameSegment: frameSegment, inherited: transaction)
+        // A scope that inherits nothing must not fall back to the node's own
+        // request; `.disabled` snaps exactly as `.inherit` does.
+        let request =
+          reducesMotion || scopeTransaction.animationRequest == .inherit
+          ? AnimationRequest.disabled : scopeTransaction.animationRequest
+        styleIntents[slot] = ScopedStyleAnimationIntent(
+          isScoped: true, request: request, batchID: scopeTransaction.animationBatchID)
+      }
     }
     if let previous {
       diffAndEnqueue(
@@ -2259,6 +2262,13 @@ package final class AnimationController: Sendable {
       )
     }
   }
+
+  /// The slots a merged draw-metadata modifier can scope to its own
+  /// transaction, with the key it records that scope under.
+  private static let drawMetadataScopeKeys: [(AnimatableSlot, ObjectIdentifier)] = [
+    (.clipShapePaths, ObjectIdentifier(ClipShapeAnimationScopeKey.self)),
+    (.opacity, ObjectIdentifier(OpacityAnimationScopeKey.self)),
+  ]
 
   /// `snapshot` with an `.inherit` request resolved the way a node's is: from
   /// the frame-selected segment when one covers the node, else from the

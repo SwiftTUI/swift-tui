@@ -40,6 +40,12 @@ package enum ScopedTintStyleAnimationKey {}
 /// mask never inherits it.
 package enum ClipShapeAnimationScopeKey {}
 
+/// The transaction a node's `opacity` animates under when it differs from the
+/// node's own: `opacity` merges into the content's node as a mask does, as in
+/// `content.transaction { … }.opacity(…)` (STUI-1325). Written and read like
+/// ``ClipShapeAnimationScopeKey``.
+package enum OpacityAnimationScopeKey {}
+
 extension ResolvedNode {
   /// Records `scope`, the transaction in effect where `clipShape` is applied,
   /// for this node's mask slot. Nothing is recorded when it agrees with the
@@ -47,7 +53,22 @@ extension ResolvedNode {
   /// several clips on one node the outermost `clipShape` decides, since one
   /// slot carries every clip's path.
   package mutating func recordClipShapeAnimationScope(_ scope: TransactionSnapshot) {
-    let key = ObjectIdentifier(ClipShapeAnimationScopeKey.self)
+    recordDrawMetadataAnimationScope(scope, key: ObjectIdentifier(ClipShapeAnimationScopeKey.self))
+  }
+
+  /// Records `scope`, the transaction in effect where `opacity` is applied,
+  /// for this node's opacity slot, as ``recordClipShapeAnimationScope(_:)``
+  /// does for masks. Opacities multiply into one value, and the innermost
+  /// one decides: the caller records only when the node had no opacity
+  /// before this merge, so a constant opacity that a control style wraps
+  /// around its label never takes over the label's own animated opacity.
+  package mutating func recordOpacityAnimationScope(_ scope: TransactionSnapshot) {
+    recordDrawMetadataAnimationScope(scope, key: ObjectIdentifier(OpacityAnimationScopeKey.self))
+  }
+
+  private mutating func recordDrawMetadataAnimationScope(
+    _ scope: TransactionSnapshot, key: ObjectIdentifier
+  ) {
     if transactionSnapshot.animationRequest == scope.animationRequest,
       transactionSnapshot.animationBatchID == scope.animationBatchID
     {
