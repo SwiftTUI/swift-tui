@@ -210,6 +210,9 @@ extension List {
         }
       }
 
+      // The bounded band an indexed list registers row actions for; the scroll
+      // route publishes it so the run loop can re-resolve a stale band.
+      var interactionBand: Range<Int>?
       if isEnabled {
         let policy = selectionPolicy
         let interactionSource = resolvedContent.indexedSource
@@ -406,17 +409,16 @@ extension List {
             }
             return .focus(listRowIdentity(for: context.identity, rowIndex: targetIndex))
           }
-          let interactionIndices: any Sequence<Int> =
-            if resolvedContent.indexedSource == nil {
-              rows.indices
-            } else {
-              collectionInteractionBand(
-                count: rows.count,
-                scrollAnchorRow: scrollCurrency?.effectiveAnchorRow,
-                selectionAnchor: activeRowIndex,
-                visibleRowCount: scrollCurrency?.visibleRowCount
-              )
-            }
+          if resolvedContent.indexedSource != nil {
+            let window = scrollCurrency?.interactionWindow
+            interactionBand = collectionInteractionBand(
+              count: rows.count,
+              scrollAnchorRow: window?.firstRow,
+              selectionAnchor: activeRowIndex,
+              visibleRowCount: window?.rowCount
+            )
+          }
+          let interactionIndices = interactionBand ?? rows.indices
           for rowIndex in interactionIndices {
             let row = rows[rowIndex]
             guard let tag = row.tag else {
@@ -493,6 +495,7 @@ extension List {
         accessibilityRole: .list
       )
       metadata.hostedCollectionContainer = .init(kind: .list)
+      metadata.hostedCollectionContainer?.interactionRows = interactionBand
       if let review {
         var structure = metadata.accessibilityStructure ?? .init()
         structure.collectionNavigation = review.metadata

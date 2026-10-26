@@ -58,11 +58,7 @@ struct AdversarialSetDCollectionResizeTests {
     try #require(visible.count >= 50, "\(h.frame)")
     let target = visible[visible.count - 2]
     try h.clickText(target)
-    setDKnown(
-      "NEW-1: after a grow resize the first frame's row actions and pointer routes cover only the previous viewport's band, so a low visible row ignores its click or selector; the band reads the previous frame's published layout and viewport (CollectionScrollState.swift:103-135, CollectionSupport.swift:239-253); contract: Collections.md:133-135, CollectionSupport.swift:204-207; adjacent STUI-1239"
-    ) {
-      #expect(box.value == target, "clicked \(target); visible \(visible.first!)…\(visible.last!)")
-    }
+    #expect(box.value == target, "clicked \(target); visible \(visible.first!)…\(visible.last!)")
   }
 
   @Test("setD102: a grown hidden-separator table routes a click on a low visible row")
@@ -75,11 +71,7 @@ struct AdversarialSetDCollectionResizeTests {
     try #require(visible.count >= 60, "\(h.frame)")
     let target = visible[visible.count - 2]
     try h.clickText(target)
-    setDKnown(
-      "NEW-1: after a grow resize the first frame's row actions and pointer routes cover only the previous viewport's band, so a low visible row ignores its click or selector; the band reads the previous frame's published layout and viewport (CollectionScrollState.swift:103-135, CollectionSupport.swift:239-253); contract: Collections.md:133-135, CollectionSupport.swift:204-207; adjacent STUI-1239"
-    ) {
-      #expect(box.value == target, "clicked \(target); visible \(visible.first!)…\(visible.last!)")
-    }
+    #expect(box.value == target, "clicked \(target); visible \(visible.first!)…\(visible.last!)")
   }
 
   // Correction C8 (input): a pointer press on a lower List row reveals and
@@ -96,16 +88,8 @@ struct AdversarialSetDCollectionResizeTests {
     let target = visible[visible.count - 2]
     let rowNumber = try #require(Int(target.dropFirst())) + 1
     let result = try h.activate(label: "Select row \(rowNumber)")
-    setDKnown(
-      "NEW-1: after a grow resize the first frame's row actions and pointer routes cover only the previous viewport's band, so a low visible row ignores its click or selector; the band reads the previous frame's published layout and viewport (CollectionScrollState.swift:103-135, CollectionSupport.swift:239-253); contract: Collections.md:133-135, CollectionSupport.swift:204-207; adjacent STUI-1239"
-    ) {
-      #expect(result == .accepted, "\(String(describing: result)) for \(target)")
-    }
-    setDKnown(
-      "NEW-1: after a grow resize the first frame's row actions and pointer routes cover only the previous viewport's band, so a low visible row ignores its click or selector; the band reads the previous frame's published layout and viewport (CollectionScrollState.swift:103-135, CollectionSupport.swift:239-253); contract: Collections.md:133-135, CollectionSupport.swift:204-207; adjacent STUI-1239"
-    ) {
-      #expect(box.value == target, "selected \(target); visible \(visible.first!)…\(visible.last!)")
-    }
+    #expect(result == .accepted, "\(String(describing: result)) for \(target)")
+    #expect(box.value == target, "selected \(target); visible \(visible.first!)…\(visible.last!)")
   }
 
   @Test("setD104: a grown table's low visible row keeps its assistive selector")
@@ -119,16 +103,8 @@ struct AdversarialSetDCollectionResizeTests {
     let target = visible[visible.count - 2]
     let rowNumber = try #require(Int(target.dropFirst())) + 1
     let result = try h.activate(label: "Select row \(rowNumber)")
-    setDKnown(
-      "NEW-1: after a grow resize the first frame's row actions and pointer routes cover only the previous viewport's band, so a low visible row ignores its click or selector; the band reads the previous frame's published layout and viewport (CollectionScrollState.swift:103-135, CollectionSupport.swift:239-253); contract: Collections.md:133-135, CollectionSupport.swift:204-207; adjacent STUI-1239"
-    ) {
-      #expect(result == .accepted, "\(String(describing: result)) for \(target)")
-    }
-    setDKnown(
-      "NEW-1: after a grow resize the first frame's row actions and pointer routes cover only the previous viewport's band, so a low visible row ignores its click or selector; the band reads the previous frame's published layout and viewport (CollectionScrollState.swift:103-135, CollectionSupport.swift:239-253); contract: Collections.md:133-135, CollectionSupport.swift:204-207; adjacent STUI-1239"
-    ) {
-      #expect(box.value == target)
-    }
+    #expect(result == .accepted, "\(String(describing: result)) for \(target)")
+    #expect(box.value == target)
   }
 
   @Test("setD105: one more root frame after the grow restores the low row's route")
@@ -205,12 +181,8 @@ struct AdversarialSetDCollectionResizeTests {
     try #require(visible.count >= 60, "\(h.frame)")
     let target = visible[visible.count - 2]
     try h.clickText(target)
-    setDKnown(
-      "NEW-1: after a grow resize the first frame's row actions and pointer routes cover only the previous viewport's band, so a low visible row ignores its click or selector; the band reads the previous frame's published layout and viewport (CollectionScrollState.swift:103-135, CollectionSupport.swift:239-253); contract: Collections.md:133-135, CollectionSupport.swift:204-207; adjacent STUI-1239"
-    ) {
-      #expect(
-        box.value == [target], "clicked \(target); visible \(visible.first!)…\(visible.last!)")
-    }
+    #expect(
+      box.value == [target], "clicked \(target); visible \(visible.first!)…\(visible.last!)")
   }
 
   @Test("setD110: a grown end window routes a click on its first visible row")
@@ -226,11 +198,7 @@ struct AdversarialSetDCollectionResizeTests {
     try #require(visible.count >= 60 && visible.last == "r199", "\(h.frame)")
     let target = visible[1]
     try h.clickText(target)
-    setDKnown(
-      "NEW-1: after a grow resize the first frame's row actions and pointer routes cover only the previous viewport's band, so a low visible row ignores its click or selector; the band reads the previous frame's published layout and viewport (CollectionScrollState.swift:103-135, CollectionSupport.swift:239-253); contract: Collections.md:133-135, CollectionSupport.swift:204-207; adjacent STUI-1239"
-    ) {
-      #expect(box.value == target, "clicked \(target); visible \(visible.first!)…\(visible.last!)")
-    }
+    #expect(box.value == target, "clicked \(target); visible \(visible.first!)…\(visible.last!)")
   }
 }
 
@@ -395,11 +363,7 @@ struct AdversarialSetDCollectionMutationTests {
     }
     defer { h.shutdown() }
     try #require(h.frame.contains("r0000"), "\(h.frame)")
-    setDKnown(
-      "NEW-8: a ScrollView-hosted 2000-row data table registers 2001 row actions; the line model publishes the whole body as visible, so the band spans the dataset (DrawExtractor+Tables.swift:784-800, CollectionSupport.swift:239-253); contract: Collections.md:154-161; adjacent STUI-1273"
-    ) {
-      #expect(h.actionRegistrationCount < 150, "\(h.actionRegistrationCount) action registrations")
-    }
+    #expect(h.actionRegistrationCount < 150, "\(h.actionRegistrationCount) action registrations")
   }
 
   @Test("setD119: an unhosted 2000-row table registers a bounded number of row actions")
@@ -613,5 +577,153 @@ struct AdversarialSetDCollectionBatchTests {
     let expected = sequential.tokens(prefix: "r").first
     try #require(expected == "r002", "\(sequential.frame)")
     #expect(h.tokens(prefix: "r").first == expected, "\(h.frame)")
+  }
+}
+
+// MARK: - Wave 4 FW-J: interaction bands follow the frame's own layout
+
+/// A Table whose viewport an external model resizes without a terminal resize.
+@MainActor
+private final class Wave4FJHeaderModel {
+  var headerLines: Int
+  init(_ headerLines: Int) { self.headerLines = headerLines }
+}
+
+/// Counts the rows a published window shows, as `CollectionScrollCurrency` sees
+/// it once the layout of the window the stored anchor selects is published.
+@MainActor
+private func wave4fjVisibleRowCount(
+  _ geometry: CollectionScrollGeometry, window: Range<Int>
+) -> Int {
+  let identity = testIdentity("Wave4FJVisibleRows")
+  let registry = LocalScrollPositionRegistry()
+  var route = ScrollRoute(
+    identity: identity,
+    viewportRect: CellRect(origin: .zero, size: CellSize(width: 20, height: window.count)),
+    contentBounds: CellRect(
+      origin: .zero, size: CellSize(width: 20, height: geometry.displayLineCount)))
+  route.collectionScrollLayout = CollectionScrollLayout(geometry: geometry, visibleLines: window)
+  registry.updateGeometry(scrollRoutes: [route], scrollTargets: [])
+  return CollectionScrollCurrency(
+    identity: identity, geometry: geometry, ownerNode: nil, registry: registry,
+    windowMetrics: { _, _ in (offset: 0, visibleLineCount: window.count) }
+  ).visibleRowCount
+}
+
+@MainActor
+@Suite("Wave 4 FW-J: collection interaction bands", .serialized)
+struct Wave4FJCollectionBandTests {
+  // wave4j01 (STUI-1312): a window that starts on a separator line does not
+  // count the row above it. Neighbours: a window that starts inside a tall row
+  // counts that row; a whole-row window and a lone separator line are unchanged.
+  @Test func wave4j01VisibleRowCountSkipsTheRowAboveALeadingSeparator() {
+    let drawn = CollectionScrollGeometry(rowCount: 3, rowSpan: 2)
+    #expect(wave4fjVisibleRowCount(drawn, window: 1..<3) == 1, "rows 0..<1, 2..<3, 4..<5")
+    #expect(wave4fjVisibleRowCount(drawn, window: 1..<5) == 2)
+    #expect(wave4fjVisibleRowCount(drawn, window: 0..<3) == 2)
+    #expect(wave4fjVisibleRowCount(drawn, window: 1..<2) == 1, "a lone separator keeps the floor")
+    let tall = CollectionScrollGeometry(rowCount: 3, rowSpan: 2, rowHeights: [0: 3])
+    #expect(wave4fjVisibleRowCount(tall, window: 1..<5) == 2, "rows 0..<3, 4..<5, 6..<7")
+    #expect(wave4fjVisibleRowCount(tall, window: 3..<7) == 2)
+  }
+
+  // wave4j02 (STUI-1315): a sibling that gives the table its space back grows
+  // the table's viewport without a terminal resize.
+  @Test(arguments: [false, true])
+  func wave4j02SiblingGrowthRoutesLowRowsOnTheFirstFrame(hidden: Bool) throws {
+    let box = SetDSelection<String?>("r100")
+    let model = Wave4FJHeaderModel(50)
+    let rows = setDRows(200)
+    let h = try SetDLiveHarness("w4j02-\(hidden)", size: .init(width: 30, height: 64)) {
+      VStack(spacing: 0) {
+        ForEach(0..<model.headerLines, id: \.self) { Text("h\($0)") }
+        Table(rows, selection: box.binding, columns: [TableColumn("Name")]) { row in
+          Text(row.id).listRowSeparator(hidden ? .hidden : .automatic)
+        }.tableHeaders(.hidden).scrollIndicators(.hidden)
+      }
+    }
+    defer { h.shutdown() }
+    try #require(h.tokens(prefix: "r").count < 16, "\(h.frame)")
+    model.headerLines = 0
+    try h.renderRoot()
+    let visible = h.tokens(prefix: "r")
+    try #require(visible.count >= 28, "\(h.frame)")
+    let target = visible[visible.count - 2]
+    try h.clickText(target)
+    #expect(box.value == target, "clicked \(target); visible \(visible.first!)…\(visible.last!)")
+  }
+
+  // wave4j03 (STUI-1315): a grown List whose window was at its end routes
+  // its first visible row's selector on the first frame.
+  @Test func wave4j03GrownEndListRoutesItsFirstRowSelector() throws {
+    let box = SetDSelection<String?>(nil)
+    let rows = setDRows(200)
+    let h = try SetDLiveHarness("w4j03", size: .init(width: 30, height: 10)) {
+      List(rows, selection: box.binding) { row in Text(row.id) }.scrollIndicators(.hidden)
+    }
+    defer { h.shutdown() }
+    try h.key(.tab)
+    try h.key(.end)
+    try #require(h.tokens(prefix: "r").last == "r199", "\(h.frame)")
+    try h.resize(.init(width: 30, height: 64))
+    let visible = h.tokens(prefix: "r")
+    try #require(visible.count >= 50 && visible.last == "r199", "\(h.frame)")
+    let target = visible[1]
+    let rowNumber = try #require(Int(target.dropFirst())) + 1
+    #expect(try h.activate(label: "Select row \(rowNumber)") == .accepted, "\(target)")
+    #expect(box.value == target)
+  }
+
+  // wave4j04 (neighbour): after a shrink every visible row still answers.
+  @Test func wave4j04ShrunkTableRoutesEveryVisibleRow() throws {
+    let box = SetDSelection<String?>("r100")
+    let rows = setDRows(200)
+    let h = try SetDLiveHarness("w4j04", size: .init(width: 30, height: 64)) {
+      Table(rows, selection: box.binding, columns: [TableColumn("Name")]) { row in
+        Text(row.id)
+      }.tableHeaders(.hidden).scrollIndicators(.hidden)
+    }
+    defer { h.shutdown() }
+    try h.resize(.init(width: 30, height: 10))
+    let visible = h.tokens(prefix: "r")
+    try #require(visible.count >= 3, "\(h.frame)")
+    for target in [visible.first!, visible.last!] {
+      try h.clickText(target)
+      #expect(box.value == target, "clicked \(target); visible \(visible)")
+    }
+  }
+
+  // wave4j05 (STUI-1321): a scroll-hosted 2000-row collection registers a
+  // bounded band that follows the enclosing ScrollView, for a Table and a List.
+  @Test(arguments: [false, true])
+  func wave4j05ScrollHostedBandFollowsTheScrollView(list: Bool) throws {
+    let box = SetDSelection<String?>("r0000")
+    let rows = setDRows(2000, digits: 4)
+    let h = try SetDLiveHarness("w4j05-\(list)", size: .init(width: 30, height: 24)) {
+      ScrollViewReader { proxy in
+        VStack(spacing: 0) {
+          Button("jump") { _ = proxy.scrollTo(edge: .bottom) }
+          ScrollView {
+            if list {
+              List(rows, selection: box.binding) { row in Text(row.id) }
+            } else {
+              Table(rows, selection: box.binding, columns: [TableColumn("Name")]) { row in
+                Text(row.id)
+              }.tableHeaders(.hidden)
+            }
+          }.scrollIndicators(.hidden).frame(height: 22)
+        }
+      }
+    }
+    defer { h.shutdown() }
+    #expect(h.actionRegistrationCount < 150, "\(h.actionRegistrationCount) action registrations")
+    try h.clickText("jump")
+    let visible = h.tokens(prefix: "r")
+    try #require(visible.last == "r1999" && visible.count >= 8, "\(h.frame)")
+    #expect(h.actionRegistrationCount < 150, "\(h.actionRegistrationCount) after the jump")
+    let target = visible[visible.count - 2]
+    let rowNumber = try #require(Int(target.dropFirst())) + 1
+    #expect(try h.activate(label: "Select row \(rowNumber)") == .accepted, "\(target)")
+    #expect(box.value == target, "selected \(target); visible \(visible.first!)…\(visible.last!)")
   }
 }

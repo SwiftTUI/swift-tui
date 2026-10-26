@@ -104,6 +104,10 @@ package struct CollectionScrollPosition: Equatable, Sendable {
 public struct ScrollRoute: Equatable, Sendable {
   package var collectionScrollPosition: CollectionScrollPosition? = nil
   package var collectionScrollLayout: CollectionScrollLayout? = nil
+  /// The rows the collection registered row actions and pointer routes for
+  /// at resolve (its interaction band), or `nil` when it registers none or
+  /// registers every row. See ``collectionInteractionBandIsStale``.
+  package var collectionInteractionRows: Range<Int>? = nil
 
   /// Authored motion policy at this route, refreshed with each semantic frame.
   package var reducesMotion = false

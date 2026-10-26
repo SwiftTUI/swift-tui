@@ -275,6 +275,8 @@ package struct SemanticExtractor: Sendable {
           scrollRoutes[scrollRoutes.count - 1].collectionScrollLayout =
             node.hostedTableVisibleLayout?.scrollMetadata?.navigation
             ?? node.hostedListVisibleLayout?.scrollMetadata?.navigation
+          scrollRoutes[scrollRoutes.count - 1].collectionInteractionRows =
+            node.semanticMetadata.hostedCollectionContainer?.interactionRows
           selectionRoutes.append(
             SelectionRoute(identity: node.identity, role: scrollRole)
           )

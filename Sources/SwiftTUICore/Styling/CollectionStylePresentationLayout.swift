@@ -237,10 +237,16 @@ extension ListStylePresentation {
         let row = geometry.lineRange(forRow: window.offset / listRowDisplaySpan)
         offset = window.offset.isMultiple(of: listRowDisplaySpan) ? row.lowerBound : row.upperBound
       }
+      // Inside a ScrollView the bounds are the whole body and only the rows
+      // the enclosing viewport declares were generated; the band sizes from them.
+      let realizedRows = windowRows.min().flatMap { first in
+        windowRows.max().map { first..<($0 + 1) }
+      }
       navigation = CollectionScrollLayout(
         geometry: geometry,
         visibleLines: offset..<(offset + capacity),
-        anchor: payload.scrollAnchor)
+        anchor: payload.scrollAnchor,
+        realizedRows: realizedRows)
     } else {
       navigation = generated.navigation
     }

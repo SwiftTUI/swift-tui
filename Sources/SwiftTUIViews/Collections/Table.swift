@@ -274,6 +274,9 @@ extension Table {
         }
       }
 
+      // The bounded band an indexed table registers row routes for; the scroll
+      // route publishes it so the run loop can re-resolve a stale band.
+      var interactionBand: Range<Int>?
       if isEnabled {
         let policy = selectionPolicy
         let interactionSource = resolvedContent.indexedSource
@@ -430,17 +433,17 @@ extension Table {
         }
 
         if policy.isSelectable {
+          if resolvedContent.indexedSource != nil {
+            let window = scrollCurrency?.interactionWindow
+            interactionBand = collectionInteractionBand(
+              count: resolvedRows.count,
+              scrollAnchorRow: window?.firstRow,
+              selectionAnchor: selectedIndex,
+              visibleRowCount: window?.rowCount
+            )
+          }
           let interactionIndices: any Sequence<Int> =
-            if resolvedContent.indexedSource == nil {
-              selectableRowIndices
-            } else {
-              collectionInteractionBand(
-                count: resolvedRows.count,
-                scrollAnchorRow: scrollCurrency?.effectiveAnchorRow,
-                selectionAnchor: selectedIndex,
-                visibleRowCount: scrollCurrency?.visibleRowCount
-              )
-            }
+            if let interactionBand { interactionBand } else { selectableRowIndices }
           for rowIndex in interactionIndices {
             guard let tag = resolvedRows[rowIndex].tag else {
               continue
@@ -541,6 +544,7 @@ extension Table {
           itemIdentity: resolvedRows[index].identity, rowIndex: index)
       }
       metadata.hostedCollectionContainer?.headerSorts = columns.map(\.sort)
+      metadata.hostedCollectionContainer?.interactionRows = interactionBand
       metadata.accessibilityProperties = .init(
         rowCount: resolvedRows.count + 1,
         columnCount: resolvedColumns.count + (isSelectable ? 1 : 0))

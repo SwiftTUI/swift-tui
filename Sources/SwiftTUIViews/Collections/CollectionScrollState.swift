@@ -126,12 +126,26 @@ package struct CollectionScrollCurrency {
   package var visibleRowCount: Int {
     let lines = visibleLineCount
     guard lines > 0, geometry.rowCount > 0 else { return 0 }
-    if let layout, layout.anchor == storedAnchor, !layout.visibleLines.isEmpty {
-      let first = layout.geometry.row(atOrBeforeLine: layout.visibleLines.lowerBound)
-      let last = layout.geometry.row(atOrBeforeLine: layout.visibleLines.upperBound - 1)
-      return max(1, last - first + 1)
+    if let layout, layout.anchor == storedAnchor, let shown = layout.shownRows {
+      // A separator line that starts the window belongs to no row (STUI-1312).
+      return max(1, shown.count)
     }
     return min(geometry.rowCount, (lines + minimumRowLineSpan - 1) / minimumRowLineSpan)
+  }
+
+  /// The rows an interaction band must cover, as a first row and a count.
+  /// When the published layout measured the window the stored anchor
+  /// selects, these are the rows it shows, or inside a `ScrollView` the rows
+  /// it realized for the enclosing viewport; otherwise the stored anchor's
+  /// row and ``visibleRowCount``'s bound. `nil` before the first geometry
+  /// sync. The run loop re-resolves a collection whose band this frame's
+  /// layout outgrew (`ScrollRoute.collectionInteractionBandIsStale`).
+  package var interactionWindow: (firstRow: Int, rowCount: Int)? {
+    if let layout, layout.anchor == storedAnchor, let rows = layout.interactionRows {
+      return (rows.lowerBound, rows.count)
+    }
+    let count = visibleRowCount
+    return count > 0 ? (effectiveAnchorRow, count) : nil
   }
 
   /// Capture the initial window before selection starts following it.

@@ -239,6 +239,10 @@ package enum HostWireSchema {
         "collectionScrollLayout",
         wire: .notSerialized(
           "measured row geometry and viewport consumed by native collection navigation")),
+      .init(
+        "collectionInteractionRows",
+        wire: .notSerialized(
+          "resolve-time row-action band the run loop checks against the frame's layout")),
       .init("identity", wire: .key("id")),
       .init(
         "viewNodeID",
