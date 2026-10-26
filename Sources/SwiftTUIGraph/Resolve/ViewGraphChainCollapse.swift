@@ -3,7 +3,9 @@
 // collapse absorbs an interior mint's output (see `reindexIdentity`'s
 // shadowing record). Registration/task-slot and queued change-event
 // re-homing to the absorber happens here before the reclaim so the F43
-// start-skip and the lost initial change event (STUI-1174) cannot recur.
+// start-skip and the lost initial change event (STUI-1174) cannot recur, and
+// the reclaim plans none of the interior's own lifecycle events, so its
+// disappear cannot run at mount (STUI-1299).
 
 extension ViewGraph {
   /// Reclaims nodes stranded by a transparent chain collapse this frame. A
@@ -89,9 +91,11 @@ extension ViewGraph {
       adoptAbsorbedRuntimeRegistrations(from: node)
       adoptAbsorbedPendingChangeHandlers(from: node)
       adoptAbsorbedDetachedHostedRoots(from: node)
+      // The interior's lifecycle is the absorber's: it plans no disappear or
+      // task cancel of its own (STUI-1299).
       removeSubtree(
         rootedAt: node,
-        policy: .absorbingIntoCollapse
+        policy: .reclaimingAbsorbedShadow
       )
     }
   }

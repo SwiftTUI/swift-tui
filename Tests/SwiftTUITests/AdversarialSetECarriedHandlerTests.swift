@@ -14,11 +14,8 @@ import Testing
 @MainActor
 @Suite("Campaign F3 pass 2 carried lifecycle handlers", .serialized)
 struct AdversarialSetECarriedHandlerTests {
-  static let newOne =
-    "NEW-1: a view mounted by a committed pass and removed by that pass's own focus re-render gets onDisappear without onAppear (appear skipped, initial onChange runs on the retired owner); the carried plan dispatches after the re-render commit, and LifecycleCoordinator.apply looks appear handlers up only in the current registry; contract: Runtime.md:117-122, LifecycleCoordinator.swift:48-55 skip zero-oracle; adjacent STUI-1234"
-  static let newTwo =
-    "NEW-2: a child view whose body applies .onChange or .task inside a switch branch to an .onAppear/.onDisappear-modified view runs onDisappear once when it mounts, before onAppear; suspected chain-collapse absorbed-interior reclaim (ViewGraphChainCollapse.swift:27-95) plans the interior's disappear; contract: SwiftUI onAppear/onDisappear pairing, Runtime.md:117-118; adjacent STUI-1174"
-
+  // NEW-1 (STUI-1298) and NEW-2 (STUI-1299) are repaired; their guards are
+  // ordinary assertions.
   @Test(arguments: Array(114...117))
   func carriedHandler(id: Int) async throws {
     let probe = SetECarryProbe()
@@ -56,24 +53,14 @@ struct AdversarialSetECarriedHandlerTests {
       try #require(!h.frame.contains("Hint"), "\(h.frame)")
       try #require(probe.disappears >= 1, "hint lifecycle: \(probe.events)")
       // One lifetime: one appear (landed), then one disappear.
-      setEKnown(Self.newOne) {
-        #expect(probe.appears == 1, "onDisappear ran without onAppear: \(probe.events)")
-        #expect(probe.appearLanded == [true])
-        #expect(coordinator.appearHandlerSkipCount == appearSkips)
-      }
-      if id == 115 || id == 116 {
-        setEKnown(Self.newTwo) {
-          #expect(probe.disappears == 1, "hint lifecycle: \(probe.events)")
-        }
-      } else {
-        #expect(probe.disappears == 1, "hint lifecycle: \(probe.events)")
-      }
+      #expect(probe.appears == 1, "onDisappear ran without onAppear: \(probe.events)")
+      #expect(probe.appearLanded == [true])
+      #expect(coordinator.appearHandlerSkipCount == appearSkips)
+      #expect(probe.disappears == 1, "hint lifecycle: \(probe.events)")
       switch id {
       case 115:
-        setEKnown(Self.newOne) {
-          #expect(probe.changeLanded == [true], "\(probe.changeLanded)")
-          #expect(coordinator.changeHandlerSnapshotFallbackCount == changeFallbacks)
-        }
+        #expect(probe.changeLanded == [true], "\(probe.changeLanded)")
+        #expect(coordinator.changeHandlerSnapshotFallbackCount == changeFallbacks)
         #expect(coordinator.changeHandlerSkipCount == changeSkips)
       case 116:
         #expect(h.activeTaskCount == baselineTasks)
@@ -106,13 +93,9 @@ struct AdversarialSetECarriedHandlerTests {
       _ = try h.clickText("Show")
       try #require(h.frame.contains("Hint"), "\(h.frame)")
       #expect(probe.appears == 1)
-      setEKnown(Self.newTwo) {
-        #expect(probe.disappears == 0, "onDisappear ran when the hint mounted: \(probe.events)")
-      }
+      #expect(probe.disappears == 0, "onDisappear ran when the hint mounted: \(probe.events)")
       _ = try h.clickText("Hide")
-      setEKnown(Self.newTwo) {
-        #expect(probe.disappears == 1, "\(probe.events)")
-      }
+      #expect(probe.disappears == 1, "\(probe.events)")
       await cleanup()
     } catch {
       await cleanup()
@@ -168,6 +151,179 @@ struct AdversarialSetECarriedHandlerTests {
     } catch {
       await cleanup()
       throw error
+    }
+  }
+}
+
+/// Wave-4 (W4-FD) neighbours of setE114–117 and of the mount-control phase
+/// (STUI-1298, STUI-1299).
+@MainActor
+@Suite("W4-FD carried lifecycle pairing", .serialized)
+struct Wave4FDLifecyclePairingTests {
+  /// The committed pass mounts two hints; its focus re-render removes one
+  /// (the premise that the re-render ran) and keeps the other. The kept
+  /// hint's appear, initial change and task each run once, on its live owner.
+  @Test func keptViewLifecycleRunsOnceAcrossFocusRerender() async throws {
+    let probe = SetECarryProbe()
+    let h = try StressRuntimeHarness(
+      rootIdentity: testIdentity("setE", "w4fd-kept"), size: .init(width: 48, height: 12)
+    ) { SetEKeptHintRoot(probe: probe) }
+    @MainActor func cleanup() async {
+      h.shutdown()
+      probe.release.fire()
+      await probe.changed.wait { probe.taskEnds == probe.taskStarts }
+    }
+    do {
+      let coordinator = h.runLoop.lifecycleCoordinator
+      let appearSkips = coordinator.appearHandlerSkipCount
+      let changeSkips = coordinator.changeHandlerSkipCount
+      let changeFallbacks = coordinator.changeHandlerSnapshotFallbackCount
+      let startSkips = coordinator.taskStartSkipCount
+      _ = try h.focusText("Open")
+      _ = try h.pressKey(.init(.return))
+      try #require(h.frame.contains("Name"), "\(h.frame)")
+      try #require(!h.frame.contains("Gone"), "the focus re-render did not run: \(h.frame)")
+      try #require(h.frame.contains("Kept"), "\(h.frame)")
+      await probe.changed.wait { probe.taskStarts == 1 }
+      #expect(probe.appears == 1, "\(probe.events)")
+      #expect(probe.appearLanded == [true])
+      #expect(probe.changeLanded == [true])
+      #expect(probe.taskStarts == 1)
+      #expect(probe.disappears == 0, "\(probe.events)")
+      #expect(coordinator.appearHandlerSkipCount == appearSkips)
+      #expect(coordinator.changeHandlerSkipCount == changeSkips)
+      #expect(coordinator.changeHandlerSnapshotFallbackCount == changeFallbacks)
+      #expect(coordinator.taskStartSkipCount == startSkips)
+      await cleanup()
+    } catch {
+      await cleanup()
+      throw error
+    }
+  }
+
+  /// A child view whose `switch` branch applies a trailing modifier to an
+  /// `onAppear`/`onDisappear`-modified value, mounted and removed in separate
+  /// frames: appear (and any initial change or task) at mount, one disappear
+  /// at removal, never a disappear at mount.
+  @Test(arguments: Array(0...5))
+  func branchTrailingModifierPairsLifecycle(kind: Int) async throws {
+    let log = SetEBranchLog()
+    let h = try StressRuntimeHarness(
+      rootIdentity: testIdentity("setE", "w4fd-branch-\(kind)"), size: .init(width: 40, height: 8)
+    ) { SetEBranchRoot(kind: kind, log: log) }
+    defer { h.shutdown() }
+    _ = try h.clickText("Show")
+    try #require(h.frame.contains("Hint"), "\(h.frame)")
+    var mounted = ["appear"]
+    if [0, 4, 5].contains(kind) { mounted.append("change") }
+    if kind == 1 {
+      // The task body runs after the frame that started it.
+      await log.changed.wait { log.events.contains("task") }
+      mounted.append("task")
+    }
+    #expect(log.events == mounted, "kind \(kind) at mount")
+    _ = try h.clickText("Hide")
+    try #require(!h.frame.contains("Hint"), "\(h.frame)")
+    #expect(log.events == mounted + ["disappear"], "kind \(kind) after removal")
+  }
+}
+
+/// The keep/remove pair for `keptViewLifecycleRunsOnceAcrossFocusRerender`.
+private struct SetEKeptHintRoot: View {
+  let probe: SetECarryProbe
+  @State private var opened = false
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      if !opened { Button("Open") { opened = true } }
+      if opened { SetEKeptHintField(probe: probe) }
+    }
+  }
+}
+
+private struct SetEKeptHintField: View {
+  let probe: SetECarryProbe
+  @State private var text = ""
+  @FocusState private var isFieldFocused: Bool
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      TextField("Name", text: $text).focused($isFieldFocused)
+      if !isFieldFocused { Text("Gone") }
+      SetEKeptHint(probe: probe)
+    }
+  }
+}
+
+private struct SetEKeptHint: View {
+  let probe: SetECarryProbe
+  @State private var mark = -1
+
+  private func stamp(_ value: Int) -> Bool {
+    mark = value
+    return mark == value
+  }
+
+  var body: some View {
+    Text("Kept")
+      .onAppear {
+        probe.events.append("appear")
+        probe.appears += 1
+        probe.appearLanded.append(stamp(1))
+      }
+      .onDisappear {
+        probe.events.append("disappear")
+        probe.disappears += 1
+      }
+      .onChange(of: 1, initial: true) {
+        probe.events.append("change")
+        probe.changeLanded.append(stamp(2))
+      }
+      .task { await probe.runTask() }
+  }
+}
+
+@MainActor
+private final class SetEBranchLog {
+  let changed = MainActorConditionSignal()
+  var events: [String] = [] {
+    didSet { changed.notify() }
+  }
+}
+
+private struct SetEBranchRoot: View {
+  let kind: Int
+  let log: SetEBranchLog
+  @State private var shown = false
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Show") { shown = true }
+      Button("Hide") { shown = false }
+      if shown { SetEBranchHint(kind: kind, log: log) }
+    }
+  }
+}
+
+/// Shapes from the STUI-1299 isolation: trailing `onChange`, trailing `task`,
+/// trailing `padding`, the bare branch, `onChange` then `padding`, and a
+/// nested conditional with a trailing `onChange`.
+private struct SetEBranchHint: View {
+  let kind: Int
+  let log: SetEBranchLog
+
+  var body: some View {
+    let hint = Text("Hint")
+      .onAppear { log.events.append("appear") }
+      .onDisappear { log.events.append("disappear") }
+    switch kind {
+    case 0: hint.onChange(of: kind, initial: true) { log.events.append("change") }
+    case 1: hint.task { log.events.append("task") }
+    case 2: hint.padding(1)
+    case 3: hint
+    case 4: hint.onChange(of: kind, initial: true) { log.events.append("change") }.padding(0)
+    default:
+      if kind == 5 { hint.onChange(of: kind, initial: true) { log.events.append("change") } }
     }
   }
 }

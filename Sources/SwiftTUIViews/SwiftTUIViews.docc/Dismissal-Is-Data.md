@@ -29,8 +29,11 @@ struct InspectorHost: View {
 ```
 
 Escape, a built-in close action, or an application write of `false` all clear
-the binding. The optional `onDismiss` callback observes the resulting teardown.
-It is not the command that performs dismissal.
+the binding. As in SwiftUI, every action of an alert or a confirmation dialog
+also clears it after the action runs, unless the action changed the
+presentation itself, for instance by presenting a different item. The optional
+`onDismiss` callback observes the resulting teardown. It is not the command
+that performs dismissal.
 
 ## Present an identifiable item
 

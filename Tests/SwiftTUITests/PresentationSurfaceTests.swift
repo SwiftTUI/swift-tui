@@ -1082,3 +1082,169 @@ private struct AppearProbePaletteBody: View {
     return mark == open
   }
 }
+
+// MARK: - Prompt action dismissal (W4-FD, STUI-1309)
+
+/// SwiftUI: every action of an alert or confirmation dialog dismisses it after
+/// the action runs. An action that changes the presentation itself (dismisses
+/// it, or presents a different item) keeps its own outcome; sheets keep their
+/// content buttons' explicit dismissal.
+@MainActor
+@Suite(.serialized)
+struct PromptActionDismissalTests {
+  @Test(arguments: [false, true])
+  func customActionDismissesBooleanPrompt(dialog: Bool) throws {
+    let log = PromptActionDismissalLog()
+    let h = try StressRuntimeHarness(
+      rootIdentity: testIdentity("w4fd-prompt", dialog ? "dialog" : "alert"),
+      size: .init(width: 50, height: 14)
+    ) { PromptActionBooleanRoot(dialog: dialog, log: log) }
+    defer { h.shutdown() }
+    _ = try h.clickText("Open")
+    try #require(h.frame.contains("Apply"), "\(h.frame)")
+    _ = try h.clickText("Apply")
+    #expect(log.applied == 1)
+    #expect(!h.frame.contains("Apply"), "the prompt stayed presented:\n\(h.frame)")
+    #expect(h.frame.contains("presented false"), "\(h.frame)")
+    #expect(log.dismissals == 1)
+  }
+
+  @Test(arguments: [false, true])
+  func customActionDismissesItemPrompt(dialog: Bool) throws {
+    let log = PromptActionDismissalLog()
+    let h = try StressRuntimeHarness(
+      rootIdentity: testIdentity("w4fd-prompt-item", dialog ? "dialog" : "alert"),
+      size: .init(width: 50, height: 14)
+    ) { PromptActionItemRoot(dialog: dialog, log: log) }
+    defer { h.shutdown() }
+    _ = try h.clickText("Open")
+    try #require(h.frame.contains("Apply a"), "\(h.frame)")
+    _ = try h.clickText("Apply a")
+    #expect(log.applied == 1)
+    #expect(!h.frame.contains("Apply a"), "the prompt stayed presented:\n\(h.frame)")
+    #expect(h.frame.contains("item none"), "\(h.frame)")
+    #expect(log.dismissals == 1)
+  }
+
+  // An action that presents a different item keeps that item presented.
+  @Test func actionPresentingAnotherItemKeepsIt() throws {
+    let log = PromptActionDismissalLog()
+    let h = try StressRuntimeHarness(
+      rootIdentity: testIdentity("w4fd-prompt-next"), size: .init(width: 50, height: 14)
+    ) { PromptActionItemRoot(dialog: false, log: log) }
+    defer { h.shutdown() }
+    _ = try h.clickText("Open")
+    _ = try h.clickText("Next")
+    #expect(h.frame.contains("Apply b"), "\(h.frame)")
+    #expect(h.frame.contains("item b"), "\(h.frame)")
+  }
+
+  // An action that dismisses the prompt itself dismisses it once.
+  @Test func selfDismissingActionDismissesOnce() throws {
+    let log = PromptActionDismissalLog()
+    let h = try StressRuntimeHarness(
+      rootIdentity: testIdentity("w4fd-prompt-self"), size: .init(width: 50, height: 14)
+    ) { PromptActionBooleanRoot(dialog: false, log: log) }
+    defer { h.shutdown() }
+    _ = try h.clickText("Open")
+    _ = try h.clickText("Close it")
+    #expect(!h.frame.contains("Apply"), "\(h.frame)")
+    #expect(log.dismissals == 1)
+  }
+
+  // Sheet content buttons do not dismiss their sheet implicitly.
+  @Test func sheetContentButtonDoesNotDismiss() throws {
+    let log = PromptActionDismissalLog()
+    let h = try StressRuntimeHarness(
+      rootIdentity: testIdentity("w4fd-prompt-sheet"), size: .init(width: 50, height: 14)
+    ) { PromptActionSheetRoot(log: log) }
+    defer { h.shutdown() }
+    _ = try h.clickText("Open")
+    _ = try h.clickText("Apply")
+    #expect(log.applied == 1)
+    #expect(h.frame.contains("Apply"), "\(h.frame)")
+    #expect(log.dismissals == 0)
+  }
+}
+
+@MainActor
+private final class PromptActionDismissalLog {
+  var applied = 0
+  var dismissals = 0
+}
+
+private struct PromptActionBooleanRoot: View {
+  let dialog: Bool
+  let log: PromptActionDismissalLog
+  @State private var presented = false
+
+  var body: some View {
+    let base = VStack(alignment: .leading, spacing: 0) {
+      Text("presented \(presented)")
+      Button("Open") { presented = true }
+    }
+    if dialog {
+      base.confirmationDialog(
+        "Confirm", isPresented: $presented, onDismiss: { log.dismissals += 1 }
+      ) {
+        Button("Apply") { log.applied += 1 }
+        Button("Close it") { presented = false }
+      } message: {
+        Text("dialog body")
+      }
+    } else {
+      base.alert("Heads up", isPresented: $presented, onDismiss: { log.dismissals += 1 }) {
+        Button("Apply") { log.applied += 1 }
+        Button("Close it") { presented = false }
+      } message: {
+        Text("alert body")
+      }
+    }
+  }
+}
+
+private struct PromptActionItem: Identifiable, Sendable {
+  var id: String
+}
+
+private struct PromptActionItemRoot: View {
+  let dialog: Bool
+  let log: PromptActionDismissalLog
+  @State private var item: PromptActionItem?
+
+  var body: some View {
+    let base = VStack(alignment: .leading, spacing: 0) {
+      Text("item \(item?.id ?? "none")")
+      Button("Open") { item = PromptActionItem(id: "a") }
+    }
+    if dialog {
+      base.confirmationDialog(
+        "Confirm", item: $item, onDismiss: { log.dismissals += 1 }
+      ) { current in
+        Button("Apply \(current.id)") { log.applied += 1 }
+        Button("Next") { item = PromptActionItem(id: "b") }
+      } message: { current in
+        Text("dialog \(current.id)")
+      }
+    } else {
+      base.alert("Heads up", item: $item, onDismiss: { log.dismissals += 1 }) { current in
+        Button("Apply \(current.id)") { log.applied += 1 }
+        Button("Next") { item = PromptActionItem(id: "b") }
+      } message: { current in
+        Text("alert \(current.id)")
+      }
+    }
+  }
+}
+
+private struct PromptActionSheetRoot: View {
+  let log: PromptActionDismissalLog
+  @State private var presented = false
+
+  var body: some View {
+    Button("Open") { presented = true }
+      .sheet(isPresented: $presented, onDismiss: { log.dismissals += 1 }) {
+        Button("Apply") { log.applied += 1 }
+      }
+  }
+}

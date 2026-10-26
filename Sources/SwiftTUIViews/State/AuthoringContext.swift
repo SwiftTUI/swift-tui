@@ -411,6 +411,27 @@ package func currentImperativeAuthoringContextSnapshot() -> ImperativeAuthoringC
   ImperativeAuthoringContextSnapshot()
 }
 
+/// A carried lifecycle handler whose view was removed before the handler ran:
+/// a committed pass mounted the view and its own focus re-render removed it,
+/// and the pass's appear and initial change run after that re-render
+/// (STUI-1298). Inside this scope a body-created closure whose captured state
+/// owner is gone resolves to that owner's retained, owner-specific storage,
+/// as a separately retained `Binding` does. The handler reads back its own
+/// writes, which never reach the authored seed or another mount, so they
+/// cannot seed a later mount (STUI-1173). A main-actor flag rather than a task
+/// local, so tasks a handler starts do not inherit it.
+@MainActor
+package enum CommittedOwnerHandlerScope {
+  package private(set) static var isActive = false
+
+  package static func run(_ body: () -> Void) {
+    let enclosing = isActive
+    isActive = true
+    defer { isActive = enclosing }
+    body()
+  }
+}
+
 /// Explicit handler operation context. Ambient environment alone is not proof
 /// of invocation. Task-local storage survives suspension without leaking into
 /// another main-actor job; nested nil snapshots preserve the enclosing scope.

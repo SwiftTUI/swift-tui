@@ -467,14 +467,11 @@ struct Wave3HuntFBStateTests {
     W3FB.withRetiredWriteDiagnostics { #expect(registry.dispatch(identity: action)) }
     let second = DefaultRenderer().render(
       released, context: .init(identity: testIdentity("w3fb015")))
-    w3fbKnown(
-      "NEW-4: a child Button writing the parent's @State through @Binding between two snapshots is lost once the first renderer is released (second snapshot Count 0); the graph-backed binding's setter keeps only an owner-retained value when the graph is gone and never the seed mirror (State.swift:617-657); contract: State-Keying.md:156-166, State.swift:240-247; adjacent STUI-1241"
-    ) {
-      // Contract: State-Keying.md:156-166; State.swift:240-247.
-      #expect(
-        second.rasterSurface.lines.contains { $0.contains("Count 1") },
-        "released: \(second.rasterSurface.lines)")
-    }
+    // Contract: State-Keying.md:156-166; State.swift:240-247. STUI-1265: a
+    // snapshot owner's graph-slot setter keeps the snapshot seed after release.
+    #expect(
+      second.rasterSurface.lines.contains { $0.contains("Count 1") },
+      "released: \(second.rasterSurface.lines)")
   }
 
   // w3fb016: a Button with @State in a LazyVStack row keeps a dispatch between
@@ -546,17 +543,11 @@ struct Wave3HuntFBStateTests {
     ) { view }
     defer { h.shutdown() }
     withExtendedLifetime(keeper) {}
-    let route =
-      rendererAlive
-      ? "while the renderer lives, the graph-slot setter's mirror (State.swift:651-653, before wave 3 too)"
-      : "after release, the capture-miss mirror e827636d kept (State.swift:362, 381)"
-    w3fbKnown(
-      "NEW-5: a snapshot's write seeds a later live mount of the same view value (the mount shows Count 1); \(route) writes the box seed that the mount's fresh slot reads (State.swift:580-615); contract: State-Keying.md:156-166, State.swift:240-247; adjacent STUI-1241, STUI-1173"
-    ) {
-      // Contract: State-Keying.md:156-166 (writes never leak between runtimes
-      // through the view value; snapshot continuity is to a later snapshot).
-      #expect(h.frame.contains("Count 0"), "\(rendererAlive ? "alive" : "released"): \(h.frame)")
-    }
+    // Contract: State-Keying.md:156-166 (writes never leak between runtimes
+    // through the view value; snapshot continuity is to a later snapshot).
+    // STUI-1266: snapshot writes reach the box's snapshot seed, which a live
+    // mount never reads.
+    #expect(h.frame.contains("Count 0"), "\(rendererAlive ? "alive" : "released"): \(h.frame)")
   }
 
   // w3fb018: a live data-driven List row's retired write never seeds the row
@@ -585,6 +576,86 @@ struct Wave3HuntFBStateTests {
     rows.ids = ["a", "b", "c"]
     _ = try h.renderAfterExternalMutation()
     #expect(h.frame.contains("bv0"), "\(h.frame)")
+  }
+}
+
+// MARK: - Wave 4 (W4-FD): snapshot continuity versus live mounts (STUI-1265, STUI-1266)
+
+/// Neighbours of w3fb015 and w3fb017. A snapshot's writes reach later
+/// snapshots of the same instance by every write route, and never a live
+/// mount (State-Keying.md:156-171).
+@MainActor
+@Suite(.serialized)
+struct Wave4FDSnapshotStateTests {
+  // Two binding writes between released snapshots accumulate (STUI-1265).
+  @Test func bindingWritesAccumulateAcrossReleasedSnapshots() throws {
+    let view = W3FBBindingParent()
+    let registry = LocalActionRegistry()
+    let action = try #require(
+      W3FB.renderWithReleasedRenderer(view, registry: registry, name: "w4fd-accumulate"))
+    W3FB.withRetiredWriteDiagnostics {
+      #expect(registry.dispatch(identity: action))
+      #expect(registry.dispatch(identity: action))
+    }
+    let second = DefaultRenderer().render(
+      view, context: .init(identity: testIdentity("w4fd-accumulate")))
+    #expect(
+      second.rasterSurface.lines.contains { $0.contains("Count 2") },
+      "\(second.rasterSurface.lines)")
+  }
+
+  // The binding route of a released snapshot never seeds a live mount.
+  @Test func releasedSnapshotBindingWriteDoesNotSeedLiveMount() throws {
+    let view = W3FBBindingParent()
+    let registry = LocalActionRegistry()
+    let action = try #require(
+      W3FB.renderWithReleasedRenderer(view, registry: registry, name: "w4fd-binding-live"))
+    W3FB.withRetiredWriteDiagnostics { #expect(registry.dispatch(identity: action)) }
+    let h = try StressRuntimeHarness(
+      rootIdentity: testIdentity("w4fd-binding-live", "live"), size: .init(width: 20, height: 3)
+    ) { view }
+    defer { h.shutdown() }
+    #expect(h.frame.contains("Count 0"), "\(h.frame)")
+  }
+
+  // A live mount between two snapshots starts from the authored value, and
+  // the later snapshot still continues the first one.
+  @Test func snapshotContinuitySurvivesInterveningLiveMount() throws {
+    let view = W3FBSnapshotCounter()
+    let registry = LocalActionRegistry()
+    let action = try #require(
+      W3FB.renderWithReleasedRenderer(view, registry: registry, name: "w4fd-intervening"))
+    W3FB.withRetiredWriteDiagnostics { #expect(registry.dispatch(identity: action)) }
+    do {
+      let h = try StressRuntimeHarness(
+        rootIdentity: testIdentity("w4fd-intervening", "live"), size: .init(width: 20, height: 3)
+      ) { view }
+      defer { h.shutdown() }
+      #expect(h.frame.contains("Count 0"), "live: \(h.frame)")
+    }
+    let later = DefaultRenderer().render(
+      view, context: .init(identity: testIdentity("w4fd-intervening")))
+    #expect(
+      later.rasterSurface.lines.contains { $0.contains("Count 1") },
+      "later snapshot: \(later.rasterSurface.lines)")
+  }
+
+  // A live runtime's write never reaches a later snapshot of the same value.
+  @Test func liveWriteDoesNotReachLaterSnapshot() throws {
+    let view = W3FBSnapshotCounter()
+    do {
+      let h = try StressRuntimeHarness(
+        rootIdentity: testIdentity("w4fd-live-first"), size: .init(width: 20, height: 3)
+      ) { view }
+      defer { h.shutdown() }
+      _ = try h.clickText("Count 0")
+      try #require(h.frame.contains("Count 1"), "\(h.frame)")
+    }
+    let snapshot = DefaultRenderer().render(
+      view, context: .init(identity: testIdentity("w4fd-live-first")))
+    #expect(
+      snapshot.rasterSurface.lines.contains { $0.contains("Count 0") },
+      "\(snapshot.rasterSurface.lines)")
   }
 }
 

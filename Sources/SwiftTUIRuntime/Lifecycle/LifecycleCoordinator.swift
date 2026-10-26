@@ -1,4 +1,5 @@
 import SwiftTUICore
+import SwiftTUIViews
 
 @MainActor
 package final class LifecycleCoordinator {
@@ -103,7 +104,8 @@ package final class LifecycleCoordinator {
   func applyCommittedFrame(
     plan: CommitPlan,
     currentLifecycleRegistry: LocalLifecycleRegistry,
-    currentTaskRegistry: LocalTaskRegistry
+    currentTaskRegistry: LocalTaskRegistry,
+    carriedEntryCount: Int = 0
   ) -> [RuntimeIssue] {
     var skipIssues: [RuntimeIssue] = []
     var disappearedIdentities: [Identity] = []
@@ -123,6 +125,7 @@ package final class LifecycleCoordinator {
         entry,
         currentLifecycleRegistry: currentLifecycleRegistry,
         currentTaskRegistry: currentTaskRegistry,
+        isCarried: index < carriedEntryCount,
         skipIssues: &skipIssues
       )
     }
@@ -247,16 +250,26 @@ package final class LifecycleCoordinator {
     _ entry: LifecycleCommitEntry,
     currentLifecycleRegistry: LocalLifecycleRegistry,
     currentTaskRegistry: LocalTaskRegistry,
+    isCarried: Bool,
     skipIssues: inout [RuntimeIssue]
   ) {
     switch entry.operation {
     case .appear(let handlerIDs):
       for handlerID in handlerIDs {
-        guard let handler = currentLifecycleRegistry.appearHandler(for: handlerID) else {
-          recordHandlerSkip(.appear, entry: entry, handlerID: handlerID, into: &skipIssues)
+        if let handler = currentLifecycleRegistry.appearHandler(for: handlerID) {
+          handler()
           continue
         }
-        handler()
+        // A carried appear whose view the pass's own focus re-render removed:
+        // the current registry no longer holds it, but the retained store
+        // absorbed the planning pass's publication at that pass's commit
+        // (`absorbPublishedRegistrations`). Run that closure against the state
+        // the pass committed, before the view's disappear (STUI-1298).
+        if isCarried, let handler = previousLifecycleHandlers.appearHandlers[handlerID] {
+          CommittedOwnerHandlerScope.run(handler)
+          continue
+        }
+        recordHandlerSkip(.appear, entry: entry, handlerID: handlerID, into: &skipIssues)
       }
     case .disappear(let handlerIDs):
       for handlerID in handlerIDs {
@@ -270,6 +283,14 @@ package final class LifecycleCoordinator {
       for handlerID in handlerIDs {
         if let handler = currentLifecycleRegistry.changeHandler(for: handlerID) {
           handler()
+          continue
+        }
+        // A carried change (an initial `onChange`) whose view the re-render
+        // removed resolves like a carried appear (STUI-1298). It is the
+        // planning pass's own registration, not the reuse-adoption fallback
+        // below.
+        if isCarried, let handler = previousLifecycleHandlers.changeHandlers[handlerID] {
+          CommittedOwnerHandlerScope.run(handler)
           continue
         }
         // Mirror the disappear path's previous-snapshot dispatch: content

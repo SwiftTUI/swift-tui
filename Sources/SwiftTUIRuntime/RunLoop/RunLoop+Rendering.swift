@@ -428,10 +428,15 @@ extension RunLoop {
     recordPresentedRasterSurface(artifacts.rasterSurface)
     previousPresentedScrollLedger = scrollTranslation.ledger
     let lifecycle = observeCallbackInvalidations(under: drainPolicy) {
+      // The merged plan leads with the carried entries
+      // (`mergeLifecycleCarryForward`); a carried appear or change whose view
+      // the focus re-render removed resolves from the planning pass's
+      // registrations (STUI-1298).
       lifecycleCoordinator.applyCommittedFrame(
         plan: artifacts.commitPlan,
         currentLifecycleRegistry: localLifecycleRegistry,
-        currentTaskRegistry: localTaskRegistry
+        currentTaskRegistry: localTaskRegistry,
+        carriedEntryCount: convergence.lifecycleCarryForward.count
       )
     }
     reportRuntimeIssues(lifecycle.value)

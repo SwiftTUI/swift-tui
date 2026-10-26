@@ -98,8 +98,15 @@ extension Button {
         context: context,
         preferringAuthoringScope: authoringScope
       )
+      // An alert or confirmation dialog action dismisses its prompt after it
+      // runs, as in SwiftUI (STUI-1309).
+      let promptActionDismissal = context.environmentValues.promptActionDismissal
       intake.registerAction(identity: context.identity) {
-        action()
+        if let promptActionDismissal {
+          promptActionDismissal.perform(action)
+        } else {
+          action()
+        }
         return true
       }
     }

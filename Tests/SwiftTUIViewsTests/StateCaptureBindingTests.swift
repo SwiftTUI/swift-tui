@@ -258,8 +258,9 @@ struct StateCaptureBindingTests {
       let (deadOwner, deadScope) = try makeDeadOwner()
 
       // The owner lived in a no-invalidator snapshot graph that is gone. That
-      // graph was never a mount lifetime, so the write reaches the seed a
-      // later snapshot of this authored value starts from (STUI-1241).
+      // graph was never a mount lifetime, so the write reaches the snapshot
+      // seed a later snapshot of this authored value starts from (STUI-1241),
+      // which a live mount never reads (STUI-1266).
       var snapshot = State(wrappedValue: "seed")
       snapshot.bindCapture(
         StateCaptureBinding(

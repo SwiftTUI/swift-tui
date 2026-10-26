@@ -101,6 +101,7 @@ private struct DynamicStateLocation<Value> {
   var getValue: @MainActor () -> Value
   var setValue: @MainActor (Value) -> Void
   var valueIdentity: @MainActor @Sendable () -> StateValueIdentity?
+  var ownerKind: StateOwnerKind
 
   var binding: Binding<Value> {
     var binding = Binding(
@@ -111,6 +112,30 @@ private struct DynamicStateLocation<Value> {
     binding.bindingSourceID = bindingSourceID
     binding.bindingDeclarationID = bindingDeclarationID
     return binding
+  }
+}
+
+/// Whether a location's owner is a snapshot owner: its node evaluates without
+/// an invalidator, the one-shot `DefaultRenderer` path, which is not a mount
+/// lifetime. The answer is read from the live node whenever it has evaluated —
+/// in its body, or imperatively afterwards, never in the update pass that runs
+/// before a fresh node's first evaluation installs its invalidator — and kept
+/// for writes that arrive after the node is gone (a projected binding written
+/// once the snapshot renderer is released, STUI-1265). A location built for an
+/// already retired owner starts from its capture's bind-time answer.
+@MainActor
+private final class StateOwnerKind {
+  private(set) var isSnapshotOwner: Bool
+
+  init(isSnapshotOwner: Bool) {
+    self.isSnapshotOwner = isSnapshotOwner
+  }
+
+  /// Records the answer of an owner node that has evaluated, and returns it.
+  @discardableResult
+  func observe(_ ownerNode: SwiftTUICore.ViewNode) -> Bool {
+    isSnapshotOwner = ownerNode.invalidator == nil
+    return isSnapshotOwner
   }
 }
 
@@ -145,6 +170,13 @@ private final class StateBox<Value> {
   private var seedValue: Value
   private let graphSeedFactory: (@MainActor () -> Value)?
   private(set) var seedValueIdentity = StateValueIdentity()
+  /// The last write a snapshot owner (an owner in a no-invalidator
+  /// `DefaultRenderer` graph) made to this box, or `nil` when a seed write
+  /// followed it. Only a snapshot owner's fresh slot or capture-miss read sees
+  /// it: snapshot continuity reaches a later snapshot of the same view value,
+  /// never a live mount, which seeds from `seedValue` alone (STUI-1241,
+  /// STUI-1265, STUI-1266).
+  private var snapshotSeed: (value: Value, identity: StateValueIdentity)?
   private var boundLocationsByOwner: [StateStorageOwner: DynamicStateLocation<Value>]
   private var retainedValuesByOwner:
     [StateStorageOwner: (value: Value, identity: StateValueIdentity)]
@@ -174,13 +206,34 @@ private final class StateBox<Value> {
     seedValue
   }
 
+  /// The value a snapshot owner's capture-miss read observes.
+  func currentSnapshotSeedValue() -> Value {
+    snapshotSeed?.value ?? seedValue
+  }
+
+  /// The value a fresh graph slot starts from: the authored (or pre-mount)
+  /// seed, never a snapshot's write.
   func initialGraphValue() -> Value {
     graphSeedFactory?() ?? seedValue
   }
 
+  /// The value a snapshot owner's fresh slot starts from instead, when a
+  /// snapshot write follows the last seed write. Factory-seeded boxes always
+  /// start from their factory.
+  func snapshotGraphValue() -> Value? {
+    graphSeedFactory == nil ? snapshotSeed?.value : nil
+  }
+
+  /// A seed write (pre-mount, or capture-less) supersedes any snapshot write,
+  /// so the last writer still wins for a later snapshot.
   func updateSeedValue(_ newValue: Value) {
     seedValue = newValue
     seedValueIdentity = StateValueIdentity()
+    snapshotSeed = nil
+  }
+
+  func updateSnapshotSeedValue(_ newValue: Value) {
+    snapshotSeed = (newValue, StateValueIdentity())
   }
 
   func remember(
@@ -253,8 +306,9 @@ private final class StateBox<Value> {
 /// Once graph-backed, mutations remain scoped to the exact graph-owner lifetime;
 /// a later snapshot or mount never inherits a retired owner's fallback value.
 /// A no-invalidator `DefaultRenderer` snapshot is not a mount lifetime: an
-/// imperative write to one of its owners reaches a later snapshot of the same
-/// view value, also after the first renderer is released.
+/// imperative write to one of its owners, through the state or a projected
+/// binding, reaches a later snapshot of the same view value, also after the
+/// first renderer is released. It never seeds a later live mount.
 public struct State<Value> {
   private let box: StateBox<Value>
   /// The owner this copy was bound to by the capture-bind pass (plan
@@ -355,6 +409,9 @@ public struct State<Value> {
           reason: "no live state owner could be resolved from the dispatch context"
         )
       }
+      if resolvesThroughCapture, capture?.isSnapshotOwner == true {
+        return box.currentSnapshotSeedValue()
+      }
       return box.currentSeedValue()
     }
     nonmutating set {
@@ -367,9 +424,10 @@ public struct State<Value> {
       // an invalidator), the write belongs to the retired lifetime and is
       // discarded: the box seed is shared by every copy of the authored value,
       // and a later mount's fresh slot seeds from it (STUI-1173). A snapshot
-      // owner's graph was never a mount lifetime, so its write keeps the
-      // seed mirror below, the same-instance continuity of the graph-slot
-      // setter (STUI-1241).
+      // owner's graph was never a mount lifetime, so its write reaches the
+      // box's snapshot seed below, the same-instance continuity of the
+      // graph-slot setter (STUI-1241), which only a later snapshot reads
+      // (STUI-1266).
       let discardsRetiredWrite = resolvesThroughCapture && capture?.isSnapshotOwner != true
       // Pre-mount seeding is the legitimate use of the seed arm. A write on a
       // box that once had a live slot does not reach that slot — the
@@ -389,7 +447,11 @@ public struct State<Value> {
       guard !discardsRetiredWrite else {
         return
       }
-      box.updateSeedValue(newValue)
+      if resolvesThroughCapture {
+        box.updateSnapshotSeedValue(newValue)
+      } else {
+        box.updateSeedValue(newValue)
+      }
     }
   }
 
@@ -442,12 +504,14 @@ public struct State<Value> {
       // another unqualified location here would duplicate closure/claim work,
       // and would erase a composed wrapper's qualified slot identity.
       if let refreshed = box.rememberedLocation(for: storageOwner) {
+        observeOwnerKind(of: refreshed, storageOwner: storageOwner)
         return refreshed
       }
       let location = makeLocation(
         for: context,
         storageOwner: storageOwner
       )
+      observeOwnerKind(of: location, storageOwner: storageOwner)
       box.remember(
         location,
         for: storageOwner
@@ -489,6 +553,18 @@ public struct State<Value> {
     return location
   }
 
+  /// An in-body access runs inside its owner's evaluation, so the owner node's
+  /// invalidator is installed: record whether it is a snapshot owner, for a
+  /// projected binding that is written only after its node is gone.
+  private func observeOwnerKind(
+    of location: DynamicStateLocation<Value>,
+    storageOwner: StateStorageOwner
+  ) {
+    if let ownerNode = LiveViewGraphRegistry.node(for: storageOwner) {
+      location.ownerKind.observe(ownerNode)
+    }
+  }
+
   /// Rung 2 of imperative resolution: route through the capture written by
   /// the bind pass. A live captured owner serves directly; a dead one takes
   /// the fire-time identity refresh — map the capture's resolve identity
@@ -496,7 +572,9 @@ public struct State<Value> {
   /// occupant node (the ratified focused-values category: dispatch context
   /// is runtime state). The refresh never crosses graph scopes and requires
   /// a live occupant. Committed removal cannot fall through to an unrelated
-  /// ambient owner. Only a projected Binding may retain the retired value.
+  /// ambient owner. Only a projected Binding, or a carried lifecycle handler of
+  /// the removed view (``CommittedOwnerHandlerScope``), may retain the retired
+  /// value.
   private func captureLocation(retainingRemovedOwner: Bool) -> DynamicStateLocation<Value>? {
     guard let binding = capture else {
       return nil
@@ -513,8 +591,10 @@ public struct State<Value> {
       return location(for: refreshedOwner, path: binding.path)
     }
     StateCaptureCensus.record(.captureMiss)
-    if retainingRemovedOwner {
-      return location(for: binding.owner, path: binding.path)
+    if retainingRemovedOwner || CommittedOwnerHandlerScope.isActive {
+      return location(
+        for: binding.owner, path: binding.path,
+        retiredOwnerIsSnapshot: binding.isSnapshotOwner)
     }
     if StateCaptureBindingConfiguration.isEnabled {
       SoundnessProbeConfiguration.recordStateCaptureMissViolation(
@@ -526,14 +606,16 @@ public struct State<Value> {
 
   private func location(
     for storageOwner: StateStorageOwner,
-    path: StateSlotPath
+    path: StateSlotPath,
+    retiredOwnerIsSnapshot: Bool = false
   ) -> DynamicStateLocation<Value> {
     if let remembered = box.rememberedLocation(for: storageOwner) {
       return remembered
     }
     let location = graphSlotLocation(
       storageOwner: storageOwner,
-      path: path
+      path: path,
+      retiredOwnerIsSnapshot: retiredOwnerIsSnapshot
     )
     box.remember(
       location,
@@ -579,15 +661,24 @@ public struct State<Value> {
   /// closures re-resolve the live node from its graph on every access, so a
   /// location built once stays valid across reuse, and degrade to the retained
   /// value (then the seed) if the node is gone.
+  ///
+  /// A snapshot owner (``StateOwnerKind``) keeps its writes for a later
+  /// snapshot of the same view value: its fresh slot continues the box's last
+  /// snapshot write, and its writes reach that snapshot seed. A live owner
+  /// never reads or writes it.
   private func graphSlotLocation(
     storageOwner: StateStorageOwner,
-    path: StateSlotPath = .root
+    path: StateSlotPath = .root,
+    retiredOwnerIsSnapshot: Bool = false
   ) -> DynamicStateLocation<Value> {
     let slotIdentifier = StateSlotIdentifier(ordinal: box.currentOrdinal, path: path)
-    // Fresh slots always seed from the authored initial value. A retained
-    // per-owner value serves only the node-gone read fallback below — seeding
-    // a new slot from carried mutation would resurrect state across committed
-    // removal and leak writes into replacement identities.
+    let ownerKind = StateOwnerKind(isSnapshotOwner: retiredOwnerIsSnapshot)
+    // Fresh slots always seed from the authored initial value; a snapshot
+    // owner's fresh slot continues the last snapshot write of this view value
+    // instead. A retained per-owner value serves only the node-gone read
+    // fallback below — seeding a new slot from carried mutation would
+    // resurrect state across committed removal and leak writes into
+    // replacement identities.
     let authoredSeed = box.initialGraphValue()
     let authoredSeedIdentity = box.seedValueIdentity
     let slotOrdinal = box.currentOrdinal
@@ -625,10 +716,11 @@ public struct State<Value> {
         {
           return authoredSeed
         }
+        let isSnapshotOwner = ownerKind.observe(liveViewNode)
         return withDormantStateSlotPolicy(dormantPolicy) {
           liveViewNode.stateSlot(
             slotIdentifier,
-            seed: authoredSeed
+            seed: (isSnapshotOwner ? box?.snapshotGraphValue() : nil) ?? authoredSeed
           )
         }
       },
@@ -636,17 +728,18 @@ public struct State<Value> {
         // Graph-backed writes stay owner-scoped: the slot holds the mutation
         // and the per-owner retained value backs the node-gone read fallback.
         // A live (invalidator-backed) graph never mirrors a write into the
-        // box-global seed — that leaked one owner's mutation into every future
-        // owner seeded from the same box.
+        // box — that leaked one owner's mutation into every future owner
+        // seeded from the same box.
         //
         // A no-invalidator graph is the one-shot `DefaultRenderer` snapshot
         // path, and it is not a mount lifetime at all: the graph is discarded
-        // when `render` returns, so there is no later owner for a seed write
-        // to leak into. Its only reader is a subsequent snapshot of the same
-        // view value, which is exactly the same-instance continuity an
-        // imperative dispatch between two renders depends on. Without this,
-        // such a write lands in a graph that no longer exists and the next
-        // render silently re-seeds from the authored value.
+        // when `render` returns. Its only reader is a subsequent snapshot of
+        // the same view value, which is exactly the same-instance continuity
+        // an imperative dispatch between two renders depends on, so a
+        // snapshot owner's write reaches the box's snapshot seed — whether
+        // its node is still live or its renderer is already released (a
+        // projected binding writes here, not through a capture, STUI-1265).
+        // A live mount never seeds from that value (STUI-1266).
         if let liveViewNode = LiveViewGraphRegistry.node(for: storageOwner) {
           if let slot = liveViewNode.stateSlotStorage(slotIdentifier),
             slot.isInitialized, !slot.stores(Value.self)
@@ -666,11 +759,14 @@ public struct State<Value> {
               invalidationIdentity: liveViewNode.identity
             )
           }
-          if liveViewNode.invalidator == nil {
-            box?.updateSeedValue(newValue)
+          if ownerKind.observe(liveViewNode) {
+            box?.updateSnapshotSeedValue(newValue)
           }
           box?.storeRetainedValue(newValue, for: storageOwner)
         } else {
+          if ownerKind.isSnapshotOwner {
+            box?.updateSnapshotSeedValue(newValue)
+          }
           box?.storeRetainedValue(newValue, for: storageOwner)
         }
       },
@@ -681,7 +777,8 @@ public struct State<Value> {
           return liveViewNode.stateSlotStorage(slotIdentifier)?.valueIdentity
         }
         return box?.retainedValueIdentity(for: storageOwner) ?? authoredSeedIdentity
-      }
+      },
+      ownerKind: ownerKind
     )
   }
 }

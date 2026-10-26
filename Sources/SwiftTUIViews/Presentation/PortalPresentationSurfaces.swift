@@ -80,7 +80,10 @@ struct PromptActionPortalSurface: View {
           maxHeight: .finite(presentation.scrollMaximumHeight),
           alignment: .topLeading)
         HStack(spacing: 1) {
-          PortalAttachmentSequenceView(payloads: item.actionPayloads, fixedSizeChildren: true)
+          // Every action dismisses its prompt after it runs, as in SwiftUI.
+          PortalAttachmentSequenceView(
+            payloads: item.actionPayloads, fixedSizeChildren: true,
+            promptActionDismissal: item.actionDismissal)
         }
         .fixedSize()
         .padding(.init(horizontal: 1, vertical: 0))
