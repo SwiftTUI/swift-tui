@@ -487,8 +487,10 @@ struct Wave3HuntFBStateTests {
       context: .init(
         identity: testIdentity("w3fb016-alive"), localActionRegistry: aliveRegistry,
         applyEnvironmentValues: true))
+    // The first focus region is the ScrollView, which publishes no action;
+    // dispatch the first button, as the released variant below does.
     #expect(
-      first.semanticSnapshot.focusRegions.map(\.identity).contains {
+      first.semanticSnapshot.focusRegions.dropFirst().map(\.identity).contains {
         aliveRegistry.dispatch(identity: $0)
       })
     let aliveSecond = DefaultRenderer().render(
