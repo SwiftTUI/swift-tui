@@ -86,19 +86,30 @@ a whole.
 An `alignmentGuide` modifier also controls placement inside a fixed or flexible
 `frame(alignment:)`. Guides propagate through layout wrappers such as padding,
 offsets, borders, and nested frames. Padding translates a guide by its inset;
-a guide authored on an outer wrapper takes precedence over the same guide
+a frame translates it by its content's exact position, so a guide on the
+content for the frame's own alignment leaves the frame at its own guide. A
+guide authored on an outer wrapper takes precedence over the same guide
 in its content. A guide outside a child's bounds does not by itself inflate
 its container: the container aligns the guides and takes the union of the
-children's extents. Centre alignment rounds once: a centred child that would
-start half a cell in moves toward the leading or top edge, so the odd cell of
-an uneven split falls after it, in frames, overlays, stacks, lazy stacks and
-`ZStack` alike. A guide computed from the centre keeps the centre's half
-cell, so `.alignmentGuide(.center) { $0[.center] }` and a custom
-`AlignmentID` whose default returns `context[.center]` place exactly like
-the built-in centre. An integer guide value, such as `{ _ in 0 }`, names its
-cell boundary exactly. An explicit `layoutPriority(0)` replaces an earlier
-priority. Custom layout values retain typed values, including an explicit
-optional `nil`; an absent key uses its declared default.
+children's extents, where they are placed. Centre alignment rounds once: a
+centred child that would start half a cell in moves toward the leading or top
+edge, so the odd cell of an uneven split falls after it, in frames, overlays,
+stacks, lazy stacks and `ZStack` alike, and for `.position(x:y:)` and a
+subview a custom layout does not place. A guide computed from the centre
+keeps the centre's half cell. Guide closures, custom `AlignmentID` defaults
+and a custom layout's `explicitAlignment` run once on the view's public
+values, and a value is half a cell past its integer when the code read a
+half-cell value, such as an odd length's centre. So
+`.alignmentGuide(.center) { $0[.center] }` and a custom `AlignmentID` whose
+default returns `context[.center]` place exactly like the built-in centre,
+and `{ $0[.center] + 1 }` one cell past it. An integer guide value, such as
+`{ _ in 0 }` or `{ $0.height / 2 }`, names its cell boundary exactly. Guide
+values are integers, so a guide that subtracts the centre, such as
+`{ $0.height - $0[.center] }` (the centre in SwiftUI), reads the centre and
+sits one cell past it; write `{ $0[.center] }` instead. An explicit
+`layoutPriority(0)` replaces an earlier priority. Custom layout values retain
+typed values, including an explicit optional `nil`; an absent key uses its
+declared default.
 
 ## Style With Modifiers
 

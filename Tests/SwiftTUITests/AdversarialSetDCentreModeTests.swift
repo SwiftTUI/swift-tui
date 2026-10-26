@@ -77,11 +77,7 @@ struct AdversarialSetDCentreModeTests {
       Text("abcde").frame(width: 10, height: 1), "141-frame", width: 10, height: 1)
     let framedX = try #require(SetDCentre.firstInk(in: framed)?.x)
     try #require(framedX == 2, "the frame rule: \(framed.lines)")
-    setDKnown(
-      "NEW-9: .position(x:y:) places an odd child half a cell trailing where frame centring places it leading; the position placement subtracts the floored half extent (LayoutEngine+PlacementRequests.swift:368-380); contract: Authoring-Views.md:92-99, 8236b3f2; adjacent STUI-1212"
-    ) {
-      #expect(SetDCentre.firstInk(in: positioned)?.x == framedX, "\(positioned.lines)")
-    }
+    #expect(SetDCentre.firstInk(in: positioned)?.x == framedX, "\(positioned.lines)")
   }
 
   @Test("setD142: vertical .position centres an odd child where a frame centres it")
@@ -98,11 +94,19 @@ struct AdversarialSetDCentreModeTests {
       column.frame(width: 1, height: 6), "142-frame", width: 1, height: 6)
     let framedY = try #require(SetDCentre.firstInk(in: framed)?.y)
     try #require(framedY == 1, "the frame rule: \(framed.lines)")
-    setDKnown(
-      "NEW-9: .position(x:y:) places an odd child half a cell trailing where frame centring places it leading; the position placement subtracts the floored half extent (LayoutEngine+PlacementRequests.swift:368-380); contract: Authoring-Views.md:92-99, 8236b3f2; adjacent STUI-1212"
-    ) {
-      #expect(SetDCentre.firstInk(in: positioned)?.y == framedY, "\(positioned.lines)")
-    }
+    #expect(SetDCentre.firstInk(in: positioned)?.y == framedY, "\(positioned.lines)")
+  }
+
+  @Test("STUI-1322: .position keeps an even child where a frame centres it")
+  func positionKeepsEvenChildOnFrameCentre() throws {
+    let positioned = SetDCentre.raster(
+      Text("abcd").position(x: 5, y: 0).frame(width: 10, height: 1, alignment: .topLeading),
+      "position-even", width: 10, height: 1)
+    let framed = SetDCentre.raster(
+      Text("abcd").frame(width: 10, height: 1), "position-even-frame", width: 10, height: 1)
+    let framedX = try #require(SetDCentre.firstInk(in: framed)?.x)
+    #expect(framedX == 3, "the frame rule: \(framed.lines)")
+    #expect(SetDCentre.firstInk(in: positioned)?.x == framedX, "\(positioned.lines)")
   }
 
   @Test("setD143: an unplaced custom-layout subview centres like ZStack (odd child)")
@@ -113,11 +117,7 @@ struct AdversarialSetDCentreModeTests {
       ZStack { Text("abcde") }.frame(width: 10, height: 1), "143-zstack", width: 10, height: 1)
     let expected = try #require(SetDCentre.firstInk(in: stacked)?.x)
     try #require(expected == 2, "\(stacked.lines)")
-    setDKnown(
-      "NEW-10: an unplaced custom-layout subview of odd width sits one cell right of ZStack's centre; defaultPlacement puts the floored centre guide at width / 2 (CustomLayoutPlacementGeometry.swift:37-63); contract: Authoring-Views.md:92-99; adjacent STUI-1212, STUI-1267"
-    ) {
-      #expect(SetDCentre.firstInk(in: custom)?.x == expected, "\(custom.lines)")
-    }
+    #expect(SetDCentre.firstInk(in: custom)?.x == expected, "\(custom.lines)")
   }
 
   @Test("setD144: an unplaced custom-layout subview centres like ZStack (even child)")
@@ -178,11 +178,7 @@ struct AdversarialSetDCentreModeTests {
     let scrollLine = try #require(try centredRowLine(list: false, name: "145-scroll"))
     try #require(scrollLine == 2, "scroll view line \(scrollLine)")
     let listLine = try centredRowLine(list: true, name: "145-list")
-    setDKnown(
-      "NEW-11: a List's scrollTo(_:anchor: .center) puts a two-line row at line 3 of a seven-line window where a ScrollView puts it at line 2; the collection rounds (visible - rowLines) * 0.5 half away from zero (CollectionScrollState.swift:321-345) while the scroll view aligns (length - 1) * u (LocalScrollPositionRegistry.swift:1036-1047); contract: Scrolling.md:134-140, 166-170, Authoring-Views.md:92-99"
-    ) {
-      #expect(listLine == scrollLine, "list line \(String(describing: listLine))")
-    }
+    #expect(listLine == scrollLine, "list line \(String(describing: listLine))")
   }
 
   @Test("setD146: a scroll view's centre anchor follows the centre rule for a two-line row")

@@ -96,6 +96,10 @@ extension View {
   /// Positions the center of this view at `(x, y)` in its parent's
   /// coordinate space.
   ///
+  /// An odd length's centre is half a cell past `length / 2`. As in every
+  /// centring container, the view then moves half a cell toward the leading
+  /// or top edge: a five-cell view at `x: 5` starts at column 2.
+  ///
   /// ``offset(x:y:)`` translates the view without affecting parent layout.
   /// In contrast, `.position` wraps the view in a container that takes the full proposed space.
   /// Thus, the parent reserves room for the absolute placement area.

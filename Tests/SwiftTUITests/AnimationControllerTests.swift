@@ -513,10 +513,13 @@ struct AnimationPipelineIntegrationTests {
     )
     #expect(positionChildBounds != nil)
     if let bounds = positionChildBounds {
-      // Text "hi" measures as 2x1, so its origin should be at
-      // (20 - 2/2, 5 - 1/2) = (19, 5).  Integer division floor.
-      let expectedX = 20 - bounds.size.width / 2
-      let expectedY = 5 - bounds.size.height / 2
+      // Text "hi" measures as 2x1. Its exact centre goes on (20, 5): the
+      // even width starts at 20 - 2/2 = 19; the odd height would start half
+      // a row in, at 4.5, and moves toward the top, as in every centring
+      // container (STUI-1322, Authoring-Views.md): row 4.
+      #expect(bounds.size == CellSize(width: 2, height: 1))
+      let expectedX = 19
+      let expectedY = 4
       #expect(
         bounds.origin.x == expectedX,
         "position child origin.x should be \(expectedX), got \(bounds.origin.x)"

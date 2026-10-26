@@ -6,8 +6,10 @@ import SwiftTUICore
 // anchor, proposal, optional exact size, and optional viewport context);
 // `LayoutSubviewPlacementRecorder`
 // collects them keyed by identity during a layout pass. `defaultPlacement`
-// centers a subview in its bounds; `placedOrigin` converts an anchored
-// placement into a top-left origin.
+// is the record of a subview the layout never placed (the layout's own
+// proposal; the subview is centred in the bounds by the frame rule at
+// placement); `placedOrigin` converts an anchored placement into a top-left
+// origin.
 //
 // Split out of `CustomLayout.swift`. The four declarations are widened from
 // `private` to file-internal so `LayoutWorkerProxy` and `LayoutSubview.place`
