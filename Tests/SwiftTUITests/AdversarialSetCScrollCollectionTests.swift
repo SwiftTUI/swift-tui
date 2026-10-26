@@ -1218,3 +1218,86 @@ private enum W4Tables {
     )
   }
 }
+
+// MARK: - Wave 4 (W4-FB): scroll-hosted collections (STUI-1273)
+
+extension Wave4CollectionPagingRepairTests {
+  // STUI-1273: in a collection that a ScrollView hosts, the first End
+  // reaches the far edge. The enclosing scroll view owns the window
+  // (`Collections.md:153-156`).
+  @Test(arguments: ["list", "table"])
+  func wave4b40ScrollHostedFirstEndReachesTheBottom(_ kind: String) throws {
+    let model = W4ScrollModel()
+    let h = try StressRuntimeHarness(
+      rootIdentity: testIdentity("wave4b40", kind), size: .init(width: 24, height: 10)
+    ) { W4HostedCollection(model: model, table: kind == "table") }
+    defer { h.shutdown() }
+    _ = try h.clickText("row01")
+    try #require(model.selection == "row01")
+    _ = try h.pressKey(.init(.end))
+    #expect(model.offset.y > 0, "\(kind): \(model.offset)")
+    #expect(h.frame.contains("row29"), "\(h.frame)")
+    _ = try h.pressKey(.init(.home))
+    #expect(model.offset.y == 0, "\(kind): \(model.offset)")
+    #expect(model.selection == "row01")
+  }
+
+  // The first wheel notch and the first PageDown over a hosted collection
+  // scroll the enclosing ScrollView.
+  @Test(arguments: ["list", "table"])
+  func wave4b41ScrollHostedFirstWheelAndPageMoveTheScrollView(_ kind: String) throws {
+    let model = W4ScrollModel()
+    let h = try StressRuntimeHarness(
+      rootIdentity: testIdentity("wave4b41", kind), size: .init(width: 24, height: 10)
+    ) { W4HostedCollection(model: model, table: kind == "table") }
+    defer { h.shutdown() }
+    let cell = try #require(h.point(forText: "row02"))
+    #expect(
+      h.runLoop.handle(.input(.mouse(.init(kind: .scrolled(deltaX: 0, deltaY: 1), location: cell))))
+        == nil)
+    _ = try h.render()
+    #expect(model.offset.y > 0, "\(kind) wheel: \(model.offset)")
+    _ = try h.clickText("row03")
+    let afterWheel = model.offset.y
+    _ = try h.pressKey(.init(.pageDown))
+    #expect(model.offset.y > afterWheel, "\(kind) page: \(model.offset)")
+  }
+
+  // Control: an unhosted collection's End still moves its own window.
+  @Test(arguments: ["list", "table"])
+  func wave4b42UnhostedCollectionEndMovesItsWindow(_ kind: String) throws {
+    let model = W4ScrollModel()
+    let h = try StressRuntimeHarness(
+      rootIdentity: testIdentity("wave4b42", kind), size: .init(width: 24, height: 10)
+    ) { W4HostedCollection(model: model, table: kind == "table", hosted: false) }
+    defer { h.shutdown() }
+    _ = try h.clickText("row01")
+    _ = try h.pressKey(.init(.end))
+    #expect(h.frame.contains("row29") && !h.frame.contains("row01"), "\(h.frame)")
+  }
+}
+
+private struct W4HostedCollection: View {
+  let model: W4ScrollModel
+  let table: Bool
+  var hosted = true
+  private var rows: [SetDRow] { setDRows(30, prefix: "row", digits: 2) }
+
+  var body: some View {
+    if hosted {
+      ScrollView(.vertical, position: model.binding) { collection }
+    } else {
+      collection
+    }
+  }
+
+  @ViewBuilder private var collection: some View {
+    if table {
+      Table(rows, selection: model.selectionBinding, columns: [TableColumn("Name")]) {
+        Text($0.id)
+      }
+    } else {
+      List(rows, selection: model.selectionBinding) { Text($0.id) }
+    }
+  }
+}

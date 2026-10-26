@@ -155,6 +155,17 @@ package struct CollectionScrollCurrency {
     return max(1, last - geometry.row(atOrAfterLine: window.anchorLine) + 1)
   }
 
+  /// A collection whose measured layout shows every one of its lines has no
+  /// window of its own to move. Inside a `ScrollView` the enclosing scroll
+  /// layout owns the viewport (`Collections.md:154-156`), so the
+  /// collection's scroll commands decline and leave the key or wheel to that
+  /// scroll view (STUI-1273).
+  private var showsEveryLine: Bool {
+    guard let layout else { return false }
+    return layout.visibleLines.lowerBound <= 0
+      && layout.visibleLines.upperBound >= layout.geometry.displayLineCount
+  }
+
   /// The geometry page and reveal arithmetic estimates unmeasured rows with.
   /// Rows the layout has not measured are estimated at the table's drawn
   /// stride of two lines. When every visible row of the measured window hides
@@ -267,7 +278,7 @@ package struct CollectionScrollCurrency {
   /// the scroll.
   @discardableResult
   package func scroll(byRows rows: Int) -> Bool {
-    guard rows != 0 else {
+    guard rows != 0, !showsEveryLine else {
       return false
     }
     // A footer-only end window is one position beyond the final row. Count
@@ -299,6 +310,7 @@ package struct CollectionScrollCurrency {
       // keypress still moves rather than reading as inert.
       return scroll(byRows: pages)
     }
+    guard !showsEveryLine else { return false }
     // Preserve a line of overlap where whole-row fitting permits it. Round
     // toward the current page so a tall row is not skipped between pages.
     let window = movementWindow()
@@ -325,6 +337,7 @@ package struct CollectionScrollCurrency {
 
   @discardableResult
   package func scroll(toEdge edge: Edge) -> Bool {
+    guard !showsEveryLine else { return false }
     switch edge {
     case .top:
       return setAnchor(.start)
