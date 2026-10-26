@@ -8,6 +8,182 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
 
 ## [Unreleased]
 
+## [0.19.5] - 2026-10-26
+
+### Changed
+
+- Every action of an `alert` or `confirmationDialog` dismisses the prompt after
+  it runs, as in SwiftUI. An action that changes the presentation itself (it
+  dismisses the prompt, presents a different item, or writes the prompt's
+  `@State`-backed binding) keeps that outcome, so an action that re-presents
+  still works. Sheets, covers, popovers and menus are unchanged (STUI-1309).
+- `.position(x:y:)`, a subview a custom `Layout` never places, and the
+  `.center` anchor of `scrollTo(_:anchor:)` in `List`, `Table` and
+  `ScrollView` round an odd remainder toward the leading or top edge, as
+  frames and stacks do. An odd-length view positioned past its half length
+  moves one cell: a one-row view at `y: 5` now draws on row 4 (STUI-1322).
+- An interactive host's frames never exceed the host's size; content beyond it
+  clips instead of growing the surface. One-shot renders
+  (`DefaultRenderer.render`, `RenderOnce`) keep their natural extent up to
+  65,536 cells per axis and 1,048,576 cells in all (STUI-796).
+- The first value an `.animation(_:value:)` or `.transaction(value:_:)`
+  modifier sees is never treated as a change, in any position, as in SwiftUI
+  (STUI-1335).
+- A deferred `ScrollViewProxy` command, one whose target the same action adds,
+  returns `false` and resolves after the next layout (STUI-1305, STUI-1306).
+
+### Fixed
+
+- Alignment guide closures, custom `AlignmentID` defaults and a custom
+  `Layout`'s `explicitAlignment` run once, on public `ViewDimensions` values
+  only; 0.19.4 could show a closure two different centres and trap when it
+  indexed by them (STUI-1261). A custom `Layout` that forwards a subview's
+  centre places like the subview, and a frame reports its content's guides
+  from the content's exact position (STUI-1267).
+- A stack whose child moved half a cell toward leading no longer measures one
+  cell wider than its children (STUI-1311), and a scroll-hosted lazy stack
+  whose rows all have negative or past-the-length guides places them where the
+  eager stack does (STUI-1310).
+- A scroll view below other content whose first lazy stack has rows wider than
+  its first window no longer traps at launch on the DEBUG layout-shadow check,
+  as the gallery's Navigation & Collections tab did at 5–8 rows (STUI-1269).
+  Content scrolled past a windowed lazy stack no longer snaps back on the next
+  re-render, so a revealed focused lazy row stays revealed and focused
+  (STUI-1270).
+- `scrollTo(edge:)` and the End key reveal content the same action appends
+  (STUI-1305); `scrollTo(_:anchor:)` reaches a row the same action inserts, in
+  `List`, `Table` and plain or lazy `ScrollView` (STUI-1306). Several scroll
+  commands in one action all take effect: both far edges of a two-axis view
+  (STUI-1263), a far edge beside a lazy target (STUI-1264), and a target after
+  an earlier command, which is no longer measured from the moved offset
+  (STUI-1330).
+- A `ScrollViewReader` addresses a `.disabled` scroll view in its scope instead
+  of skipping to the next; interactive input still honours `.disabled`
+  (STUI-1317).
+- Keys that arrive together on a hidden-separator data `Table` move as far as
+  the same keys one frame at a time, PageUp from the end moves a full page, and
+  repeated assistive page actions move by the rows shown (STUI-1316,
+  STUI-1262). In a `List` or `Table` inside a `ScrollView`, the first End,
+  Home or Page key scrolls the enclosing view (STUI-1273).
+- Data `Table` and `List` rows answer clicks, selection and "Select row" on the
+  first frame after the collection gains room (STUI-1315); inside a
+  `ScrollView` they register row actions only around the realized rows, not
+  one per dataset row (STUI-1321); a window that starts on a separator line no
+  longer counts the row above it (STUI-1312).
+- A `List` with a selection takes initial and Tab focus at its selected row
+  (STUI-1290); a click on a lower `List` row selects it, and a shape-only
+  selectable row publishes its list item and selector (STUI-1291).
+- Later duplicates of a `ForEach` ID publish occurrence-qualified runtime
+  identities for static text, list items and row selectors (STUI-1296).
+- A `@Binding` write between two one-shot snapshots of the same view value
+  survives the first renderer's release (STUI-1265), and a snapshot write no
+  longer seeds a later live mount (STUI-1266).
+- A view that a committed pass mounts and its focus re-render removes gets its
+  `onAppear` and initial `onChange` before its `onDisappear` (STUI-1298), and a
+  branch child with `.onChange` or `.task` on an appear-modified view no longer
+  runs `onDisappear` at mount (STUI-1299).
+- A navigation destination inside a tab keeps its `@State` across tab round
+  trips, and records the returning content no longer declares are released
+  (STUI-1307); a write to a departing tab is archived when the arriving tab has
+  a `GeometryReader` or `TextEditor` (STUI-1237); returning to a tab restores
+  focus to its focused field (STUI-1308).
+- Far custom paths stroke, fill, dash, trim and clip their visible part instead
+  of drawing nothing (STUI-1268); far sloped `Canvas` lines and path segments
+  keep their position (STUI-1249); `BrailleCanvas.fillCircle` spans rows
+  exactly from r = 2^26, `Path.contains` is scale-invariant past 2^510, far
+  axis-parallel clips keep subnormal coordinates, and
+  `Point.fractionInCell` stays below 1 (STUI-1314).
+- A `clipShape` reveal from an empty mask paints (STUI-1318); a `clipShape`
+  mask animates under the transaction where `clipShape` is applied
+  (STUI-1319); true-colour SGR converts non-sRGB colours to sRGB first, as the
+  256-colour path and host wire do (STUI-1320).
+- `.transaction { $0.animation = … }` animates its subtree's changes on a
+  plain write and keeps an assigned curve under `withAnimation`; it now
+  registers the curve as `transaction(_:body:)` does (STUI-1326). An
+  `opacity(_:)` outside a `transaction(_:)` or `animation(_:value:)`
+  animates under the transaction where it is applied; when several opacities
+  share a view, the innermost one's transaction decides (STUI-1325).
+- In a view whose body root is an `if`, `if let` or `switch`, modifiers see
+  the transaction of a `withAnimation` write to that view's state, and
+  `.animation(_:value:)` and `.transaction(value:_:)` animate the first change
+  of their value, including at `NavigationStack` destinations, where they
+  never fired. Switching such a body between value gates of different types
+  no longer traps with "State slot type mismatch" (STUI-1335, STUI-1349).
+- Extreme `Int` layout arguments no longer terminate the process: `padding`,
+  `safeAreaPadding`, stack spacing, frames and `Spacer` minimums in stacks,
+  `safeAreaInset` spacing, `TableColumn` widths, `offset` and `position` at
+  `Int.min` or `Int.max`. Sums saturate and unoverflowed results are
+  unchanged. `EdgeInsets.horizontal`, `vertical` and `adding` and `CellRect`'s
+  `maxX`, `maxY`, `intersection` and `union` saturate where they trapped
+  (STUI-1303, STUI-777, STUI-780). Borders and rectangle strokes visit only
+  visible cells (STUI-796).
+- Lazy stacks, `List` and `Table` no longer terminate the process for extreme
+  `Int` spacing, row padding or frames, or row heights that sum past
+  `Int.max`, hosted directly or in a `ScrollView`, under keyboard, wheel and
+  `scrollTo` input; a lazy stack renders what its eager twin renders. Arrow-key
+  focus, click focus, focus reveal and image occlusion handle views at extreme
+  offsets, positions or frames (STUI-1333).
+- `Spring` with negative or NaN stiffness, `KeyframeTimeline.value(progress:)`
+  with NaN or out-of-range progress (STUI-1304), extreme `Animation`
+  durations, speeds, delays and repeat counts (STUI-742), toasts with
+  infinite, NaN or huge durations (STUI-758) and scale transitions with huge
+  scales or non-finite anchors (STUI-790) no longer trap.
+- `_printChanges()` and `_logChanges()` name the property of a
+  collection-element binding such as a `ForEach($items)` row or `$items[0]`
+  (STUI-1272).
+- On macOS, a socket-owned presentation no longer refuses runtime issues sent
+  to a different inet socket (STUI-1271). On Windows a read timeout above
+  `UInt32.max` milliseconds no longer traps (STUI-1292), and a nonempty
+  `TERM_PROGRAM` outranks an inherited `WT_SESSION` (STUI-1313).
+- A failed raw-mode entry whose rollback could not finish no longer leaves the
+  host in raw-mode state (STUI-1300). The attach discovery server removes only
+  a stale socket at its path and names any other file type it finds
+  (STUI-1301, STUI-1302). A runtime issue recorded outside a frame is no longer
+  lost when the next frame is abandoned or laid out again (STUI-1323).
+
+### Coordinated packages
+
+- `SwiftTUITerminalView` publishes `.sgr` and `.disabled` mouse encodings
+  correctly after a child selects 8-bit reply controls, a 0.19.4 regression
+  (STUI-1287).
+- `SwiftTUICharts` documents that the coincident-sample rule holds within one
+  domain (STUI-1289).
+- The SwiftUI host keeps VoiceOver identifiers stable when duplicate elements
+  appear and leave (STUI-1288) and converts wheel travel to cells exactly
+  (STUI-1274, STUI-1275).
+- The browser host clamps wheel travel to 16 cells, carries sub-cell travel in
+  device units and drops it on every reversal (STUI-1274–STUI-1276), keeps
+  duplicate accessibility siblings distinct (STUI-1259) and keeps a refused
+  `StdIOPipe` chunk queued (STUI-1294).
+- The Android host refuses surface records that are not grammatical JSON
+  (STUI-1277).
+- `gifeditor` keeps the sheet an unsaved-changes guard action opens under the
+  new prompt dismissal (STUI-1309), refuses GIF canvases its project format
+  cannot store (STUI-845), and fixes APNG play counts, recents limits and
+  oversized palettes (STUI-1346). `csvui` saves files it reopens unchanged and
+  refuses a dangling-symlink Save As destination (STUI-1347). `mrkdwn` matches
+  reserved IPv4 blocks on their full prefix (STUI-1348). `git-viz` reads git
+  output NUL-framed, opens bare repositories, labels detached HEADs, bounds
+  history windows by local days and joins DAG lanes by commit (STUI-1338–
+  STUI-1341). `sextant` lists symlinks with unresolvable targets as broken
+  links, classifies previews on the whole capped read without splitting
+  scalars, keeps emoji sequences in names, lexes `VISUAL`/`EDITOR` by POSIX
+  rules, and tightens PATH probing, search truncation, template checks and
+  bookmark identity (STUI-1342–STUI-1345).
+- The site build compares DocC mounts by identity, normalizes theme mounts,
+  refuses unplaceable `docc-repos.yml` lines, honours `var()` fallbacks
+  (STUI-1278–STUI-1281) and parses under bash 3.2 again.
+- Browser packages, Charts, Terminal View, native hosts, examples, the counter
+  demo, and documentation move together to 0.19.5.
+
+### Documentation
+
+- `Accessibility.md` states that an ineligible row disables only its selection
+  button (STUI-1293). `Authoring-Views.md` states the integer centre-guide rule
+  and its limits (STUI-1324). `Divergences-And-Gaps.md` records that clip masks
+  applied back to back share the outermost clip's transaction, and that
+  opacities on one view follow the innermost one's.
+
 ## [0.19.4] - 2026-10-25
 
 ### Changed
@@ -2629,7 +2805,8 @@ precomposition work (still images), cache hardening, and glyph-aware backdrops.
 See the GitHub releases for the full per-tag history:
 <https://github.com/SwiftTUI/swift-tui/releases>.
 
-[Unreleased]: https://github.com/SwiftTUI/swift-tui/compare/0.19.4...HEAD
+[Unreleased]: https://github.com/SwiftTUI/swift-tui/compare/0.19.5...HEAD
+[0.19.5]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.19.5
 [0.19.4]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.19.4
 [0.19.3]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.19.3
 [0.19.2]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.19.2

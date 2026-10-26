@@ -2580,6 +2580,7 @@ var AccessibilityTreeMounter = class {
   hasLiveRegionBaseline = !1;
   readingText = /* @__PURE__ */ new WeakMap;
   modelsById = /* @__PURE__ */ new Map;
+  keysByElement = /* @__PURE__ */ new WeakMap;
   presenting = !1;
   nextRequestID = 0n;
   acknowledgedRequestID = 0n;
@@ -2672,7 +2673,7 @@ var AccessibilityTreeMounter = class {
     }
   }
   presentFrame(nodes, metrics, announcements, options) {
-    let activeBeforePresentation = document.activeElement, reviewedID = activeBeforePresentation?.dataset?.accessibilityId, reviewedModel = reviewedID ? this.modelsById.get(reviewedID) : void 0, reviewedMenu = reviewedModel ? this.enclosingMenu(reviewedModel) : void 0, menuReturn = this.pendingMenuReturn ?? reviewedMenu?.properties?.labelledBy?.[0], visibleNodes = nodes.filter((node) => !node.hidden).map((node) => ({
+    let activeBeforePresentation = document.activeElement, reviewedID = activeBeforePresentation ? this.keysByElement.get(activeBeforePresentation) : void 0, reviewedModel = reviewedID ? this.modelsById.get(reviewedID) : void 0, reviewedMenu = reviewedModel ? this.enclosingMenu(reviewedModel) : void 0, menuReturn = this.pendingMenuReturn ?? reviewedMenu?.properties?.labelledBy?.[0], visibleNodes = presentationNodes(nodes.filter((node) => !node.hidden)).map((node) => ({
       ...node,
       liveRegion: normalizeLiveRegion(node.liveRegion)
     })), normalizedAnnouncements = announcements.map((announcement) => ({
@@ -3122,7 +3123,7 @@ var AccessibilityTreeMounter = class {
     return element;
   }
   applyNodeAttributes(element, node, metrics, parent) {
-    if (element.id = `swifttui-a11y-${this.domIdentity}-${stableDOMId(node.id)}`, element.dataset.accessibilityId = node.id, element.tabIndex = this.isTabStop(node) ? 0 : -1, element.tagName === "A") {
+    if (element.id = `swifttui-a11y-${this.domIdentity}-${stableDOMId(node.id)}`, element.dataset.accessibilityId = node.wireId, this.keysByElement.set(element, node.id), element.tabIndex = this.isTabStop(node) ? 0 : -1, element.tagName === "A") {
       element.setAttribute("target", "_blank"), element.setAttribute("rel", "noopener noreferrer");
       let destination = node.value?.type === "text" ? node.value.value : void 0;
       setOrRemoveAttribute(element, "href", node.isEnabled !== !1 ? safeLinkDestination(destination) : void 0), element.style.pointerEvents = "auto";
@@ -3328,6 +3329,45 @@ function roleMapping(role) {
     default:
       return { role: "group" };
   }
+}
+var presentationKeySeparator = "\x1F";
+function presentationNodes(nodes) {
+  let used = /* @__PURE__ */ new Set, keysByWireId = /* @__PURE__ */ new Map, keys = nodes.map((node) => {
+    let base = node.actionTarget === void 0 ? node.id : `${node.id}${presentationKeySeparator}${node.actionTarget}`, key = base;
+    for (let occurrence = 1;used.has(key); occurrence++)
+      key = `${base}${presentationKeySeparator}#${occurrence}`;
+    used.add(key);
+    let group = keysByWireId.get(node.id);
+    if (group)
+      group.push(key);
+    else
+      keysByWireId.set(node.id, [key]);
+    return key;
+  }), unique = (id) => {
+    let group = keysByWireId.get(id);
+    return group?.length === 1 ? group[0] : group ? void 0 : id;
+  }, references = (ids) => ids?.flatMap((id) => unique(id) ?? []), preceding = /* @__PURE__ */ new Map;
+  return nodes.map((node, index) => {
+    let key = keys[index] ?? node.id, parentId = node.parentId === void 0 ? void 0 : preceding.get(node.parentId) ?? keysByWireId.get(node.parentId)?.[0] ?? node.parentId;
+    preceding.set(node.id, key);
+    let properties = node.properties && {
+      ...node.properties,
+      labelledBy: references(node.properties.labelledBy),
+      describedBy: references(node.properties.describedBy),
+      errorMessage: references(node.properties.errorMessage),
+      controls: references(node.properties.controls),
+      owns: references(node.properties.owns),
+      flowTo: references(node.properties.flowTo),
+      activeDescendant: node.properties.activeDescendant === void 0 ? void 0 : unique(node.properties.activeDescendant)
+    };
+    return {
+      ...node,
+      id: key,
+      parentId,
+      properties,
+      wireId: node.id
+    };
+  });
 }
 function stableDOMId(id) {
   return Array.from(id, (character) => character.codePointAt(0).toString(16)).join("-");
@@ -4203,9 +4243,12 @@ var HostGeometrySession = class {
 };
 
 // dist/src/InputEventEncoder.js
-var DOM_DELTA_LINE = 1, DOM_DELTA_PAGE = 2, InputEventEncoder = class {
-  wheelRemainderX = 0;
-  wheelRemainderY = 0;
+var DOM_DELTA_LINE = 1, DOM_DELTA_PAGE = 2, noWheelTravel = {
+  travel: 0,
+  unitsPerCell: 1
+}, InputEventEncoder = class {
+  wheelCarryX = noWheelTravel;
+  wheelCarryY = noWheelTravel;
   encodeKey(event) {
     let key = keyInputFromKeyboardEvent(event);
     if (!key)
@@ -4253,8 +4296,8 @@ var DOM_DELTA_LINE = 1, DOM_DELTA_PAGE = 2, InputEventEncoder = class {
     }, geometryRevision, viewportRevision);
   }
   encodeWheel(location, event, metrics, geometryRevision, viewportRevision) {
-    let mode = event.deltaMode, [deltaX, remainderX] = wholeWheelCells(this.wheelRemainderX, wheelTravel(event.deltaX, mode, metrics.cellWidth, metrics.columns)), [deltaY, remainderY] = wholeWheelCells(this.wheelRemainderY, wheelTravel(event.deltaY, mode, metrics.cellHeight, metrics.rows));
-    if (this.wheelRemainderX = remainderX, this.wheelRemainderY = remainderY, deltaX === 0 && deltaY === 0)
+    let mode = event.deltaMode, [deltaX, carryX] = wholeWheelCells(this.wheelCarryX, wheelTravel(event.deltaX, mode, metrics.cellWidth, metrics.columns)), [deltaY, carryY] = wholeWheelCells(this.wheelCarryY, wheelTravel(event.deltaY, mode, metrics.cellHeight, metrics.rows));
+    if (this.wheelCarryX = carryX, this.wheelCarryY = carryY, deltaX === 0 && deltaY === 0)
       return;
     return encodeMouseInputMessage({
       kind: "scrolled",
@@ -4264,6 +4307,9 @@ var DOM_DELTA_LINE = 1, DOM_DELTA_PAGE = 2, InputEventEncoder = class {
       deltaY,
       modifiers: modifierMask(event)
     }, geometryRevision, viewportRevision);
+  }
+  observeUnforwardedWheel(event) {
+    this.wheelCarryX = droppingReversedCarry(this.wheelCarryX, event.deltaX), this.wheelCarryY = droppingReversedCarry(this.wheelCarryY, event.deltaY);
   }
   pointerButton(button) {
     return pointerButton(button);
@@ -4326,21 +4372,48 @@ function modifierMask(event) {
 }
 function wheelTravel(delta, mode, pitch, extent) {
   if (!Number.isFinite(delta) || delta === 0)
-    return 0;
+    return;
   switch (mode) {
     case DOM_DELTA_LINE:
-      return delta;
+      return {
+        travel: delta,
+        unitsPerCell: 1
+      };
     case DOM_DELTA_PAGE:
-      return delta * (Number.isFinite(extent) && extent >= 1 ? extent : 1);
+      return {
+        travel: delta * (Number.isFinite(extent) && extent >= 1 ? extent : 1),
+        unitsPerCell: 1
+      };
     default:
-      return Number.isFinite(pitch) && pitch > 0 ? delta / pitch : Math.sign(delta);
+      return Number.isFinite(pitch) && pitch > 0 ? {
+        travel: delta,
+        unitsPerCell: pitch
+      } : {
+        travel: Math.sign(delta),
+        unitsPerCell: 1
+      };
   }
 }
-function wholeWheelCells(remainder, travel) {
-  let total = (travel !== 0 && Math.sign(travel) !== Math.sign(remainder) ? 0 : remainder) + travel, whole = Math.trunc(total);
-  if (Math.abs(whole) > 16)
-    return [Math.sign(whole) * 16, 0];
-  return [whole || 0, total - whole];
+function wholeWheelCells(carry, next) {
+  if (!next)
+    return [0, carry];
+  let unit = next.unitsPerCell, kept = droppingReversedCarry(carry, next.travel), total = (kept.unitsPerCell === unit ? kept.travel : kept.travel / kept.unitsPerCell * unit) + next.travel;
+  if (Math.abs(total) > 16 * unit)
+    return [Math.sign(total) * 16, {
+      travel: 0,
+      unitsPerCell: unit
+    }];
+  let remainder = total % unit;
+  return [Math.round((total - remainder) / unit) || 0, {
+    travel: remainder,
+    unitsPerCell: unit
+  }];
+}
+function droppingReversedCarry(carry, delta) {
+  return Number.isFinite(delta) && delta !== 0 && Math.sign(delta) !== Math.sign(carry.travel) ? {
+    travel: 0,
+    unitsPerCell: carry.unitsPerCell
+  } : carry;
 }
 
 // dist/src/PointerGeometry.js
@@ -5131,18 +5204,21 @@ var WebHostSceneRuntime = class {
       if (!this.hasCapturedPointer)
         this.terminalMount.style.cursor = this.linkTarget(location) !== void 0 ? "pointer" : "";
       this.onInput(this.inputEncoder.encodePointerMove(location, this.activePointerButton, event, this.pointerRevision, this.pointerViewportRevision));
-    }, handleWheel = (event) => {
+    }, forwardWheel = (event) => {
       if (this.wheelMode === "passive" || event.ctrlKey || event.metaKey)
-        return;
+        return !1;
       let location = this.cellLocation(event);
       if (!location)
-        return;
+        return !1;
       if (this.wheelMode === "chain" && !wheelTargetCanScroll(this.currentFrame?.scrollRegions, location, event.deltaX, event.deltaY))
-        return;
+        return !1;
       let record = this.inputEncoder.encodeWheel(location, event, this.pointerMetrics(), this.pointerRevision, this.pointerViewportRevision);
       if (record)
         this.onInput(record);
-      event.preventDefault();
+      return event.preventDefault(), !0;
+    }, handleWheel = (event) => {
+      if (!forwardWheel(event))
+        this.inputEncoder.observeUnforwardedWheel(event);
     }, cancelPointer = (event) => {
       if (event.pointerId === this.capturedPointerId)
         this.cancelGeometryPointer();
@@ -5824,9 +5900,14 @@ var StdIOPipe = class {
         value: bytes
       });
     else {
+      if (this.consumer && this.chunks.length > 0)
+        this.offerQueued();
       if (!this.consumer)
         this.chunks.push(bytes);
-      delivered = this.consumer?.(bytes) !== !1;
+      else if (this.chunks.length > 0)
+        delivered = !1;
+      else
+        delivered = this.consumer(bytes) !== !1;
     }
     let observed = !0;
     for (let listener of this.listeners)
@@ -5867,13 +5948,22 @@ var StdIOPipe = class {
   consume(listener) {
     if (this.consumer || this.waiters.length > 0)
       throw Error("The pipe already has an exclusive consumer or pending read");
-    this.consumer = listener;
-    for (let chunk of this.chunks.splice(0))
-      listener(chunk);
-    return () => {
+    return this.consumer = listener, this.offerQueued(), () => {
       if (this.consumer === listener)
         this.consumer = void 0;
     };
+  }
+  offerQueued() {
+    let consumer = this.consumer;
+    while (consumer && this.consumer === consumer) {
+      let chunk = this.chunks.shift();
+      if (!chunk)
+        return;
+      if (consumer(chunk) === !1) {
+        this.chunks.unshift(chunk);
+        return;
+      }
+    }
   }
   async* [Symbol.asyncIterator]() {
     while (!0) {
