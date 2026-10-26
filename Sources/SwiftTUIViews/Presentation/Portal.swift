@@ -165,8 +165,15 @@ package struct PortalAttachmentSequenceView: PrimitiveView, IterativeResolvableV
 {
   package var payloads: [PortalAttachmentPayload]
   package var fixedSizeChildren = false
+  /// Installed on a prompt's action row: its buttons dismiss the prompt after
+  /// their actions run (``PromptActionDismissal``).
+  package var promptActionDismissal: PromptActionDismissal? = nil
 
   package func makeResolveWork(in context: ResolveContext) -> ResolveWork<[ResolvedNode]> {
+    let context =
+      promptActionDismissal.map {
+        context.settingEnvironment(\.promptActionDismissal, to: $0)
+      } ?? context
     let result = DeclaredChildrenWorkState()
     return resolveSequentially(Array(payloads.enumerated())) { index, payload in
       let childContext = payloadContext(index: index, root: context)

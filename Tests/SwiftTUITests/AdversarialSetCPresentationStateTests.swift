@@ -608,8 +608,9 @@ private struct SetCPSAlertRoot: View {
     .alert("Heads up", isPresented: $alert) {
       let action = { count += 10 }
       let _ = log.retainAlertAction(action)
-      // Correction C2: alert actions do not dismiss implicitly here; the
-      // action clears the binding, as Dismissal-Is-Data describes.
+      // Correction C2: the action clears the binding itself. Since STUI-1309
+      // every alert action also dismisses the alert after it runs, as in
+      // SwiftUI; the explicit write keeps this case independent of that.
       Button("OK") { alert = false }
     } message: {
       Text("alert body")

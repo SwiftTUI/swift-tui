@@ -85,6 +85,9 @@ package struct PromptPresentationItem: PortalPresentationItem {
   package var contentPayloads: [PortalAttachmentPayload]
   package var dismiss: @MainActor @Sendable () -> Void
   package var onDismiss: (@MainActor @Sendable () -> Void)?
+  /// The dismissal an alert's or confirmation dialog's action row applies
+  /// after each action runs; `nil` for every other surface.
+  package var actionDismissal: PromptActionDismissal?
 
   package var entryDismissObserver: (@MainActor @Sendable () -> Void)? {
     onDismiss
@@ -107,7 +110,8 @@ package struct PromptPresentationItem: PortalPresentationItem {
     messagePayloads: [PortalAttachmentPayload],
     contentPayloads: [PortalAttachmentPayload],
     dismiss: @escaping @MainActor @Sendable () -> Void,
-    onDismiss: (@MainActor @Sendable () -> Void)? = nil
+    onDismiss: (@MainActor @Sendable () -> Void)? = nil,
+    actionDismissal: PromptActionDismissal? = nil
   ) {
     let portalEntryID = portalEntryID ?? fallbackPortalEntryID(for: id)
     let edge = PortalAttachmentEdge(portalEntryID: portalEntryID)
@@ -123,6 +127,100 @@ package struct PromptPresentationItem: PortalPresentationItem {
     self.contentPayloads = contentPayloads.map { $0.attachingEdgeIfMissing(edge) }
     self.dismiss = dismiss
     self.onDismiss = onDismiss
+    self.actionDismissal = actionDismissal
+  }
+}
+
+/// SwiftUI's prompt rule: every action of an alert or confirmation dialog
+/// dismisses the prompt after the action runs. The prompt surface installs it
+/// on its action row (`PromptActionPortalSurface`), and a `Button` there runs
+/// its action through ``perform(_:)``. An action that changes the prompt's
+/// source itself — it dismisses the prompt, presents a different item, or
+/// writes a binding that reports its writes (a `@State` projection) — keeps
+/// that outcome, so an action that re-presents still works (STUI-1309).
+///
+/// Equal for reuse per activation: the closures read the presentation's
+/// binding when they run, so an earlier resolve's copy behaves the same.
+package struct PromptActionDismissal: Sendable, Equatable {
+  private struct Source {
+    /// The presented activation: `"presented"` for a Boolean prompt, the
+    /// item's ID for an item prompt, `nil` when nothing is presented.
+    var activation: String?
+    /// The binding's write identity, when its storage reports one.
+    var writeIdentity: StateValueIdentity?
+  }
+
+  private let portalEntryID: PortalEntryID
+  private let source: @MainActor @Sendable () -> Source
+  private let dismiss: @MainActor @Sendable () -> Void
+
+  @MainActor
+  package init(
+    isPresented: Binding<Bool>,
+    portalEntryID: PortalEntryID,
+    dismiss: @escaping @MainActor @Sendable () -> Void
+  ) {
+    self.portalEntryID = portalEntryID
+    source = {
+      Source(
+        activation: isPresented.wrappedValue ? "presented" : nil,
+        writeIdentity: isPresented.valueIdentity?())
+    }
+    self.dismiss = dismiss
+  }
+
+  @MainActor
+  package init<Item: Identifiable & Sendable>(
+    item: Binding<Item?>,
+    portalEntryID: PortalEntryID,
+    dismiss: @escaping @MainActor @Sendable () -> Void
+  ) {
+    self.portalEntryID = portalEntryID
+    source = {
+      Source(
+        activation: item.wrappedValue.map { String(reflecting: $0.id) },
+        writeIdentity: item.valueIdentity?())
+    }
+    self.dismiss = dismiss
+  }
+
+  /// Runs `action`, then dismisses the prompt unless the action changed it.
+  @MainActor
+  package func perform(_ action: () -> Void) {
+    let before = source()
+    action()
+    guard before.activation != nil else {
+      return
+    }
+    let after = source()
+    // The action dismissed the prompt or presented a different item.
+    guard after.activation == before.activation else {
+      return
+    }
+    // The action wrote the binding itself, for instance to re-present.
+    if let original = before.writeIdentity, let written = after.writeIdentity,
+      written !== original
+    {
+      return
+    }
+    dismiss()
+  }
+
+  package static func == (lhs: Self, rhs: Self) -> Bool {
+    lhs.portalEntryID == rhs.portalEntryID
+  }
+}
+
+private enum PromptActionDismissalKey: EnvironmentKey, FrameworkEnvironmentKey {
+  static let defaultValue: PromptActionDismissal? = nil
+}
+
+extension EnvironmentValues {
+  /// The prompt dismissal a `Button` in an alert's or confirmation dialog's
+  /// action row applies after its action runs.
+  package var promptActionDismissal: PromptActionDismissal? {
+    get { self[PromptActionDismissalKey.self] }
+    set { self[PromptActionDismissalKey.self] = newValue }
   }
 }
 

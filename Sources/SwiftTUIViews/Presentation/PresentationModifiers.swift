@@ -32,6 +32,16 @@ public struct BuiltinPromptPresentationModifier<Actions: View, Message: View>:
     ) { background, triggerIdentity in
       let sourceIdentity = background.identity
       let portalEntryID = presentationAttachment(for: background, token: spec.token)
+      let dismiss: @MainActor @Sendable () -> Void = {
+        [isPresented, dismissAuthoringContext, dismissInvalidator, triggerIdentity] in
+        withAuthoringContext(dismissAuthoringContext) {
+          isPresented.wrappedValue = false
+        }
+        requestPresentationDismissReconcile(
+          dismissInvalidator,
+          triggerIdentity: triggerIdentity
+        )
+      }
       let item = PromptPresentationItem(
         id: portalEntryID.description,
         portalEntryID: portalEntryID,
@@ -51,16 +61,10 @@ public struct BuiltinPromptPresentationModifier<Actions: View, Message: View>:
           )
         },
         contentPayloads: [],
-        dismiss: { [isPresented, dismissAuthoringContext, dismissInvalidator, triggerIdentity] in
-          withAuthoringContext(dismissAuthoringContext) {
-            isPresented.wrappedValue = false
-          }
-          requestPresentationDismissReconcile(
-            dismissInvalidator,
-            triggerIdentity: triggerIdentity
-          )
-        },
-        onDismiss: onDismiss
+        dismiss: dismiss,
+        onDismiss: onDismiss,
+        actionDismissal: PromptActionDismissal(
+          isPresented: isPresented, portalEntryID: portalEntryID, dismiss: dismiss)
       )
 
       return .init(
@@ -184,6 +188,16 @@ package struct BuiltinItemPromptPresentationModifier<
         for: background,
         token: "\(spec.token):\(String(reflecting: currentItem.id))"
       )
+      let dismiss: @MainActor @Sendable () -> Void = {
+        [itemBinding, dismissAuthoringContext, dismissInvalidator, triggerIdentity] in
+        withAuthoringContext(dismissAuthoringContext) {
+          itemBinding.wrappedValue = nil
+        }
+        requestPresentationDismissReconcile(
+          dismissInvalidator,
+          triggerIdentity: triggerIdentity
+        )
+      }
       let presentationItem = PromptPresentationItem(
         id: portalEntryID.description,
         portalEntryID: portalEntryID,
@@ -203,16 +217,10 @@ package struct BuiltinItemPromptPresentationModifier<
           )
         },
         contentPayloads: [],
-        dismiss: { [itemBinding, dismissAuthoringContext, dismissInvalidator, triggerIdentity] in
-          withAuthoringContext(dismissAuthoringContext) {
-            itemBinding.wrappedValue = nil
-          }
-          requestPresentationDismissReconcile(
-            dismissInvalidator,
-            triggerIdentity: triggerIdentity
-          )
-        },
-        onDismiss: onDismiss
+        dismiss: dismiss,
+        onDismiss: onDismiss,
+        actionDismissal: PromptActionDismissal(
+          item: itemBinding, portalEntryID: portalEntryID, dismiss: dismiss)
       )
 
       return .init(

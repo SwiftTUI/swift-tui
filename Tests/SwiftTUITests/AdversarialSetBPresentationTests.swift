@@ -278,7 +278,13 @@ private struct SetBQueuedUnderSheetFixture: View {
       }
     }
     .alert("Alert A", isPresented: $a, onDismiss: { probe.events.append("A dismissed") }) {
-      Button("Open sheet") { s = true }
+      // Every alert action dismisses its alert unless it writes the alert's
+      // binding itself (STUI-1309). Re-asserting `a` keeps A presented beneath
+      // the newer sheet, the shape this case probes.
+      Button("Open sheet") {
+        s = true
+        a = true
+      }
       Button("Dismiss A") { a = false }
     } message: {
       Text("A body")

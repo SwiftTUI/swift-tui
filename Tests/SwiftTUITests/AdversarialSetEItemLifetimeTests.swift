@@ -54,13 +54,17 @@ private struct SetERefreshItem: Identifiable, Sendable {
 private struct SetERefreshContent: View {
   let item: SetERefreshItem
   let replace: @MainActor () -> Void
+  let keep: @MainActor () -> Void
   let probe: SetEItemProbe
   @State private var value = 0
   var body: some View {
     VStack {
       Text("Payload \(item.payload)")
       Text("Value \(value)")
-      Button("Bump") { value += 1 }
+      Button("Bump") {
+        value += 1
+        keep()
+      }
       Button("Replace", action: replace)
     }.onAppear { probe.appeared += 1 }.onDisappear { probe.disappeared += 1 }
   }
@@ -76,6 +80,12 @@ private struct SetEItemLifetimeRoot: View {
       item: value,
       replace: {
         item = .init(id: value.id + (kind < 46 ? 0 : 1), payload: value.payload + 1)
+      },
+      keep: {
+        // An alert or dialog action dismisses its prompt unless it writes the
+        // prompt's binding itself (STUI-1309); Bump keeps the prompt so the
+        // case still measures same-ID refresh and remount.
+        if (kind - 41) % 5 >= 3 { item = item }
       }, probe: probe)
   }
   @ViewBuilder var body: some View {

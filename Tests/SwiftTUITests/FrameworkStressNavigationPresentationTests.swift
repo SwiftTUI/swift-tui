@@ -1422,7 +1422,13 @@ private struct StressNP021Destination: View {
         "Stateful Alert",
         isPresented: $alert,
         actions: {
-          Button("Advance Alert Generation") { generation += 1 }
+          // Every alert action dismisses its alert unless it writes the
+          // alert's binding itself (STUI-1309); re-asserting it keeps the
+          // alert presented across generations.
+          Button("Advance Alert Generation") {
+            generation += 1
+            alert = true
+          }
           Button("Record Alert Generation") {
             probe.markers.append("record \(generation)")
             alert = false
@@ -1511,9 +1517,13 @@ private struct StressNP022Destination: View {
         "Reorder Confirmation",
         isPresented: $confirmation,
         actions: {
+          // Every dialog action dismisses its dialog unless it writes the
+          // dialog's binding itself (STUI-1309); re-asserting it keeps the
+          // dialog presented across reorders.
           Button("Reorder Confirmation Source") {
             generation += 1
             reversed.toggle()
+            confirmation = true
           }
           Button("Commit Confirmation Generation") {
             probe.markers.append("commit \(generation)")
@@ -1781,7 +1791,13 @@ private struct StressNP025Destination: View {
       "Layered Confirmation",
       isPresented: $confirmation,
       actions: {
-        Button("Open Alert Above Confirmation") { alert = true }
+        // Re-asserting the dialog's binding keeps it presented beneath the
+        // alert this action opens (STUI-1309: otherwise every dialog action
+        // dismisses its dialog).
+        Button("Open Alert Above Confirmation") {
+          alert = true
+          confirmation = true
+        }
       },
       message: {
         Text("confirmation below alert body")

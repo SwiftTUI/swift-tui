@@ -389,7 +389,13 @@ private struct StackedAlertQueueFixture: View {
       isPresented: $showsAlertA,
       onDismiss: { probe.events.append("alert A dismissed") },
       actions: {
-        Button("Queue Alert B") { showsAlertB = true }
+        // Every alert action dismisses its alert unless it writes the
+        // alert's binding itself (STUI-1309); re-asserting it keeps A
+        // presented while B queues behind it.
+        Button("Queue Alert B") {
+          showsAlertB = true
+          showsAlertA = true
+        }
         Button("Dismiss Alert A") { showsAlertA = false }
       },
       message: {
