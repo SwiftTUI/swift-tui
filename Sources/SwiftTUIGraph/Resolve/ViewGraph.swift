@@ -445,6 +445,11 @@ package final class ViewGraph {
     set { frameCommit.currentFrameID = newValue }
     _modify { yield &frameCommit.currentFrameID }
   }
+  /// Identifies the current frame's resolve pass: every resolve in one frame,
+  /// including a same-pass re-resolve, reads the same value. Value-gated
+  /// modifiers key a pass-stable baseline on it, as `onChange` does with
+  /// ``changeObservationValue(entityIdentity:identity:ordinal:as:)``.
+  package var resolvePassID: UInt64 { currentFrameID }
   package var animationInputMutationToken: UInt64 {
     frameCommit.animationInputMutationToken
   }

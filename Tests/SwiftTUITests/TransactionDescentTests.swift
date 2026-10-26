@@ -322,6 +322,124 @@ struct BodyRootTransactionTests {
   }
 
   @Test(
+    "w4fn03: .animation(_:value:) in a body-root conditional animates the first change",
+    arguments: BodyRootEntry.allCases)
+  func w4fn03ValueAnimationInBodyRootConditionalAnimatesFirstChange(entry: BodyRootEntry) throws {
+    let log = BodyRootLog()
+    let view = BodyRootView(log: log) { v in
+      if v > -1 { BodyRoot.glyph(v).animation(bodyRootOneSecond, value: v) }
+    }
+    let after = try BodyRoot.run(
+      "w4fn03-\(entry)", entry: entry, log: log, view, writes: [(1, nil), (0.5, nil)])
+    #expect(after[0][.offset] == bodyRootOneSecond, "first write: \(after[0])")
+    #expect(after[1][.offset] == bodyRootOneSecond, "second write: \(after[1])")
+  }
+
+  @Test(
+    "w4fn04: .transaction(value:_:) at a body root animates the first change",
+    arguments: BodyRootEntry.allCases)
+  func w4fn04ValueTransactionAtBodyRootAnimatesFirstChange(entry: BodyRootEntry) throws {
+    let conditionalLog = BodyRootLog()
+    let conditional = try BodyRoot.run(
+      "w4fn04-if-\(entry)", entry: entry, log: conditionalLog,
+      BodyRootView(log: conditionalLog) { v in
+        if v > -1 {
+          BodyRoot.glyph(v).transaction(value: v) { $0.animation = bodyRootOneSecond }
+        }
+      }, writes: [(1, nil)])
+    #expect(conditional[0][.offset] == bodyRootOneSecond, "if: \(conditional[0])")
+    let groupLog = BodyRootLog()
+    let group = try BodyRoot.run(
+      "w4fn04-group-\(entry)", entry: entry, log: groupLog,
+      BodyRootView(log: groupLog) { v in
+        Group { BodyRoot.glyph(v).transaction(value: v) { $0.animation = bodyRootOneSecond } }
+      }, writes: [(1, nil)])
+    #expect(group[0][.offset] == bodyRootOneSecond, "Group: \(group[0])")
+  }
+
+  @Test("w4fn05: value gates at a navigation destination root fire on every change")
+  func w4fn05ValueGatesAtNavigationDestinationFire() throws {
+    let animationLog = BodyRootLog()
+    let animation = try BodyRoot.run(
+      "w4fn05-animation", entry: .navigation, log: animationLog,
+      BodyRootView(log: animationLog) { v in
+        BodyRoot.glyph(v).animation(bodyRootOneSecond, value: v)
+      }, writes: [(1, nil), (0.5, nil)])
+    #expect(
+      animation.map { $0[.offset] } == [bodyRootOneSecond, bodyRootOneSecond], "\(animation)")
+    let transactionLog = BodyRootLog()
+    let transaction = try BodyRoot.run(
+      "w4fn05-transaction", entry: .navigation, log: transactionLog,
+      BodyRootView(log: transactionLog) { v in
+        BodyRoot.glyph(v).transaction(value: v) { $0.animation = bodyRootOneSecond }
+      }, writes: [(1, nil), (0.5, nil)])
+    #expect(
+      transaction.map { $0[.offset] } == [bodyRootOneSecond, bodyRootOneSecond], "\(transaction)")
+  }
+
+  @Test("w4fn06: a branch flip between value gates of different types keeps separate values")
+  func w4fn06BranchFlipBetweenDifferentlyTypedGates() throws {
+    // The view is the run loop's root view, then one container down.
+    let rootLog = BodyRootTypedFlipLog()
+    let rootView = BodyRootTypedFlip(log: rootLog)
+    let root = try StressRuntimeHarness(
+      rootIdentity: testIdentity("BodyRoot", "w4fn06-root"), size: .init(width: 20, height: 3)
+    ) { rootView }
+    defer { root.shutdown() }
+    let rootCurves = try flipCurves(rootLog, root.runLoop.renderer.internalAnimationController) {
+      _ = try root.render()
+    }
+    let stackLog = BodyRootTypedFlipLog()
+    let stackView = BodyRootTypedFlip(log: stackLog)
+    let stack = try StressRuntimeHarness(
+      rootIdentity: testIdentity("BodyRoot", "w4fn06-stack"), size: .init(width: 20, height: 3)
+    ) { VStack { stackView } }
+    defer { stack.shutdown() }
+    let stackCurves = try flipCurves(stackLog, stack.runLoop.renderer.internalAnimationController) {
+      _ = try stack.render()
+    }
+    // The Int gate fires; the String branch appears without firing, then
+    // fires on its own change; the Int branch reappears, then fires again.
+    let expected: [AnimatableSlot?] = [.offset, nil, .offset, nil, .offset]
+    #expect(rootCurves == expected, "root: \(rootCurves)")
+    #expect(stackCurves == expected, "stack child: \(stackCurves)")
+  }
+
+  private func flipCurves(
+    _ log: BodyRootTypedFlipLog, _ controller: AnimationController, render: () throws -> Void
+  ) throws -> [AnimatableSlot?] {
+    let flag = try #require(log.flag)
+    let count = try #require(log.count)
+    let writes: [() -> Void] = [
+      { count.wrappedValue += 1 }, { flag.wrappedValue = false }, { count.wrappedValue += 1 },
+      { flag.wrappedValue = true }, { count.wrappedValue += 1 },
+    ]
+    return try withAnimationSinks(controller) {
+      try writes.map { write -> AnimatableSlot? in
+        write()
+        try render()
+        return BodyRoot.curves(controller).keys.first
+      }
+    }
+  }
+
+  @Test("w4fn07: a one-shot root whose body is a conditional animates its first changed render")
+  func w4fn07OneShotConditionalRootAnimatesFirstChange() {
+    let renderer = DefaultRenderer()
+    let controller = renderer.internalAnimationController
+    let identity = testIdentity("BodyRoot", "w4fn07")
+    let proposal = ProposedSize(width: 20, height: 3)
+    _ = renderer.render(
+      BodyRootOneShot(value: 0.25), context: .init(identity: identity), proposal: proposal)
+    withAnimationSinks(controller) {
+      _ = renderer.render(
+        BodyRootOneShot(value: 1), context: .init(identity: identity), proposal: proposal)
+    }
+    #expect(
+      BodyRoot.curves(controller)[.offset] == bodyRootOneSecond, "\(BodyRoot.curves(controller))")
+  }
+
+  @Test(
     "w4fn14: a transform in the branch a withAnimation write switches to sees the curve",
     arguments: BodyRootEntry.allCases.filter { $0 != .navigation })
   func w4fn14TransformInSwitchedBranchSeesWithAnimation(entry: BodyRootEntry) throws {
@@ -377,5 +495,101 @@ struct BodyRootTransactionTests {
     let after = try BodyRoot.run(
       "w4fn09", entry: .runLoopRoot, log: log, view, writes: [(1, bodyRootFourSeconds)])
     #expect(after[0].isEmpty, "\(after[0])")
+  }
+
+  @Test("w4fn10: a value gate whose value did not change stays silent on a plain write")
+  func w4fn10UnchangedGateStaysSilent() throws {
+    let log = BodyRootLog()
+    let view = BodyRootView(log: log) { v in
+      if v > -1 { BodyRoot.glyph(v).animation(bodyRootOneSecond, value: v > 2) }
+    }
+    let after = try BodyRoot.run(
+      "w4fn10", entry: .runLoopRoot, log: log, view, writes: [(1, nil), (0.5, nil)])
+    #expect(after.allSatisfy { $0.isEmpty }, "\(after)")
+  }
+
+  @Test("w4fn11: reduce motion snaps a value gate and a withAnimation write in a body-root branch")
+  func w4fn11ReducedMotionSnapsBodyRootBranch() throws {
+    let log = BodyRootLog()
+    let view = BodyRootView(log: log) { v in
+      if v > -1 { BodyRoot.glyph(v).animation(bodyRootOneSecond, value: v) }
+    }
+    .environment(\.accessibilityReduceMotion, true)
+    let after = try BodyRoot.run(
+      "w4fn11", entry: .stackChild, log: log, view, writes: [(1, nil), (0.5, bodyRootFourSeconds)])
+    #expect(after.allSatisfy { $0.isEmpty }, "\(after)")
+  }
+
+  @Test("w4fn12: stacked value gates in one branch keep separate values")
+  func w4fn12StackedGatesKeepSeparateValues() throws {
+    let log = BodyRootLog()
+    let view = BodyRootView(log: log) { v in
+      if v > -1 {
+        BodyRoot.glyph(v)
+          .animation(bodyRootOneSecond, value: v)
+          .animation(bodyRootFourSeconds, value: v > 0.75)
+      }
+    }
+    // 0.25 -> 1 changes both watched values: the outer gate's curve reaches
+    // the content first and the inner one wins below it. 1 -> 0.9 changes
+    // only the inner value; 0.9 -> 0.5 changes both again.
+    let after = try BodyRoot.run(
+      "w4fn12", entry: .runLoopRoot, log: log, view, writes: [(1, nil), (0.9, nil), (0.5, nil)])
+    #expect(after.map { $0[.offset] } == [bodyRootOneSecond, bodyRootOneSecond, bodyRootOneSecond])
+    let outerOnlyLog = BodyRootLog()
+    let outerOnly = try BodyRoot.run(
+      "w4fn12-outer", entry: .runLoopRoot, log: outerOnlyLog,
+      BodyRootView(log: outerOnlyLog) { v in
+        if v > -1 {
+          BodyRoot.glyph(v)
+            .animation(nil, value: 0)
+            .animation(bodyRootFourSeconds, value: v)
+        }
+      }, writes: [(1, nil)])
+    #expect(outerOnly[0][.offset] == bodyRootFourSeconds, "\(outerOnly[0])")
+  }
+}
+
+extension BodyRootTransactionTests {
+  @Test("w4fn13: a value gate inside an explicit .id in a conditionally hosted view animates")
+  func w4fn13ValueGateInsideExplicitIDInConditionallyHostedView() throws {
+    let log = BodyRootLog()
+    let view = BodyRootView(log: log) { v in
+      BodyRoot.glyph(v).animation(bodyRootOneSecond, value: v).id("k")
+    }
+    let after = try BodyRoot.run(
+      "w4fn13", entry: .conditionalHost, log: log, view, writes: [(1, nil), (0.5, nil)])
+    #expect(after.map { $0[.offset] } == [bodyRootOneSecond, bodyRootOneSecond], "\(after)")
+  }
+}
+
+@MainActor
+private final class BodyRootTypedFlipLog {
+  var flag: Binding<Bool>?
+  var count: Binding<Int>?
+}
+
+private struct BodyRootTypedFlip: View {
+  @State private var flag = true
+  @State private var count = 1
+  let log: BodyRootTypedFlipLog
+  var body: some View {
+    let _ = capture()
+    if flag {
+      Text("#").offset(x: count, y: 0).animation(bodyRootOneSecond, value: count)
+    } else {
+      Text("#").offset(x: count, y: 0).animation(bodyRootOneSecond, value: "s\(count)")
+    }
+  }
+  private func capture() {
+    log.flag = $flag
+    log.count = $count
+  }
+}
+
+private struct BodyRootOneShot: View {
+  let value: Double
+  var body: some View {
+    if value > -1 { BodyRoot.glyph(value).animation(bodyRootOneSecond, value: value) }
   }
 }

@@ -231,7 +231,7 @@ extension ViewGraph {
   /// The live authored node registered as the evaluation owner for `identity`
   /// while a single-child flattening absorber claims its identity index
   /// entry — see `GraphIndex.flattenedAuthoredOwnerNodeIDByIdentity`.
-  func flattenedAuthoredOwnerNode(
+  package func flattenedAuthoredOwnerNode(
     for identity: Identity
   ) -> ViewNode? {
     guard !flattenedAuthoredOwnerNodeIDByIdentity.isEmpty,

@@ -111,7 +111,7 @@ private struct SetDMaskRoot: View {
       rows("#").transaction { $0.disablesAnimations = true }
         .clipShape(SetDMaskShape(fraction: fraction))
     case .innerValueAnimation:
-      rows("#").animation(.linear(duration: .seconds(1)), value: fraction)
+      rows("#").opacity(fraction).animation(.linear(duration: .seconds(1)), value: fraction)
         .clipShape(SetDMaskShape(fraction: fraction))
     case .reducedMotion:
       rows("#").clipShape(SetDMaskShape(fraction: fraction))
@@ -155,7 +155,8 @@ private struct SetDMaskRoot: View {
       }
       .transaction { $0.animation = .linear(duration: .seconds(1)) }.topLeading
     // The next four sit one container below the body root, where a transform
-    // observes the enclosing `withAnimation` (brief OBS-A).
+    // observed the enclosing `withAnimation` before STUI-1335 gave the body
+    // root's switch branches the write's transaction too (W4-FL OBS-A).
     case .fillingTransaction:
       VStack(alignment: .leading, spacing: 0) {
         glyph.transaction {
@@ -427,10 +428,20 @@ struct AdversarialSetDClipTrimModeTests {
 
   @Test("setD155: a mask outside an inner .animation(value:) snaps on a plain write")
   func setD155MaskOutsideInnerValueAnimationSnaps() async throws {
+    let midway = SetDMask.rowsForeground(opacity: 0.625)
+    try #require(midway != nil && !SetDMask.near(midway, SetDMask.rowsForeground(opacity: 1)))
     let result = try await SetDMask.reveal(
       "155", start: 0.25, mode: .innerValueAnimation, sampleAt: .milliseconds(500),
       write: { $0.wrappedValue = 1 })
+    // Oracle correction (W4-FN): the value gate at the root of this switch
+    // branch fires (STUI-1335), so the rows inside it fade on its curve while
+    // the mask outside it snaps (STUI-1319).
+    #expect(result.curves[.opacity] == .linear(duration: .seconds(1)), "\(result.curves)")
+    #expect(!result.slots.contains(.clipShapePaths), "the mask outside snaps: \(result.slots)")
     #expect(SetDMask.lastPaintedX(result.mid) == 19, "mid \(SetDMask.lastPaintedX(result.mid))")
+    let mid = SetDMask.firstGlyph(result.mid)?.fg
+    #expect(
+      SetDMask.near(mid, midway), "mid \(String(describing: mid)) of \(String(describing: midway))")
   }
 
   @Test("setD156: reduce motion snaps an animated mask change")
