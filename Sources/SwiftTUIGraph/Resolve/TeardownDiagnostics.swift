@@ -31,6 +31,7 @@ package enum TeardownBarrierStage: String, CaseIterable, Equatable, Sendable {
   case absorbedShadow
   case staleDetachedHostedRoot
   case departedNavigationSurface
+  case dormantRestorePlaceholder
   case sparedVisitedDescent
 }
 
@@ -40,6 +41,7 @@ package struct TeardownWorkSnapshot: Equatable, Sendable {
   package var entityRoutedRemovalNodeIDs: Set<ViewNodeID>
   package var absorbedShadowNodeIDs: Set<ViewNodeID>
   package var departedNavigationSurfaceNodeIDs: Set<ViewNodeID>
+  package var dormantRestorePlaceholderNodeIDs: Set<ViewNodeID>
   package var sparedVisitedDescentNodeIDs: Set<ViewNodeID>
 
   package init(
@@ -47,12 +49,14 @@ package struct TeardownWorkSnapshot: Equatable, Sendable {
     entityRoutedRemovalNodeIDs: Set<ViewNodeID>,
     absorbedShadowNodeIDs: Set<ViewNodeID>,
     departedNavigationSurfaceNodeIDs: Set<ViewNodeID>,
+    dormantRestorePlaceholderNodeIDs: Set<ViewNodeID> = [],
     sparedVisitedDescentNodeIDs: Set<ViewNodeID> = []
   ) {
     self.resolveScopeScratchNodeIDs = resolveScopeScratchNodeIDs
     self.entityRoutedRemovalNodeIDs = entityRoutedRemovalNodeIDs
     self.absorbedShadowNodeIDs = absorbedShadowNodeIDs
     self.departedNavigationSurfaceNodeIDs = departedNavigationSurfaceNodeIDs
+    self.dormantRestorePlaceholderNodeIDs = dormantRestorePlaceholderNodeIDs
     self.sparedVisitedDescentNodeIDs = sparedVisitedDescentNodeIDs
   }
 
@@ -61,6 +65,7 @@ package struct TeardownWorkSnapshot: Equatable, Sendable {
       + entityRoutedRemovalNodeIDs.count
       + absorbedShadowNodeIDs.count
       + departedNavigationSurfaceNodeIDs.count
+      + dormantRestorePlaceholderNodeIDs.count
       + sparedVisitedDescentNodeIDs.count
   }
 
@@ -79,6 +84,9 @@ package struct TeardownWorkSnapshot: Equatable, Sendable {
       ),
       departedNavigationSurfaceNodeIDs: departedNavigationSurfaceNodeIDs.subtracting(
         other.departedNavigationSurfaceNodeIDs
+      ),
+      dormantRestorePlaceholderNodeIDs: dormantRestorePlaceholderNodeIDs.subtracting(
+        other.dormantRestorePlaceholderNodeIDs
       ),
       sparedVisitedDescentNodeIDs: sparedVisitedDescentNodeIDs.subtracting(
         other.sparedVisitedDescentNodeIDs

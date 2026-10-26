@@ -97,6 +97,7 @@ package enum StateSlotOrdinals {
 @MainActor
 private struct DynamicStateLocation<Value> {
   var bindingSourceID: AnyID
+  var bindingDeclarationID: AnyID
   var getValue: @MainActor () -> Value
   var setValue: @MainActor (Value) -> Void
   var valueIdentity: @MainActor @Sendable () -> StateValueIdentity?
@@ -108,6 +109,7 @@ private struct DynamicStateLocation<Value> {
     )
     binding.valueIdentity = valueIdentity
     binding.bindingSourceID = bindingSourceID
+    binding.bindingDeclarationID = bindingDeclarationID
     return binding
   }
 }
@@ -116,6 +118,15 @@ private struct DynamicStateLocation<Value> {
 /// declarations, composed-property paths, and independently mounted owners.
 private struct StateBindingSource: Hashable, Sendable {
   var owner: StateStorageOwner
+  var slot: StateSlotIdentifier
+}
+
+/// The declaration a `StateBindingSource` belongs to, without its owner's
+/// lifetime: the same authored `@State` keeps one token across every node the
+/// framework mounts for it, such as an owner restored from tab dormancy.
+private struct StateBindingDeclaration: Hashable, Sendable {
+  var graphScope: StateGraphScopeID
+  var declarationFileID: String
   var slot: StateSlotIdentifier
 }
 
@@ -584,6 +595,13 @@ public struct State<Value> {
     let dormantPolicy = box.dormantPolicy
     return DynamicStateLocation(
       bindingSourceID: AnyID(StateBindingSource(owner: storageOwner, slot: slotIdentifier)),
+      bindingDeclarationID: AnyID(
+        StateBindingDeclaration(
+          graphScope: storageOwner.graphScope,
+          declarationFileID: declarationFileID,
+          slot: slotIdentifier
+        )
+      ),
       getValue: { [weak box] in
         guard let liveViewNode = LiveViewGraphRegistry.node(for: storageOwner) else {
           if let retainedValue = box?.retainedValue(for: storageOwner) {

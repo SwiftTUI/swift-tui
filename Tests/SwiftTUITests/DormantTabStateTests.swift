@@ -2244,6 +2244,211 @@ extension DormantTabStateTests {
     #expect(surfaceText(returned).contains("A count 1"), "\(surfaceText(returned))")
   }
 
+  /// STUI-1307: an item destination's surface identity must not embed the
+  /// presentation binding's owner lifetime, which tab dormancy renews.
+  @Test("an item navigation destination inside a tab keeps its state across round trips")
+  func itemDestinationKeepsStateAcrossRoundTrips() throws {
+    let model = DormantTabModel()
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("DormantTabsItemDestination"),
+      size: .init(width: 40, height: 10)
+    ) {
+      DormantItemDestinationFixture(model: model)
+    }
+    defer { harness.shutdown() }
+    _ = try harness.clickText("Open")
+    _ = try harness.clickText("Increment")
+    _ = try harness.clickText("Increment")
+    try #require(harness.frame.contains("item count 2"), "\(harness.frame)")
+
+    for trip in 1...3 {
+      model.selection = "B"
+      _ = try harness.renderAfterExternalMutation()
+      #expect(harness.frame.contains("plain-B"), "round trip \(trip): \(harness.frame)")
+      model.selection = "A"
+      _ = try harness.renderAfterExternalMutation()
+      _ = try harness.render()
+      #expect(harness.frame.contains("item count 2"), "round trip \(trip): \(harness.frame)")
+      let unreachable =
+        harness.runLoop.renderer.viewGraph.debugTeardownCoherenceViolation()?.unreachableCount ?? 0
+      #expect(unreachable == 0, "round trip \(trip) stranded \(unreachable) node(s)")
+    }
+  }
+
+  /// STUI-1307: restore seeds a placeholder per archived record; one the
+  /// returning payload does not claim is reclaimed at the frame barrier
+  /// (Dormant-Tab-State.md "Restoration") and never resurrects later.
+  @Test("a dormant record the returning payload no longer claims is reclaimed")
+  func unclaimedDormantPlaceholderIsReclaimed() throws {
+    let model = DormantTabModel()
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("DormantTabsUnclaimedPlaceholder"),
+      size: .init(width: 40, height: 10)
+    ) {
+      DormantConditionalChildFixture(model: model)
+    }
+    defer { harness.shutdown() }
+    _ = try harness.clickText("Increment child")
+    try #require(harness.frame.contains("child count 1"), "\(harness.frame)")
+
+    model.selection = "B"
+    _ = try harness.renderAfterExternalMutation()
+    model.includesA = false
+    model.selection = "A"
+    _ = try harness.renderAfterExternalMutation()
+    _ = try harness.render()
+    #expect(harness.frame.contains("header A"), "\(harness.frame)")
+    #expect(!harness.frame.contains("child count"), "\(harness.frame)")
+    let unreachable =
+      harness.runLoop.renderer.viewGraph.debugTeardownCoherenceViolation()?.unreachableCount ?? 0
+    #expect(unreachable == 0, "stranded \(unreachable) restore placeholder(s)")
+
+    // The child comes back later as a new lifetime with authored state.
+    model.selection = "B"
+    _ = try harness.renderAfterExternalMutation()
+    model.includesA = true
+    model.selection = "A"
+    _ = try harness.renderAfterExternalMutation()
+    _ = try harness.render()
+    #expect(harness.frame.contains("child count 0"), "\(harness.frame)")
+  }
+
+  /// STUI-1307 neighbour: lazy rows adopt their restored records while the
+  /// frame tail realizes them, before the barrier judges the placeholders.
+  @Test("lazy rows inside a tab keep their @State across a round trip", arguments: [false, true])
+  func lazyRowStateSurvivesRoundTrip(list: Bool) throws {
+    let model = DormantTabModel()
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("DormantTabsLazyRows", list ? "list" : "stack"),
+      size: .init(width: 40, height: 10)
+    ) {
+      DormantLazyRowsFixture(model: model, list: list)
+    }
+    defer { harness.shutdown() }
+    _ = try harness.clickText("Bump row 2")
+    try #require(harness.frame.contains("row 2 count 1"), "\(harness.frame)")
+
+    model.selection = "B"
+    _ = try harness.renderAfterExternalMutation()
+    model.selection = "A"
+    _ = try harness.renderAfterExternalMutation()
+    _ = try harness.render()
+    #expect(harness.frame.contains("row 2 count 1"), "\(harness.frame)")
+    let unreachable =
+      harness.runLoop.renderer.viewGraph.debugTeardownCoherenceViolation()?.unreachableCount ?? 0
+    #expect(unreachable == 0, "stranded \(unreachable) node(s)")
+  }
+
+}
+
+private struct DormantDestinationItem: Identifiable, Sendable {
+  let id = "item"
+}
+
+@MainActor
+private struct DormantItemDestinationFixture: View {
+  let model: DormantTabModel
+
+  var body: some View {
+    TabView(selection: model.selectionBinding) {
+      Tab("A", value: "A") { DormantItemDestinationSource() }
+      Tab("B", value: "B") { Text("plain-B") }
+    }
+    .tabViewStyle(.literalTabs)
+  }
+}
+
+@MainActor
+private struct DormantItemDestinationSource: View {
+  @State private var item: DormantDestinationItem?
+
+  var body: some View {
+    NavigationStack {
+      Button("Open") { item = DormantDestinationItem() }
+        .navigationDestination(item: $item) { _ in DormantDestinationCounter() }
+    }
+  }
+}
+
+@MainActor
+private struct DormantDestinationCounter: View {
+  @State private var count = 0
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Text("item count \(count)")
+      Button("Increment") { count += 1 }
+    }
+  }
+}
+
+@MainActor
+private struct DormantConditionalChildFixture: View {
+  let model: DormantTabModel
+
+  var body: some View {
+    TabView(selection: model.selectionBinding) {
+      Tab("A", value: "A") {
+        VStack(alignment: .leading, spacing: 0) {
+          Text("header A")
+          if model.includesA {
+            DormantConditionalChild()
+          }
+        }
+      }
+      Tab("B", value: "B") { Text("plain-B") }
+    }
+    .tabViewStyle(.literalTabs)
+  }
+}
+
+@MainActor
+private struct DormantConditionalChild: View {
+  @State private var count = 0
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Text("child count \(count)")
+      Button("Increment child") { count += 1 }
+    }
+  }
+}
+
+@MainActor
+private struct DormantLazyRowsFixture: View {
+  let model: DormantTabModel
+  let list: Bool
+
+  var body: some View {
+    TabView(selection: model.selectionBinding) {
+      Tab("A", value: "A") {
+        if list {
+          List(0..<20, id: \.self) { index in DormantLazyRow(index: index) }
+        } else {
+          ScrollView {
+            LazyVStack(alignment: .leading, spacing: 0) {
+              ForEach(0..<20, id: \.self) { index in DormantLazyRow(index: index) }
+            }
+          }
+        }
+      }
+      Tab("B", value: "B") { Text("plain-B") }
+    }
+    .tabViewStyle(.literalTabs)
+  }
+}
+
+@MainActor
+private struct DormantLazyRow: View {
+  let index: Int
+  @State private var count = 0
+
+  var body: some View {
+    HStack(spacing: 1) {
+      Text("row \(index) count \(count)")
+      Button("Bump row \(index)") { count += 1 }
+    }
+  }
 }
 
 /// Races a frame-tail gate against the render that should reach it, so a

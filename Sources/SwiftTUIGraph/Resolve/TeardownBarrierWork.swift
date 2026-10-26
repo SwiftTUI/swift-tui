@@ -7,6 +7,12 @@ package enum TeardownWorkReason: CaseIterable, Hashable, Sendable {
   case entityRoutedRemoval
   case absorbedShadow
   case departedNavigationSurface
+  /// A node a dormant-archive restore seeded as a state placeholder
+  /// (`restoreDormantStateArchive`). Authored resolution adopts the
+  /// placeholders its payload still declares; the barrier keeps a placeholder
+  /// iff a durable anchor claims it and reclaims one the payload no longer
+  /// claims, which nothing else would ever reach (STUI-1307).
+  case dormantRestorePlaceholder
   /// A visited node a departing-subtree descent spared (the re-adoption
   /// keep-guard). The spare is provisional: "visited this frame" also holds
   /// for a node a SUPERSEDED same-frame pass resolved and the committed pass

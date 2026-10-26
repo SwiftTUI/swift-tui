@@ -3285,6 +3285,9 @@ package final class ViewGraph {
       departedNavigationSurfaceNodeIDs: teardownBarrierWork.nodeIDs(
         for: .departedNavigationSurface
       ),
+      dormantRestorePlaceholderNodeIDs: teardownBarrierWork.nodeIDs(
+        for: .dormantRestorePlaceholder
+      ),
       sparedVisitedDescentNodeIDs: teardownBarrierWork.nodeIDs(
         for: .sparedVisitedDescent
       )
@@ -3373,11 +3376,45 @@ package final class ViewGraph {
     candidateRootID: ViewNodeID,
     activeEntities: Set<EntityIdentity>
   ) {
-    let candidates = teardownBarrierWork.nodeIDs(for: .sparedVisitedDescent)
+    pruneUnreachableBarrierCandidates(
+      .sparedVisitedDescent,
+      candidateRootID: candidateRootID,
+      activeEntities: activeEntities
+    )
+  }
+
+  /// Barrier verdict for dormant-archive restore placeholders
+  /// (`.dormantRestorePlaceholder`). Restore seeds one placeholder per
+  /// archived record before the returning payload resolves; the payload
+  /// adopts every record it still declares. A record it no longer claims (a
+  /// child removed while its tab was dormant, a surface re-keyed since) is a
+  /// parentless, unanchored, never-visited node that no other teardown path
+  /// reaches: it stayed stored forever, counted by the census, and a later
+  /// resolve at its identity adopted it with stale state. The census
+  /// reachability walk decides, as for spared-descent strands.
+  private func pruneUnclaimedDormantRestorePlaceholders(
+    candidateRootID: ViewNodeID,
+    activeEntities: Set<EntityIdentity>
+  ) {
+    pruneUnreachableBarrierCandidates(
+      .dormantRestorePlaceholder,
+      candidateRootID: candidateRootID,
+      activeEntities: activeEntities
+    )
+  }
+
+  /// Consumes `reason`'s work and removes each candidate the lifetime
+  /// reachability walk from the committed root cannot reach.
+  private func pruneUnreachableBarrierCandidates(
+    _ reason: TeardownWorkReason,
+    candidateRootID: ViewNodeID,
+    activeEntities: Set<EntityIdentity>
+  ) {
+    let candidates = teardownBarrierWork.nodeIDs(for: reason)
     guard !candidates.isEmpty else {
       return
     }
-    consumeTeardownWork(.sparedVisitedDescent, for: candidates)
+    consumeTeardownWork(reason, for: candidates)
     let stored = candidates.filter { nodeID in
       nodeIfExists(for: nodeID) != nil
         && nodeID != candidateRootID
@@ -3456,6 +3493,17 @@ package final class ViewGraph {
         tearDownDepartedNavigationSurfaces()
       }
       afterStage?(.departedNavigationSurface, iteration)
+      runTeardownStage(
+        .dormantRestorePlaceholder,
+        iteration: iteration,
+        trace: trace
+      ) {
+        pruneUnclaimedDormantRestorePlaceholders(
+          candidateRootID: candidateRootID,
+          activeEntities: activeEntities
+        )
+      }
+      afterStage?(.dormantRestorePlaceholder, iteration)
       runTeardownStage(
         .sparedVisitedDescent,
         iteration: iteration,
