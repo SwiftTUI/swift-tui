@@ -25,6 +25,15 @@ public struct Binding<Value> {
   /// those consumers with no distinction, preserving prior behavior.
   package var bindingSourceID: AnyID?
 
+  /// The authored declaration ``bindingSourceID`` names, without the lifetime
+  /// of the owner that currently mounts it. `State` supplies its graph scope,
+  /// declaring file and slot. A consumer that keys storage by declaration,
+  /// as navigation destinations do, reads this so storage survives a lifetime
+  /// the framework renews for the same declaration: tab dormancy restores the
+  /// owner as a new node (STUI-1307). Nil leaves those consumers on
+  /// ``bindingSourceID``.
+  package var bindingDeclarationID: AnyID?
+
   /// Certifies replacement of the returned value, when its producer owns all
   /// stores. Nil means unknown: source identity and writes through this binding
   /// alone cannot certify arbitrary closures' external mutations. Consumers
@@ -110,6 +119,7 @@ public struct Binding<Value> {
     )
     self.transaction = base.transaction
     self.bindingSourceID = base.bindingSourceID
+    self.bindingDeclarationID = base.bindingDeclarationID
     self.valueIdentity = base.valueIdentity
   }
 
@@ -131,6 +141,7 @@ public struct Binding<Value> {
     )
     self.transaction = base.transaction
     self.bindingSourceID = base.bindingSourceID
+    self.bindingDeclarationID = base.bindingDeclarationID
     self.valueIdentity = base.valueIdentity
   }
 
@@ -207,6 +218,9 @@ public struct Binding<Value> {
     )
     projected.transaction = transaction
     projected.bindingSourceID = bindingSourceID.map {
+      AnyID(BindingProjectionSource(base: $0, path: .intern(keyPath)))
+    }
+    projected.bindingDeclarationID = bindingDeclarationID.map {
       AnyID(BindingProjectionSource(base: $0, path: .intern(keyPath)))
     }
     // Computed properties and paths through references may change without a

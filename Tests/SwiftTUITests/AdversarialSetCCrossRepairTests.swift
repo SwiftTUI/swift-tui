@@ -122,8 +122,9 @@ struct AdversarialSetCCrossRepairTests {
     _ = try h.clickText("Increment")
     _ = try h.clickText("Increment")
     try #require(h.frame.contains("dest 3"), "\(h.frame)")
-    // The re-minted destination strands its predecessor's nodes; the census
-    // is read here and the sampled-frame trace is kept local to this scope
+    // STUI-1307: before the repair each return re-minted the destination and
+    // stranded its predecessor's restored records (2, 4, 6). The census is
+    // read here and the sampled-frame trace is kept local to this scope
     // (setC006's pattern), so the gate's trace scan sees only unexpected ones.
     var stranded: [Int] = []
     try setCWithoutSoundnessTrace {
@@ -139,12 +140,8 @@ struct AdversarialSetCCrossRepairTests {
       }
     }
     try #require(h.frame.contains("dest"), "the destination is presented again: \(h.frame)")
-    setCKnown(setCNEW12) {
-      #expect(h.frame.contains("dest 3"), "\(h.frame)")
-    }
-    setCKnown(setCNEW12) {
-      #expect(stranded.allSatisfy { $0 == 0 }, "stranded node counts per round trip \(stranded)")
-    }
+    #expect(h.frame.contains("dest 3"), "\(h.frame)")
+    #expect(stranded.allSatisfy { $0 == 0 }, "stranded node counts per round trip \(stranded)")
   }
 
   @Test func setC293TabArchivedDestinationFocusRestored() throws {
@@ -164,14 +161,12 @@ struct AdversarialSetCCrossRepairTests {
       _ = try h.render()
     }
     try #require(h.frame.contains("draft"), "\(h.frame)")
-    setCKnown(setCNEW13) {
-      #expect(log.fieldFocused == true, "\(String(describing: log.fieldFocused))")
-    }
+    #expect(log.fieldFocused == true, "\(String(describing: log.fieldFocused))")
   }
 
   // Control for setC293 (minimization, not a corpus case): the same field
-  // directly in tab A's content keeps its `@FocusState` across the switch, so
-  // only the destination's state is lost (the setC292 mechanism).
+  // directly in tab A's content, without a navigation destination. It lost
+  // focus as well (STUI-1308), independent of setC292's re-mint (STUI-1307).
   @Test func setC293ControlTabContentFocusRestored() throws {
     let log = SetCXLog()
     let h = try StressRuntimeHarness(
@@ -185,12 +180,10 @@ struct AdversarialSetCCrossRepairTests {
     log.selection = "a"
     _ = try h.renderAfterExternalMutation()
     _ = try h.render()
-    setCKnown(setCNEW13) {
-      #expect(
-        log.fieldFocused == true,
-        "history \(log.focusHistory) focus \(String(describing: h.runLoop.focusTracker.currentFocusIdentity))"
-      )
-    }
+    #expect(
+      log.fieldFocused == true,
+      "history \(log.focusHistory) focus \(String(describing: h.runLoop.focusTracker.currentFocusIdentity))"
+    )
   }
 
   @Test func setC294TabListWindowRestored() throws {
@@ -524,21 +517,3 @@ private struct SetCXDestination: View {
     }
   }
 }
-
-private let setCNEW12 = Comment(
-  rawValue:
-    "NEW-12: a navigation destination presented inside a tab is re-presented "
-    + "on return with its @State restarted, and each round trip strands the "
-    + "previous activation's nodes in the graph (2, 4, 6 unreachable stored "
-    + "nodes after 1-3 round trips); the destination's declaration and "
-    + "activation identities embed the isPresented binding source, whose owner "
-    + "lifetime changes across dormancy, so a new activation ordinal mints a "
-    + "fresh surface (NavigationStack.swift:258-276, 886-918; State.swift:586); "
-    + "contract: Dormant-Tab-State.md:36-46, 139-141")
-private let setCNEW13 = Comment(
-  rawValue:
-    "NEW-13: returning to a tab does not restore keyboard focus to the field "
-    + "whose @FocusState was true at departure; runtime focus moves to the tab "
-    + "container at departure and the restored FocusState reads false "
-    + "(FocusState.swift:433-441 runtime store); contract: "
-    + "Dormant-Tab-State.md:43, 107-109")

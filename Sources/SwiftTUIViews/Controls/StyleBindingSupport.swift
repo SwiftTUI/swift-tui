@@ -10,5 +10,6 @@ func enabledStyleBinding<Value>(_ binding: Binding<Value>, isEnabled: Bool) -> B
     set: { if isEnabled { binding.wrappedValue = $0 } })
   projection.transaction = binding.transaction
   projection.bindingSourceID = binding.bindingSourceID
+  projection.bindingDeclarationID = binding.bindingDeclarationID
   return projection
 }

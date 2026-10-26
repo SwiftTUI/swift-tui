@@ -260,12 +260,12 @@ public struct BooleanNavigationDestinationModifier<Destination: View>:
         sourceEntity: node.entityIdentity,
         modifierOrdinal: modifierOrdinal,
         scope: context.environmentValues.navigationDestinationDeclarationScope,
-        bindingSourceID: isPresented.bindingSourceID
+        bindingSourceID: isPresented.navigationDestinationBindingKey
       )
       let activationOrdinal = updateNavigationDestinationActivation(
         sourceIdentity: sourceIdentity,
         modifierOrdinal: modifierOrdinal,
-        bindingSourceID: isPresented.bindingSourceID,
+        bindingSourceID: isPresented.navigationDestinationBindingKey,
         activeKey: isPresented.wrappedValue ? .boolean : nil,
         in: context
       )
@@ -328,14 +328,14 @@ where Item.ID: Sendable {
         sourceEntity: node.entityIdentity,
         modifierOrdinal: modifierOrdinal,
         scope: context.environmentValues.navigationDestinationDeclarationScope,
-        bindingSourceID: item.bindingSourceID
+        bindingSourceID: item.navigationDestinationBindingKey
       )
       let currentItem = item.wrappedValue
       let activeKey = currentItem.map { NavigationDestinationActivationKey($0.id) }
       let activationOrdinal = updateNavigationDestinationActivation(
         sourceIdentity: sourceIdentity,
         modifierOrdinal: modifierOrdinal,
-        bindingSourceID: item.bindingSourceID,
+        bindingSourceID: item.navigationDestinationBindingKey,
         activeKey: activeKey,
         in: context
       )
@@ -774,6 +774,18 @@ private enum NavigationDestinationActivationKey: Equatable, Hashable, Sendable {
 
   init<ID: Hashable & Sendable>(_ itemID: ID) {
     self = .item(AnyHashableSendable(itemID))
+  }
+}
+
+extension Binding {
+  /// The presentation binding's key for destination storage: its authored
+  /// declaration, falling back to its source. Never the source owner's
+  /// lifetime, which tab dormancy renews for the same declaration (STUI-1307):
+  /// keying on it re-minted the destination, restarting its `@State` and
+  /// stranding the previous activation's restored records on every return.
+  /// Distinct declarations still get distinct storage (STUI-905).
+  fileprivate var navigationDestinationBindingKey: AnyID? {
+    bindingDeclarationID ?? bindingSourceID
   }
 }
 

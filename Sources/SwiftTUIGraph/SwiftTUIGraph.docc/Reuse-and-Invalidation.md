@@ -328,7 +328,10 @@ keeps the node. Otherwise, `SubtreeRemovalPolicy.barrierAdjudicated` removes the
 strand and repeats for newly exposed descendants. Fresh stamps alone do not let
 SwiftTUI serve a snapshot *across* that departure boundary. The
 reuse door's structural intersection denies the departing cone, and the barrier
-owns the final liveness verdict.
+owns the final liveness verdict. Dormant tab restoration uses the same verdict
+through `TeardownWorkReason.dormantRestorePlaceholder`: every placeholder that
+`restoreDormantStateArchive` seeds is adjudicated, so the barrier keeps a
+placeholder the returning payload adopted and removes one it no longer claims.
 
 ## Suppression scopes and cones
 

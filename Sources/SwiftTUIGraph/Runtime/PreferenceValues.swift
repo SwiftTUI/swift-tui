@@ -102,6 +102,24 @@ package struct PreferenceValues: Equatable, Sendable {
     storage[ObjectIdentifier(key)] != nil
   }
 
+  /// The identifiers of the keys this container holds a value for.
+  package var keyIdentifiers: Set<ObjectIdentifier> {
+    Set(storage.keys)
+  }
+
+  /// These values with each key in `keys` taken from `refolded`, including
+  /// the key's absence there. Every other key keeps its value here.
+  package func replacingEntries(
+    for keys: Set<ObjectIdentifier>,
+    from refolded: Self
+  ) -> Self {
+    var result = self
+    for key in keys {
+      result.storage[key] = refolded.storage[key]
+    }
+    return result
+  }
+
   package mutating func merge<K: PreferenceKey>(
     _ key: K.Type,
     value: K.Value

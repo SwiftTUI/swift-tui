@@ -16,8 +16,9 @@ struct TeardownBarrierFixedPointTests {
     // One `runTeardownStage(` per barrier stage inside `settleTeardownBarrier`
     // (resolveScopeScratch, entityRoutedRemoval, absorbedShadow,
     // staleDetachedHostedRoot, departedNavigationSurface,
-    // sparedVisitedDescent) plus the helper's definition.
-    #expect(source.components(separatedBy: "runTeardownStage(").count - 1 == 7)
+    // dormantRestorePlaceholder, sparedVisitedDescent) plus the helper's
+    // definition.
+    #expect(source.components(separatedBy: "runTeardownStage(").count - 1 == 8)
     #expect(
       source.components(separatedBy: "prunePendingEntityRoutedRemovals(").count - 1 == 1
     )

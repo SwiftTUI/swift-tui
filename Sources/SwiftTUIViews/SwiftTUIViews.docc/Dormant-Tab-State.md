@@ -105,8 +105,8 @@ resumed frame:
   return. Repeated switching keeps exactly one active task per declared
   `.task`; visits do not leak or stack tasks.
 - Focus candidates are re-derived from the new active tree (the restored
-  `@FocusState` value still applies), and gesture state begins at its
-  authored seed.
+  `@FocusState` value still applies: a field that held focus when the tab
+  left requests it again), and gesture state begins at its authored seed.
 
 ```swift
 Tab("Feed", value: "feed") {

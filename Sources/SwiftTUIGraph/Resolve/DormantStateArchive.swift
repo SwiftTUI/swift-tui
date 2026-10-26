@@ -182,8 +182,9 @@ extension ViewGraph {
 
   /// Seeds freshly activated nodes before their dynamic-property update/body
   /// evaluation. Nodes that no longer exist in the authored payload are only
-  /// placeholders in this candidate frame and are swept by normal graph
-  /// reachability at the frame barrier; the archive itself owns no node.
+  /// placeholders in this candidate frame: each seeded node is owed a teardown
+  /// barrier verdict (`.dormantRestorePlaceholder`), which reclaims it unless
+  /// the payload adopted it. The archive itself owns no node.
   package func restoreDormantStateArchive(
     _ archive: DormantStateArchive
   ) {
@@ -196,11 +197,12 @@ extension ViewGraph {
       // that built it -- taking its `.task`/lifecycle registrations with it.
       // Routing is authored adoption's to decide; seeding is not adoption.
       let node = prepareDynamicPropertyUpdate(identity: record.identity)
+      enqueueTeardownWork(.dormantRestorePlaceholder, for: node.viewNodeID)
       node.hotReloadDeclarationNames.merge(record.declarationNames) { _, incoming in incoming }
       for (identifier, slot) in record.stateSlots {
         node.restoreStateSlot(
           identifier,
-          slot: AnyStateSlot(restoringDormant: slot)
+          slot: AnyStateSlot(restoringDormant: slot.reactivatedAfterDormancy())
         )
       }
     }

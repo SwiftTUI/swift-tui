@@ -1390,6 +1390,14 @@ struct DormantTabStateTests {
     rasterGate.release()
     let switched = await switchTask.value
     #expect(surfaceText(switched).contains("B width"))
+
+    // The departing tab's archive takes the hop write (STUI-1237): the
+    // arriving GeometryReader's realization must not drop the TabView's
+    // archive refresh request.
+    renderer.setFrameTailRenderHooks(nil)
+    model.selection = "A"
+    let returned = await render()
+    #expect(surfaceText(returned).contains("A count 1"), "\(surfaceText(returned))")
   }
 
   /// The tab switch moves focus off the departing content, so the run loop
@@ -2191,6 +2199,378 @@ extension DormantTabStateTests {
   }
 }
 
+extension DormantTabStateTests {
+  /// STUI-1237, the FW3-D archive-refresh probe shape: the write lands while
+  /// the switch's raster stage is suspended, so no layout hop is involved;
+  /// only the arriving tab's layout-realized content differs from
+  /// `departingStateWriteDuringSuspendedTailRestoresNewestValue`.
+  @Test(
+    "a raster-stage departing write is archived when the arriving tab holds layout-realized content",
+    arguments: [false, true])
+  func rasterStageWriteIsArchivedWithLayoutRealizedArrival(textEditor: Bool) async {
+    let model = DormantTabModel()
+    let probe = DepartingLayoutHopProbe()
+    let renderer = DefaultRenderer()
+    let root = testIdentity(
+      "DormantTabsRasterWriteLayoutRealizedArrival", textEditor ? "editor" : "geometry")
+    func render() async -> RenderSnapshot {
+      let context = dormantContext(root: root, actions: LocalActionRegistry())
+      if textEditor {
+        return await renderer.renderAsync(
+          DepartingEditorArrivalFixture(model: model, probe: probe), context: context)
+      }
+      return await renderer.renderAsync(
+        DepartingLayoutHopFixture(model: model, probe: probe), context: context)
+    }
+    #expect(surfaceText(await render()).contains("A count 0"))
+
+    let gate = AsyncFrameTailBlockingGate()
+    renderer.setFrameTailRenderHooks(.init(beforeRaster: { gate.beforeRaster() }))
+    defer {
+      gate.release()
+      renderer.setFrameTailRenderHooks(nil)
+    }
+    model.selection = "B"
+    let switchTask = Task { @MainActor in await render() }
+    await gate.waitUntilBlocked()
+    probe.write?(1)
+    #expect(probe.read?() == 1)
+    gate.release()
+    #expect(surfaceText(await switchTask.value).contains(textEditor ? "B editor" : "B width"))
+    renderer.setFrameTailRenderHooks(nil)
+
+    model.selection = "A"
+    let returned = await render()
+    #expect(surfaceText(returned).contains("A count 1"), "\(surfaceText(returned))")
+  }
+
+  /// STUI-1307: an item destination's surface identity must not embed the
+  /// presentation binding's owner lifetime, which tab dormancy renews.
+  @Test("an item navigation destination inside a tab keeps its state across round trips")
+  func itemDestinationKeepsStateAcrossRoundTrips() throws {
+    let model = DormantTabModel()
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("DormantTabsItemDestination"),
+      size: .init(width: 40, height: 10)
+    ) {
+      DormantItemDestinationFixture(model: model)
+    }
+    defer { harness.shutdown() }
+    _ = try harness.clickText("Open")
+    _ = try harness.clickText("Increment")
+    _ = try harness.clickText("Increment")
+    try #require(harness.frame.contains("item count 2"), "\(harness.frame)")
+
+    for trip in 1...3 {
+      model.selection = "B"
+      _ = try harness.renderAfterExternalMutation()
+      #expect(harness.frame.contains("plain-B"), "round trip \(trip): \(harness.frame)")
+      model.selection = "A"
+      _ = try harness.renderAfterExternalMutation()
+      _ = try harness.render()
+      #expect(harness.frame.contains("item count 2"), "round trip \(trip): \(harness.frame)")
+      let unreachable =
+        harness.runLoop.renderer.viewGraph.debugTeardownCoherenceViolation()?.unreachableCount ?? 0
+      #expect(unreachable == 0, "round trip \(trip) stranded \(unreachable) node(s)")
+    }
+  }
+
+  /// STUI-1307: restore seeds a placeholder per archived record; one the
+  /// returning payload does not claim is reclaimed at the frame barrier
+  /// (Dormant-Tab-State.md "Restoration") and never resurrects later.
+  @Test("a dormant record the returning payload no longer claims is reclaimed")
+  func unclaimedDormantPlaceholderIsReclaimed() throws {
+    let model = DormantTabModel()
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("DormantTabsUnclaimedPlaceholder"),
+      size: .init(width: 40, height: 10)
+    ) {
+      DormantConditionalChildFixture(model: model)
+    }
+    defer { harness.shutdown() }
+    _ = try harness.clickText("Increment child")
+    try #require(harness.frame.contains("child count 1"), "\(harness.frame)")
+
+    model.selection = "B"
+    _ = try harness.renderAfterExternalMutation()
+    model.includesA = false
+    model.selection = "A"
+    _ = try harness.renderAfterExternalMutation()
+    _ = try harness.render()
+    #expect(harness.frame.contains("header A"), "\(harness.frame)")
+    #expect(!harness.frame.contains("child count"), "\(harness.frame)")
+    let unreachable =
+      harness.runLoop.renderer.viewGraph.debugTeardownCoherenceViolation()?.unreachableCount ?? 0
+    #expect(unreachable == 0, "stranded \(unreachable) restore placeholder(s)")
+
+    // The child comes back later as a new lifetime with authored state.
+    model.selection = "B"
+    _ = try harness.renderAfterExternalMutation()
+    model.includesA = true
+    model.selection = "A"
+    _ = try harness.renderAfterExternalMutation()
+    _ = try harness.render()
+    #expect(harness.frame.contains("child count 0"), "\(harness.frame)")
+  }
+
+  /// STUI-1307 neighbour: lazy rows adopt their restored records while the
+  /// frame tail realizes them, before the barrier judges the placeholders.
+  @Test("lazy rows inside a tab keep their @State across a round trip", arguments: [false, true])
+  func lazyRowStateSurvivesRoundTrip(list: Bool) throws {
+    let model = DormantTabModel()
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("DormantTabsLazyRows", list ? "list" : "stack"),
+      size: .init(width: 40, height: 10)
+    ) {
+      DormantLazyRowsFixture(model: model, list: list)
+    }
+    defer { harness.shutdown() }
+    _ = try harness.clickText("Bump row 2")
+    try #require(harness.frame.contains("row 2 count 1"), "\(harness.frame)")
+
+    model.selection = "B"
+    _ = try harness.renderAfterExternalMutation()
+    model.selection = "A"
+    _ = try harness.renderAfterExternalMutation()
+    _ = try harness.render()
+    #expect(harness.frame.contains("row 2 count 1"), "\(harness.frame)")
+    let unreachable =
+      harness.runLoop.renderer.viewGraph.debugTeardownCoherenceViolation()?.unreachableCount ?? 0
+    #expect(unreachable == 0, "stranded \(unreachable) node(s)")
+  }
+
+  /// STUI-1308: the archive holds the focused value; a restored focus target
+  /// is re-requested, so the returning tab's field takes runtime focus instead
+  /// of having its value cleared by focus sync.
+  @Test(
+    "a focused field's @FocusState and runtime focus return with its tab", arguments: [false, true])
+  func focusedFieldIsRefocusedOnReturn(optional: Bool) throws {
+    let model = DormantTabModel()
+    let probe = DormantFocusProbe()
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("DormantTabsFocusReturn", optional ? "optional" : "bool"),
+      size: .init(width: 40, height: 10)
+    ) {
+      DormantFocusFieldsFixture(model: model, probe: probe, optional: optional)
+    }
+    defer { harness.shutdown() }
+    let second = try harness.focusIdentity(forText: "second text")
+    _ = try harness.focusText("second text")
+    try #require(probe.secondFocused == true, "\(probe.history)")
+
+    model.selection = "B"
+    _ = try harness.renderAfterExternalMutation()
+    #expect(harness.frame.contains("plain-B"))
+    model.selection = "A"
+    _ = try harness.renderAfterExternalMutation()
+    _ = try harness.render()
+    #expect(probe.secondFocused == true, "history \(probe.history)")
+    #expect(harness.runLoop.focusTracker.currentFocusIdentity == second)
+  }
+
+  /// STUI-1308 neighbour: only a focus target is re-requested. A field whose
+  /// `@FocusState` was clear at departure takes no focus on return.
+  @Test("an unfocused field's @FocusState stays clear on return")
+  func unfocusedFieldTakesNoFocusOnReturn() throws {
+    let model = DormantTabModel()
+    let probe = DormantFocusProbe()
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("DormantTabsFocusClear"),
+      size: .init(width: 40, height: 10)
+    ) {
+      DormantFocusFieldsFixture(model: model, probe: probe, optional: false)
+    }
+    defer { harness.shutdown() }
+    let second = try harness.focusIdentity(forText: "second text")
+    _ = try harness.focusText("first text")
+    try #require(probe.secondFocused == false)
+
+    model.selection = "B"
+    _ = try harness.renderAfterExternalMutation()
+    model.selection = "A"
+    _ = try harness.renderAfterExternalMutation()
+    _ = try harness.render()
+    #expect(probe.secondFocused == false, "history \(probe.history)")
+    #expect(harness.runLoop.focusTracker.currentFocusIdentity != second)
+  }
+}
+
+private struct DormantDestinationItem: Identifiable, Sendable {
+  let id = "item"
+}
+
+@MainActor
+private struct DormantItemDestinationFixture: View {
+  let model: DormantTabModel
+
+  var body: some View {
+    TabView(selection: model.selectionBinding) {
+      Tab("A", value: "A") { DormantItemDestinationSource() }
+      Tab("B", value: "B") { Text("plain-B") }
+    }
+    .tabViewStyle(.literalTabs)
+  }
+}
+
+@MainActor
+private struct DormantItemDestinationSource: View {
+  @State private var item: DormantDestinationItem?
+
+  var body: some View {
+    NavigationStack {
+      Button("Open") { item = DormantDestinationItem() }
+        .navigationDestination(item: $item) { _ in DormantDestinationCounter() }
+    }
+  }
+}
+
+@MainActor
+private struct DormantDestinationCounter: View {
+  @State private var count = 0
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Text("item count \(count)")
+      Button("Increment") { count += 1 }
+    }
+  }
+}
+
+@MainActor
+private struct DormantConditionalChildFixture: View {
+  let model: DormantTabModel
+
+  var body: some View {
+    TabView(selection: model.selectionBinding) {
+      Tab("A", value: "A") {
+        VStack(alignment: .leading, spacing: 0) {
+          Text("header A")
+          if model.includesA {
+            DormantConditionalChild()
+          }
+        }
+      }
+      Tab("B", value: "B") { Text("plain-B") }
+    }
+    .tabViewStyle(.literalTabs)
+  }
+}
+
+@MainActor
+private struct DormantConditionalChild: View {
+  @State private var count = 0
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Text("child count \(count)")
+      Button("Increment child") { count += 1 }
+    }
+  }
+}
+
+@MainActor
+private struct DormantLazyRowsFixture: View {
+  let model: DormantTabModel
+  let list: Bool
+
+  var body: some View {
+    TabView(selection: model.selectionBinding) {
+      Tab("A", value: "A") {
+        if list {
+          List(0..<20, id: \.self) { index in DormantLazyRow(index: index) }
+        } else {
+          ScrollView {
+            LazyVStack(alignment: .leading, spacing: 0) {
+              ForEach(0..<20, id: \.self) { index in DormantLazyRow(index: index) }
+            }
+          }
+        }
+      }
+      Tab("B", value: "B") { Text("plain-B") }
+    }
+    .tabViewStyle(.literalTabs)
+  }
+}
+
+@MainActor
+private struct DormantLazyRow: View {
+  let index: Int
+  @State private var count = 0
+
+  var body: some View {
+    HStack(spacing: 1) {
+      Text("row \(index) count \(count)")
+      Button("Bump row \(index)") { count += 1 }
+    }
+  }
+}
+
+@MainActor
+private final class DormantFocusProbe {
+  var secondFocused: Bool?
+  var history: [Bool] = []
+}
+
+private enum DormantFocusField: Hashable {
+  case first
+  case second
+}
+
+@MainActor
+private struct DormantFocusFieldsFixture: View {
+  let model: DormantTabModel
+  let probe: DormantFocusProbe
+  let optional: Bool
+
+  var body: some View {
+    TabView(selection: model.selectionBinding) {
+      Tab("A", value: "A") {
+        if optional {
+          DormantOptionalFocusFields(probe: probe)
+        } else {
+          DormantBoolFocusFields(probe: probe)
+        }
+      }
+      Tab("B", value: "B") { Text("plain-B") }
+    }
+    .tabViewStyle(.literalTabs)
+  }
+}
+
+@MainActor
+private struct DormantBoolFocusFields: View {
+  let probe: DormantFocusProbe
+  @State private var first = "first text"
+  @State private var second = "second text"
+  @FocusState private var secondFocused: Bool
+
+  var body: some View {
+    probe.secondFocused = secondFocused
+    probe.history.append(secondFocused)
+    return VStack(alignment: .leading, spacing: 0) {
+      TextField("first", text: $first)
+      TextField("second", text: $second).focused($secondFocused)
+    }
+  }
+}
+
+@MainActor
+private struct DormantOptionalFocusFields: View {
+  let probe: DormantFocusProbe
+  @State private var first = "first text"
+  @State private var second = "second text"
+  @FocusState private var field: DormantFocusField?
+
+  var body: some View {
+    probe.secondFocused = field == .second
+    probe.history.append(field == .second)
+    return VStack(alignment: .leading, spacing: 0) {
+      TextField("first", text: $first).focused($field, equals: .first)
+      TextField("second", text: $second).focused($field, equals: .second)
+    }
+  }
+}
+
 /// Races a frame-tail gate against the render that should reach it, so a
 /// premise failure (the render never blocks) ends the test instead of hanging.
 /// Shared with `PresentationSurfaceTests`.
@@ -2252,6 +2632,35 @@ private struct DepartingLayoutHopFixture: View {
         }
       }
     }
+  }
+}
+
+/// The framework's other layout-realized boundary: a `TextEditor` realizes
+/// its content-width probe during layout.
+@MainActor
+private struct DepartingEditorArrivalFixture: View {
+  let model: DormantTabModel
+  let probe: DepartingLayoutHopProbe
+
+  var body: some View {
+    TabView(selection: model.selectionBinding) {
+      Tab("A", value: "A") {
+        DepartingLayoutHopContent(probe: probe)
+      }
+      Tab("B", value: "B") {
+        DepartingArrivingEditor()
+      }
+    }
+  }
+}
+
+@MainActor
+private struct DepartingArrivingEditor: View {
+  @State private var text = "B editor"
+
+  var body: some View {
+    TextEditor(text: $text)
+      .frame(width: 20, height: 3)
   }
 }
 

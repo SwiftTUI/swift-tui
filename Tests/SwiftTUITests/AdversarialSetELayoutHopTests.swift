@@ -16,9 +16,6 @@ import Testing
 @MainActor
 @Suite("Campaign F3 pass 2 writes during an offloaded relayout", .serialized)
 struct AdversarialSetELayoutHopTests {
-  static let newThree =
-    "NEW-3: in a tab switch whose arriving tab realizes layout-dependent content (GeometryReader), a write to the departing tab's State while the frame tail is suspended (offloaded relayout or raster) reaches the live owner but not the tab archive, so the returning tab shows the pre-write value; suspected: the layout-dependent realization rebuilds canonicalResolved (LatePreferenceReconciliation.swift:186-216) and the departing tab's archive refresh request no longer reaches captureDormantTabArchiveCommitRefreshes (DefaultRenderer+CompletedFrameCandidates.swift:17-22); contract: Dormant-Tab-State.md:166-169, Runtime.md:127-130; adjacent STUI-1233"
-
   @Test(arguments: Array(109...113))
   func layoutHopWrite(id: Int) async {
     let model = SetEHopModel()
@@ -81,11 +78,11 @@ struct AdversarialSetELayoutHopTests {
         model.selection = "A"
         let returned = await render()
         let expected = id == 112 ? 2 : (id == 113 ? cycle : 1)
-        setEKnown(Self.newThree) {
-          #expect(
-            returned.contains("A count \(expected)"),
-            "the departing tab's hop write missed its archive: \(returned)")
-        }
+        // STUI-1237: the arriving GeometryReader's realization no longer
+        // drops the TabView's archive refresh request.
+        #expect(
+          returned.contains("A count \(expected)"),
+          "the departing tab's hop write missed its archive: \(returned)")
       }
     }
   }

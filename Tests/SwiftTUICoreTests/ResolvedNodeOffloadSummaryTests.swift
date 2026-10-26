@@ -195,6 +195,61 @@ struct ResolvedNodeOffloadSummaryTests {
   }
 }
 
+/// STUI-1237: layout-dependent realization rewrites the boundary and every
+/// ancestor's children. The `children` setter re-derives a node's preferences
+/// from its children alone, so a node's own declaration (a `TabView`'s
+/// departing-tab archive refresh request, a `.preference` modifier) must not
+/// be lost on that path; keys the realized content carries are re-folded.
+@MainActor
+@Suite
+struct ResolvedNodeRealizationPreferenceTests {
+  @Test("realization keeps node-local declarations and re-folds the realized keys")
+  func realizationReFoldsOnlyTheRealizedKeys() throws {
+    var boundary = makeNode("boundary")
+    boundary.layoutRealizedContent = makeBoundary(for: boundary.identity)
+    boundary.preferenceValues[RealizationLocalKey.self] = ["boundary"]
+    var ancestor = makeNode("ancestor", children: [boundary, makeNode("sibling")])
+    ancestor.preferenceValues[RealizationLocalKey.self] = ["ancestor"]
+    let root = makeNode("root", children: [ancestor])
+    #expect(root.preferenceValues[RealizationLocalKey.self] == ["ancestor"])
+
+    var content = makeNode("content")
+    content.preferenceValues[RealizationContentKey.self] = ["content"]
+    let realizations = [boundary.identity: [content]]
+    let realized = root.applyingLayoutDependentRealizations(realizations)
+    #expect(realized.preferenceValues[RealizationLocalKey.self] == ["ancestor"])
+    #expect(realized.preferenceValues[RealizationContentKey.self] == ["content"])
+    #expect(
+      realized.children[0].children[0].preferenceValues[RealizationLocalKey.self] == ["boundary"])
+
+    // A relayout whose realization no longer carries the content key drops it.
+    let relaidOut = realized.applyingLayoutDependentRealizations(
+      [boundary.identity: [makeNode("plain")]])
+    #expect(!relaidOut.preferenceValues.contains(RealizationContentKey.self))
+    #expect(relaidOut.preferenceValues[RealizationLocalKey.self] == ["ancestor"])
+
+    // The worker snapshot rewrites the same path.
+    let snapshot = try #require(realized.layoutRealizationWorkerSnapshot(using: realizations))
+    #expect(snapshot.children[0].children[0].layoutRealizedContent == nil)
+    #expect(snapshot.preferenceValues[RealizationLocalKey.self] == ["ancestor"])
+    #expect(snapshot.preferenceValues[RealizationContentKey.self] == ["content"])
+  }
+}
+
+private enum RealizationLocalKey: PreferenceKey {
+  static let defaultValue: [String] = []
+  static func reduce(value: inout [String], nextValue: () -> [String]) {
+    value.append(contentsOf: nextValue())
+  }
+}
+
+private enum RealizationContentKey: PreferenceKey {
+  static let defaultValue: [String] = []
+  static func reduce(value: inout [String], nextValue: () -> [String]) {
+    value.append(contentsOf: nextValue())
+  }
+}
+
 private func makeNode(
   _ name: String,
   children: [ResolvedNode] = []
