@@ -186,7 +186,9 @@ moves the window. Selection moves within it.
   can look at row 500 while row 3 stays selected.
 - **PageUp**, **PageDown**, **Home**, and **End** scroll the window. A
   non-selectable data-backed collection is focusable, so these keys reach it. A
-  selectable one keeps focus at the row layer, as before.
+  selectable one keeps focus at the row layer, as before. Keys that arrive
+  before a frame has measured the rows they reach move as far as the same keys
+  one frame at a time.
 - **Arrow keys** move the selection. The window follows only when necessary. It
   moves only far enough to reveal the new row and one context row. A selection
   step within the visible rows does not scroll.

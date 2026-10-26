@@ -460,18 +460,16 @@ struct AdversarialSetDCollectionBatchTests {
     )
   }
 
+  // STUI-1316 (repaired in wave 4), setD121 and setD123–setD125: keys applied
+  // before a frame estimate unmeasured rows like the measured window's.
   @Test(
     "setD121: two PageDowns in one batch land where two separate pages land (hidden separators)")
   func setD121BatchedPagesHiddenSeparators() throws {
     let result = try pagedFirstRows("121", hidden: true, keys: [.pageDown, .pageDown])
     try #require(result.sequential != nil && result.sequential != "r000")
-    setDKnown(
-      "NEW-2: a later paging or reveal command in one input batch on a hidden-separator table counts rows realized since the last frame at the estimated two-line stride, so the window lands short or overshoots; page(by:) and reveal(row:) read the stored anchor with estimated geometry (CollectionScrollState.swift:227-312, CollectionScrollGeometry.swift:93-110); contract: Collections.md:185-198; adjacent STUI-1262"
-    ) {
-      #expect(
-        result.batched == result.sequential,
-        "batched \(result.batched ?? "-") sequential \(result.sequential ?? "-")")
-    }
+    #expect(
+      result.batched == result.sequential,
+      "batched \(result.batched ?? "-") sequential \(result.sequential ?? "-")")
   }
 
   @Test("setD122: two PageDowns in one batch land where two separate pages land (drawn separators)")
@@ -487,26 +485,18 @@ struct AdversarialSetDCollectionBatchTests {
   func setD123BatchedThreePages() throws {
     let result = try pagedFirstRows("123", hidden: true, keys: [.pageDown, .pageDown, .pageDown])
     try #require(result.sequential != nil && result.sequential != "r000")
-    setDKnown(
-      "NEW-2: a later paging or reveal command in one input batch on a hidden-separator table counts rows realized since the last frame at the estimated two-line stride, so the window lands short or overshoots; page(by:) and reveal(row:) read the stored anchor with estimated geometry (CollectionScrollState.swift:227-312, CollectionScrollGeometry.swift:93-110); contract: Collections.md:185-198; adjacent STUI-1262"
-    ) {
-      #expect(
-        result.batched == result.sequential,
-        "batched \(result.batched ?? "-") sequential \(result.sequential ?? "-")")
-    }
+    #expect(
+      result.batched == result.sequential,
+      "batched \(result.batched ?? "-") sequential \(result.sequential ?? "-")")
   }
 
   @Test("setD124: End then PageUp in one batch lands where the separate keys land")
   func setD124BatchedEndThenPageUp() throws {
     let result = try pagedFirstRows("124", hidden: true, keys: [.end, .pageUp])
     try #require(result.sequential != nil)
-    setDKnown(
-      "NEW-2: a later paging or reveal command in one input batch on a hidden-separator table counts rows realized since the last frame at the estimated two-line stride, so the window lands short or overshoots; page(by:) and reveal(row:) read the stored anchor with estimated geometry (CollectionScrollState.swift:227-312, CollectionScrollGeometry.swift:93-110); contract: Collections.md:185-198; adjacent STUI-1262"
-    ) {
-      #expect(
-        result.batched == result.sequential,
-        "batched \(result.batched ?? "-") sequential \(result.sequential ?? "-")")
-    }
+    #expect(
+      result.batched == result.sequential,
+      "batched \(result.batched ?? "-") sequential \(result.sequential ?? "-")")
   }
 
   @Test("setD125: twelve Downs in one batch reveal the selection as twelve separate Downs do")
@@ -528,13 +518,9 @@ struct AdversarialSetDCollectionBatchTests {
     #expect(box.value == "r012")
     let visible = h.tokens(prefix: "r")
     #expect(visible.contains("r012") && visible.contains("r013"), "\(h.frame)")
-    setDKnown(
-      "NEW-2: a later paging or reveal command in one input batch on a hidden-separator table counts rows realized since the last frame at the estimated two-line stride, so the window lands short or overshoots; page(by:) and reveal(row:) read the stored anchor with estimated geometry (CollectionScrollState.swift:227-312, CollectionScrollGeometry.swift:93-110); contract: Collections.md:185-198; adjacent STUI-1262"
-    ) {
-      #expect(
-        visible.first == sequential.tokens(prefix: "r").first, "\(h.frame)\n--\n\(sequential.frame)"
-      )
-    }
+    #expect(
+      visible.first == sequential.tokens(prefix: "r").first, "\(h.frame)\n--\n\(sequential.frame)"
+    )
   }
 
   @Test("setD126: PageDown then Down in one batch reveals the selection's new row")

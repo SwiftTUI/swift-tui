@@ -41,14 +41,12 @@ struct Wave3HuntFBCollectionTests {
   // table move by the rows the window shows, less one row of overlap, each.
   @Test func w3fb001ReviewPagesBeforeOneFrameMoveByVisibleRowsOnDrawnTable() throws {
     let outcome = try W3FB.reviewTwoPagesBeforeOneFrame("w3fb001", hidden: false)
-    w3fbKnown(
-      "NEW-1: two review Next page actions before one frame on a drawn-separator table move 10 then 21 rows (position 32, expected 21, 11 rows visible); after reveal moves the stored anchor, CollectionScrollCurrency.visibleRowCount takes the one-line-per-row bound (CollectionScrollState.swift:126-135; CollectionAccessibilityNavigation.swift:112-115); contract: wave3e04, Accessibility.md:142-148; adjacent STUI-1239"
-    ) {
-      // Contract: wave3e04 (the repair's own), Accessibility.md:142-148.
-      #expect(
-        outcome.value == .number(Double(1 + 2 * (outcome.visible - 1))),
-        "\(outcome.visible) visible rows; value \(String(describing: outcome.value))")
-    }
+    // STUI-1262 (repaired in wave 4): the second page sizes from the rows the
+    // estimated window holds, not the band's one-line-per-row bound.
+    // Contract: wave3e04 (the repair's own), Accessibility.md:142-148.
+    #expect(
+      outcome.value == .number(Double(1 + 2 * (outcome.visible - 1))),
+      "\(outcome.visible) visible rows; value \(String(describing: outcome.value))")
   }
 
   // w3fb002: the same with hidden separators, where one line holds one row.

@@ -1127,3 +1127,94 @@ private struct W4DisabledFirstRoot: View {
     }
   }
 }
+
+// MARK: - Wave 4 (W4-FB): collection paging estimates
+
+/// Wave-4 repair group W4-FB: review pages and keyboard movement that a batch
+/// applies before a frame measures the rows it reaches (STUI-1262,
+/// STUI-1316). An extension below adds scroll keys in a collection that a
+/// `ScrollView` hosts (STUI-1273). Contracts: `Collections.md:153-156,
+/// 176-198`, `Accessibility.md:142-148`, `Scrolling.md:206-210`.
+@MainActor
+@Suite(.serialized)
+struct Wave4CollectionPagingRepairTests {
+  // Three review pages before one frame each move by the rows shown, less
+  // one row of overlap.
+  @Test(arguments: [false, true])
+  func wave4b30ThreeReviewPagesBeforeOneFrame(hidden: Bool) throws {
+    let h = try W4Tables.plain("wave4b30-\(hidden)", hidden: hidden, height: 24)
+    defer { h.shutdown() }
+    let visible = h.tokens(prefix: "r")
+    try #require(visible.first == "r000" && visible.count >= 8, "\(h.frame)")
+    let review = try #require(h.accessibilityNode(label: "Review items")?.actionTarget)
+    for _ in 0..<3 {
+      #expect(
+        h.runLoop.handleAccessibilityAction(.init(target: review, action: .custom("Next page")))
+          == .accepted)
+    }
+    try h.render()
+    #expect(
+      h.accessibilityNode(label: "Review items")?.control?.value
+        == .number(Double(1 + 3 * (visible.count - 1))),
+      "\(visible.count) visible rows")
+  }
+
+  // PageUp from the end of a hidden-separator table moves a whole page of
+  // rows, less one of overlap, although the rows above the end window were
+  // never measured (Collections.md:187).
+  @Test func wave4b32EndThenPageUpMovesAFullPage() throws {
+    let h = try W4Tables.plain("wave4b32", hidden: true)
+    defer { h.shutdown() }
+    try h.key(.tab)
+    try h.key(.end)
+    let end = h.tokens(prefix: "r")
+    try #require(end.last == "r199" && end.count >= 8, "\(h.frame)")
+    try h.key(.pageUp)
+    let endFirst = try #require(end.first)
+    let first = try #require(Int(endFirst.dropFirst()))
+    #expect(
+      h.tokens(prefix: "r").first == setDPadded(first - (end.count - 1), "r"),
+      "end window \(end.first ?? "-")…r199\n\(h.frame)")
+  }
+
+  // Two PageDowns and two PageUps in one batch return to the start.
+  @Test(arguments: [false, true])
+  func wave4b31BatchedPagesDownAndUpReturnToTheStart(hidden: Bool) throws {
+    let result = try W4Tables.pagedFirstRows(
+      "wave4b31-\(hidden)", hidden: hidden, keys: [.pageDown, .pageDown, .pageUp, .pageUp])
+    #expect(result.sequential == "r000", "\(result.batchedFrame)")
+    #expect(result.batched == result.sequential, "\(result.batchedFrame)")
+  }
+}
+
+@MainActor
+private enum W4Tables {
+  static func plain(
+    _ name: String, hidden: Bool, height: Int = 12
+  ) throws -> SetDLiveHarness<some View> {
+    let rows = setDRows(200)
+    return try SetDLiveHarness(name, size: .init(width: 30, height: height)) {
+      Table(rows, columns: [TableColumn("Name")]) { row in
+        Text(row.id).listRowSeparator(hidden ? .hidden : .automatic)
+      }.tableHeaders(.hidden).scrollIndicators(.hidden)
+    }
+  }
+
+  /// `keys` one frame at a time on one fresh table and in one batch on
+  /// another; both windows' first visible rows.
+  static func pagedFirstRows(
+    _ name: String, hidden: Bool, keys: [KeyEvent]
+  ) throws -> (sequential: String?, batched: String?, batchedFrame: String) {
+    let sequential = try plain(name + "-seq", hidden: hidden)
+    defer { sequential.shutdown() }
+    try sequential.key(.tab)
+    for key in keys { try sequential.key(key) }
+    let batched = try plain(name, hidden: hidden)
+    defer { batched.shutdown() }
+    try batched.key(.tab)
+    try batched.keys(keys)
+    return (
+      sequential.tokens(prefix: "r").first, batched.tokens(prefix: "r").first, batched.frame
+    )
+  }
+}
