@@ -3529,6 +3529,34 @@
     "Tests/SwiftTUITests/AdversarialSetERetiredStateTests.swift": {
       "category": "runtime-integration",
       "reason": "Campaign two F3 pass 2: writes from retired State owners across tasks, disappear handlers, sheets, modifiers and nested dynamic properties (STUI-1173/1241 neighbors)."
+    },
+    "Tests/SwiftTUITests/AdversarialSetGClippingTests.swift": {
+      "category": "core-rendering",
+      "reason": "Core phase products, extraction, layout, rasterization or commit contracts; Graph is a supported dependency."
+    },
+    "Tests/SwiftTUITests/AdversarialSetGTrimTests.swift": {
+      "category": "core-rendering",
+      "reason": "Core phase products, extraction, layout, rasterization or commit contracts; Graph is a supported dependency."
+    },
+    "Tests/SwiftTUITests/AdversarialSetGCentreTests.swift": {
+      "category": "core-rendering",
+      "reason": "Core phase products, extraction, layout, rasterization or commit contracts; Graph is a supported dependency."
+    },
+    "Tests/SwiftTUITests/AdversarialSetGRowSpanTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/AdversarialSetGCapabilityTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/AdversarialSetGSaturationTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/AdversarialSetGWireCodecTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
     }
   }
 }
