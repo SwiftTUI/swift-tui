@@ -1,0 +1,346 @@
+import Foundation
+import Testing
+
+@_spi(Testing) @testable import SwiftTUICore
+@_spi(Runners) @testable import SwiftTUIRuntime
+@testable import SwiftTUIViews
+
+// Campaign two, F2 pass 2 (STUI-1283), setD151–setD160: clip masks (animated
+// since STUI-1218) and trimmed shapes under frame elision, transaction
+// scoping, reduced motion, wide glyphs and hit testing. Brief 06. The mask
+// fixture follows PathAnimationIntegrationTests.swift:326-433.
+
+/// A rectangle covering `fraction` of the width; every fraction has the same
+/// element topology (four lines and a close), so it interpolates, and
+/// fraction 0 is a collapsed but well-formed path.
+private struct SetDMaskShape: Shape {
+  var fraction: Double
+  func path(in rect: Rect) -> Path {
+    var path = Path()
+    let right = rect.origin.x + rect.size.width * fraction
+    let bottom = rect.origin.y + rect.size.height
+    path.move(to: Point(x: rect.origin.x, y: rect.origin.y))
+    path.addLine(to: Point(x: right, y: rect.origin.y))
+    path.addLine(to: Point(x: right, y: bottom))
+    path.addLine(to: Point(x: rect.origin.x, y: bottom))
+    path.closeSubpath()
+    return path
+  }
+}
+
+@MainActor
+private final class SetDMaskLog {
+  var fraction: Binding<Double>?
+}
+
+@MainActor
+private final class SetDMaskClock { var now = MonotonicInstant.now() }
+
+private enum SetDMaskMode: Sendable {
+  case bare
+  case innerTransactionDisabled
+  case innerValueAnimation
+  case reducedMotion
+  case wide
+}
+
+private struct SetDMaskRoot: View {
+  @State private var fraction: Double
+  let mode: SetDMaskMode
+  let log: SetDMaskLog
+
+  init(start: Double, mode: SetDMaskMode, log: SetDMaskLog) {
+    _fraction = State(initialValue: start)
+    self.mode = mode
+    self.log = log
+  }
+
+  var body: some View {
+    let _ = capture()
+    switch mode {
+    case .bare:
+      rows("#").clipShape(SetDMaskShape(fraction: fraction))
+    case .innerTransactionDisabled:
+      rows("#").transaction { $0.disablesAnimations = true }
+        .clipShape(SetDMaskShape(fraction: fraction))
+    case .innerValueAnimation:
+      rows("#").animation(.linear(duration: .seconds(1)), value: fraction)
+        .clipShape(SetDMaskShape(fraction: fraction))
+    case .reducedMotion:
+      rows("#").clipShape(SetDMaskShape(fraction: fraction))
+        .environment(\.accessibilityReduceMotion, true)
+    case .wide:
+      VStack(alignment: .leading, spacing: 0) {
+        ForEach(0..<4, id: \.self) { _ in Text("日本語日本語日本語日本") }
+      }
+      .clipShape(SetDMaskShape(fraction: fraction))
+    }
+  }
+
+  private func rows(_ glyph: String) -> some View {
+    VStack(spacing: 0) {
+      ForEach(0..<4, id: \.self) { _ in Text(String(repeating: glyph, count: 20)) }
+    }
+  }
+
+  private func capture() { log.fraction = $fraction }
+}
+
+@MainActor
+private enum SetDMask {
+  static func lastPaintedX(_ raster: RasterSurface?) -> Int {
+    guard let row = raster?.cells.first else { return -1 }
+    return row.lastIndex { !$0.isContinuation && $0.character != " " } ?? -1
+  }
+
+  /// The last painted column of a static mask at `fraction`.
+  static func staticExtent(_ fraction: Double) -> Int {
+    let surface = DefaultRenderer().render(
+      VStack(spacing: 0) {
+        ForEach(0..<4, id: \.self) { _ in Text(String(repeating: "#", count: 20)) }
+      }.clipShape(SetDMaskShape(fraction: fraction)),
+      proposal: .init(width: 20, height: 4)
+    ).rasterSurface
+    return lastPaintedX(surface)
+  }
+
+  /// A live async run loop (the production frame driver, which elides
+  /// off-screen deadline frames) over `SetDMaskRoot`.
+  static func loop(
+    _ name: String, start: Double, mode: SetDMaskMode, log: SetDMaskLog
+  ) -> (SwiftTUIRuntime.RunLoop<Int, SetDMaskRoot>, SetDResizableSurface, FrameScheduler, Identity)
+  {
+    let root = testIdentity("setD", name)
+    let surface = SetDResizableSurface()
+    surface.surfaceSize = .init(width: 20, height: 4)
+    let scheduler = FrameScheduler()
+    let focus = FocusTracker(invalidationIdentities: [root])
+    let loop = SwiftTUIRuntime.RunLoop(
+      rootIdentity: root, presentationSurface: surface,
+      terminalInputReader: SetDFiniteInput([]), signalReader: nil, scheduler: scheduler,
+      stateContainer: StateContainer(initialState: 0, invalidationIdentities: [root]),
+      focusTracker: focus,
+      viewBuilder: { _, _ in SetDMaskRoot(start: start, mode: mode, log: log) })
+    focus.invalidator = scheduler
+    return (loop, surface, scheduler, root)
+  }
+
+  /// Animates the mask from `start` to 1 over one second on an injected clock
+  /// and returns the raster at `sampleAt` and, when asked, after completion.
+  /// `rootFrames` adds a root invalidation to every frame, so no frame is
+  /// deadline-only.
+  static func reveal(
+    _ name: String, start: Double, mode: SetDMaskMode = .bare,
+    sampleAt sample: Duration, rootFrames: Bool = false,
+    write: (Binding<Double>) -> Void = { binding in
+      withAnimation(.linear(duration: .seconds(1))) { binding.wrappedValue = 1 }
+    }
+  ) async throws -> (mid: RasterSurface?, end: RasterSurface?, elided: Int) {
+    let log = SetDMaskLog()
+    let (loop, surface, scheduler, root) = Self.loop(name, start: start, mode: mode, log: log)
+    let clock = SetDMaskClock()
+    loop.frameClock = { clock.now }
+    loop.renderMode = .asyncNoCancel
+    defer { loop.lifecycleCoordinator.shutdown() }
+    return try await withAnimationSinks(loop.renderer.internalAnimationController) {
+      var rendered = 0
+      scheduler.requestInvalidation(of: [root])
+      try loop.renderPendingFrames(renderedFrames: &rendered)
+      loop.renderer.enableSelectiveEvaluation()
+      let binding = try #require(log.fraction)
+      let started = clock.now
+      write(binding)
+      _ = try await loop.renderPendingFramesAsync(renderedFrames: &rendered, eventPump: nil)
+      @MainActor func advance(to target: MonotonicInstant) async throws {
+        var turns = 0
+        while let wake = scheduler.nextWakeInstant(after: clock.now), wake < target, turns < 256 {
+          clock.now = wake
+          if rootFrames { scheduler.requestInvalidation(of: [root]) }
+          _ = try await loop.renderPendingFramesAsync(renderedFrames: &rendered, eventPump: nil)
+          turns += 1
+        }
+        clock.now = target
+        scheduler.requestDeadline(clock.now)
+        if rootFrames { scheduler.requestInvalidation(of: [root]) }
+        _ = try await loop.renderPendingFramesAsync(renderedFrames: &rendered, eventPump: nil)
+      }
+      try await advance(to: started.advanced(by: sample))
+      let mid = surface.raster
+      try await advance(to: started.advanced(by: .milliseconds(1_100)))
+      return (mid, surface.raster, loop.renderer.elidedFrameCount)
+    }
+  }
+}
+
+@MainActor
+private final class SetDTapCount {
+  var count = 0
+}
+
+@MainActor
+@Suite(
+  "Campaign F2 pass 2: clip masks and trims under elision, scoping and hit testing", .serialized)
+struct AdversarialSetDClipTrimModeTests {
+  @Test("setD151: a reveal from an empty clip mask paints midway through its animation")
+  func setD151EmptyMaskRevealPaintsMidway() async throws {
+    let expected = SetDMask.staticExtent(0.5)
+    try #require(expected > 4 && expected < 19, "static midway extent \(expected)")
+    let result = try await SetDMask.reveal("151", start: 0, sampleAt: .milliseconds(500))
+    setDKnown(
+      "NEW-5: a clip mask animated from an empty mask stays unpainted; an empty mask has no region, so its node is never recorded as drawn and every deadline frame of the reveal is elided (Rasterizer+Paint.swift:128-179, AnimationController.swift:631-647); contract: Shapes.md:121-127, OffscreenFrameElision.swift:1-25; adjacent STUI-1218"
+    ) {
+      #expect(
+        SetDMask.lastPaintedX(result.mid) == expected,
+        "mid \(SetDMask.lastPaintedX(result.mid)) of \(expected); elided \(result.elided)")
+    }
+  }
+
+  @Test("setD152: a reveal from an empty clip mask paints fully after it completes")
+  func setD152EmptyMaskRevealPaintsAtEnd() async throws {
+    let result = try await SetDMask.reveal("152", start: 0, sampleAt: .milliseconds(500))
+    setDKnown(
+      "NEW-5: a clip mask animated from an empty mask stays unpainted; an empty mask has no region, so its node is never recorded as drawn and every deadline frame of the reveal is elided (Rasterizer+Paint.swift:128-179, AnimationController.swift:631-647); contract: Shapes.md:121-127, OffscreenFrameElision.swift:1-25; adjacent STUI-1218"
+    ) {
+      #expect(
+        SetDMask.lastPaintedX(result.end) == 19,
+        "end \(SetDMask.lastPaintedX(result.end)); elided \(result.elided)")
+    }
+  }
+
+  @Test("setD153: the same reveal with root-invalidated frames paints midway")
+  func setD153EmptyMaskRevealWithRootFrames() async throws {
+    let expected = SetDMask.staticExtent(0.5)
+    let result = try await SetDMask.reveal(
+      "153", start: 0, sampleAt: .milliseconds(500), rootFrames: true)
+    #expect(SetDMask.lastPaintedX(result.mid) == expected, "\(SetDMask.lastPaintedX(result.mid))")
+  }
+
+  @Test("setD154: a mask outside a disabling .transaction still morphs")
+  func setD154MaskOutsideDisablingTransactionMorphs() async throws {
+    let expected = SetDMask.staticExtent(0.625)
+    let result = try await SetDMask.reveal(
+      "154", start: 0.25, mode: .innerTransactionDisabled, sampleAt: .milliseconds(500))
+    setDKnown(
+      "NEW-6: a clip mask applied outside .transaction { disablesAnimations } snaps instead of morphing; clipShape merges its mask into the clipped content's node, which carries the inner transaction (ViewLayoutModifiers.swift:64-72, AnimationModifiers.swift:262-289); contract: Animating-Views.md:92-101, Shapes.md:125-127; adjacent STUI-1218"
+    ) {
+      #expect(
+        SetDMask.lastPaintedX(result.mid) == expected,
+        "mid \(SetDMask.lastPaintedX(result.mid)) of \(expected)")
+    }
+  }
+
+  @Test("setD155: a mask outside an inner .animation(value:) snaps on a plain write")
+  func setD155MaskOutsideInnerValueAnimationSnaps() async throws {
+    let result = try await SetDMask.reveal(
+      "155", start: 0.25, mode: .innerValueAnimation, sampleAt: .milliseconds(500),
+      write: { $0.wrappedValue = 1 })
+    #expect(SetDMask.lastPaintedX(result.mid) == 19, "mid \(SetDMask.lastPaintedX(result.mid))")
+  }
+
+  @Test("setD156: reduce motion snaps an animated mask change")
+  func setD156ReducedMotionSnapsMask() async throws {
+    let result = try await SetDMask.reveal(
+      "156", start: 0.25, mode: .reducedMotion, sampleAt: .milliseconds(500))
+    #expect(SetDMask.lastPaintedX(result.mid) == 19, "mid \(SetDMask.lastPaintedX(result.mid))")
+  }
+
+  @Test("setD157: a disablesAnimations write snaps the mask")
+  func setD157DisablesAnimationsWriteSnapsMask() async throws {
+    let result = try await SetDMask.reveal(
+      "157", start: 0.25, sampleAt: .milliseconds(500),
+      write: { binding in
+        withAnimation(.linear(duration: .seconds(1))) {
+          withTransaction(\.disablesAnimations, true) { binding.wrappedValue = 1 }
+        }
+      })
+    #expect(SetDMask.lastPaintedX(result.mid) == 19, "mid \(SetDMask.lastPaintedX(result.mid))")
+  }
+
+  @Test("setD158: a morphing mask paints a wide glyph only when its whole span is covered")
+  func setD158MorphingMaskKeepsWideGlyphsWhole() async throws {
+    let covered = SetDMask.staticExtent(0.625) + 1
+    let result = try await SetDMask.reveal(
+      "158", start: 0.25, mode: .wide, sampleAt: .milliseconds(500))
+    let row = try #require(result.mid?.cells.first)
+    var painted = 0
+    for (x, cell) in row.enumerated() where !cell.isContinuation && cell.character != " " {
+      painted += 1
+      #expect(x + max(1, cell.spanWidth) <= covered, "glyph at \(x) past the mask end \(covered)")
+    }
+    #expect(painted > 0, "some glyphs are painted mid-morph")
+    for (x, cell) in row.enumerated() where cell.isContinuation {
+      #expect(x > 0 && row[x - 1].character != " ", "continuation at \(x) without its lead")
+    }
+  }
+
+  @Test("setD159: clipping a button leaves its clipped-away cells hit-testable")
+  func setD159ClipLeavesHitTesting() throws {
+    let taps = SetDTapCount()
+    let h = try SetDLiveHarness("159", size: .init(width: 20, height: 1)) {
+      Button("ABCDEFGHIJ") { taps.count += 1 }
+        .clipShape(SetDMaskShape(fraction: 0.3))
+    }
+    defer { h.shutdown() }
+    let region = try #require(h.runLoop.latestSemanticSnapshot.interactionRegions.first)
+    let far = CellPoint(
+      x: region.rect.origin.x + region.rect.size.width - 2, y: region.rect.origin.y)
+    try #require(h.raster?.cells[far.y][far.x].character == " ", "the far cell is clipped away")
+    try h.click(far)
+    #expect(taps.count == 1)
+  }
+
+  @Test("setD160: a trimmed contentShape follows its painted cells after scrolling")
+  func setD160TrimmedContentShapeAfterScrolling() throws {
+    let painted = try #require(SetDCentreless.paintedCell(painted: true))
+    let unpainted = try #require(SetDCentreless.paintedCell(painted: false))
+    let shape = Circle().trim(from: 0, to: 0.5).path(
+      in: Rect(origin: .zero, size: .init(width: 10, height: 5)))
+    let taps = SetDTapCount()
+    let offset = SetDOffsetBox()
+    let h = try SetDLiveHarness("160", size: .init(width: 20, height: 8)) {
+      ScrollView(.vertical, position: offset.binding) {
+        VStack(alignment: .leading, spacing: 0) {
+          Text("pad0")
+          Text("pad1")
+          Text("pad2")
+          Button {
+            taps.count += 1
+          } label: {
+            Text("").frame(width: 10, height: 5)
+          }
+          .buttonStyle(.plain)
+          .contentShape(shape)
+          ForEach(0..<10, id: \.self) { Text("tail\($0)") }
+        }
+      }
+      .scrollIndicators(.hidden)
+    }
+    defer { h.shutdown() }
+    offset.value = .init(x: 0, y: 2)
+    try h.renderRoot()
+    try #require(h.lines.first?.hasPrefix("pad2") == true, "\(h.frame)")
+    try h.click(CellPoint(x: unpainted.x, y: unpainted.y + 1))
+    #expect(taps.count == 0, "an unpainted cell inside the frame does not activate")
+    try h.click(CellPoint(x: painted.x, y: painted.y + 1))
+    #expect(taps.count == 1, "a painted cell activates")
+  }
+}
+
+@MainActor
+private enum SetDCentreless {
+  /// A cell of a 10×5 frame that the trimmed fill paints (or leaves blank).
+  static func paintedCell(painted: Bool) -> CellPoint? {
+    let raster = DefaultRenderer().render(
+      Circle().trim(from: 0, to: 0.5).fill(Color.white).frame(width: 10, height: 5),
+      proposal: .init(width: 10, height: 5)
+    ).rasterSurface
+    for (y, row) in raster.cells.enumerated() {
+      for (x, cell) in row.enumerated()
+      where (cell.character != " " || cell.style?.backgroundColor != nil) == painted {
+        if !painted, y == 0 || x == 0 { continue }
+        return CellPoint(x: x, y: y)
+      }
+    }
+    return nil
+  }
+}

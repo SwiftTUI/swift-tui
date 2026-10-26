@@ -1082,6 +1082,38 @@
       "category": "runtime-integration",
       "reason": "Adversarial set C pass 2: trimmed-fill morphing slots and physical versus cell-unit trim paths (STUI-1129/1112 neighbors)."
     },
+    "Tests/SwiftTUITests/AdversarialSetDCentreModeTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Adversarial set D pass 2 (F2 interactions): centre rounding under .position, custom layout, scroll anchors, presentation cards, wide glyphs and live resize (STUI-1283)."
+    },
+    "Tests/SwiftTUITests/AdversarialSetDClipTrimModeTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Adversarial set D pass 2 (F2 interactions): clip masks and trimmed shapes under frame elision, transaction scoping, reduced motion, wide glyphs and hit testing (STUI-1283)."
+    },
+    "Tests/SwiftTUITests/AdversarialSetDCollectionModeTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Adversarial set D pass 2 (F2 interactions): data tables and lists under live resize, external mutation and one input batch (STUI-1283)."
+    },
+    "Tests/SwiftTUITests/AdversarialSetDPresentationModeTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Adversarial set D pass 2 (F2 interactions): modal presentations over tables, lists and scroll views, under resize, item replacement and batches (STUI-1283)."
+    },
+    "Tests/SwiftTUITests/AdversarialSetDRuntimeIssueModeTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Adversarial set D pass 2 (F2 interactions): dispatch-time runtime issues through elided, aborted, batched and presented frames (STUI-1283)."
+    },
+    "Tests/SwiftTUITests/AdversarialSetDScrollEdgeModeTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Adversarial set D pass 2 (F2 interactions): far-edge commands under content mutation, batches, disabling and a modal cover (STUI-1283)."
+    },
+    "Tests/SwiftTUITests/AdversarialSetDTerminalCapabilityModeTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Adversarial set D pass 2 (F2 interactions): terminal capability detection and emission with tables, wide glyphs, deltas and colour profiles (STUI-1283)."
+    },
+    "Tests/SwiftTUITests/AdversarialSetDWideGlyphModeTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Adversarial set D pass 2 (F2 interactions): wide glyphs under table columns, scroll offsets and clips; two-axis End beside indicators (STUI-1283)."
+    },
     "Tests/SwiftTUITests/AmbientCollectionAttributeTests.swift": {
       "category": "runtime-integration",
       "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
