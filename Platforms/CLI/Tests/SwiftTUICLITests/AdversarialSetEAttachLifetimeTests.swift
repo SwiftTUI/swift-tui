@@ -108,15 +108,13 @@
     @Test func setE139ServerLifecycleReturnsDescriptorsAndEntry() async throws {
       let fixture = try SetEAttachDirectory()
       defer { fixture.remove() }
-      // One warm-up cycle first: on Linux the first server start allocates one
-      // process-lifetime runtime descriptor, constant across every later cycle.
-      // The contract is that each lifecycle returns what it opened.
-      let warmUp = await SetEServerRun.start(fixture.server(identifier: "warm-up"))
-      try #require(warmUp.isReady, "the warm-up cycle never became ready")
-      warmUp.cancel()
-      _ = await warmUp.finish()
-      let baseline = setEOpenDescriptorCount()
-      for cycle in 1...3 {
+      // The baseline is the count after the first two cycles: on Linux the
+      // first server starts allocate a process-lifetime runtime descriptor
+      // (after the first start on the arm64 container, after the second on
+      // amd64 CI), constant across every later cycle. The contract is that
+      // each lifecycle returns what it opened.
+      var baseline = 0
+      for cycle in 0...4 {
         let server = fixture.server(identifier: "cycle")
         let run = await SetEServerRun.start(server)
         try #require(run.isReady, "cycle \(cycle) never became ready")
@@ -125,7 +123,11 @@
         let outcome = await run.finish()
         #expect(outcome.didReturn, "\(outcome)")
         #expect(setEEntryType(server.socketPath) == nil, "cycle \(cycle) left its entry")
-        #expect(setEOpenDescriptorCount() == baseline, "cycle \(cycle) leaked a descriptor")
+        if cycle < 2 {
+          baseline = setEOpenDescriptorCount()
+        } else {
+          #expect(setEOpenDescriptorCount() == baseline, "cycle \(cycle) leaked a descriptor")
+        }
       }
     }
 

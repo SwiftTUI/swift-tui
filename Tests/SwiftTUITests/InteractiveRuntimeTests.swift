@@ -2146,193 +2146,6 @@ struct InteractiveRuntimeTests {
   }
 
   @MainActor
-  @Test("A ScrollView body flick keeps gliding (momentum) after release, then settles")
-  func scrollViewBodyFlickHasMomentum() throws {
-    final class Box { var position = ScrollCellOffset.zero }
-    let terminalSize = CellSize(width: 20, height: 12)
-    let rootIdentity = testIdentity("FlingFixture")
-    let scrollID = testIdentity("FlingFixture", "Scroll")
-    let box = Box()
-    @MainActor func makeView() -> some View {
-      ScrollView(
-        .vertical,
-        position: Binding(get: { box.position }, set: { box.position = $0 })
-      ) {
-        VStack(alignment: .leading, spacing: 0) {
-          ForEach(0..<200) { index in
-            Text("Row \(index)")
-          }
-        }
-      }
-      .id(scrollID)
-      .frame(width: 12, height: 6, alignment: .topLeading)
-    }
-
-    let scrollRect = try #require(
-      renderedScrollViewportRect(
-        for: scrollID,
-        in: makeView(),
-        rootIdentity: rootIdentity,
-        terminalSize: terminalSize
-      )
-    )
-
-    let t0 = MonotonicInstant.now()
-    let clock = VirtualFrameClock(t0)
-    let runLoop = try mountedMomentumRunLoop(
-      terminalSize: terminalSize,
-      rootIdentity: rootIdentity,
-      clock: clock,
-      viewBuilder: makeView
-    )
-
-    var frames = 0
-    let bottom = bottomPoint(of: scrollRect)
-    let top = topPoint(of: scrollRect)
-    // A fast upward flick: press at the bottom, drag to the top within ~24 ms,
-    // release. The drag itself pans; the release seeds the fling.
-    _ = runLoop.handle(
-      .input(.mouse(.init(kind: .down(.primary), location: bottom, timestamp: t0))))
-    try runLoop.renderPendingFrames(renderedFrames: &frames)
-    let tDrag = t0.advanced(by: .milliseconds(16))
-    _ = runLoop.handle(
-      .input(.mouse(.init(kind: .dragged(.primary), location: top, timestamp: tDrag))))
-    try runLoop.renderPendingFrames(renderedFrames: &frames)
-    let tUp = t0.advanced(by: .milliseconds(24))
-    clock.now = tUp
-    // Time advances within a drain pass in production. An invalidation echo
-    // must not create a second, slightly later momentum deadline chain.
-    runLoop.frameClock = { [clock] in
-      let now = clock.now
-      clock.now = now.advanced(by: .microseconds(1))
-      return now
-    }
-    _ = runLoop.handle(.input(.mouse(.init(kind: .up(.primary), location: top, timestamp: tUp))))
-    try runLoop.renderPendingFrames(renderedFrames: &frames)
-
-    let offsetAtRelease = box.position.y
-    #expect(offsetAtRelease > 0)  // the drag itself panned the content down
-    #expect(runLoop.scrollMomentum.hasActiveMomentum)  // and a fling was armed
-
-    // Drive the decay deterministically by stepping the frame-readiness clock at
-    // the 33 ms tick cadence — no sleeps, no async loop.
-    var nextTick = tUp.advanced(by: .milliseconds(33))
-    var step = 0
-    while runLoop.scrollMomentum.hasActiveMomentum, step < 600 {
-      #expect(runLoop.scheduler.nextWakeInstant(after: clock.now) == nextTick)
-      clock.now = nextTick
-      try runLoop.renderPendingFrames(renderedFrames: &frames)
-      nextTick = nextTick.advanced(by: .milliseconds(33))
-      step += 1
-    }
-
-    let settled = box.position.y
-    #expect(settled > offsetAtRelease)  // momentum carried it well past the release
-    #expect(!runLoop.scrollMomentum.hasActiveMomentum)  // then it settled
-    #expect(settled < 195)  // never overshot the content extent (maxScrollY = 194)
-
-    // A settled fling does not drift further.
-    clock.now = clock.now.advanced(by: .milliseconds(33))
-    try runLoop.renderPendingFrames(renderedFrames: &frames)
-    #expect(box.position.y == settled)
-  }
-
-  @Test("Momentum ticks repaint untracked Binding(get:set:) positions (R4-D)")
-  func momentumTicksRepaintUntrackedBindingPositions() throws {
-    // The registry `scrollBy` on a momentum tick writes through the authored
-    // binding. A plain `Binding(get:set:)` position writes no state slot and
-    // schedules nothing, and momentum ticks have no dispatch invalidation
-    // (the wheel path's only scheduler for such bindings, kept by R1.6) —
-    // so without the tick's own invalidation backstop the physics advance
-    // while the presented pixels freeze at the release frame.
-    final class Box { var position = ScrollCellOffset.zero }
-    let terminalSize = CellSize(width: 20, height: 12)
-    let rootIdentity = testIdentity("FlingRepaintFixture")
-    let scrollID = testIdentity("FlingRepaintFixture", "Scroll")
-    let box = Box()
-    @MainActor func makeView() -> some View {
-      ScrollView(
-        .vertical,
-        position: Binding(get: { box.position }, set: { box.position = $0 })
-      ) {
-        VStack(alignment: .leading, spacing: 0) {
-          ForEach(0..<200) { index in
-            Text("Row \(index)")
-          }
-        }
-      }
-      .id(scrollID)
-      .frame(width: 12, height: 6, alignment: .topLeading)
-    }
-
-    let scrollRect = try #require(
-      renderedScrollViewportRect(
-        for: scrollID,
-        in: makeView(),
-        rootIdentity: rootIdentity,
-        terminalSize: terminalSize
-      )
-    )
-
-    let t0 = MonotonicInstant.now()
-    let clock = VirtualFrameClock(t0)
-    let terminal = RecordingTerminalHost(
-      surfaceSizeProvider: { terminalSize },
-      pointerInputCapabilities: panningPointerCapabilities
-    )
-    let runLoop = try mountedMomentumRunLoop(
-      terminalSize: terminalSize,
-      rootIdentity: rootIdentity,
-      clock: clock,
-      terminal: terminal,
-      viewBuilder: makeView
-    )
-
-    var frames = 0
-    let bottom = bottomPoint(of: scrollRect)
-    let top = topPoint(of: scrollRect)
-    _ = runLoop.handle(
-      .input(.mouse(.init(kind: .down(.primary), location: bottom, timestamp: t0))))
-    try runLoop.renderPendingFrames(renderedFrames: &frames)
-    let tDrag = t0.advanced(by: .milliseconds(16))
-    _ = runLoop.handle(
-      .input(.mouse(.init(kind: .dragged(.primary), location: top, timestamp: tDrag))))
-    try runLoop.renderPendingFrames(renderedFrames: &frames)
-    let tUp = t0.advanced(by: .milliseconds(24))
-    _ = runLoop.handle(.input(.mouse(.init(kind: .up(.primary), location: top, timestamp: tUp))))
-    try runLoop.renderPendingFrames(renderedFrames: &frames)
-
-    let offsetAtRelease = box.position.y
-    #expect(runLoop.scrollMomentum.hasActiveMomentum)
-
-    clock.now = tUp
-    var step = 0
-    while runLoop.scrollMomentum.hasActiveMomentum, step < 600 {
-      clock.now = clock.now.advanced(by: .milliseconds(33))
-      try runLoop.renderPendingFrames(renderedFrames: &frames)
-      step += 1
-    }
-
-    let settled = box.position.y
-    try #require(
-      settled > offsetAtRelease + 6,
-      "the glide must carry well past the release for the pixel oracle to discriminate"
-    )
-
-    // The pixels must follow the physics: rows are one cell tall, so the
-    // settled offset IS the top visible row index.
-    let lastFrame = terminal.frames.last ?? ""
-    #expect(
-      lastFrame.contains("Row \(settled)"),
-      """
-      the presented surface froze at the release offset (\(offsetAtRelease)) while the \
-      physics settled at \(settled):
-      \(lastFrame)
-      """
-    )
-  }
-
-  @MainActor
   @Test(
     "Every reduced-motion source releases a pan without a fling",
     arguments: ["launch", "host", "view", "stable"])
@@ -7699,5 +7512,201 @@ extension InteractiveRuntimeTests {
     try runLoop.renderPendingFrames(renderedFrames: &frames)
     #expect(box.inner == ScrollCellOffset(x: 0, y: 5))
     #expect(box.outer == ScrollCellOffset(x: 1, y: 0))
+  }
+}
+
+// The two momentum journeys drive a fling to rest one 33 ms tick at a time
+// with no iteration count to read from stressIterations(full:hotPath:). They
+// sit at the 20 s hard bound on the amd64 runner class (13.3-20.7 s across
+// the 0.19.x gate runs), so they run isolated in the core lane, which has no
+// per-test duration bound (Scripts/data/runtime-shards.txt).
+@MainActor
+@Suite
+struct ScrollMomentumJourneyTests {
+  @MainActor
+  @Test("A ScrollView body flick keeps gliding (momentum) after release, then settles")
+  func scrollViewBodyFlickHasMomentum() throws {
+    final class Box { var position = ScrollCellOffset.zero }
+    let terminalSize = CellSize(width: 20, height: 12)
+    let rootIdentity = testIdentity("FlingFixture")
+    let scrollID = testIdentity("FlingFixture", "Scroll")
+    let box = Box()
+    @MainActor func makeView() -> some View {
+      ScrollView(
+        .vertical,
+        position: Binding(get: { box.position }, set: { box.position = $0 })
+      ) {
+        VStack(alignment: .leading, spacing: 0) {
+          ForEach(0..<200) { index in
+            Text("Row \(index)")
+          }
+        }
+      }
+      .id(scrollID)
+      .frame(width: 12, height: 6, alignment: .topLeading)
+    }
+
+    let scrollRect = try #require(
+      renderedScrollViewportRect(
+        for: scrollID,
+        in: makeView(),
+        rootIdentity: rootIdentity,
+        terminalSize: terminalSize
+      )
+    )
+
+    let t0 = MonotonicInstant.now()
+    let clock = VirtualFrameClock(t0)
+    let runLoop = try mountedMomentumRunLoop(
+      terminalSize: terminalSize,
+      rootIdentity: rootIdentity,
+      clock: clock,
+      viewBuilder: makeView
+    )
+
+    var frames = 0
+    let bottom = bottomPoint(of: scrollRect)
+    let top = topPoint(of: scrollRect)
+    // A fast upward flick: press at the bottom, drag to the top within ~24 ms,
+    // release. The drag itself pans; the release seeds the fling.
+    _ = runLoop.handle(
+      .input(.mouse(.init(kind: .down(.primary), location: bottom, timestamp: t0))))
+    try runLoop.renderPendingFrames(renderedFrames: &frames)
+    let tDrag = t0.advanced(by: .milliseconds(16))
+    _ = runLoop.handle(
+      .input(.mouse(.init(kind: .dragged(.primary), location: top, timestamp: tDrag))))
+    try runLoop.renderPendingFrames(renderedFrames: &frames)
+    let tUp = t0.advanced(by: .milliseconds(24))
+    clock.now = tUp
+    // Time advances within a drain pass in production. An invalidation echo
+    // must not create a second, slightly later momentum deadline chain.
+    runLoop.frameClock = { [clock] in
+      let now = clock.now
+      clock.now = now.advanced(by: .microseconds(1))
+      return now
+    }
+    _ = runLoop.handle(.input(.mouse(.init(kind: .up(.primary), location: top, timestamp: tUp))))
+    try runLoop.renderPendingFrames(renderedFrames: &frames)
+
+    let offsetAtRelease = box.position.y
+    #expect(offsetAtRelease > 0)  // the drag itself panned the content down
+    #expect(runLoop.scrollMomentum.hasActiveMomentum)  // and a fling was armed
+
+    // Drive the decay deterministically by stepping the frame-readiness clock at
+    // the 33 ms tick cadence — no sleeps, no async loop.
+    var nextTick = tUp.advanced(by: .milliseconds(33))
+    var step = 0
+    while runLoop.scrollMomentum.hasActiveMomentum, step < 600 {
+      #expect(runLoop.scheduler.nextWakeInstant(after: clock.now) == nextTick)
+      clock.now = nextTick
+      try runLoop.renderPendingFrames(renderedFrames: &frames)
+      nextTick = nextTick.advanced(by: .milliseconds(33))
+      step += 1
+    }
+
+    let settled = box.position.y
+    #expect(settled > offsetAtRelease)  // momentum carried it well past the release
+    #expect(!runLoop.scrollMomentum.hasActiveMomentum)  // then it settled
+    #expect(settled < 195)  // never overshot the content extent (maxScrollY = 194)
+
+    // A settled fling does not drift further.
+    clock.now = clock.now.advanced(by: .milliseconds(33))
+    try runLoop.renderPendingFrames(renderedFrames: &frames)
+    #expect(box.position.y == settled)
+  }
+
+  @Test("Momentum ticks repaint untracked Binding(get:set:) positions (R4-D)")
+  func momentumTicksRepaintUntrackedBindingPositions() throws {
+    // The registry `scrollBy` on a momentum tick writes through the authored
+    // binding. A plain `Binding(get:set:)` position writes no state slot and
+    // schedules nothing, and momentum ticks have no dispatch invalidation
+    // (the wheel path's only scheduler for such bindings, kept by R1.6) —
+    // so without the tick's own invalidation backstop the physics advance
+    // while the presented pixels freeze at the release frame.
+    final class Box { var position = ScrollCellOffset.zero }
+    let terminalSize = CellSize(width: 20, height: 12)
+    let rootIdentity = testIdentity("FlingRepaintFixture")
+    let scrollID = testIdentity("FlingRepaintFixture", "Scroll")
+    let box = Box()
+    @MainActor func makeView() -> some View {
+      ScrollView(
+        .vertical,
+        position: Binding(get: { box.position }, set: { box.position = $0 })
+      ) {
+        VStack(alignment: .leading, spacing: 0) {
+          ForEach(0..<200) { index in
+            Text("Row \(index)")
+          }
+        }
+      }
+      .id(scrollID)
+      .frame(width: 12, height: 6, alignment: .topLeading)
+    }
+
+    let scrollRect = try #require(
+      renderedScrollViewportRect(
+        for: scrollID,
+        in: makeView(),
+        rootIdentity: rootIdentity,
+        terminalSize: terminalSize
+      )
+    )
+
+    let t0 = MonotonicInstant.now()
+    let clock = VirtualFrameClock(t0)
+    let terminal = RecordingTerminalHost(
+      surfaceSizeProvider: { terminalSize },
+      pointerInputCapabilities: panningPointerCapabilities
+    )
+    let runLoop = try mountedMomentumRunLoop(
+      terminalSize: terminalSize,
+      rootIdentity: rootIdentity,
+      clock: clock,
+      terminal: terminal,
+      viewBuilder: makeView
+    )
+
+    var frames = 0
+    let bottom = bottomPoint(of: scrollRect)
+    let top = topPoint(of: scrollRect)
+    _ = runLoop.handle(
+      .input(.mouse(.init(kind: .down(.primary), location: bottom, timestamp: t0))))
+    try runLoop.renderPendingFrames(renderedFrames: &frames)
+    let tDrag = t0.advanced(by: .milliseconds(16))
+    _ = runLoop.handle(
+      .input(.mouse(.init(kind: .dragged(.primary), location: top, timestamp: tDrag))))
+    try runLoop.renderPendingFrames(renderedFrames: &frames)
+    let tUp = t0.advanced(by: .milliseconds(24))
+    _ = runLoop.handle(.input(.mouse(.init(kind: .up(.primary), location: top, timestamp: tUp))))
+    try runLoop.renderPendingFrames(renderedFrames: &frames)
+
+    let offsetAtRelease = box.position.y
+    #expect(runLoop.scrollMomentum.hasActiveMomentum)
+
+    clock.now = tUp
+    var step = 0
+    while runLoop.scrollMomentum.hasActiveMomentum, step < 600 {
+      clock.now = clock.now.advanced(by: .milliseconds(33))
+      try runLoop.renderPendingFrames(renderedFrames: &frames)
+      step += 1
+    }
+
+    let settled = box.position.y
+    try #require(
+      settled > offsetAtRelease + 6,
+      "the glide must carry well past the release for the pixel oracle to discriminate"
+    )
+
+    // The pixels must follow the physics: rows are one cell tall, so the
+    // settled offset IS the top visible row index.
+    let lastFrame = terminal.frames.last ?? ""
+    #expect(
+      lastFrame.contains("Row \(settled)"),
+      """
+      the presented surface froze at the release offset (\(offsetAtRelease)) while the \
+      physics settled at \(settled):
+      \(lastFrame)
+      """
+    )
   }
 }

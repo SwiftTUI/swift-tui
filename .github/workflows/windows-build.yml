@@ -68,8 +68,10 @@ jobs:
     if: needs.changes.outputs.changed == 'true'
     # The expanded x64 suite needs ~32 minutes after a ~21-minute cold build.
     # Leave room for the remaining lanes and cache upload; suite time limits
-    # still bound individual tests.
-    timeout-minutes: 90
+    # still bound individual tests. At 0.19.5 the x64 SwiftTUITests lane ran
+    # past 56 minutes after a 30-minute build and the job hit a 90-minute cap
+    # (arm64: 46 minutes, from 40 at 0.19.4).
+    timeout-minutes: 120
     env:
       # Same policy as the POSIX repo gate: the gate builds with
       # warnings-as-errors so new Windows-only warnings fail here instead of

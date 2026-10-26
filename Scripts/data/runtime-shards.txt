@@ -42,3 +42,8 @@ isolated|PresentationOverlayCoexistenceTests
 # states with both render drivers. Preserve the complete sequence in the core
 # lane: amd64 release CI passed every assertion but averaged 22.8 s per case.
 isolated|CollectionAccessibilityTransportRegressionTests
+# Isolated for the duration ratchet: the two scroll-momentum journeys step a
+# fling to rest tick by tick with no iteration count to read from
+# stressIterations(full:hotPath:), and sit at the 20 s hard bound on the amd64
+# runner class (13.3-20.7 s across the 0.19.x gate runs).
+isolated|ScrollMomentumJourneyTests
