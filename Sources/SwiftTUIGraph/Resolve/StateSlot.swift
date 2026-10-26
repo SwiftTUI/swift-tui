@@ -57,6 +57,28 @@ package protocol DormantStateProjecting {
   @MainActor func dormantStateProjection() -> Self?
 }
 
+/// A persistent value that carries runtime intent and must re-arm it when a
+/// dormant archive restores it, rather than come back as a settled value.
+/// `@FocusState` storage is the case: a focused value that returns without a
+/// request is overwritten by focus sync, because runtime focus left with the
+/// departing content (STUI-1308).
+package protocol DormantStateReactivating {
+  @MainActor func reactivatedAfterDormancy() -> Self
+}
+
+extension DormantStateSlotSnapshot {
+  /// The snapshot a dormant restore installs: a reactivating value re-arms
+  /// its intent, every other value is restored as archived.
+  @MainActor package func reactivatedAfterDormancy() -> Self {
+    guard let reactivating = value as? any DormantStateReactivating else {
+      return self
+    }
+    var copy = self
+    copy.value = reactivating.reactivatedAfterDormancy()
+    return copy
+  }
+}
+
 extension Optional: DormantStateProjecting where Wrapped: DormantStateProjecting {
   package func dormantStateProjection() -> Self? {
     switch self {

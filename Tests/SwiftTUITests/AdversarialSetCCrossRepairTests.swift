@@ -161,13 +161,11 @@ struct AdversarialSetCCrossRepairTests {
       _ = try h.render()
     }
     try #require(h.frame.contains("draft"), "\(h.frame)")
-    setCKnown(setCSTUI1308) {
-      #expect(log.fieldFocused == true, "\(String(describing: log.fieldFocused))")
-    }
+    #expect(log.fieldFocused == true, "\(String(describing: log.fieldFocused))")
   }
 
   // Control for setC293 (minimization, not a corpus case): the same field
-  // directly in tab A's content, without a navigation destination. It loses
+  // directly in tab A's content, without a navigation destination. It lost
   // focus as well (STUI-1308), independent of setC292's re-mint (STUI-1307).
   @Test func setC293ControlTabContentFocusRestored() throws {
     let log = SetCXLog()
@@ -182,12 +180,10 @@ struct AdversarialSetCCrossRepairTests {
     log.selection = "a"
     _ = try h.renderAfterExternalMutation()
     _ = try h.render()
-    setCKnown(setCSTUI1308) {
-      #expect(
-        log.fieldFocused == true,
-        "history \(log.focusHistory) focus \(String(describing: h.runLoop.focusTracker.currentFocusIdentity))"
-      )
-    }
+    #expect(
+      log.fieldFocused == true,
+      "history \(log.focusHistory) focus \(String(describing: h.runLoop.focusTracker.currentFocusIdentity))"
+    )
   }
 
   @Test func setC294TabListWindowRestored() throws {
@@ -521,11 +517,3 @@ private struct SetCXDestination: View {
     }
   }
 }
-
-private let setCSTUI1308 = Comment(
-  rawValue:
-    "STUI-1308 (NEW-13): returning to a tab does not restore keyboard focus to the field "
-    + "whose @FocusState was true at departure; runtime focus moves to the tab "
-    + "container at departure and the restored FocusState reads false "
-    + "(FocusState.swift:433-441 runtime store); contract: "
-    + "Dormant-Tab-State.md:43, 107-109")

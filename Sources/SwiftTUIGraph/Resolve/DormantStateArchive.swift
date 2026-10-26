@@ -202,7 +202,7 @@ extension ViewGraph {
       for (identifier, slot) in record.stateSlots {
         node.restoreStateSlot(
           identifier,
-          slot: AnyStateSlot(restoringDormant: slot)
+          slot: AnyStateSlot(restoringDormant: slot.reactivatedAfterDormancy())
         )
       }
     }

@@ -2339,6 +2339,60 @@ extension DormantTabStateTests {
     #expect(unreachable == 0, "stranded \(unreachable) node(s)")
   }
 
+  /// STUI-1308: the archive holds the focused value; a restored focus target
+  /// is re-requested, so the returning tab's field takes runtime focus instead
+  /// of having its value cleared by focus sync.
+  @Test(
+    "a focused field's @FocusState and runtime focus return with its tab", arguments: [false, true])
+  func focusedFieldIsRefocusedOnReturn(optional: Bool) throws {
+    let model = DormantTabModel()
+    let probe = DormantFocusProbe()
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("DormantTabsFocusReturn", optional ? "optional" : "bool"),
+      size: .init(width: 40, height: 10)
+    ) {
+      DormantFocusFieldsFixture(model: model, probe: probe, optional: optional)
+    }
+    defer { harness.shutdown() }
+    let second = try harness.focusIdentity(forText: "second text")
+    _ = try harness.focusText("second text")
+    try #require(probe.secondFocused == true, "\(probe.history)")
+
+    model.selection = "B"
+    _ = try harness.renderAfterExternalMutation()
+    #expect(harness.frame.contains("plain-B"))
+    model.selection = "A"
+    _ = try harness.renderAfterExternalMutation()
+    _ = try harness.render()
+    #expect(probe.secondFocused == true, "history \(probe.history)")
+    #expect(harness.runLoop.focusTracker.currentFocusIdentity == second)
+  }
+
+  /// STUI-1308 neighbour: only a focus target is re-requested. A field whose
+  /// `@FocusState` was clear at departure takes no focus on return.
+  @Test("an unfocused field's @FocusState stays clear on return")
+  func unfocusedFieldTakesNoFocusOnReturn() throws {
+    let model = DormantTabModel()
+    let probe = DormantFocusProbe()
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("DormantTabsFocusClear"),
+      size: .init(width: 40, height: 10)
+    ) {
+      DormantFocusFieldsFixture(model: model, probe: probe, optional: false)
+    }
+    defer { harness.shutdown() }
+    let second = try harness.focusIdentity(forText: "second text")
+    _ = try harness.focusText("first text")
+    try #require(probe.secondFocused == false)
+
+    model.selection = "B"
+    _ = try harness.renderAfterExternalMutation()
+    model.selection = "A"
+    _ = try harness.renderAfterExternalMutation()
+    _ = try harness.render()
+    #expect(probe.secondFocused == false, "history \(probe.history)")
+    #expect(harness.runLoop.focusTracker.currentFocusIdentity != second)
+  }
 }
 
 private struct DormantDestinationItem: Identifiable, Sendable {
@@ -2447,6 +2501,72 @@ private struct DormantLazyRow: View {
     HStack(spacing: 1) {
       Text("row \(index) count \(count)")
       Button("Bump row \(index)") { count += 1 }
+    }
+  }
+}
+
+@MainActor
+private final class DormantFocusProbe {
+  var secondFocused: Bool?
+  var history: [Bool] = []
+}
+
+private enum DormantFocusField: Hashable {
+  case first
+  case second
+}
+
+@MainActor
+private struct DormantFocusFieldsFixture: View {
+  let model: DormantTabModel
+  let probe: DormantFocusProbe
+  let optional: Bool
+
+  var body: some View {
+    TabView(selection: model.selectionBinding) {
+      Tab("A", value: "A") {
+        if optional {
+          DormantOptionalFocusFields(probe: probe)
+        } else {
+          DormantBoolFocusFields(probe: probe)
+        }
+      }
+      Tab("B", value: "B") { Text("plain-B") }
+    }
+    .tabViewStyle(.literalTabs)
+  }
+}
+
+@MainActor
+private struct DormantBoolFocusFields: View {
+  let probe: DormantFocusProbe
+  @State private var first = "first text"
+  @State private var second = "second text"
+  @FocusState private var secondFocused: Bool
+
+  var body: some View {
+    probe.secondFocused = secondFocused
+    probe.history.append(secondFocused)
+    return VStack(alignment: .leading, spacing: 0) {
+      TextField("first", text: $first)
+      TextField("second", text: $second).focused($secondFocused)
+    }
+  }
+}
+
+@MainActor
+private struct DormantOptionalFocusFields: View {
+  let probe: DormantFocusProbe
+  @State private var first = "first text"
+  @State private var second = "second text"
+  @FocusState private var field: DormantFocusField?
+
+  var body: some View {
+    probe.secondFocused = field == .second
+    probe.history.append(field == .second)
+    return VStack(alignment: .leading, spacing: 0) {
+      TextField("first", text: $first).focused($field, equals: .first)
+      TextField("second", text: $second).focused($field, equals: .second)
     }
   }
 }

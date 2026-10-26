@@ -70,6 +70,36 @@ private struct FocusStateStorage<Value: Equatable>: Equatable {
   }
 }
 
+/// A tab's archive holds the focused value, but runtime focus left with the
+/// departing content and the stored request was consumed when focus was
+/// established. Restored as is, the returning field reports a selected value
+/// with no request, nothing moves focus to it, and focus sync clears it
+/// (STUI-1308). A restored focus target is therefore re-requested, as an
+/// authored write would be; a cleared value is restored untouched, so the
+/// return never clears or steals focus.
+extension FocusStateStorage: DormantStateReactivating {
+  func reactivatedAfterDormancy() -> Self {
+    let current = snapshot
+    guard focusStateValueNamesTarget(current.value) else {
+      return self
+    }
+    var reactivated = self
+    reactivated.requestValue(current.value)
+    return reactivated
+  }
+}
+
+/// Whether a focus value names a target: `true` for a Boolean `@FocusState`,
+/// a non-nil value for an optional one. Their cleared values are their seeds
+/// (`false` and `nil`), the only two `FocusState` initializers.
+private func focusStateValueNamesTarget<Value>(_ value: Value) -> Bool {
+  if Value.self == Bool.self {
+    return value as? Bool ?? false
+  }
+  let mirror = Mirror(reflecting: value)
+  return mirror.displayStyle == .optional && !mirror.children.isEmpty
+}
+
 extension FocusStateStorage: Encodable where Value: Encodable {
   func encode(to encoder: any Encoder) throws {
     var container = encoder.singleValueContainer()
