@@ -1390,6 +1390,14 @@ struct DormantTabStateTests {
     rasterGate.release()
     let switched = await switchTask.value
     #expect(surfaceText(switched).contains("B width"))
+
+    // The departing tab's archive takes the hop write (STUI-1237): the
+    // arriving GeometryReader's realization must not drop the TabView's
+    // archive refresh request.
+    renderer.setFrameTailRenderHooks(nil)
+    model.selection = "A"
+    let returned = await render()
+    #expect(surfaceText(returned).contains("A count 1"), "\(surfaceText(returned))")
   }
 
   /// The tab switch moves focus off the departing content, so the run loop
@@ -2191,6 +2199,53 @@ extension DormantTabStateTests {
   }
 }
 
+extension DormantTabStateTests {
+  /// STUI-1237, the FW3-D archive-refresh probe shape: the write lands while
+  /// the switch's raster stage is suspended, so no layout hop is involved;
+  /// only the arriving tab's layout-realized content differs from
+  /// `departingStateWriteDuringSuspendedTailRestoresNewestValue`.
+  @Test(
+    "a raster-stage departing write is archived when the arriving tab holds layout-realized content",
+    arguments: [false, true])
+  func rasterStageWriteIsArchivedWithLayoutRealizedArrival(textEditor: Bool) async {
+    let model = DormantTabModel()
+    let probe = DepartingLayoutHopProbe()
+    let renderer = DefaultRenderer()
+    let root = testIdentity(
+      "DormantTabsRasterWriteLayoutRealizedArrival", textEditor ? "editor" : "geometry")
+    func render() async -> RenderSnapshot {
+      let context = dormantContext(root: root, actions: LocalActionRegistry())
+      if textEditor {
+        return await renderer.renderAsync(
+          DepartingEditorArrivalFixture(model: model, probe: probe), context: context)
+      }
+      return await renderer.renderAsync(
+        DepartingLayoutHopFixture(model: model, probe: probe), context: context)
+    }
+    #expect(surfaceText(await render()).contains("A count 0"))
+
+    let gate = AsyncFrameTailBlockingGate()
+    renderer.setFrameTailRenderHooks(.init(beforeRaster: { gate.beforeRaster() }))
+    defer {
+      gate.release()
+      renderer.setFrameTailRenderHooks(nil)
+    }
+    model.selection = "B"
+    let switchTask = Task { @MainActor in await render() }
+    await gate.waitUntilBlocked()
+    probe.write?(1)
+    #expect(probe.read?() == 1)
+    gate.release()
+    #expect(surfaceText(await switchTask.value).contains(textEditor ? "B editor" : "B width"))
+    renderer.setFrameTailRenderHooks(nil)
+
+    model.selection = "A"
+    let returned = await render()
+    #expect(surfaceText(returned).contains("A count 1"), "\(surfaceText(returned))")
+  }
+
+}
+
 /// Races a frame-tail gate against the render that should reach it, so a
 /// premise failure (the render never blocks) ends the test instead of hanging.
 /// Shared with `PresentationSurfaceTests`.
@@ -2252,6 +2307,35 @@ private struct DepartingLayoutHopFixture: View {
         }
       }
     }
+  }
+}
+
+/// The framework's other layout-realized boundary: a `TextEditor` realizes
+/// its content-width probe during layout.
+@MainActor
+private struct DepartingEditorArrivalFixture: View {
+  let model: DormantTabModel
+  let probe: DepartingLayoutHopProbe
+
+  var body: some View {
+    TabView(selection: model.selectionBinding) {
+      Tab("A", value: "A") {
+        DepartingLayoutHopContent(probe: probe)
+      }
+      Tab("B", value: "B") {
+        DepartingArrivingEditor()
+      }
+    }
+  }
+}
+
+@MainActor
+private struct DepartingArrivingEditor: View {
+  @State private var text = "B editor"
+
+  var body: some View {
+    TextEditor(text: $text)
+      .frame(width: 20, height: 3)
   }
 }
 
