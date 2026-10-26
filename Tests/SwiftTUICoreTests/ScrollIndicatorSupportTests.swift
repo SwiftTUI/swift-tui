@@ -161,6 +161,27 @@ struct ScrollIndicatorSupportTests {
       ) == 10
     )
   }
+
+  /// FW-E's unswept `ScrollIndicatorSupport` conversions: an `Int.max` scroll
+  /// range or viewport saturates instead of trapping, and the track's far edge
+  /// cannot overflow.
+  @Test("extreme scroll ranges keep the thumb on its track")
+  func extremeTrackArithmeticSaturates() {
+    let track = CellRect(origin: .zero, size: .init(width: 1, height: 10))
+    let range = ScrollIndicatorMetrics(
+      axis: .vertical, rect: track, maxOffset: Int.max, viewportLength: 10,
+      contentLength: Int.max)
+    #expect(range.targetOffset(for: .cellFallback(.init(x: 0, y: 9)), currentOffset: 0) == Int.max)
+    #expect(range.targetOffset(for: .cellFallback(.init(x: 0, y: 0)), currentOffset: 7) == 0)
+    let viewport = ScrollIndicatorMetrics(
+      axis: .vertical, rect: track, maxOffset: 1, viewportLength: Int.max, contentLength: 1)
+    #expect(viewport.thumbRange(for: 0) == 0..<10)
+    let far = ScrollIndicatorMetrics(
+      axis: .horizontal,
+      rect: CellRect(origin: .init(x: Int.max - 2, y: 0), size: .init(width: 10, height: 1)),
+      maxOffset: 4, viewportLength: 4, contentLength: 8)
+    #expect(far.thumbRange(for: 0)?.lowerBound == Int.max - 2)
+  }
 }
 
 private func precisePointer(

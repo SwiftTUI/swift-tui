@@ -1,10 +1,17 @@
+/// The widest fixed column a table draws, in cells. Each line of a table is
+/// built as text padded to its column widths, so a wider fixed width (an
+/// `Int.max` column) would allocate without bound; no surface shows a column
+/// this wide (the raster surface is capped at the same extent), so the clamp
+/// changes nothing visible.
+package let maximumTableColumnWidth = 1 << 16
+
 package func measureTableColumnWidths(
   columns: [TableColumnPayload],
   rows: [TableRowPayload]
 ) -> [Int] {
   columns.enumerated().map { index, column in
     if let width = column.width {
-      return max(1, width)
+      return min(max(1, width), maximumTableColumnWidth)
     }
 
     let titleWidth = layoutText(for: column.title, width: nil).size.width
@@ -116,9 +123,9 @@ private func borderedTableLineWidth(
   join: String,
   right: String
 ) -> Int {
-  let cellsWidth = widths.reduce(0, +) + (widths.count * 2)
+  let cellsWidth = SaturatingConversion.adding(SaturatingConversion.sum(widths), widths.count * 2)
   let leftWidth = layoutText(for: left, width: nil).size.width
   let rightWidth = layoutText(for: right, width: nil).size.width
   let joinWidth = layoutText(for: join, width: nil).size.width * max(0, widths.count - 1)
-  return cellsWidth + leftWidth + joinWidth + rightWidth
+  return SaturatingConversion.sum([cellsWidth, leftWidth, joinWidth, rightWidth])
 }

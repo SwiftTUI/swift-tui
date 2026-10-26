@@ -246,7 +246,12 @@ extension LayoutEngine {
           return nil
         }
         let allowance = safeArea.value(for: edge)
-        return base + max(0, inset + spacing - allowance)
+        return SaturatingConversion.adding(
+          base,
+          max(
+            0,
+            SaturatingConversion.subtracting(SaturatingConversion.adding(inset, spacing), allowance)
+          ))
       }
       guard let base, let inset = insetMaximum else {
         return nil
@@ -255,16 +260,17 @@ extension LayoutEngine {
     case .stack(axis: let stackAxis, let spacing, _, _),
       .lazyStack(axis: let stackAxis, let spacing, _, _):
       if stackAxis == axis {
-        var total = resolvedStackSpacings(
-          for: stackChildren,
-          axis: axis,
-          spacingOverride: spacing
-        ).reduce(0, +)
+        var total = SaturatingConversion.sum(
+          resolvedStackSpacings(
+            for: stackChildren,
+            axis: axis,
+            spacingOverride: spacing
+          ))
         for childMaximum in childMaximums {
           guard let childMaximum else {
             return nil
           }
-          total += childMaximum
+          total = SaturatingConversion.adding(total, childMaximum)
         }
         return total
       }
@@ -273,7 +279,8 @@ extension LayoutEngine {
       guard let content = childMaximums.first, let content else {
         return childMaximums.first == nil ? idealMain : nil
       }
-      return content + (axis == .horizontal ? insets.horizontal : insets.vertical)
+      return SaturatingConversion.adding(
+        content, axis == .horizontal ? insets.horizontal : insets.vertical)
     case .border(let set, let placement, _, _, _, _, let sides):
       let insets = borderLayoutInsets(
         set: set,
@@ -283,7 +290,8 @@ extension LayoutEngine {
       guard let content = childMaximums.first, let content else {
         return childMaximums.first == nil ? idealMain : nil
       }
-      return content + (axis == .horizontal ? insets.horizontal : insets.vertical)
+      return SaturatingConversion.adding(
+        content, axis == .horizontal ? insets.horizontal : insets.vertical)
     case .frame:
       guard let content = childMaximums.first else {
         return idealMain

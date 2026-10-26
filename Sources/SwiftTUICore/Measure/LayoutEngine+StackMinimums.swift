@@ -308,16 +308,19 @@ extension LayoutEngine {
       let baseMinimum = childMinimums.first ?? 0
       let insetMinimum = childMinimums.dropFirst().first ?? 0
       let safeAreaAllowance = safeArea.value(for: edge)
-      let consumed = max(0, insetMinimum + spacing - safeAreaAllowance)
+      let consumed = max(
+        0,
+        SaturatingConversion.subtracting(
+          SaturatingConversion.adding(insetMinimum, spacing), safeAreaAllowance))
       switch edge {
       case .top, .bottom:
         if axis == .vertical {
-          return baseMinimum + consumed
+          return SaturatingConversion.adding(baseMinimum, consumed)
         }
         return max(baseMinimum, insetMinimum)
       case .leading, .trailing:
         if axis == .horizontal {
-          return baseMinimum + consumed
+          return SaturatingConversion.adding(baseMinimum, consumed)
         }
         return max(baseMinimum, insetMinimum)
       }
@@ -328,12 +331,13 @@ extension LayoutEngine {
       verticalAlignment: _
     ):
       if stackAxis == axis {
-        let spacingBudget = resolvedStackSpacings(
-          for: stackChildren,
-          axis: axis,
-          spacingOverride: spacing
-        ).reduce(0, +)
-        return childMinimums.reduce(0, +) + spacingBudget
+        let spacingBudget = SaturatingConversion.sum(
+          resolvedStackSpacings(
+            for: stackChildren,
+            axis: axis,
+            spacingOverride: spacing
+          ))
+        return SaturatingConversion.adding(SaturatingConversion.sum(childMinimums), spacingBudget)
       }
       return childMinimums.max() ?? 0
     case .lazyStack(
@@ -343,17 +347,19 @@ extension LayoutEngine {
       verticalAlignment: _
     ):
       if stackAxis == axis {
-        let spacingBudget = resolvedStackSpacings(
-          for: stackChildren,
-          axis: axis,
-          spacingOverride: spacing
-        ).reduce(0, +)
-        return childMinimums.reduce(0, +) + spacingBudget
+        let spacingBudget = SaturatingConversion.sum(
+          resolvedStackSpacings(
+            for: stackChildren,
+            axis: axis,
+            spacingOverride: spacing
+          ))
+        return SaturatingConversion.adding(SaturatingConversion.sum(childMinimums), spacingBudget)
       }
       return childMinimums.max() ?? 0
     case .padding(let insets):
       let contentMinimum = childMinimums.first ?? 0
-      return contentMinimum + (axis == .horizontal ? insets.horizontal : insets.vertical)
+      return SaturatingConversion.adding(
+        contentMinimum, axis == .horizontal ? insets.horizontal : insets.vertical)
     case .border(let set, let placement, _, _, _, _, let sides):
       let insets = borderLayoutInsets(
         set: set,
@@ -361,7 +367,8 @@ extension LayoutEngine {
         sides: sides
       )
       let contentMinimum = childMinimums.first ?? 0
-      return contentMinimum + (axis == .horizontal ? insets.horizontal : insets.vertical)
+      return SaturatingConversion.adding(
+        contentMinimum, axis == .horizontal ? insets.horizontal : insets.vertical)
     case .frame(let width, let height, _):
       let explicit =
         switch axis {

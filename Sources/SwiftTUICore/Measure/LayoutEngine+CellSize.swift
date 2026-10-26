@@ -106,11 +106,12 @@ extension LayoutEngine {
         verticalAlignment: .center,
         passContext: passContext
       )
-      let contentHeight = childMeasurements.reduce(0) { $0 + $1.measuredSize.height }
-      let totalSpacing = stackSpacings.reduce(0, +)
+      let contentHeight = SaturatingConversion.sum(
+        childMeasurements.lazy.map(\.measuredSize.height))
+      let totalSpacing = SaturatingConversion.sum(stackSpacings)
       return CellSize(
-        width: crossMetrics.leading + crossMetrics.trailing,
-        height: contentHeight + totalSpacing
+        width: SaturatingConversion.adding(crossMetrics.leading, crossMetrics.trailing),
+        height: SaturatingConversion.adding(contentHeight, totalSpacing)
       )
     case .lazyStack(
       axis: .vertical, let spacing, let horizontalAlignment,
@@ -131,11 +132,12 @@ extension LayoutEngine {
         verticalAlignment: .center,
         passContext: passContext
       )
-      let contentHeight = childMeasurements.reduce(0) { $0 + $1.measuredSize.height }
-      let totalSpacing = stackSpacings.reduce(0, +)
+      let contentHeight = SaturatingConversion.sum(
+        childMeasurements.lazy.map(\.measuredSize.height))
+      let totalSpacing = SaturatingConversion.sum(stackSpacings)
       return CellSize(
-        width: crossMetrics.leading + crossMetrics.trailing,
-        height: contentHeight + totalSpacing
+        width: SaturatingConversion.adding(crossMetrics.leading, crossMetrics.trailing),
+        height: SaturatingConversion.adding(contentHeight, totalSpacing)
       )
     case .stack(
       axis: .horizontal, let spacing,
@@ -156,11 +158,11 @@ extension LayoutEngine {
         verticalAlignment: verticalAlignment,
         passContext: passContext
       )
-      let totalWidth = childMeasurements.reduce(0) { $0 + $1.measuredSize.width }
-      let totalSpacing = stackSpacings.reduce(0, +)
+      let totalWidth = SaturatingConversion.sum(childMeasurements.lazy.map(\.measuredSize.width))
+      let totalSpacing = SaturatingConversion.sum(stackSpacings)
       return CellSize(
-        width: totalWidth + totalSpacing,
-        height: crossMetrics.leading + crossMetrics.trailing
+        width: SaturatingConversion.adding(totalWidth, totalSpacing),
+        height: SaturatingConversion.adding(crossMetrics.leading, crossMetrics.trailing)
       )
     case .lazyStack(
       axis: .horizontal, let spacing,
@@ -181,17 +183,17 @@ extension LayoutEngine {
         verticalAlignment: verticalAlignment,
         passContext: passContext
       )
-      let totalWidth = childMeasurements.reduce(0) { $0 + $1.measuredSize.width }
-      let totalSpacing = stackSpacings.reduce(0, +)
+      let totalWidth = SaturatingConversion.sum(childMeasurements.lazy.map(\.measuredSize.width))
+      let totalSpacing = SaturatingConversion.sum(stackSpacings)
       return CellSize(
-        width: totalWidth + totalSpacing,
-        height: crossMetrics.leading + crossMetrics.trailing
+        width: SaturatingConversion.adding(totalWidth, totalSpacing),
+        height: SaturatingConversion.adding(crossMetrics.leading, crossMetrics.trailing)
       )
     case .padding(let insets):
       let contentSize = childMeasurements.first?.measuredSize ?? .zero
       return CellSize(
-        width: contentSize.width + insets.horizontal,
-        height: contentSize.height + insets.vertical
+        width: SaturatingConversion.adding(contentSize.width, insets.horizontal),
+        height: SaturatingConversion.adding(contentSize.height, insets.vertical)
       )
     case .safeAreaIgnoring(let insets, let fillsProposal):
       let contentSize = childMeasurements.first?.measuredSize ?? .zero
@@ -216,11 +218,11 @@ extension LayoutEngine {
       case .top, .bottom:
         return CellSize(
           width: max(baseSize.width, insetSize.width),
-          height: baseSize.height + consumed
+          height: SaturatingConversion.adding(baseSize.height, consumed)
         )
       case .leading, .trailing:
         return CellSize(
-          width: baseSize.width + consumed,
+          width: SaturatingConversion.adding(baseSize.width, consumed),
           height: max(baseSize.height, insetSize.height)
         )
       }
@@ -229,8 +231,8 @@ extension LayoutEngine {
         set: set, placement: placement, sides: sides)
       let contentSize = childMeasurements.first?.measuredSize ?? .zero
       return CellSize(
-        width: contentSize.width + insets.horizontal,
-        height: contentSize.height + insets.vertical
+        width: SaturatingConversion.adding(contentSize.width, insets.horizontal),
+        height: SaturatingConversion.adding(contentSize.height, insets.vertical)
       )
     case .frame(let width, let height, _):
       let contentSize = childMeasurements.first?.measuredSize ?? .zero

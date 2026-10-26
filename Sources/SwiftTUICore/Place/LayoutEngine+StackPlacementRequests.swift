@@ -30,9 +30,9 @@ extension LayoutEngine {
       var nextY = bounds.origin.y
       return measured.childMeasurements.enumerated().map { index, childMeasurement in
         defer {
-          nextY += childMeasurement.measuredSize.height
+          nextY = SaturatingConversion.adding(nextY, childMeasurement.measuredSize.height)
           if index < stackSpacings.count {
-            nextY += stackSpacings[index]
+            nextY = SaturatingConversion.adding(nextY, stackSpacings[index])
           }
         }
         let dimensions = viewDimensions(
@@ -45,8 +45,8 @@ extension LayoutEngine {
           measured: childMeasurement,
           bounds: CellRect(
             origin: CellPoint(
-              x: bounds.origin.x
-                + crossMetrics.offset(of: dimensions, on: horizontalAlignment),
+              x: SaturatingConversion.adding(
+                bounds.origin.x, crossMetrics.offset(of: dimensions, on: horizontalAlignment)),
               y: nextY
             ),
             size: childMeasurement.measuredSize
@@ -57,9 +57,9 @@ extension LayoutEngine {
       var nextX = bounds.origin.x
       return measured.childMeasurements.enumerated().map { index, childMeasurement in
         defer {
-          nextX += childMeasurement.measuredSize.width
+          nextX = SaturatingConversion.adding(nextX, childMeasurement.measuredSize.width)
           if index < stackSpacings.count {
-            nextX += stackSpacings[index]
+            nextX = SaturatingConversion.adding(nextX, stackSpacings[index])
           }
         }
         let dimensions = viewDimensions(
@@ -73,8 +73,8 @@ extension LayoutEngine {
           bounds: CellRect(
             origin: CellPoint(
               x: nextX,
-              y: bounds.origin.y
-                + crossMetrics.offset(of: dimensions, on: verticalAlignment)
+              y: SaturatingConversion.adding(
+                bounds.origin.y, crossMetrics.offset(of: dimensions, on: verticalAlignment))
             ),
             size: childMeasurement.measuredSize
           )

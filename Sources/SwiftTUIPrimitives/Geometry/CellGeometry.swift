@@ -88,12 +88,16 @@ public struct CellRect: Equatable, Hashable, Sendable {
     size.width <= 0 || size.height <= 0
   }
 
+  /// The far horizontal edge, `origin.x + size.width`, saturating at
+  /// `Int.min` and `Int.max`.
   public var maxX: Int {
-    origin.x + size.width
+    SaturatingConversion.adding(origin.x, size.width)
   }
 
+  /// The far vertical edge, `origin.y + size.height`, saturating at `Int.min`
+  /// and `Int.max`.
   public var maxY: Int {
-    origin.y + size.height
+    SaturatingConversion.adding(origin.y, size.height)
   }
 
   public func contains(_ cell: CellPoint) -> Bool {
@@ -137,7 +141,9 @@ public struct CellRect: Equatable, Hashable, Sendable {
 
     return CellRect(
       origin: .init(x: minX, y: minY),
-      size: .init(width: maxX - minX, height: maxY - minY)
+      size: .init(
+        width: SaturatingConversion.subtracting(maxX, minX),
+        height: SaturatingConversion.subtracting(maxY, minY))
     )
   }
 
@@ -158,7 +164,9 @@ public struct CellRect: Equatable, Hashable, Sendable {
     let maxY = max(self.maxY, other.maxY)
     return CellRect(
       origin: .init(x: minX, y: minY),
-      size: .init(width: maxX - minX, height: maxY - minY)
+      size: .init(
+        width: SaturatingConversion.subtracting(maxX, minX),
+        height: SaturatingConversion.subtracting(maxY, minY))
     )
   }
 }

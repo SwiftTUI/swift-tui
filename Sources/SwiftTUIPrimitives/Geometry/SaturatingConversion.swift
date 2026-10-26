@@ -44,6 +44,40 @@ package enum SaturatingConversion {
     }
     return rhs < 0 ? .min : .max
   }
+
+  /// `lhs - rhs`, saturating at `Int.min` and `Int.max` instead of trapping.
+  package static func subtracting(_ lhs: Int, _ rhs: Int) -> Int {
+    let (difference, overflow) = lhs.subtractingReportingOverflow(rhs)
+    guard overflow else {
+      return difference
+    }
+    return rhs < 0 ? .max : .min
+  }
+
+  /// `-value`; `Int.min`, which has no negation, maps to `Int.max`.
+  package static func negated(_ value: Int) -> Int {
+    subtracting(0, value)
+  }
+
+  /// The sum of `values`, added in order with each step saturating like
+  /// `adding(_:_:)`. Equal to `values.reduce(0, +)` whenever no partial sum
+  /// overflows.
+  package static func sum(_ values: some Sequence<Int>) -> Int {
+    values.reduce(0, adding)
+  }
+
+  /// `(lhs * rhs) / divisor` without an intermediate overflow, for
+  /// non-negative operands and a positive divisor, saturating at `Int.max`.
+  /// Equal to the plain expression whenever the product fits in `Int`.
+  package static func multiplied(_ lhs: Int, by rhs: Int, dividedBy divisor: Int) -> Int {
+    let product = lhs.multipliedFullWidth(by: rhs)
+    // The quotient fits in `Int` exactly when the product is below
+    // 2^63 · divisor, that is when `product >> 63` is below the divisor.
+    guard 2 * product.high + Int(product.low >> 63) < divisor else {
+      return .max
+    }
+    return divisor.dividingFullWidth(product).quotient
+  }
 }
 
 /// Clipping of continuous line segments before their endpoints are converted

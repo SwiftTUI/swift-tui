@@ -77,12 +77,16 @@ public struct EdgeInsets: Equatable, Sendable {
     self.init(top: vertical, leading: horizontal, bottom: vertical, trailing: horizontal)
   }
 
+  /// The leading and trailing insets together, saturating at `Int.min` and
+  /// `Int.max`.
   public var horizontal: Int {
-    leading + trailing
+    SaturatingConversion.adding(leading, trailing)
   }
 
+  /// The top and bottom insets together, saturating at `Int.min` and
+  /// `Int.max`.
   public var vertical: Int {
-    top + bottom
+    SaturatingConversion.adding(top, bottom)
   }
 
   public static let zero = Self()
@@ -122,24 +126,27 @@ public struct EdgeInsets: Equatable, Sendable {
     )
   }
 
+  /// The edge-wise sum, each edge saturating at `Int.min` and `Int.max`.
   public func adding(_ other: Self) -> Self {
     Self(
-      top: top + other.top,
-      leading: leading + other.leading,
-      bottom: bottom + other.bottom,
-      trailing: trailing + other.trailing
+      top: SaturatingConversion.adding(top, other.top),
+      leading: SaturatingConversion.adding(leading, other.leading),
+      bottom: SaturatingConversion.adding(bottom, other.bottom),
+      trailing: SaturatingConversion.adding(trailing, other.trailing)
     )
   }
 
+  /// These insets with `amount` added to each edge in `edges`, saturating at
+  /// `Int.min` and `Int.max`.
   public func adding(
     _ amount: Int,
     to edges: Edge.Set
   ) -> Self {
     Self(
-      top: top + (edges.contains(.top) ? amount : 0),
-      leading: leading + (edges.contains(.leading) ? amount : 0),
-      bottom: bottom + (edges.contains(.bottom) ? amount : 0),
-      trailing: trailing + (edges.contains(.trailing) ? amount : 0)
+      top: SaturatingConversion.adding(top, edges.contains(.top) ? amount : 0),
+      leading: SaturatingConversion.adding(leading, edges.contains(.leading) ? amount : 0),
+      bottom: SaturatingConversion.adding(bottom, edges.contains(.bottom) ? amount : 0),
+      trailing: SaturatingConversion.adding(trailing, edges.contains(.trailing) ? amount : 0)
     )
   }
 }

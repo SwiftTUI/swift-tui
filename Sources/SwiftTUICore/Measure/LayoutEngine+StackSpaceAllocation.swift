@@ -120,7 +120,7 @@ extension LayoutEngine {
       mainDimension(of: $0.measuredSize, for: axis)
     }
     let flexibilities: [Int?] = children.indices.map { index in
-      maximums[index].map { max(0, $0 - minimums[index]) }
+      maximums[index].map { max(0, SaturatingConversion.subtracting($0, minimums[index])) }
     }
     // An unknown custom response is not a promise to absorb its entire offer.
     // Measure it before proven absorbers so its unused share remains available.
@@ -166,21 +166,23 @@ extension LayoutEngine {
 
     var suffixMinimums = [Int](repeating: 0, count: order.count + 1)
     for position in order.indices.reversed() {
-      suffixMinimums[position] = suffixMinimums[position + 1] + minimums[order[position]]
+      suffixMinimums[position] = SaturatingConversion.adding(
+        suffixMinimums[position + 1], minimums[order[position]])
     }
     let reservedLowerMinimums = order.indices.map {
       suffixMinimums[groupEndPositions[$0]]
     }
     let groupMinimumSuffixes = order.indices.map {
-      suffixMinimums[$0] - suffixMinimums[groupEndPositions[$0]]
+      SaturatingConversion.subtracting(suffixMinimums[$0], suffixMinimums[groupEndPositions[$0]])
     }
 
     var suffixIdeals = [Int](repeating: 0, count: order.count + 1)
     for position in order.indices.reversed() {
-      suffixIdeals[position] = suffixIdeals[position + 1] + ideals[order[position]]
+      suffixIdeals[position] = SaturatingConversion.adding(
+        suffixIdeals[position + 1], ideals[order[position]])
     }
     let groupIdealSuffixes = order.indices.map {
-      suffixIdeals[$0] - suffixIdeals[groupEndPositions[$0]]
+      SaturatingConversion.subtracting(suffixIdeals[$0], suffixIdeals[groupEndPositions[$0]])
     }
 
     var unboundedTailFromPosition = [Bool](repeating: false, count: order.count)
@@ -207,8 +209,8 @@ extension LayoutEngine {
         ? (deficitClaimantCounts[next], spacerSuffixMinimums[next])
         : (0, 0)
       deficitClaimantCounts[position] = nextClaimants + (isAxisSpacer ? 0 : 1)
-      spacerSuffixMinimums[position] =
-        nextSpacerMinimums + (isAxisSpacer ? minimums[childIndex] : 0)
+      spacerSuffixMinimums[position] = SaturatingConversion.adding(
+        nextSpacerMinimums, isAxisSpacer ? minimums[childIndex] : 0)
     }
 
     return StackSequentialAllocationPlan(
@@ -280,12 +282,14 @@ extension LayoutEngine {
 
     let position = state.position
     let cross = crossDimension(of: effectiveProposal, for: axis)
-    let available = max(0, state.remainingMain - plan.reservedLowerMinimums[position])
+    let available = max(
+      0, SaturatingConversion.subtracting(state.remainingMain, plan.reservedLowerMinimums[position])
+    )
 
     if plan.unboundedTailFromPosition[position] {
       let run = position..<plan.groupEndPositions[position]
       let runChildIndices = run.map { plan.order[$0] }
-      let runIdealTotal = runChildIndices.reduce(0) { $0 + plan.ideals[$1] }
+      let runIdealTotal = SaturatingConversion.sum(runChildIndices.lazy.map { plan.ideals[$0] })
       let targets: [Int]
       if available >= runIdealTotal {
         // Surplus: equal division from zero (SwiftUI's treatment of
@@ -314,9 +318,9 @@ extension LayoutEngine {
       for (offset, runPosition) in run.enumerated() {
         let childIndex = plan.order[runPosition]
         state.allocatedMainSizes[childIndex] = targets[offset]
-        consumed += targets[offset]
+        consumed = SaturatingConversion.adding(consumed, targets[offset])
       }
-      state.remainingMain = max(0, state.remainingMain - consumed)
+      state.remainingMain = max(0, SaturatingConversion.subtracting(state.remainingMain, consumed))
       state.position = run.upperBound
 
       localMetrics.branching.builtinChildMeasureRequests += run.count
@@ -366,11 +370,12 @@ extension LayoutEngine {
     // sibling permanently loses (the batch arm's deficit distribution).
     let share: Int
     if inSurplus {
-      share = (2 * available + groupCountLeft) / (2 * groupCountLeft)
+      share = roundedHalfUpShare(of: available, among: groupCountLeft)
     } else {
       let claimants = max(1, plan.deficitClaimantCounts[position])
-      let claimable = max(0, available - plan.spacerSuffixMinimums[position])
-      share = (2 * claimable + claimants) / (2 * claimants)
+      let claimable = max(
+        0, SaturatingConversion.subtracting(available, plan.spacerSuffixMinimums[position]))
+      share = roundedHalfUpShare(of: claimable, among: claimants)
     }
     // In surplus, no group member yields below its ideal: unlike
     // SwiftUI (where text responds larger than a lean offer), measure
@@ -386,8 +391,9 @@ extension LayoutEngine {
       // Earlier flexible siblings cannot spend a later sibling's minimum.
       // Keep the current floor when the deficit itself is impossible, so
       // fitting the proposal never takes precedence over structural minima.
-      let laterMinimums = plan.groupMinimumSuffixes[position] - plan.minimums[childIndex]
-      offer = min(offer, max(floorSize, available - laterMinimums))
+      let laterMinimums = SaturatingConversion.subtracting(
+        plan.groupMinimumSuffixes[position], plan.minimums[childIndex])
+      offer = min(offer, max(floorSize, SaturatingConversion.subtracting(available, laterMinimums)))
     }
     if let cap = plan.maximums[childIndex] {
       offer = min(offer, cap)
@@ -494,7 +500,8 @@ extension LayoutEngine {
       guard !freeOffsets.isEmpty else {
         return targets.map { $0 ?? 0 }
       }
-      let budget = available - targets.compactMap { $0 }.reduce(0, +)
+      let budget = SaturatingConversion.subtracting(
+        available, SaturatingConversion.sum(targets.compactMap { $0 }))
       let base = budget / freeOffsets.count
       let pinned = freeOffsets.filter { floors[$0] > base }
       guard pinned.isEmpty else {
@@ -525,9 +532,11 @@ extension LayoutEngine {
     ideals: [Int],
     minimums: [Int]
   ) -> [Int] {
-    let overflow = ideals.reduce(0, +) - available
-    let compressibles = ideals.indices.map { max(0, ideals[$0] - minimums[$0]) }
-    let totalCompressible = compressibles.reduce(0, +)
+    let overflow = SaturatingConversion.subtracting(SaturatingConversion.sum(ideals), available)
+    let compressibles = ideals.indices.map {
+      max(0, SaturatingConversion.subtracting(ideals[$0], minimums[$0]))
+    }
+    let totalCompressible = SaturatingConversion.sum(compressibles)
 
     guard overflow < totalCompressible else {
       return minimums
@@ -536,12 +545,15 @@ extension LayoutEngine {
     var reductions = [Int](repeating: 0, count: ideals.count)
     var distributed = 0
     for offset in ideals.indices {
-      let reduction = (overflow * compressibles[offset]) / totalCompressible
+      // `overflow < totalCompressible`, so the quotient is at most the
+      // member's give; the full-width product cannot overflow on the way.
+      let reduction = SaturatingConversion.multiplied(
+        overflow, by: compressibles[offset], dividedBy: totalCompressible)
       reductions[offset] = reduction
-      distributed += reduction
+      distributed = SaturatingConversion.adding(distributed, reduction)
     }
 
-    let remainder = overflow - distributed
+    let remainder = SaturatingConversion.subtracting(overflow, distributed)
     if remainder > 0 {
       let eligibleOffsets = ideals.indices.filter {
         reductions[$0] < compressibles[$0]
@@ -555,8 +567,17 @@ extension LayoutEngine {
     }
 
     return ideals.indices.map {
-      max(minimums[$0], ideals[$0] - reductions[$0])
+      max(minimums[$0], SaturatingConversion.subtracting(ideals[$0], reductions[$0]))
     }
+  }
+
+  /// `amount / count` rounded half up, which is `(2 * amount + count) / (2 * count)`
+  /// computed without doubling `amount`: that expression overflows once
+  /// `amount` exceeds `Int.max / 2` (STUI-780). Equal to it for every
+  /// non-negative `amount` it could compute.
+  func roundedHalfUpShare(of amount: Int, among count: Int) -> Int {
+    let (quotient, remainder) = amount.quotientAndRemainder(dividingBy: count)
+    return remainder >= count - remainder ? quotient + 1 : quotient
   }
 
   package func evenlyDistributedOffsets(

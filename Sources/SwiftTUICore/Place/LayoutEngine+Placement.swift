@@ -188,12 +188,14 @@ extension LayoutEngine {
   ) -> CellRect {
     let minX = min(lhs.origin.x, rhs.origin.x)
     let minY = min(lhs.origin.y, rhs.origin.y)
-    let maxX = max(lhs.origin.x + lhs.size.width, rhs.origin.x + rhs.size.width)
-    let maxY = max(lhs.origin.y + lhs.size.height, rhs.origin.y + rhs.size.height)
+    let maxX = max(lhs.maxX, rhs.maxX)
+    let maxY = max(lhs.maxY, rhs.maxY)
 
     return CellRect(
       origin: .init(x: minX, y: minY),
-      size: .init(width: maxX - minX, height: maxY - minY)
+      size: .init(
+        width: SaturatingConversion.subtracting(maxX, minX),
+        height: SaturatingConversion.subtracting(maxY, minY))
     )
   }
 
@@ -252,7 +254,7 @@ extension LayoutEngine {
       if let child = children.first {
         return translated(
           child.contentBoundsForParent,
-          by: .init(x: -x, y: -y)
+          by: .init(x: SaturatingConversion.negated(x), y: SaturatingConversion.negated(y))
         )
       }
       return bounds
@@ -382,8 +384,8 @@ extension LayoutEngine {
   ) -> CellRect {
     CellRect(
       origin: .init(
-        x: rect.origin.x + delta.x,
-        y: rect.origin.y + delta.y
+        x: SaturatingConversion.adding(rect.origin.x, delta.x),
+        y: SaturatingConversion.adding(rect.origin.y, delta.y)
       ),
       size: rect.size
     )
