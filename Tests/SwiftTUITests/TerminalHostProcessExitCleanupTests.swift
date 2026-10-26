@@ -96,6 +96,12 @@
       )
 
       try host.enableRawMode()
+      // Leave raw mode before the pipes close: an enabled host keeps its
+      // screen-ownership entry, whose captured pipe identity a later test's
+      // pipe can reuse (macOS recycles pipe objects), refusing its writes.
+      defer {
+        do { try host.disableRawMode() } catch { Issue.record("fixture cleanup failed: \(error)") }
+      }
 
       TerminalProcessExitCleanupRegistry.runForTesting()
       closeFileDescriptor(&outputPipe.writeEnd)
@@ -128,6 +134,12 @@
       )
 
       try host.enableRawMode()
+      // Leave raw mode before the pipes close: an enabled host keeps its
+      // screen-ownership entry, whose captured pipe identity a later test's
+      // pipe can reuse (macOS recycles pipe objects), refusing its writes.
+      defer {
+        do { try host.disableRawMode() } catch { Issue.record("fixture cleanup failed: \(error)") }
+      }
 
       TerminalProcessExitCleanupRegistry.runForTesting()
       closeFileDescriptor(&outputPipe.writeEnd)
@@ -159,6 +171,12 @@
       )
 
       try host.enableRawMode()
+      // Leave raw mode before the pipes close: an enabled host keeps its
+      // screen-ownership entry, whose captured pipe identity a later test's
+      // pipe can reuse (macOS recycles pipe objects), refusing its writes.
+      defer {
+        do { try host.disableRawMode() } catch { Issue.record("fixture cleanup failed: \(error)") }
+      }
       try host.setPointerHoverEnabled(true)
 
       TerminalProcessExitCleanupRegistry.runForTesting()

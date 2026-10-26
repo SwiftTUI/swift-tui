@@ -251,16 +251,23 @@ public enum TerminalHostError: Error, Equatable, Sendable, CustomStringConvertib
           } catch {
             // Retain the process-exit fallback if escape cleanup also fails.
           }
+          var restoredMode = restorePlan.savedSnapshot == nil
           if let savedSnapshot = restorePlan.savedSnapshot {
             do {
               try controller.restore(
                 savedSnapshot,
                 input: inputFileDescriptor, output: outputFileDescriptor)
-              if restoredOutput { _ = rawModeSession.deactivate() }
+              restoredMode = true
             } catch {
-              // The process-exit fallback retains the snapshot.
+              // The process-exit fallback and the next entry keep the snapshot.
             }
           }
+          // A failed entry never leaves the session enabled, so a retry or a
+          // later session performs a fresh entry. The entry's own error is
+          // what throws; a rollback that could not finish stays owed apart
+          // from the session, in the process-exit fallback.
+          rawModeSession.abandonFailedEntry(
+            restoredOutput: restoredOutput, restoredMode: restoredMode)
         }
       }
 
