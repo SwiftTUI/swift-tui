@@ -32,11 +32,15 @@ extension DefaultRenderer {
     abortPreparedFrameHead(draft)
   }
 
+  /// Abandons a prepared head whose frame reports nothing (cancelled before
+  /// its tail): the dispatch-time issues it drained return to the queue for
+  /// the next frame.
   @MainActor
   package func abortPreparedFrameHead(
     _ draft: FrameHeadDraft
   ) {
     draft.transaction.discard()
+    draft.frameTailInput.imperativeRuntimeIssues.requeue()
   }
 
   @MainActor

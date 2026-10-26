@@ -33,6 +33,13 @@ import SwiftTUICore
     var readerMode = false
     private var savedSnapshot: TerminalModeSnapshot?
     private var processExitCleanupToken: UInt64?
+    /// The process-exit fallback of a failed entry whose rollback could not
+    /// finish (STUI-1121). It is owed apart from the session, which a failed
+    /// entry always clears, until the next activation supersedes it.
+    private var owedProcessExitCleanupToken: UInt64?
+    /// The saved mode of a failed entry whose restore failed: the terminal is
+    /// still raw, so the next entry's own capture would be a raw snapshot.
+    private var unrestoredSnapshot: TerminalModeSnapshot?
 
     var ownsScreen = false
     var isEnabled = false
@@ -46,13 +53,18 @@ import SwiftTUICore
       inputFileDescriptor: Int32,
       outputFileDescriptor: Int32
     ) {
-      savedSnapshot = snapshot
+      savedSnapshot = unrestoredSnapshot ?? snapshot
+      unrestoredSnapshot = nil
       self.mouseCoordinateMode = mouseCoordinateMode
       isEnabled = true
       refreshProcessExitCleanupRegistration(
         inputFileDescriptor: inputFileDescriptor,
         outputFileDescriptor: outputFileDescriptor
       )
+      // This session's own fallback carries the reset bytes and the original
+      // snapshot, so a failed entry's owed fallback is superseded.
+      TerminalProcessExitCleanupRegistry.unregister(owedProcessExitCleanupToken)
+      owedProcessExitCleanupToken = nil
     }
 
     mutating func deactivate() -> TerminalRawModeRestorePlan {
@@ -60,6 +72,23 @@ import SwiftTUICore
       let plan = restorePlan
       reset()
       return plan
+    }
+
+    /// Clears the session after a failed entry, so a retry or a later session
+    /// performs a fresh entry (STUI-1182). What the rollback could not finish
+    /// stays owed apart from the session: when the reset bytes or the restore
+    /// failed, the process-exit fallback stays registered (STUI-1121), and an
+    /// unrestored snapshot becomes the next entry's saved mode.
+    mutating func abandonFailedEntry(restoredOutput: Bool, restoredMode: Bool) {
+      if restoredOutput, restoredMode {
+        unregisterProcessExitCleanup()
+      } else {
+        TerminalProcessExitCleanupRegistry.unregister(owedProcessExitCleanupToken)
+        owedProcessExitCleanupToken = processExitCleanupToken
+        processExitCleanupToken = nil
+        if !restoredMode { unrestoredSnapshot = savedSnapshot }
+      }
+      reset()
     }
 
     var restorePlan: TerminalRawModeRestorePlan {

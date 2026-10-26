@@ -87,7 +87,8 @@ extension DefaultRenderer {
     // Life-tab revisit freeze). Skip before any checkpoint touch; the caller
     // replays the frame intent against the post-commit graph.
     if draft.transaction.baselineIsStale {
-      draft.transaction.discard()
+      // Skipped unreported: the replayed intent reports its issues.
+      abortPreparedFrameHead(draft)
       return .skippedStaleBaseline(runtimeIssues: draft.runtimeIssues)
     }
     let candidate = makeCompletedFrameCandidate(
@@ -274,6 +275,8 @@ extension DefaultRenderer {
       _ = draft.transaction.commitElided()
       recordElidedFrame()
     }
+    // No artifacts report this frame's issues: the next frame does.
+    draft.frameTailInput.imperativeRuntimeIssues.requeue()
   }
 
   @MainActor
@@ -311,7 +314,9 @@ extension DefaultRenderer {
     reconciliation: SkippedFrameReconciliation
   ) {
     precondition(reconciliation.isAvailableToRuntimePolicy)
-    abortPreparedFrameHead(candidate.draft)
+    // A dropped frame reports its issues (the drop outcome carries the
+    // preview's), so it returns nothing to the imperative queue.
+    candidate.draft.transaction.discard()
   }
 
   @MainActor

@@ -27,8 +27,6 @@ func setGProperty<Value: Sendable>(
 let setGKnownIssues: [Int: String] = [
   130:
     "NEW-6: visibleRowCount counts the row above a separator line that starts the published window (window 1..<3 over rows 0..<1 and 2..<3 counts 2); the exact branch takes row(atOrBeforeLine:) of the first line; contract: CollectionScrollState.swift:116-125, :76-78; adjacent STUI-1239, STUI-1262",
-  136:
-    "NEW-7: the Windows arm enables hyperlinks and synchronized output from an inherited WT_SESSION although TERM_PROGRAM names another emulator (mintty, TERM empty); isWindowsTerminal ignores TERM_PROGRAM; contract: Environment-Variables.md:43-45; adjacent STUI-1225, STUI-1247",
 ]
 
 /// `count` independent draws in `range`; properties derive their inputs from

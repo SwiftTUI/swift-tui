@@ -183,4 +183,35 @@ struct AdversarialSetGCapabilityTests {
         : "WT_SESSION under TERM_PROGRAM \(environment["TERM_PROGRAM"] ?? "") and TERM '\(term)': hyperlinks \(marked.supportsHyperlinks), sync \(marked.supportsSynchronizedOutput); without it \(unmarked.supportsHyperlinks), \(unmarked.supportsSynchronizedOutput)"
     }
   }
+
+  // STUI-1313 neighbours: WT_SESSION still marks Windows Terminal when nothing
+  // names another emulator (unset or empty TERM_PROGRAM, as setC271 pins on
+  // POSIX), a foreign TERM still gets neither upgrade, and an emulator named
+  // by TERM_PROGRAM keeps only its own capabilities (vscode: hyperlinks on a
+  // generic xterm, as on the POSIX arm).
+  @Test func windowsTerminalMarkerNeighbours() {
+    func windows(_ environment: [String: String]) -> TerminalCapabilityProfile {
+      TerminalCapabilityProfile.detectWindowsConsole(environment: environment, isTTY: true)
+    }
+    for environment in [
+      ["WT_SESSION": "8c2f"], ["WT_SESSION": "8c2f", "TERM_PROGRAM": ""],
+      ["WT_SESSION": "8c2f", "TERM": "XTERM"],
+      ["WT_SESSION": "8c2f", "TERM": "xterm-256color", "TERM_PROGRAM": ""],
+    ] {
+      let profile = windows(environment)
+      #expect(profile.supportsHyperlinks, "\(environment)")
+      #expect(profile.supportsSynchronizedOutput, "\(environment)")
+    }
+    let foreign = windows(["WT_SESSION": "8c2f", "TERM": "screen-256color"])
+    #expect(!foreign.supportsHyperlinks)
+    #expect(!foreign.supportsSynchronizedOutput)
+    let vscode = ["WT_SESSION": "8c2f", "TERM": "xterm-256color", "TERM_PROGRAM": "vscode"]
+    let vscodeWindows = windows(vscode)
+    let vscodePOSIX = TerminalCapabilityProfile.detectPOSIXTerminal(
+      environment: vscode, isTTY: true)
+    #expect(vscodeWindows.supportsHyperlinks)
+    #expect(!vscodeWindows.supportsSynchronizedOutput, "WT_SESSION outranked TERM_PROGRAM")
+    #expect(vscodeWindows.supportsHyperlinks == vscodePOSIX.supportsHyperlinks)
+    #expect(vscodeWindows.supportsSynchronizedOutput == vscodePOSIX.supportsSynchronizedOutput)
+  }
 }

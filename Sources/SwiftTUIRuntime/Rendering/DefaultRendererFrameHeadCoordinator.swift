@@ -124,10 +124,10 @@ struct DefaultRendererFrameHeadCoordinator {
       frameProducts.frameTailInput.layoutPassContext.recordRuntimeIssue(issue)
     }
     // Dispatch-time issues recorded since the previous frame surface on this
-    // frame (see `ImperativeRuntimeIssueQueue`).
-    for issue in ImperativeRuntimeIssueQueue.drain() {
-      frameProducts.frameTailInput.layoutPassContext.recordRuntimeIssue(issue)
-    }
+    // frame (see `ImperativeRuntimeIssueQueue`); an abandoned frame returns
+    // them.
+    frameProducts.frameTailInput.imperativeRuntimeIssues.drainQueue(
+      into: frameProducts.frameTailInput.layoutPassContext)
     let checkpoints = preparedCheckpoints(
       for: mode,
       graphDraft: graphDraft,

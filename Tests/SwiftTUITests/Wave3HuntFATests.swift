@@ -52,9 +52,28 @@ func w3faKnownAsync(_ comment: Comment, _ body: () async throws -> Void) async {
 
   #if canImport(Glibc)
     private let w3faStreamSocketType = Int32(SOCK_STREAM.rawValue)
+    private let w3faDatagramSocketType = Int32(SOCK_DGRAM.rawValue)
   #else
     private let w3faStreamSocketType = SOCK_STREAM
+    private let w3faDatagramSocketType = SOCK_DGRAM
   #endif
+
+  /// The socket kinds the STUI-1271 pins cross: TCP, UDP, TCPv6 and AF_UNIX.
+  private let w3faSocketKinds: [(name: String, family: Int32, type: Int32)] = [
+    ("tcp", AF_INET, w3faStreamSocketType), ("udp", AF_INET, w3faDatagramSocketType),
+    ("tcp6", AF_INET6, w3faStreamSocketType), ("unix", AF_UNIX, w3faStreamSocketType),
+  ]
+
+  /// A fresh unbound socket of `kind`, or nil when the host lacks the family
+  /// (an IPv6-less container).
+  private func w3faSocket(
+    _ kind: (name: String, family: Int32, type: Int32)
+  ) throws -> Int32? {
+    let descriptor = socket(kind.family, kind.type, 0)
+    if descriptor < 0, errno == EAFNOSUPPORT { return nil }
+    try #require(descriptor >= 0, "\(kind.name) socket: errno \(errno)")
+    return descriptor
+  }
 
   /// Reads whatever `descriptor` holds without blocking.
   func w3faReadAvailable(_ descriptor: Int32) -> String {
@@ -212,11 +231,43 @@ func w3faKnownAsync(_ comment: Comment, _ body: () async throws -> Void) async {
       // Controls: the owner's own socket is refused; a unix socket is admitted.
       #expect(!DiagnosticScreenOwnership.allowsDiagnosticWrite(to: ownerSocket))
       #expect(DiagnosticScreenOwnership.allowsDiagnosticWrite(to: pair[0]))
-      let allowed = DiagnosticScreenOwnership.allowsDiagnosticWrite(to: destination)
-      w3faKnown(
-        "NEW-1: under an AF_INET socket presentation owner, runtime issues to a different AF_INET socket are refused as if it were the owner's own stream; mechanism: DiagnosticScreenOwnership identifies stream owners and destinations by st_dev/st_ino (DiagnosticScreenOwnership.swift:73-78, 89-112), and Darwin's fstat reports 0/0 for every inet socket, so Owner.stream(0, 0) matches any inet destination; contract: commit 3af7dd55 'allowed unless it is a stream owner's own file', fw3-a decision table; adjacent STUI-1210"
-      ) {
-        #expect(allowed)
+      // STUI-1271 (repaired): macOS identifies a socket by its kernel handle.
+      #expect(DiagnosticScreenOwnership.allowsDiagnosticWrite(to: destination))
+    }
+
+    // STUI-1271 neighbours of w3fa009: two sockets are two files whatever
+    // their families and types, so each distinct destination is admitted
+    // under each owner (Darwin's fstat(2) reports 0/0 for every inet socket).
+    @Test func socketOwnerAllowsEveryDistinctSocket() throws {
+      for ownerKind in w3faSocketKinds {
+        guard let owner = try w3faSocket(ownerKind) else { continue }
+        defer { _ = close(owner) }
+        DiagnosticScreenOwnership.acquire(owner)
+        defer { DiagnosticScreenOwnership.release(owner) }
+        for destinationKind in w3faSocketKinds {
+          guard let destination = try w3faSocket(destinationKind) else { continue }
+          defer { _ = close(destination) }
+          #expect(
+            DiagnosticScreenOwnership.allowsDiagnosticWrite(to: destination),
+            "\(ownerKind.name) owner, distinct \(destinationKind.name) destination")
+        }
+      }
+    }
+
+    // The owner's own socket stays refused through every descriptor of it:
+    // the acquired one and a dup(2), which shares the open socket.
+    @Test func socketOwnerRefusesItsOwnSocketThroughEveryDescriptor() throws {
+      for kind in w3faSocketKinds {
+        guard let owner = try w3faSocket(kind) else { continue }
+        let duplicate = dup(owner)
+        defer {
+          for descriptor in [owner, duplicate] where descriptor >= 0 { _ = close(descriptor) }
+        }
+        try #require(duplicate >= 0)
+        DiagnosticScreenOwnership.acquire(owner)
+        defer { DiagnosticScreenOwnership.release(owner) }
+        #expect(!DiagnosticScreenOwnership.allowsDiagnosticWrite(to: owner), "\(kind.name)")
+        #expect(!DiagnosticScreenOwnership.allowsDiagnosticWrite(to: duplicate), "\(kind.name) dup")
       }
     }
   }

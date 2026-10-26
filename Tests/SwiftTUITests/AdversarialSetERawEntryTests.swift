@@ -23,9 +23,6 @@
   @MainActor
   @Suite("Campaign F3 pass 2 raw-mode entry failure", .serialized)
   struct AdversarialSetERawEntryTests {
-    static let newFour =
-      "NEW-4: a raw-mode entry whose rollback reset write also fails leaves TerminalHost reporting raw mode, so a retry or a later RunLoop session performs no raw-mode entry; the entry defer deactivates the session only after a successful reset write (TerminalHost.swift:259) and enableRawMode returns early while isEnabled (:213); contract: STUI-1182 fix (a failed entry rolled itself back), pass-1 brief 06 (a later enable performs a fresh entry); adjacent STUI-1182, STUI-1121"
-
     @Test(arguments: [129, 130, 131, 132, 135])
     func rawEntryFailure(id: Int) async throws {
       let sink = try FileHandle(forUpdating: URL(fileURLWithPath: "/dev/null"))
@@ -57,9 +54,8 @@
         #expect(controller.snapshot.restores == 1)
         controller.clearErrors()
         try host.enableRawMode()
-        setEKnown(Self.newFour) {
-          #expect(controller.snapshot.enters == 2, "the retry performed no raw-mode entry")
-        }
+        // STUI-1300 (repaired): a failed entry always clears the session.
+        #expect(controller.snapshot.enters == 2, "the retry performed no raw-mode entry")
         return
       }
       let first = try await SetERawSession.run(host: host, id: id)
@@ -87,9 +83,7 @@
         controller.clearErrors()
         let second = try await SetERawSession.run(host: host, id: id)
         #expect(second.threw == nil)
-        setEKnown(Self.newFour) {
-          #expect(controller.snapshot.enters == 2, "the second session never entered raw mode")
-        }
+        #expect(controller.snapshot.enters == 2, "the second session never entered raw mode")
         #expect(controller.snapshot.restores == 2)
       }
     }
@@ -159,6 +153,69 @@
           #expect(count == -1 && (errno == EAGAIN || errno == EWOULDBLOCK))
         }
       }
+    }
+
+    // STUI-1300 neighbour: the process-exit fallback a failed rollback keeps
+    // (STUI-1121) is owed only until a later entry takes over. After the
+    // retry's clean exit, process exit writes nothing for the failed attempt.
+    @Test func setE131RetrySupersedesTheRetainedExitFallback() throws {
+      let sink = try FileHandle(forUpdating: URL(fileURLWithPath: "/dev/null"))
+      var output: [Int32] = [-1, -1]
+      try #require(unsafe pipe(&output) == 0)
+      defer {
+        for fd in output { _ = close(fd) }
+        do { try sink.close() } catch { Issue.record("fixture descriptor close failed: \(error)") }
+      }
+      let readFlags = fcntl(output[0], F_GETFL)
+      try #require(fcntl(output[0], F_SETFL, readFlags | O_NONBLOCK) == 0)
+      let controller = SetERawController()
+      let host = TerminalHost(
+        inputFileDescriptor: sink.fileDescriptor, outputFileDescriptor: output[1],
+        fallbackSize: .init(width: 20, height: 4), controller: controller,
+        capabilityProfile: .trueColor, environment: [:])
+      defer {
+        controller.clearErrors()
+        do { try host.disableRawMode() } catch { Issue.record("fixture cleanup failed: \(error)") }
+      }
+      controller.failWrite(TerminalHostEscapeSequences.enterAlternateScreen)
+      controller.failWrite(TerminalHostEscapeSequences.exitAlternateScreen)
+      #expect(throws: SetERawError.write) { try host.enableRawMode() }
+      controller.clearErrors()
+      try host.enableRawMode()
+      #expect(controller.snapshot.enters == 2, "the retry performed no raw-mode entry")
+      try host.disableRawMode()
+      TerminalProcessExitCleanupRegistry.runForTesting()
+      var byte: UInt8 = 0
+      let count = unsafe read(output[0], &byte, 1)
+      #expect(count == -1 && (errno == EAGAIN || errno == EWOULDBLOCK), "stale reset bytes at exit")
+    }
+
+    // STUI-1300 neighbour: when the rollback's restore fails, the terminal is
+    // still raw, so the retry's own capture is a raw snapshot. The session
+    // keeps the original one, and leaving raw mode restores it.
+    @Test func setE131RetryAfterFailedRestoreKeepsTheOriginalSnapshot() throws {
+      let sink = try FileHandle(forUpdating: URL(fileURLWithPath: "/dev/null"))
+      let controller = SetERawController()
+      let host = TerminalHost(
+        inputFileDescriptor: sink.fileDescriptor, outputFileDescriptor: sink.fileDescriptor,
+        fallbackSize: .init(width: 20, height: 4), controller: controller,
+        capabilityProfile: .trueColor, environment: [:])
+      defer {
+        controller.clearErrors()
+        do { try host.disableRawMode() } catch { Issue.record("fixture cleanup failed: \(error)") }
+        do { try sink.close() } catch { Issue.record("fixture descriptor close failed: \(error)") }
+      }
+      controller.failWrite(TerminalHostEscapeSequences.enterAlternateScreen)
+      controller.state.withLock { $0.restoreErrors = 1 }
+      #expect(throws: SetERawError.write) { try host.enableRawMode() }
+      #expect(controller.snapshot.restoredEntries == [1])
+      controller.clearErrors()
+      try host.enableRawMode()
+      #expect(controller.snapshot.enters == 2, "the retry performed no raw-mode entry")
+      try host.disableRawMode()
+      #expect(
+        controller.snapshot.restoredEntries == [1, 1],
+        "leaving raw mode restored the snapshot captured while raw")
     }
   }
 
@@ -235,6 +292,9 @@
       var writes: [String] = []
       var enterErrors = 0
       var writeNeedles: [String] = []
+      var restoreErrors = 0
+      /// The entry ordinal of each snapshot restore received.
+      var restoredEntries: [Int32] = []
     }
     let state = Mutex(State())
     var snapshot: State { state.withLock { $0 } }
@@ -242,6 +302,7 @@
       state.withLock {
         $0.enterErrors = 0
         $0.writeNeedles = []
+        $0.restoreErrors = 0
       }
     }
     func failWrite(_ needle: String) {
@@ -250,19 +311,30 @@
     func isATTY(_: Int32) -> Bool { true }
     func windowSize(of _: Int32) throws -> CellSize { .init(width: 20, height: 4) }
     func enterRawMode(input _: Int32, output _: Int32) throws -> TerminalModeSnapshot {
-      let fails = state.withLock { value in
+      let (fails, entry) = state.withLock { value in
         value.enters += 1
         if value.enterErrors > 0 {
           value.enterErrors -= 1
+          return (true, value.enters)
+        }
+        return (false, value.enters)
+      }
+      if fails { throw SetERawError.entry }
+      // Each entry's snapshot carries its ordinal, so a test can tell which
+      // entry's saved mode a restore received.
+      return TerminalModeSnapshot(attributes: termios(), inputFileStatusFlags: Int32(entry))
+    }
+    func restore(_ snapshot: TerminalModeSnapshot, input _: Int32, output _: Int32) throws {
+      let fails = state.withLock { value in
+        value.restores += 1
+        value.restoredEntries.append(snapshot.inputFileStatusFlags)
+        if value.restoreErrors > 0 {
+          value.restoreErrors -= 1
           return true
         }
         return false
       }
-      if fails { throw SetERawError.entry }
-      return .init()
-    }
-    func restore(_: TerminalModeSnapshot, input _: Int32, output _: Int32) throws {
-      state.withLock { $0.restores += 1 }
+      if fails { throw SetERawError.restore }
     }
     func write(_ output: String, to _: Int32) throws {
       let fails = state.withLock { value in

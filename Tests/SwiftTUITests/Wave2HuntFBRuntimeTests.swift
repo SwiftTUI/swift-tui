@@ -690,8 +690,10 @@ struct Wave2HuntFBRuntimeTests {
     let windows = TerminalCapabilityProfile.detectWindowsConsole(
       environment: environment, isTTY: true)
     let posix = TerminalCapabilityProfile.detectPOSIXTerminal(environment: environment, isTTY: true)
-    // Observation, recorded in the hypotheses.
-    #expect(windows.supportsHyperlinks && windows.supportsSynchronizedOutput)
+    // The hunt recorded the arms disagreeing here (Windows: both on). STUI-1313
+    // applies the documented rule on Windows too: a nonempty TERM_PROGRAM
+    // outranks the inherited WT_SESSION, so both arms leave both off.
+    #expect(!windows.supportsHyperlinks && !windows.supportsSynchronizedOutput)
     #expect(!posix.supportsHyperlinks && !posix.supportsSynchronizedOutput)
   }
 

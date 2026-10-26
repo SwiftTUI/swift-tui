@@ -169,6 +169,49 @@ struct FrameTailInput {
   /// stage re-runs measure/place with all reuse disabled and compares — the
   /// `layout-shadow-divergence` oracle.
   var verifyLayoutShadow: Bool = false
+  /// The dispatch-time issues drained into this frame's issue channel. Every
+  /// pass of one frame shares it, so a relayout pass and an abandoned frame
+  /// can account for them.
+  var imperativeRuntimeIssues = FrameImperativeRuntimeIssues()
+}
+
+/// The `ImperativeRuntimeIssueQueue` issues one frame drained into its issue
+/// channel. A committed or dropped frame reports them. A frame abandoned
+/// without reporting (cancelled before its tail, a stale-baseline skip, an
+/// elided commit) returns them to the queue with ``requeue()``.
+final class FrameImperativeRuntimeIssues: Sendable {
+  private let drained = Mutex<[RuntimeIssue]>([])
+
+  /// Drains the queue into `context`, this frame's issue channel.
+  @MainActor
+  func drainQueue(into context: LayoutPassContext) {
+    let issues = ImperativeRuntimeIssueQueue.drain()
+    guard !issues.isEmpty else {
+      return
+    }
+    drained.withLock { $0.append(contentsOf: issues) }
+    for issue in issues {
+      context.recordRuntimeIssue(issue)
+    }
+  }
+
+  /// Records what this frame drained so far into `context`: a relayout pass
+  /// starts from a fresh layout context but reports the same frame.
+  func record(into context: LayoutPassContext) {
+    for issue in drained.withLock({ $0 }) {
+      context.recordRuntimeIssue(issue)
+    }
+  }
+
+  /// Returns the drained issues to the queue; the frame reports nothing.
+  @MainActor
+  func requeue() {
+    let issues = drained.withLock { drained in
+      defer { drained = [] }
+      return drained
+    }
+    ImperativeRuntimeIssueQueue.requeue(issues)
+  }
 }
 
 struct FrameTailDiagnostics {
