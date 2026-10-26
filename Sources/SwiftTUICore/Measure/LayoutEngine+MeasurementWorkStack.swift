@@ -358,9 +358,9 @@ extension LayoutEngine {
         let childCount
       ):
         let probes = popMeasurements(from: &results, count: childCount)
-        let main =
-          probes.reduce(0) { $0 + mainDimension(of: $1.measuredSize, for: axis) }
-          + max(0, childCount - 1) * spacing
+        let main = SaturatingConversion.adding(
+          SaturatingConversion.sum(probes.map { mainDimension(of: $0.measuredSize, for: axis) }),
+          SaturatingConversion.multiplying(max(0, childCount - 1), spacing))
         let cross = probes.reduce(0) { max($0, crossDimension(of: $1.measuredSize, for: axis)) }
         let probeMeasurement = MeasuredNode(
           identity: node.identity, proposal: originalProposal,

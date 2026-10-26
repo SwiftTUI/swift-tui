@@ -54,6 +54,15 @@ package enum SaturatingConversion {
     return rhs < 0 ? .max : .min
   }
 
+  /// `lhs * rhs`, saturating at `Int.min` and `Int.max` instead of trapping.
+  package static func multiplying(_ lhs: Int, _ rhs: Int) -> Int {
+    let (product, overflow) = lhs.multipliedReportingOverflow(by: rhs)
+    guard overflow else {
+      return product
+    }
+    return (lhs < 0) == (rhs < 0) ? .max : .min
+  }
+
   /// `-value`; `Int.min`, which has no negation, maps to `Int.max`.
   package static func negated(_ value: Int) -> Int {
     subtracting(0, value)

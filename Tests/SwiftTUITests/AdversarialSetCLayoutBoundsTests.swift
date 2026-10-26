@@ -360,6 +360,88 @@ struct AdversarialSetCLayoutBoundsTests {
 
   // MARK: - Wave 4 FW-M regressions (STUI-1333)
 
+  /// STUI-1333: a lazy stack lays out an extreme spacing exactly as its eager
+  /// twin does (FW-I repaired the eager stack's sums): the same frame and the
+  /// same measured size, in both axes. The in-range spacings are the controls
+  /// that make the twin a valid oracle.
+  @Test(arguments: [Int.max, Int.min, Int.max / 2, 0, 1], [false, true])
+  func lazyStackMatchesEagerTwinAtExtremeSpacing(spacing: Int, horizontal: Bool) {
+    func render(_ view: some View) -> RenderSnapshot {
+      DefaultRenderer().render(
+        view, context: .init(identity: testIdentity("setCLazyTwin")),
+        proposal: .init(width: 20, height: 6))
+    }
+    let lazy =
+      horizontal
+      ? render(AnyView(LazyHStack(spacing: spacing) { setCTwinRows() }))
+      : render(AnyView(LazyVStack(spacing: spacing) { setCTwinRows() }))
+    let eager =
+      horizontal
+      ? render(AnyView(HStack(spacing: spacing) { setCTwinRows() }))
+      : render(AnyView(VStack(spacing: spacing) { setCTwinRows() }))
+    #expect(lazy.rasterSurface.lines == eager.rasterSurface.lines)
+    #expect(lazy.measuredTree.measuredSize == eager.measuredTree.measuredSize)
+  }
+
+  /// STUI-1333: windowed and exhaustive lazy stacks with an extreme spacing or
+  /// extreme row geometry render inside a scroll view and take wheel, click,
+  /// page, End and Home input. The interactive surface stays the host's size,
+  /// and an extreme spacing still shows the first row at the top.
+  @Test(arguments: SetCExtremeLazyStack.allCases)
+  func extremeLazyStackScrollsInsideAScrollView(_ shape: SetCExtremeLazyStack) throws {
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("setCLazy", "\(shape)"),
+      size: .init(width: 20, height: 6)
+    ) { shape.view }
+    defer { harness.shutdown() }
+    if let prefix = shape.firstFramePrefix {
+      #expect(harness.frame.hasPrefix(prefix), "\(harness.frame)")
+    }
+    var frames = [harness.frame]
+    frames.append(try harness.scrollPointer(at: .init(x: 1, y: 1), deltaX: 2, deltaY: 3))
+    frames.append(try harness.click(.init(x: 1, y: 0)))
+    for key in [KeyPress(.pageDown), KeyPress(.end), KeyPress(.pageUp), KeyPress(.home)] {
+      frames.append(try harness.pressKey(key))
+    }
+    frames.append(try harness.scrollPointer(at: .init(x: 1, y: 1), deltaX: -2, deltaY: -3))
+    for frame in frames {
+      #expect(frame.split(separator: "\n", omittingEmptySubsequences: false).count == 6)
+    }
+  }
+
+  /// STUI-1333: `scrollTo` targets in a lazy stack whose offsets saturate
+  /// resolve without trapping, and scrolling back to the first row shows it.
+  @Test(arguments: [true, false])
+  func scrollToInsideSaturatedLazyStack(tallRows: Bool) throws {
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("setCLazyScrollTo", "\(tallRows)"),
+      size: .init(width: 20, height: 8)
+    ) {
+      ScrollViewReader { proxy in
+        VStack(alignment: .leading, spacing: 0) {
+          HStack {
+            Button("last") { proxy.scrollTo(99, anchor: .top) }
+            Button("first") { proxy.scrollTo(0, anchor: .top) }
+          }
+          ScrollView {
+            LazyVStack(alignment: .leading, spacing: tallRows ? 0 : Int.max) {
+              ForEach(0..<100, id: \.self) { row in
+                Text("row \(row)")
+                  .frame(height: tallRows ? Int.max : 1, alignment: .top)
+                  .id(row)
+              }
+            }
+          }
+        }
+      }
+    }
+    defer { harness.shutdown() }
+    #expect(harness.frame.contains("row 0"))
+    _ = try harness.clickText("last")
+    let back = try harness.clickText("first")
+    #expect(back.contains("row 0"), "\(back)")
+  }
+
   /// STUI-1333: directional focus moves to and from a button at an extreme
   /// offset, position or frame exactly as to a merely distant twin. Moving
   /// focus repaints both buttons, so the presentation damage of the far one
@@ -566,6 +648,133 @@ private func setCBoundsLines<V: View>(_ view: V, _ name: String) -> [String] {
     view, context: .init(identity: testIdentity("setCBounds", name)),
     proposal: .init(width: 20, height: 4)
   ).rasterSurface.lines
+}
+
+@MainActor
+@ViewBuilder
+private func setCTwinRows() -> some View {
+  Text("a")
+  Text("bb")
+  Text("c")
+}
+
+@MainActor
+private func setCLazyRows(_ count: Int = 100) -> some View {
+  ForEach(0..<count, id: \.self) { Text("row \($0)") }
+}
+
+/// Lazy stacks whose windowed or exhaustive arithmetic overflowed (STUI-1333).
+enum SetCExtremeLazyStack: CaseIterable, Sendable, CustomTestStringConvertible {
+  case spacingMax, spacingMin, horizontalSpacingMax, horizontalSpacingMin, spacingSumOverflows
+  case rowPaddingMax, rowFrameHeightMax, rowMinHeightMax, rowPaddingMin, rowTopPaddingMax
+  case horizontalRowPaddingMax, stackPaddingMax, stackTopPaddingMax, coldEstimateSpacingMax
+  case nestedSpacingMax, positionedRows, rowHeightsSumOverflow
+
+  var testDescription: String { "\(self)" }
+
+  /// How the first frame starts: an extreme spacing still shows the first
+  /// row at the top. An `Int.min` spacing overlaps every later row onto the
+  /// first at an `Int.min` offset and paints what its eager twin paints
+  /// (`lazyStackMatchesEagerTwinAtExtremeSpacing`), which is nothing.
+  var firstFramePrefix: String? {
+    switch self {
+    case .spacingMax, .horizontalSpacingMax, .spacingSumOverflows, .rowHeightsSumOverflow: "row 0"
+    case .coldEstimateSpacingMax: "header\nrow 0"
+    default: nil
+    }
+  }
+
+  @MainActor
+  var view: AnyView {
+    switch self {
+    case .spacingMax:
+      AnyView(ScrollView { LazyVStack(alignment: .leading, spacing: Int.max) { setCLazyRows() } })
+    case .spacingMin:
+      AnyView(ScrollView { LazyVStack(alignment: .leading, spacing: Int.min) { setCLazyRows() } })
+    case .horizontalSpacingMax:
+      AnyView(ScrollView(.horizontal) { LazyHStack(spacing: Int.max) { setCLazyRows() } })
+    case .horizontalSpacingMin:
+      AnyView(ScrollView(.horizontal) { LazyHStack(spacing: Int.min) { setCLazyRows() } })
+    case .spacingSumOverflows:
+      AnyView(
+        ScrollView { LazyVStack(alignment: .leading, spacing: Int.max / 50) { setCLazyRows() } })
+    case .rowPaddingMax:
+      AnyView(
+        ScrollView {
+          LazyVStack { ForEach(0..<100, id: \.self) { Text("row \($0)").padding(Int.max) } }
+        })
+    case .rowFrameHeightMax:
+      AnyView(
+        ScrollView {
+          LazyVStack {
+            ForEach(0..<100, id: \.self) { Text("row \($0)").frame(height: Int.max) }
+          }
+        })
+    case .rowMinHeightMax:
+      AnyView(
+        ScrollView {
+          LazyVStack {
+            ForEach(0..<100, id: \.self) { Text("row \($0)").frame(minHeight: .finite(Int.max)) }
+          }
+        })
+    case .rowPaddingMin:
+      AnyView(
+        ScrollView {
+          LazyVStack { ForEach(0..<100, id: \.self) { Text("row \($0)").padding(Int.min) } }
+        })
+    case .rowTopPaddingMax:
+      AnyView(
+        ScrollView {
+          LazyVStack {
+            ForEach(0..<100, id: \.self) { Text("row \($0)").padding(.top, Int.max) }
+          }
+        })
+    case .horizontalRowPaddingMax:
+      AnyView(
+        ScrollView(.horizontal) {
+          LazyHStack { ForEach(0..<100, id: \.self) { Text("r\($0)").padding(Int.max) } }
+        })
+    case .stackPaddingMax:
+      AnyView(ScrollView { LazyVStack { setCLazyRows() }.padding(Int.max) })
+    case .stackTopPaddingMax:
+      AnyView(ScrollView { LazyVStack { setCLazyRows() }.padding(.top, Int.max) })
+    case .coldEstimateSpacingMax:
+      AnyView(
+        VStack(alignment: .leading, spacing: 0) {
+          Text("header")
+          ScrollView { LazyVStack(alignment: .leading, spacing: Int.max) { setCLazyRows() } }
+        })
+    case .nestedSpacingMax:
+      AnyView(
+        ScrollView {
+          LazyVStack(spacing: Int.max) {
+            ForEach(0..<10, id: \.self) { row in
+              LazyHStack(spacing: Int.max) {
+                ForEach(0..<10, id: \.self) { Text("\(row).\($0)") }
+              }
+            }
+          }
+        })
+    case .positionedRows:
+      AnyView(
+        ScrollView {
+          LazyVStack {
+            ForEach(0..<100, id: \.self) { row in
+              Text("row \(row)").offset(y: row.isMultiple(of: 2) ? Int.max : Int.min)
+            }
+          }
+        })
+    case .rowHeightsSumOverflow:
+      AnyView(
+        ScrollView {
+          LazyVStack(alignment: .leading) {
+            ForEach(0..<100, id: \.self) { row in
+              Text("row \(row)").frame(height: Int.max / 4, alignment: .top)
+            }
+          }
+        })
+    }
+  }
 }
 
 /// Buttons at extreme geometry, each beside a distant twin (STUI-1333).

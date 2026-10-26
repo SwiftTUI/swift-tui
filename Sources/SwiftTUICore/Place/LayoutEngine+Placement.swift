@@ -138,7 +138,8 @@ extension LayoutEngine {
     }
 
     let placedIdentities = Set(placedChildren.map(\.identity))
-    let crossLength = max(0, snapshot.crossLeading + snapshot.crossTrailing)
+    let crossLength = max(
+      0, SaturatingConversion.adding(snapshot.crossLeading, snapshot.crossTrailing))
     var estimates: [LazyChildScrollEstimate] = []
     estimates.reserveCapacity(max(0, snapshot.childIdentities.count - placedChildren.count))
     for (index, identity) in snapshot.childIdentities.enumerated()
@@ -154,14 +155,14 @@ extension LayoutEngine {
           CellRect(
             origin: CellPoint(
               x: bounds.origin.x,
-              y: bounds.origin.y + snapshot.childMainOffsets[index]
+              y: SaturatingConversion.adding(bounds.origin.y, snapshot.childMainOffsets[index])
             ),
             size: CellSize(width: crossLength, height: snapshot.childMainLengths[index])
           )
         case .horizontal:
           CellRect(
             origin: CellPoint(
-              x: bounds.origin.x + snapshot.childMainOffsets[index],
+              x: SaturatingConversion.adding(bounds.origin.x, snapshot.childMainOffsets[index]),
               y: bounds.origin.y
             ),
             size: CellSize(width: snapshot.childMainLengths[index], height: crossLength)
@@ -277,13 +278,13 @@ extension LayoutEngine {
         switch axis {
         case .vertical:
           .init(
-            width: snapshot.crossLeading + snapshot.crossTrailing,
+            width: SaturatingConversion.adding(snapshot.crossLeading, snapshot.crossTrailing),
             height: snapshot.contentMainLength
           )
         case .horizontal:
           .init(
             width: snapshot.contentMainLength,
-            height: snapshot.crossLeading + snapshot.crossTrailing
+            height: SaturatingConversion.adding(snapshot.crossLeading, snapshot.crossTrailing)
           )
         }
       let contentBounds = CellRect(origin: bounds.origin, size: contentSize)
