@@ -108,6 +108,13 @@
     @Test func setE139ServerLifecycleReturnsDescriptorsAndEntry() async throws {
       let fixture = try SetEAttachDirectory()
       defer { fixture.remove() }
+      // One warm-up cycle first: on Linux the first server start allocates one
+      // process-lifetime runtime descriptor, constant across every later cycle.
+      // The contract is that each lifecycle returns what it opened.
+      let warmUp = await SetEServerRun.start(fixture.server(identifier: "warm-up"))
+      try #require(warmUp.isReady, "the warm-up cycle never became ready")
+      warmUp.cancel()
+      _ = await warmUp.finish()
       let baseline = setEOpenDescriptorCount()
       for cycle in 1...3 {
         let server = fixture.server(identifier: "cycle")
