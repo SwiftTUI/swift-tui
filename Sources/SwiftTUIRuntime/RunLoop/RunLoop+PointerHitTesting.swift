@@ -30,7 +30,12 @@ extension RunLoop {
       return true
     }
 
-    let candidateArea = candidateRect.size.width * candidateRect.size.height
+    // Areas are compared exactly in 128 bits: a region framed or padded at an
+    // extreme extent overflows `width * height` (STUI-1333).
+    func area(_ rect: CellRect) -> Int128 {
+      Int128(rect.size.width) * Int128(rect.size.height)
+    }
+    let candidateArea = area(candidateRect)
     let hasSmallerDescendant = latestSemanticSnapshot.focusRegions.contains { region in
       guard region.identity != focusIdentity,
         region.rect.contains(location.cell),
@@ -38,8 +43,7 @@ extension RunLoop {
       else {
         return false
       }
-      let regionArea = region.rect.size.width * region.rect.size.height
-      return regionArea < candidateArea
+      return area(region.rect) < candidateArea
     }
     return !hasSmallerDescendant
   }

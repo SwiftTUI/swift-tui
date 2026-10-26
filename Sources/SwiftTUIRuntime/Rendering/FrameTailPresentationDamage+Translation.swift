@@ -210,17 +210,22 @@ extension FrameTailPresentationDamageResolver {
       // Contribution class per row: 2 = row-invariant interior, 0 = beyond
       // the one-cell reach (no ink), 1 = edge zone (corners, boundary
       // glyphs, half-block reach — ink that may vary by row).
+      // Saturating: a rect at an extreme extent (STUI-1333) must not trap.
+      let interiorStart = SaturatingConversion.adding(rectRows.lowerBound, edge)
+      let interiorEnd = SaturatingConversion.subtracting(rectRows.upperBound, edge)
+      let reachStart = SaturatingConversion.subtracting(rectRows.lowerBound, 1)
+      let reachEnd = SaturatingConversion.adding(rectRows.upperBound, 1)
       func contributionClass(_ row: Int) -> Int {
-        if row >= rectRows.lowerBound + edge, row < rectRows.upperBound - edge {
+        if row >= interiorStart, row < interiorEnd {
           return 2
         }
-        if row < rectRows.lowerBound - 1 || row >= rectRows.upperBound + 1 {
+        if row < reachStart || row >= reachEnd {
           return 0
         }
         return 1
       }
       for row in bandRows {
-        let sourceClass = contributionClass(row - dy)
+        let sourceClass = contributionClass(SaturatingConversion.subtracting(row, dy))
         let rowClass = contributionClass(row)
         if rowClass == 1 || sourceClass == 1 || rowClass != sourceClass {
           rows.insert(row)
@@ -239,8 +244,14 @@ extension FrameTailPresentationDamageResolver {
       guard !rows.isEmpty else {
         return false
       }
-      let currentReach = (rows.lowerBound - 1)..<(rows.upperBound + 1)
-      let previousReach = (rows.lowerBound + dy - 1)..<(rows.upperBound + dy + 1)
+      let currentReach =
+        SaturatingConversion.subtracting(
+          rows.lowerBound, 1)..<SaturatingConversion.adding(rows.upperBound, 1)
+      let previousReach =
+        SaturatingConversion.subtracting(
+          SaturatingConversion.adding(rows.lowerBound, dy), 1)..<SaturatingConversion.sum([
+          rows.upperBound, dy, 1,
+        ])
       return currentReach.overlaps(bandRows) || previousReach.overlaps(bandRows)
     }
 
@@ -254,9 +265,15 @@ extension FrameTailPresentationDamageResolver {
       else {
         return
       }
-      let lower = rectRows.lowerBound + shift - 1
-      let upper = rectRows.upperBound + shift + 1
-      for row in lower..<upper where bandRows.contains(row) {
+      // Only band rows can be tainted, so walk the band's part of the dilated
+      // range: a rect at an extreme extent (STUI-1333) spans `Int.max` rows.
+      let lower = SaturatingConversion.subtracting(
+        SaturatingConversion.adding(rectRows.lowerBound, shift), 1)
+      let upper = SaturatingConversion.sum([rectRows.upperBound, shift, 1])
+      for row in max(
+        lower, bandRows.lowerBound)..<max(
+          max(lower, bandRows.lowerBound), min(upper, bandRows.upperBound))
+      {
         rows.insert(row)
       }
     }

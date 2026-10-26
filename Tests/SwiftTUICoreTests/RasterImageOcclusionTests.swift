@@ -34,6 +34,30 @@ struct RasterImageOcclusionTests {
     )
   }
 
+  @Test("STUI-1333: the largest remainder of an extreme image is chosen exactly")
+  func extremeImageKeepsTheExactLargestRemainder() throws {
+    // Every remainder's area exceeds `Int.max`. Below and right tie exactly
+    // at `Int.max * (Int.max - 15)` and below comes first; above and left are
+    // `10 * Int.max`. A saturated product would tie all four at `Int.max` and
+    // keep the first, above.
+    let image = CellRect(origin: .zero, size: .init(width: .max, height: .max))
+    let occluder = CellRect(origin: .init(x: 10, y: 10), size: .init(width: 5, height: 5))
+    let attachment = RasterImageAttachment(
+      identity: testIdentity("ExtremeImage"), bounds: image, source: .path("extreme.png"))
+    var attachments = [attachment]
+    RasterImageOcclusion.apply(
+      to: &attachments,
+      layers: [
+        RasterPresentationLayer(order: 0, bounds: image, content: .image(attachment)),
+        RasterPresentationLayer(
+          order: 1, bounds: occluder, content: .cells(.init(bounds: occluder, cells: []))),
+      ])
+    let trimmed = try #require(attachments.first?.unoccludedVisibleBounds)
+    #expect(
+      trimmed
+        == CellRect(origin: .init(x: 0, y: 15), size: .init(width: .max, height: .max - 15)))
+  }
+
   @Test("cells painted before an image do not trim it")
   func cellsPaintedBeforeImageDoNotTrim() throws {
     let imageBounds = CellRect(

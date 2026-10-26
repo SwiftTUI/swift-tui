@@ -319,22 +319,50 @@ extension LayoutEngine {
   /// geometry immediately and keeps the untranslated children as placeholders;
   /// completed children are written back into the parent frame's value-typed
   /// `children[index]` one at a time, so the tree is rebuilt bottom-up without
-  /// call-stack frames.
+  /// call-stack frames. Coordinates saturate at `Int.min` and `Int.max`.
   package func translatedPlacement(
     _ node: PlacedNode,
     by delta: CellPoint
   ) -> PlacedNode {
+    // The saturating move never declines a node.
+    rebuiltPlacement(node) { translatedNodeItself($0, by: delta, exactly: false) }!
+  }
+
+  /// `translatedPlacement(_:by:)`, or `nil` when a node's bounds or content
+  /// bounds hold saturated geometry (an origin or far edge at `Int.min` or
+  /// `Int.max`) or would overflow when moved. Saturating sums do not commute
+  /// with a later move, so the retained viewport-translation leg places such a
+  /// subtree afresh instead of translating it (STUI-1333).
+  package func exactlyTranslatedPlacement(
+    _ node: PlacedNode,
+    by delta: CellPoint
+  ) -> PlacedNode? {
+    rebuiltPlacement(node) { translatedNodeItself($0, by: delta, exactly: true) }
+  }
+
+  /// The iterative rebuild behind both translations: `translate` moves one
+  /// node's own geometry, and a `nil` from it abandons the rebuild.
+  private func rebuiltPlacement(
+    _ node: PlacedNode,
+    translatingEach translate: (PlacedNode) -> PlacedNode?
+  ) -> PlacedNode? {
     struct Frame {
       var node: PlacedNode
       var nextChildIndex: Int
     }
 
-    var stack: [Frame] = [Frame(node: translatedNodeItself(node, by: delta), nextChildIndex: 0)]
+    guard let root = translate(node) else {
+      return nil
+    }
+    var stack: [Frame] = [Frame(node: root, nextChildIndex: 0)]
     while true {
       let index = stack.count - 1
       if stack[index].nextChildIndex < stack[index].node.children.count {
         let child = stack[index].node.children[stack[index].nextChildIndex]
-        stack.append(Frame(node: translatedNodeItself(child, by: delta), nextChildIndex: 0))
+        guard let translatedChild = translate(child) else {
+          return nil
+        }
+        stack.append(Frame(node: translatedChild, nextChildIndex: 0))
         continue
       }
 
@@ -348,14 +376,26 @@ extension LayoutEngine {
   }
 
   /// Translates one node's own geometry, leaving `children` untouched for the
-  /// caller to replace as each is rebuilt.
+  /// caller to replace as each is rebuilt. `exactly` declines (`nil`) a node
+  /// whose bounds or content bounds cannot move exactly.
   private func translatedNodeItself(
     _ node: PlacedNode,
-    by delta: CellPoint
-  ) -> PlacedNode {
+    by delta: CellPoint,
+    exactly: Bool
+  ) -> PlacedNode? {
     var translatedNode = node
-    translatedNode.bounds = translated(node.bounds, by: delta)
-    translatedNode.contentBounds = translated(node.contentBounds, by: delta)
+    if exactly {
+      guard let bounds = exactlyTranslated(node.bounds, by: delta),
+        let contentBounds = exactlyTranslated(node.contentBounds, by: delta)
+      else {
+        return nil
+      }
+      translatedNode.bounds = bounds
+      translatedNode.contentBounds = contentBounds
+    } else {
+      translatedNode.bounds = translated(node.bounds, by: delta)
+      translatedNode.contentBounds = translated(node.contentBounds, by: delta)
+    }
     translatedNode.clipBounds = node.clipBounds.map { translated($0, by: delta) }
     var metadata = node.placementMetadata
     metadata.scrollViewportRect = metadata.scrollViewportRect.map { translated($0, by: delta) }
@@ -389,5 +429,23 @@ extension LayoutEngine {
       ),
       size: rect.size
     )
+  }
+
+  /// `rect` moved by `delta`, or `nil` when `rect` holds saturated geometry
+  /// (an origin or far edge at `Int.min` or `Int.max`) or the move overflows.
+  private func exactlyTranslated(
+    _ rect: CellRect,
+    by delta: CellPoint
+  ) -> CellRect? {
+    for edge in [rect.origin.x, rect.origin.y, rect.maxX, rect.maxY]
+    where edge == .min || edge == .max {
+      return nil
+    }
+    let (x, xOverflow) = rect.origin.x.addingReportingOverflow(delta.x)
+    let (y, yOverflow) = rect.origin.y.addingReportingOverflow(delta.y)
+    guard !xOverflow, !yOverflow else {
+      return nil
+    }
+    return CellRect(origin: .init(x: x, y: y), size: rect.size)
   }
 }

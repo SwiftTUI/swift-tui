@@ -213,7 +213,9 @@ extension Rasterizer {
           // Compute the bottom from the original position before clamping it.
           // Moving a negative top to zero must not make the subtree taller.
           let subtreeBottom = max(
-            0, node.subtreeBounds.origin.y + max(0, node.subtreeBounds.size.height))
+            0,
+            SaturatingConversion.adding(
+              node.subtreeBounds.origin.y, max(0, node.subtreeBounds.size.height)))
           if subtreeBottom > subtreeTop,
             !dirtySpans.intersects(rows: subtreeTop..<subtreeBottom)
           {

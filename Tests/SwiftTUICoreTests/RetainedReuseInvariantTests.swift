@@ -211,6 +211,36 @@ struct RetainedReuseInvariantTests {
     #expect(translated.children.first?.surfaceComposition == child.surfaceComposition)
   }
 
+  @Test("STUI-1333: exact translation declines saturated geometry and matches in range")
+  func exactTranslationDeclinesSaturatedGeometry() {
+    let engine = LayoutEngine()
+    func tree(childY: Int, childHeight: Int = 2) -> PlacedNode {
+      let child = PlacedNode(
+        identity: testIdentity("ExactTranslated", "Child"),
+        bounds: rect(x: 1, y: childY, width: 2, height: childHeight))
+      return PlacedNode(
+        identity: testIdentity("ExactTranslated", "Parent"),
+        bounds: rect(x: 0, y: 0, width: 4, height: 4), children: [child])
+    }
+    let delta = CellPoint(x: 3, y: -5)
+    // In range the exact move is the ordinary move.
+    let inRange = tree(childY: 1)
+    #expect(
+      engine.exactlyTranslatedPlacement(inRange, by: delta)
+        == engine.translatedPlacement(inRange, by: delta))
+    // A coordinate or far edge at either bound came from a saturated sum: a
+    // fresh placement at the new origin need not equal the moved one.
+    #expect(engine.exactlyTranslatedPlacement(tree(childY: .max), by: delta) == nil)
+    #expect(engine.exactlyTranslatedPlacement(tree(childY: .min), by: delta) == nil)
+    #expect(engine.exactlyTranslatedPlacement(tree(childY: 2, childHeight: .max), by: delta) == nil)
+    // A move that overflows declines too.
+    #expect(
+      engine.exactlyTranslatedPlacement(
+        tree(childY: .max - 1, childHeight: 0), by: CellPoint(x: 0, y: 5)) == nil)
+    #expect(
+      engine.exactlyTranslatedPlacement(tree(childY: .max - 1, childHeight: 0), by: delta) != nil)
+  }
+
   @Test(
     "placementEquivalence reports identical for a byte-identical subtree and the sync is a no-op")
   func placementEquivalenceReportsIdenticalAndSyncIsNoOp() {

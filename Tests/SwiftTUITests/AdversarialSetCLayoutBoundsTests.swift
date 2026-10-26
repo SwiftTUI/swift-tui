@@ -357,6 +357,93 @@ struct AdversarialSetCLayoutBoundsTests {
     let rows = frame.split(separator: "\n", omittingEmptySubsequences: false)
     #expect(rows.count == 16)
   }
+
+  // MARK: - Wave 4 FW-M regressions (STUI-1333)
+
+  /// STUI-1333: directional focus moves to and from a button at an extreme
+  /// offset, position or frame exactly as to a merely distant twin. Moving
+  /// focus repaints both buttons, so the presentation damage of the far one
+  /// is exercised too.
+  @Test(arguments: SetCFarFocus.allCases)
+  func directionalFocusReachesExtremeGeometryLikeADistantTwin(_ shape: SetCFarFocus) throws {
+    func run(extreme: Bool) throws -> [Identity?] {
+      let harness = try StressRuntimeHarness(
+        rootIdentity: testIdentity("setCFarFocus", "\(shape)"),
+        size: .init(width: 20, height: 6)
+      ) { shape.view(extreme: extreme) }
+      defer { harness.shutdown() }
+      _ = try harness.pressKey(.init(.tab))
+      var focused = [harness.runLoop.focusTracker.currentFocusIdentity]
+      for key in shape.keys {
+        _ = try harness.pressKey(.init(key))
+        focused.append(harness.runLoop.focusTracker.currentFocusIdentity)
+      }
+      return focused
+    }
+    let extreme = try run(extreme: true)
+    #expect(extreme == (try run(extreme: false)))
+    #expect(Set(extreme.compactMap { $0 }).count >= 2, "focus never moved: \(extreme)")
+  }
+
+  /// STUI-1333: a click inside a focusable region framed at `Int.max` that
+  /// holds a smaller focusable descendant under the click leaves focus to the
+  /// descendant, as the region's 10,000-cell twin does; a click outside the
+  /// descendant focuses the region in both.
+  @Test func clickFocusOnExtremeRegionMatchesDistantTwin() throws {
+    func run(extent: Int) throws -> [Identity?] {
+      let harness = try StressRuntimeHarness(
+        rootIdentity: testIdentity("setCClickFocus"),
+        size: .init(width: 20, height: 6)
+      ) {
+        VStack(alignment: .leading, spacing: 0) {
+          Text("inner").focusable()
+        }
+        .frame(width: extent, height: extent, alignment: .topLeading)
+        .focusable()
+        .frame(width: 20, height: 6, alignment: .topLeading)
+      }
+      defer { harness.shutdown() }
+      var focused: [Identity?] = []
+      for point in [Point(x: 1, y: 0), Point(x: 8, y: 3), Point(x: 2, y: 0)] {
+        _ = try harness.click(point)
+        focused.append(harness.runLoop.focusTracker.currentFocusIdentity)
+      }
+      return focused
+    }
+    let extreme = try run(extent: Int.max)
+    #expect(extreme == (try run(extent: 10_000)))
+  }
+
+  /// STUI-1333: scrolling content that holds a saturated coordinate places it
+  /// afresh instead of translating the retained placement, so production and
+  /// the DEBUG layout shadow agree (the shadow oracle asserts on divergence).
+  @Test(arguments: [false])
+  func scrolledSaturatedContentMatchesAFreshPlacement(list: Bool) throws {
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("setCSaturatedScroll", "\(list)"),
+      size: .init(width: 20, height: 8)
+    ) {
+      ScrollView {
+        if list {
+          List {
+            Text("a").padding(Int.max)
+            Text("b")
+          }
+        } else {
+          VStack {
+            Text("x")
+            Text("a").padding(Int.max)
+            Text("b")
+          }
+        }
+      }
+    }
+    defer { harness.shutdown() }
+    for delta in [3, -2, 1] {
+      let frame = try harness.scrollPointer(at: .init(x: 1, y: 1), deltaY: delta)
+      #expect(frame.split(separator: "\n", omittingEmptySubsequences: false).count == 8)
+    }
+  }
 }
 
 /// The far placements STUI-777 names, each beside a distant twin that paints
@@ -479,4 +566,68 @@ private func setCBoundsLines<V: View>(_ view: V, _ name: String) -> [String] {
     view, context: .init(identity: testIdentity("setCBounds", name)),
     proposal: .init(width: 20, height: 4)
   ).rasterSurface.lines
+}
+
+/// Buttons at extreme geometry, each beside a distant twin (STUI-1333).
+enum SetCFarFocus: CaseIterable, Sendable, CustomTestStringConvertible {
+  case rightToOffsetMaxX, leftToOffsetMinX, downToOffsetMaxY, upToPositionMin, acrossFrameMax
+  case mixedOffsets
+
+  var testDescription: String { "\(self)" }
+
+  var keys: [KeyEvent] {
+    switch self {
+    case .rightToOffsetMaxX: [.arrowRight, .arrowLeft, .arrowRight]
+    case .leftToOffsetMinX: [.arrowLeft, .arrowRight, .arrowLeft]
+    case .downToOffsetMaxY: [.arrowDown, .arrowUp, .arrowDown]
+    case .upToPositionMin: [.arrowUp, .arrowLeft, .arrowDown, .arrowRight]
+    case .acrossFrameMax: [.arrowRight, .arrowRight, .arrowLeft, .arrowDown, .arrowUp]
+    case .mixedOffsets: [.arrowLeft, .arrowLeft, .arrowRight, .arrowRight, .arrowUp, .arrowDown]
+    }
+  }
+
+  @MainActor
+  func view(extreme: Bool) -> AnyView {
+    let far = 10_000
+    switch self {
+    case .rightToOffsetMaxX:
+      return AnyView(
+        HStack {
+          Button("a") {}
+          Button("b") {}.offset(x: extreme ? .max : far)
+        })
+    case .leftToOffsetMinX:
+      return AnyView(
+        HStack {
+          Button("a") {}
+          Button("b") {}.offset(x: extreme ? .min : -far)
+        })
+    case .downToOffsetMaxY:
+      return AnyView(
+        VStack {
+          Button("a") {}
+          Button("b") {}.offset(y: extreme ? .max : far)
+        })
+    case .upToPositionMin:
+      return AnyView(
+        VStack {
+          Button("a") {}
+          Button("b") {}.position(x: extreme ? .min : -far, y: extreme ? .min : -far)
+        })
+    case .acrossFrameMax:
+      return AnyView(
+        HStack {
+          Button("a") {}
+          Button("b") {}.frame(width: extreme ? .max : far, height: extreme ? .max : far)
+          Button("c") {}
+        })
+    case .mixedOffsets:
+      return AnyView(
+        HStack {
+          Button("a") {}.offset(x: extreme ? .max : far, y: extreme ? .max : far)
+          Button("b") {}.offset(x: extreme ? .min : -far, y: extreme ? .min : -far)
+          Button("c") {}
+        })
+    }
+  }
 }

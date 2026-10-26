@@ -14,19 +14,19 @@
 extension CellRect {
   package func offsetBy(dy: Int) -> CellRect {
     CellRect(
-      origin: CellPoint(x: origin.x, y: origin.y + dy),
+      origin: CellPoint(x: origin.x, y: SaturatingConversion.adding(origin.y, dy)),
       size: size
     )
   }
 
   /// The half-open row range this rect covers.
   package var rows: Range<Int> {
-    origin.y..<(origin.y + max(0, size.height))
+    origin.y..<SaturatingConversion.adding(origin.y, max(0, size.height))
   }
 
   /// The half-open column range this rect covers.
   package var columns: Range<Int> {
-    origin.x..<(origin.x + max(0, size.width))
+    origin.x..<SaturatingConversion.adding(origin.x, max(0, size.width))
   }
 }
 

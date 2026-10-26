@@ -286,14 +286,18 @@ extension FocusTracker {
     var sharesSection: Bool
     var sharedScopeDepth: Int
     var overlapsOrthogonalAxis: Bool
-    var primaryDistance: Int
-    var orthogonalDistance: Int
+    var primaryDistance: Int128
+    var orthogonalDistance: Int128
     var documentDistance: Int
   }
 
+  /// Distances between focus regions, exact in 128 bits: a region placed by an
+  /// extreme offset or frame keeps far geometry (STUI-777), and its doubled
+  /// centre or gap overflows `Int` (STUI-1333). In-range distances are the
+  /// same values as before.
   private struct DirectionalMetrics {
-    var primaryDistance: Int
-    var orthogonalDistance: Int
+    var primaryDistance: Int128
+    var orthogonalDistance: Int128
     var overlapsOrthogonalAxis: Bool
   }
 
@@ -457,10 +461,12 @@ extension FocusTracker {
     to candidate: CellRect,
     direction: FocusDirection
   ) -> DirectionalMetrics? {
-    let currentCenterX = current.origin.x * 2 + current.size.width
-    let currentCenterY = current.origin.y * 2 + current.size.height
-    let candidateCenterX = candidate.origin.x * 2 + candidate.size.width
-    let candidateCenterY = candidate.origin.y * 2 + candidate.size.height
+    let current = Rect128(current)
+    let candidate = Rect128(candidate)
+    let currentCenterX = current.x * 2 + current.width
+    let currentCenterY = current.y * 2 + current.height
+    let candidateCenterX = candidate.x * 2 + candidate.width
+    let candidateCenterY = candidate.y * 2 + candidate.height
 
     switch direction {
     case .left:
@@ -469,10 +475,7 @@ extension FocusTracker {
       }
       let orthogonalDistance = verticalGap(between: current, and: candidate)
       return DirectionalMetrics(
-        primaryDistance: max(
-          0,
-          current.origin.x - (candidate.origin.x + candidate.size.width)
-        ),
+        primaryDistance: max(0, current.x - candidate.maxX),
         orthogonalDistance: orthogonalDistance,
         overlapsOrthogonalAxis: orthogonalDistance == 0
       )
@@ -482,10 +485,7 @@ extension FocusTracker {
       }
       let orthogonalDistance = verticalGap(between: current, and: candidate)
       return DirectionalMetrics(
-        primaryDistance: max(
-          0,
-          candidate.origin.x - (current.origin.x + current.size.width)
-        ),
+        primaryDistance: max(0, candidate.x - current.maxX),
         orthogonalDistance: orthogonalDistance,
         overlapsOrthogonalAxis: orthogonalDistance == 0
       )
@@ -495,10 +495,7 @@ extension FocusTracker {
       }
       let orthogonalDistance = horizontalGap(between: current, and: candidate)
       return DirectionalMetrics(
-        primaryDistance: max(
-          0,
-          current.origin.y - (candidate.origin.y + candidate.size.height)
-        ),
+        primaryDistance: max(0, current.y - candidate.maxY),
         orthogonalDistance: orthogonalDistance,
         overlapsOrthogonalAxis: orthogonalDistance == 0
       )
@@ -508,14 +505,30 @@ extension FocusTracker {
       }
       let orthogonalDistance = horizontalGap(between: current, and: candidate)
       return DirectionalMetrics(
-        primaryDistance: max(
-          0,
-          candidate.origin.y - (current.origin.y + current.size.height)
-        ),
+        primaryDistance: max(0, candidate.y - current.maxY),
         orthogonalDistance: orthogonalDistance,
         overlapsOrthogonalAxis: orthogonalDistance == 0
       )
     }
+  }
+
+  /// A focus region's rect widened to 128 bits, where no sum or doubling of
+  /// its coordinates can overflow.
+  private struct Rect128 {
+    let x: Int128
+    let y: Int128
+    let width: Int128
+    let height: Int128
+
+    init(_ rect: CellRect) {
+      x = Int128(rect.origin.x)
+      y = Int128(rect.origin.y)
+      width = Int128(rect.size.width)
+      height = Int128(rect.size.height)
+    }
+
+    var maxX: Int128 { x + width }
+    var maxY: Int128 { y + height }
   }
 
   private func sharedScopePrefixLength(
@@ -528,31 +541,27 @@ extension FocusTracker {
   }
 
   private func horizontalGap(
-    between lhs: CellRect,
-    and rhs: CellRect
-  ) -> Int {
-    let lhsMaxX = lhs.origin.x + lhs.size.width
-    let rhsMaxX = rhs.origin.x + rhs.size.width
-    if lhsMaxX <= rhs.origin.x {
-      return rhs.origin.x - lhsMaxX
+    between lhs: Rect128,
+    and rhs: Rect128
+  ) -> Int128 {
+    if lhs.maxX <= rhs.x {
+      return rhs.x - lhs.maxX
     }
-    if rhsMaxX <= lhs.origin.x {
-      return lhs.origin.x - rhsMaxX
+    if rhs.maxX <= lhs.x {
+      return lhs.x - rhs.maxX
     }
     return 0
   }
 
   private func verticalGap(
-    between lhs: CellRect,
-    and rhs: CellRect
-  ) -> Int {
-    let lhsMaxY = lhs.origin.y + lhs.size.height
-    let rhsMaxY = rhs.origin.y + rhs.size.height
-    if lhsMaxY <= rhs.origin.y {
-      return rhs.origin.y - lhsMaxY
+    between lhs: Rect128,
+    and rhs: Rect128
+  ) -> Int128 {
+    if lhs.maxY <= rhs.y {
+      return rhs.y - lhs.maxY
     }
-    if rhsMaxY <= lhs.origin.y {
-      return lhs.origin.y - rhsMaxY
+    if rhs.maxY <= lhs.y {
+      return lhs.y - rhs.maxY
     }
     return 0
   }
