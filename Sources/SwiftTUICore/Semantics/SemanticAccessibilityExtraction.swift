@@ -213,11 +213,15 @@ extension SemanticExtractor {
           for: node,
           emittedSubtrees: emittedSubtrees
         )
+        // A selectable collection row publishes its structural item and its
+        // selection button even when its content publishes nothing, such as a
+        // row that is only a shape (STUI-1291).
         if accessibilitySelfIsRelevant(
           node, focusIdentities: focusIdentities,
           textPresentation: frame.textPresentation
         )
           || hasEmittedChild || metadata.accessibilityStructure?.disclosureContent != nil
+          || metadata.hostedCollectionItem?.selection != nil
         {
           emittedSubtrees.insert(node.identity)
         }
@@ -690,6 +694,7 @@ extension SemanticExtractor {
       cursorAnchor: textInputPresentations[node.identity]?.anchor
         ?? accessibilityCursorAnchor(for: node)
     )
+    if node.identity != result.identity { result.occurrenceIdentity = node.identity }
     result.textInput = role == .secureField ? nil : textInputPresentations[node.identity]?.textInput
     result.properties =
       suppressingPresentation ? nil : node.semanticMetadata.accessibilityProperties

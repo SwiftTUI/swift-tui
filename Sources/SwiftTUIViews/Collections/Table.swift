@@ -188,7 +188,8 @@ extension Table {
         guard let tag = resolvedRows[index].tag else { continue }
         resolvedContent.children[index].semanticMetadata.hostedCollectionItem?.selection = .init(
           isSelected: selectionPolicy.contains(tag),
-          actionIdentity: tableRowIdentity(for: context.identity, rowIndex: index),
+          actionIdentity: tableRowIdentity(
+            for: context.identity, rowIndex: index, rowIdentity: resolvedRows[index].identity),
           ownerNodeID: ownerNode?.viewNodeID)
       }
       let keyboardValue: SelectionValue? = withPersistentDormantStateSlot {
@@ -274,6 +275,9 @@ extension Table {
         }
       }
 
+      // The bounded band an indexed table registers row routes for; the scroll
+      // route publishes it so the run loop can re-resolve a stale band.
+      var interactionBand: Range<Int>?
       if isEnabled {
         let policy = selectionPolicy
         let interactionSource = resolvedContent.indexedSource
@@ -430,23 +434,25 @@ extension Table {
         }
 
         if policy.isSelectable {
+          if resolvedContent.indexedSource != nil {
+            let window = scrollCurrency?.interactionWindow
+            interactionBand = collectionInteractionBand(
+              count: resolvedRows.count,
+              scrollAnchorRow: window?.firstRow,
+              selectionAnchor: selectedIndex,
+              visibleRowCount: window?.rowCount
+            )
+          }
           let interactionIndices: any Sequence<Int> =
-            if resolvedContent.indexedSource == nil {
-              selectableRowIndices
-            } else {
-              collectionInteractionBand(
-                count: resolvedRows.count,
-                scrollAnchorRow: scrollCurrency?.effectiveAnchorRow,
-                selectionAnchor: selectedIndex,
-                visibleRowCount: scrollCurrency?.visibleRowCount
-              )
-            }
+            if let interactionBand { interactionBand } else { selectableRowIndices }
           for rowIndex in interactionIndices {
             guard let tag = resolvedRows[rowIndex].tag else {
               continue
             }
 
-            let identity = tableRowIdentity(for: context.identity, rowIndex: rowIndex)
+            let identity = tableRowIdentity(
+              for: context.identity, rowIndex: rowIndex,
+              rowIdentity: resolvedRows[rowIndex].identity)
             intake.registerAction(
               identity: identity,
               accessibilityHandler: { action in
@@ -460,12 +466,7 @@ extension Table {
               return policy.isMultiple ? policy.toggle(tag) : policy.select(tag)
             }
 
-            let routeID = runtimePrimaryRouteID(
-              for: tableRowIdentity(
-                for: context.identity,
-                rowIndex: rowIndex
-              )
-            )
+            let routeID = runtimePrimaryRouteID(for: identity)
             intake.registerPointerHandler(routeID: routeID) { event in
               // A disabled row has no pointer action, like a disabled control.
               guard rowIsEnabled(rowIndex) else { return .ignored }
@@ -541,6 +542,7 @@ extension Table {
           itemIdentity: resolvedRows[index].identity, rowIndex: index)
       }
       metadata.hostedCollectionContainer?.headerSorts = columns.map(\.sort)
+      metadata.hostedCollectionContainer?.interactionRows = interactionBand
       metadata.accessibilityProperties = .init(
         rowCount: resolvedRows.count + 1,
         columnCount: resolvedColumns.count + (isSelectable ? 1 : 0))
@@ -716,7 +718,8 @@ extension Table {
       if let compatibleTag {
         node.semanticMetadata.hostedCollectionItem?.selection = .init(
           isSelected: policy.isMultiple ? policy.contains(compatibleTag) : selectedIndex == index,
-          actionIdentity: tableRowIdentity(for: context.identity, rowIndex: index),
+          actionIdentity: tableRowIdentity(
+            for: context.identity, rowIndex: index, rowIdentity: node.identity),
           ownerNodeID: selectionOwner)
       }
       node =

@@ -367,10 +367,16 @@ extension DrawExtractor {
     let offset = generated.scrollPosition?.cellOffset ?? 0
     let navigation: CollectionScrollLayout?
     if payload.isViewportBacked {
+      // Inside a ScrollView the bounds are the whole body and only the rows
+      // the enclosing viewport declares were generated; the band sizes from them.
+      let realizedRows = windowRows.min().flatMap { first in
+        windowRows.max().map { first..<($0 + 1) }
+      }
       navigation = CollectionScrollLayout(
         geometry: geometry,
         visibleLines: offset..<(offset + generated.visibleBodyLineCount),
-        anchor: payload.scrollAnchor)
+        anchor: payload.scrollAnchor,
+        realizedRows: realizedRows)
     } else {
       navigation = nil
     }

@@ -26,6 +26,11 @@ public struct FocusRegion: Equatable, Sendable {
   package var ownerIdentity: Identity?
   /// The authored item behind positional list focus or a table's active row.
   package var collectionFocusTarget: CollectionFocusTarget? = nil
+  /// Whether this collection row is its collection's active row (the
+  /// selection, or the keyboard cursor of a multiple selection). Initial
+  /// adoption and linear traversal that land on another row of the same
+  /// collection enter it here instead.
+  package var isCollectionEntry = false
   package var scopePath: [Identity]
   package var sectionIdentity: Identity?
   package var modalFocusScopePath: [Identity]?
@@ -104,6 +109,10 @@ package struct CollectionScrollPosition: Equatable, Sendable {
 public struct ScrollRoute: Equatable, Sendable {
   package var collectionScrollPosition: CollectionScrollPosition? = nil
   package var collectionScrollLayout: CollectionScrollLayout? = nil
+  /// The rows the collection registered row actions and pointer routes for
+  /// at resolve (its interaction band), or `nil` when it registers none or
+  /// registers every row. See ``collectionInteractionBandIsStale``.
+  package var collectionInteractionRows: Range<Int>? = nil
 
   /// Authored motion policy at this route, refreshed with each semantic frame.
   package var reducesMotion = false
@@ -220,6 +229,11 @@ public struct AccessibilityNode: Equatable, Sendable {
   /// Authored named navigation groups, in addition to native role navigation.
   public var navigationCategories: [String] = []
   package var actionIdentity: Identity? = nil
+  /// The node's own occurrence-qualified identity when it lies in a later
+  /// duplicate (an `ID[x#n]` component) and differs from the reported,
+  /// occurrence-free ``identity``: static text, structural list items and
+  /// cells. `nil` for every other node.
+  package var occurrenceIdentity: Identity? = nil
   /// Combined descendants retain their own committed routing and lifetime checks.
   package var combinedActions: [String: AccessibilityCombinedAction] = [:]
   package var viewNodeID: ViewNodeID?

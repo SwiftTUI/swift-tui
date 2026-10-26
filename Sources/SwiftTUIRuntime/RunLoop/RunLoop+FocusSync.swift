@@ -434,6 +434,20 @@ extension RunLoop {
     // The frame's scroll registrations are current now — retire any fling
     // whose route re-registered a different authored binding this frame.
     reconcileScrollMomentumBindings()
+    // A data collection registers row actions and pointer routes at resolve
+    // for a band sized from the previous frame's layout. When this frame's
+    // layout shows rows outside that band (a resize, a sibling's layout, an
+    // enclosing scroll view's scroll), re-resolve the collection in the one
+    // eager rerender so the committed frame routes every row it shows
+    // (STUI-1315, STUI-1321). Once that rerender is spent nothing is
+    // scheduled: the next frame's resolve reads this frame's layout.
+    let staleCollectionBands: [Identity] =
+      convergence.didEagerFocusLocationRerender
+      ? []
+      : renderedArtifacts.semanticSnapshot.scrollRoutes.compactMap { route in
+        route.collectionInteractionBandIsStale ? route.identity : nil
+      }
+    convergence.midFrameRelocationInvalidations.formUnion(staleCollectionBands)
     convergence.focusGraphChanged = convergence.focusGraphChanged || focusChanged
     convergence.focusBindingChanged =
       convergence.focusBindingChanged || appliedFocusRequest || appliedDefaultFocusRequest
@@ -445,7 +459,7 @@ extension RunLoop {
 
     if focusChanged || appliedFocusRequest || appliedDefaultFocusRequest || armedArrivalDefault
       || focusStateChanged || accessibilityFocusChanged || focusedValuesChanged
-      || scrollPositionChanged
+      || scrollPositionChanged || !staleCollectionBands.isEmpty
     {
       carryCommittedLifecycleForward(
         renderedArtifacts.commitPlan.lifecycle,
@@ -462,10 +476,11 @@ extension RunLoop {
       // focused values ride along on that same re-render. Capped at one pass by
       // `didEagerFocusLocationRerender` (the termination guarantee); any residual
       // change after it lags a frame.
+      // A stale collection band rides the same single rerender.
       let focusLocationChanged =
         focusChanged || appliedFocusRequest
         || appliedDefaultFocusRequest || armedArrivalDefault || focusStateChanged
-        || scrollPositionChanged
+        || scrollPositionChanged || !staleCollectionBands.isEmpty
         || previousFrameFocusIdentity != focusTracker.currentFocusIdentity
       if focusLocationChanged, !convergence.didEagerFocusLocationRerender {
         convergence.didEagerFocusLocationRerender = true

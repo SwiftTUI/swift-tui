@@ -199,6 +199,10 @@ package enum HostWireSchema {
       .init(
         "actionIdentity", wire: .notSerialized("runtime dispatch uses the opaque actionTarget")),
       .init(
+        "occurrenceIdentity",
+        wire: .notSerialized(
+          "a later duplicate's runtime focus identity; the wire keys focus by focusedIdentity")),
+      .init(
         "viewNodeID",
         wire: .notSerialized("package-internal graph plumbing")),
       .init("identity", wire: .key("id")),
@@ -239,6 +243,10 @@ package enum HostWireSchema {
         "collectionScrollLayout",
         wire: .notSerialized(
           "measured row geometry and viewport consumed by native collection navigation")),
+      .init(
+        "collectionInteractionRows",
+        wire: .notSerialized(
+          "resolve-time row-action band the run loop checks against the frame's layout")),
       .init("identity", wire: .key("id")),
       .init(
         "viewNodeID",

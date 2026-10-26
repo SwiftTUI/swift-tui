@@ -160,7 +160,8 @@ extension List {
         else { continue }
         resolvedContent.children[index].semanticMetadata.hostedCollectionItem?.selection = .init(
           isSelected: selectionPolicy.contains(tag),
-          actionIdentity: listRowIdentity(for: context.identity, rowIndex: rowIndex),
+          actionIdentity: listRowIdentity(
+            for: context.identity, rowIndex: rowIndex, rowIdentity: rows[rowIndex].identity),
           ownerNodeID: ownerNode?.viewNodeID)
       }
       var scrollCurrency: CollectionScrollCurrency?
@@ -210,6 +211,9 @@ extension List {
         }
       }
 
+      // The bounded band an indexed list registers row actions for; the scroll
+      // route publishes it so the run loop can re-resolve a stale band.
+      var interactionBand: Range<Int>?
       if isEnabled {
         let policy = selectionPolicy
         let interactionSource = resolvedContent.indexedSource
@@ -277,6 +281,14 @@ extension List {
 
           let rootRouteID = runtimePrimaryRouteID(for: context.identity)
           intake.registerPointerHandler(routeID: rootRouteID) { event in
+            if case .down(.primary) = event.kind {
+              // A press click-focuses the row under it, and while nothing is
+              // stored the window centres on the focused row. Pin the shown
+              // window first, as the arrow keys do, so the release lands on
+              // the pressed row (STUI-1291). The press itself stays unclaimed.
+              scrollCurrency.pinCurrentAnchor()
+              return .ignored
+            }
             guard case .scrolled(let deltaX, let deltaY) = event.kind,
               let delta = pointerSelectionDelta(deltaX: deltaX, deltaY: deltaY)
             else {
@@ -404,19 +416,21 @@ extension List {
               scrollCurrency.pinCurrentAnchor()
               scrollCurrency.reveal(row: targetIndex)
             }
-            return .focus(listRowIdentity(for: context.identity, rowIndex: targetIndex))
+            return .focus(
+              listRowIdentity(
+                for: context.identity, rowIndex: targetIndex,
+                rowIdentity: rows[targetIndex].identity))
           }
-          let interactionIndices: any Sequence<Int> =
-            if resolvedContent.indexedSource == nil {
-              rows.indices
-            } else {
-              collectionInteractionBand(
-                count: rows.count,
-                scrollAnchorRow: scrollCurrency?.effectiveAnchorRow,
-                selectionAnchor: activeRowIndex,
-                visibleRowCount: scrollCurrency?.visibleRowCount
-              )
-            }
+          if resolvedContent.indexedSource != nil {
+            let window = scrollCurrency?.interactionWindow
+            interactionBand = collectionInteractionBand(
+              count: rows.count,
+              scrollAnchorRow: window?.firstRow,
+              selectionAnchor: activeRowIndex,
+              visibleRowCount: window?.rowCount
+            )
+          }
+          let interactionIndices = interactionBand ?? rows.indices
           for rowIndex in interactionIndices {
             let row = rows[rowIndex]
             guard let tag = row.tag else {
@@ -424,7 +438,8 @@ extension List {
             }
             let rowIdentity = listRowIdentity(
               for: context.identity,
-              rowIndex: rowIndex
+              rowIndex: rowIndex,
+              rowIdentity: row.identity
             )
             intake.registerAction(
               identity: rowIdentity,
@@ -493,6 +508,7 @@ extension List {
         accessibilityRole: .list
       )
       metadata.hostedCollectionContainer = .init(kind: .list)
+      metadata.hostedCollectionContainer?.interactionRows = interactionBand
       if let review {
         var structure = metadata.accessibilityStructure ?? .init()
         structure.collectionNavigation = review.metadata
@@ -577,7 +593,8 @@ extension List {
       if let compatibleTag {
         node.semanticMetadata.hostedCollectionItem?.selection = .init(
           isSelected: policy.isMultiple ? policy.contains(compatibleTag) : selectedIndex == index,
-          actionIdentity: listRowIdentity(for: context.identity, rowIndex: index),
+          actionIdentity: listRowIdentity(
+            for: context.identity, rowIndex: index, rowIdentity: node.identity),
           ownerNodeID: selectionOwner)
       }
       return node

@@ -63,12 +63,16 @@ extension SemanticExtractor {
       origin: .init(x: max(0, node.bounds.origin.x - 2), y: node.bounds.origin.y),
       size: .init(width: 2, height: max(1, node.bounds.size.height)))
     let identity = node.identity.strippingEntityOccurrences.child(.named("AccessibilitySelection"))
+    // A later duplicate's selector token keeps its occurrence, so it does not
+    // resolve to the first duplicate's selector. Unique rows are unchanged.
+    let ownIdentity = node.identity.child(.named("AccessibilitySelection"))
     var result: [AccessibilityNode] = []
     let buttonParent: Identity
     if isTable {
       buttonParent = identity.child(.named("Cell"))
       var cell = AccessibilityNode(
         identity: buttonParent, parentIdentity: parent, rect: bounds, role: .cell)
+      if ownIdentity != identity { cell.occurrenceIdentity = ownIdentity.child(.named("Cell")) }
       cell.properties = .init(rowIndex: rowIndex + 2, columnIndex: 1)
       result.append(cell)
     } else {
@@ -88,7 +92,7 @@ extension SemanticExtractor {
       && node.semanticMetadata.interactionAvailability.isEnabled
     button.actionIdentity = selection.actionIdentity
     if let owner = selection.ownerNodeID {
-      button.actionTarget = "\(owner.rawValue):\(identity.path)"
+      button.actionTarget = "\(owner.rawValue):\(ownIdentity.path)"
     }
     result.append(button)
     return result
@@ -105,6 +109,8 @@ extension SemanticExtractor {
       identity: node.identity.strippingEntityOccurrences.child(.named("AccessibilityListItem")),
       parentIdentity: parent?.strippingEntityOccurrences, rect: node.bounds,
       role: .custom("listitem"))
+    let ownIdentity = node.identity.child(.named("AccessibilityListItem"))
+    if ownIdentity != item.identity { item.occurrenceIdentity = ownIdentity }
     let section = node.semanticMetadata.hostedCollectionItem?.section
     item.properties = .init(
       description: section.map { "\($0.title ?? "Section"), item \($0.position) of \($0.count)" },

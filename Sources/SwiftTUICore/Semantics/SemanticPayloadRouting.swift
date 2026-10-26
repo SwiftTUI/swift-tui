@@ -195,7 +195,8 @@ extension SemanticExtractor {
 
       let identity = listRowIdentity(
         for: node.identity,
-        rowIndex: rowIndex
+        rowIndex: rowIndex,
+        rowIdentity: hostedRow?.identity
       )
       if allowsPointerHitTesting {
         interactionRegions.append(
@@ -225,6 +226,8 @@ extension SemanticExtractor {
             }
           )
         )
+        focusRegions[focusRegions.count - 1].isCollectionEntry =
+          rowIndex == payload.selectedRowIndex
       }
     }
   }
@@ -302,7 +305,8 @@ extension SemanticExtractor {
 
       let identity = tableRowIdentity(
         for: node.identity,
-        rowIndex: rowIndex
+        rowIndex: rowIndex,
+        rowIdentity: hostedRow?.identity
       )
       interactionRegions.append(
         InteractionRegion(

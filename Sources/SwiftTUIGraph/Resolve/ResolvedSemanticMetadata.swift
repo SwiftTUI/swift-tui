@@ -540,6 +540,10 @@ package struct HostedCollectionContainerMetadata: Equatable, Sendable {
   package var hasSelection: Bool = false
   package var headerSorts: [AccessibilitySortDirection?] = []
   package var focusTarget: CollectionFocusTarget? = nil
+  /// The bounded band of rows a data-driven collection registered row
+  /// actions and pointer routes for at resolve; `nil` when it registers none
+  /// or every row. The scroll route publishes it beside the frame's layout.
+  package var interactionRows: Range<Int>? = nil
 
   package init(
     kind: HostedCollectionContainerKind,

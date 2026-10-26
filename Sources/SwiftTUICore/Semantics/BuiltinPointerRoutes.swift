@@ -93,11 +93,19 @@ package func pickerOptionIdentity(
   controlIdentity.child(BuiltinPointerRouteComponent.pickerOption(index).identityComponent)
 }
 
+/// `rowIdentity` is the row's own identity. A later duplicate's row (one
+/// whose identity carries an `ID[x#n]` occurrence) keeps those occurrence
+/// components after the index component, so its route, which is also its
+/// selector's action identity and its keyboard focus identity, carries the
+/// occurrence as a duplicate button's identity does (STUI-1296). A unique
+/// row's route is unchanged.
 package func listRowIdentity(
   for controlIdentity: Identity,
-  rowIndex: Int
+  rowIndex: Int,
+  rowIdentity: Identity? = nil
 ) -> Identity {
   controlIdentity.child(BuiltinPointerRouteComponent.listRow(rowIndex).identityComponent)
+    .appendingRowOccurrences(of: rowIdentity, below: controlIdentity)
 }
 
 /// The row index encoded in `identity`, when it is `container`'s list-row
@@ -110,12 +118,42 @@ package func listRowIndex(
   parsedFrom identity: Identity,
   container: Identity
 ) -> Int? {
-  guard identity.parent == container,
-    let component = identity.lastComponent
+  guard let route = rowRoute(of: identity, container: container),
+    let component = route.lastComponent
   else {
     return nil
   }
   return builtinRouteRowIndex(in: component, kind: "ListRow")
+}
+
+/// `identity` without the occurrence components a later duplicate's row
+/// route carries after its index component, when it is a child route of
+/// `container`.
+private func rowRoute(of identity: Identity, container: Identity) -> Identity? {
+  var route = identity
+  while route.parent != container {
+    guard let last = route.lastComponent,
+      !Identity(components: [last]).entityOccurrenceComponents.isEmpty,
+      let parent = route.parent
+    else { return nil }
+    route = parent
+  }
+  return route
+}
+
+extension Identity {
+  /// Only the occurrences below the collection count: a collection that is
+  /// itself a later duplicate already carries its occurrence in every route.
+  fileprivate func appendingRowOccurrences(
+    of rowIdentity: Identity?, below container: Identity
+  ) -> Identity {
+    guard let rowIdentity else { return self }
+    let own =
+      container.isAncestor(of: rowIdentity)
+      ? Identity(components: Array(rowIdentity.components.dropFirst(container.components.count)))
+      : rowIdentity
+    return own.entityOccurrenceComponents.reduce(self) { $0.child($1) }
+  }
 }
 
 private func builtinRouteRowIndex(
@@ -133,11 +171,14 @@ private func builtinRouteRowIndex(
   return Int(digits)
 }
 
+/// See ``listRowIdentity(for:rowIndex:rowIdentity:)`` for `rowIdentity`.
 package func tableRowIdentity(
   for controlIdentity: Identity,
-  rowIndex: Int
+  rowIndex: Int,
+  rowIdentity: Identity? = nil
 ) -> Identity {
   controlIdentity.child(BuiltinPointerRouteComponent.tableRow(rowIndex).identityComponent)
+    .appendingRowOccurrences(of: rowIdentity, below: controlIdentity)
 }
 
 package func routeIDHasTerminalComponent(

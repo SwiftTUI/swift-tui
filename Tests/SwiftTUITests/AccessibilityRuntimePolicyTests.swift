@@ -2109,3 +2109,195 @@ extension CustomAccessibilityActionTests {
         == .number(3))
   }
 }
+
+// MARK: - Wave 4 FW-J (STUI-1296): later duplicates publish their occurrence
+
+/// A later duplicate's runtime identity carries its `ID[…#n]` occurrence, so a
+/// host can tell it from a unique element and from the first duplicate. The
+/// reported identity stays occurrence-free and a unique element is unchanged.
+@MainActor
+@Suite("Wave 4 FW-J: duplicate runtime identities", .serialized)
+struct Wave4FJDuplicateRuntimeIdentityTests {
+  fileprivate static func carriesOccurrence(_ identity: Identity) -> Bool {
+    identity.strippingEntityOccurrences != identity
+  }
+
+  private static func nodes<V: View>(_ h: SetDLiveHarness<V>) -> [AccessibilityNode] {
+    h.runLoop.publishedAccessibilitySnapshot.accessibilityNodes
+  }
+
+  // wave4j20: duplicate static text and its first copy.
+  @Test func wave4j20DuplicateTextPublishesItsOccurrence() throws {
+    let h = try SetDLiveHarness("w4j20", size: .init(width: 20, height: 6)) {
+      VStack { ForEach(["Same", "Same", "Other"], id: \.self) { Text($0) } }
+    }
+    defer { h.shutdown() }
+    let texts = Self.nodes(h).filter { $0.label == "Same" }
+    try #require(texts.count == 2)
+    #expect(texts[0].identity == texts[1].identity, "reported identities stay equal")
+    #expect(texts[0].runtimeFocusIdentity == texts[0].identity)
+    #expect(
+      Self.carriesOccurrence(texts[1].runtimeFocusIdentity), "\(texts[1].runtimeFocusIdentity)")
+    #expect(texts[1].runtimeFocusIdentity.strippingEntityOccurrences == texts[1].identity)
+    let other = try #require(Self.nodes(h).first { $0.label == "Other" })
+    #expect(other.runtimeFocusIdentity == other.identity)
+  }
+
+  // wave4j21: a builder List of duplicate rows. The later row's list item and
+  // selector carry the occurrence; its selector's runtime identity is still
+  // its keyboard focus identity (STUI-1211); unique rows keep their routes.
+  @Test func wave4j21DuplicateListRowsPublishTheirOccurrence() throws {
+    let box = SetDSelection<String?>(nil)
+    let h = try SetDLiveHarness("w4j21", size: .init(width: 30, height: 10)) {
+      List(selection: box.binding) {
+        ForEach(["Same", "Same", "Other"], id: \.self) { item in Text(item).tag(item) }
+      }
+    }
+    defer { h.shutdown() }
+    let nodes = Self.nodes(h)
+    let items = nodes.filter { $0.role == .custom("listitem") }
+    try #require(items.count == 3)
+    #expect(
+      Self.carriesOccurrence(items[1].runtimeFocusIdentity), "\(items[1].runtimeFocusIdentity)")
+    #expect(!Self.carriesOccurrence(items[0].runtimeFocusIdentity))
+    #expect(!Self.carriesOccurrence(items[2].runtimeFocusIdentity))
+    func selector(_ row: Int) throws -> AccessibilityNode {
+      try #require(nodes.first { $0.label == "Select row \(row)" })
+    }
+    #expect(try selector(1).runtimeFocusIdentity.lastComponent == "ListRow[0]")
+    #expect(try selector(3).runtimeFocusIdentity.lastComponent == "ListRow[2]")
+    let second = try selector(2)
+    #expect(Self.carriesOccurrence(second.runtimeFocusIdentity), "\(second.runtimeFocusIdentity)")
+    #expect(second.identity == (try selector(1)).identity, "reported identities stay equal")
+    try h.focus(second.runtimeFocusIdentity)
+    #expect(h.runLoop.focusTracker.currentFocusIdentity == second.runtimeFocusIdentity)
+    try h.key(.arrowDown)
+    #expect(box.value == "Other")
+    #expect(h.runLoop.focusTracker.currentFocusIdentity == (try selector(3)).runtimeFocusIdentity)
+  }
+
+  // wave4j22: a data List with duplicate IDs; the later row's route carries
+  // its occurrence for activation, keyboard focus and the selector alike.
+  @Test func wave4j22DuplicateDataListRowsRouteTheirOccurrence() throws {
+    let box = SetDSelection<String?>(nil)
+    let h = try SetDLiveHarness("w4j22", size: .init(width: 30, height: 10)) {
+      List(["A", "A", "B"], id: \.self, selection: box.binding) { Text($0) }
+    }
+    defer { h.shutdown() }
+    let second = try #require(Self.nodes(h).first { $0.label == "Select row 2" })
+    #expect(Self.carriesOccurrence(second.runtimeFocusIdentity), "\(second.runtimeFocusIdentity)")
+    #expect(
+      h.runLoop.focusTracker.focusRegions.contains { $0.identity == second.runtimeFocusIdentity })
+    #expect(try h.activate(label: "Select row 2") == .accepted)
+    #expect(box.value == "A")
+    try h.focus(second.runtimeFocusIdentity)
+    try h.key(.arrowDown)
+    #expect(box.value == "B")
+  }
+
+  // wave4j23: a data Table with duplicate IDs; clicks and selectors reach the
+  // later row through its occurrence-qualified route.
+  @Test func wave4j23DuplicateDataTableRowsRouteTheirOccurrence() throws {
+    let box = SetDSelection<String?>(nil)
+    let rows = ["A", "A", "B"].map { SetDRow(id: $0) }
+    let h = try SetDLiveHarness("w4j23", size: .init(width: 30, height: 10)) {
+      Table(rows, selection: box.binding, columns: [TableColumn("Name")]) { row in
+        Text(row.id)
+      }.tableHeaders(.hidden)
+    }
+    defer { h.shutdown() }
+    let selectors = Self.nodes(h).filter { $0.label?.hasPrefix("Select row") == true }
+    try #require(selectors.count == 3)
+    #expect(!Self.carriesOccurrence(selectors[0].runtimeFocusIdentity))
+    #expect(Self.carriesOccurrence(selectors[1].runtimeFocusIdentity))
+    #expect(!Self.carriesOccurrence(selectors[2].runtimeFocusIdentity))
+    #expect(try h.activate(label: "Select row 3") == .accepted)
+    #expect(box.value == "B")
+    let rowLines = h.lines.enumerated().filter { line in
+      line.element.split(whereSeparator: { !$0.isLetter }).contains("A")
+    }
+    try #require(rowLines.count == 2, "\(h.frame)")
+    let column = try #require(rowLines[1].element.firstIndex(of: "A"))
+    let x = rowLines[1].element.distance(from: rowLines[1].element.startIndex, to: column)
+    try h.click(.init(x: x, y: rowLines[1].offset))
+    #expect(box.value == "A")
+  }
+
+  // wave4j24 (neighbour): unique rows, items and text keep every identity.
+  @Test func wave4j24UniqueElementsKeepTheirIdentities() throws {
+    let box = SetDSelection<String?>(nil)
+    let h = try SetDLiveHarness("w4j24", size: .init(width: 30, height: 10)) {
+      List(["A", "B"], id: \.self, selection: box.binding) { Text($0) }
+    }
+    defer { h.shutdown() }
+    for node in Self.nodes(h) {
+      #expect(!Self.carriesOccurrence(node.runtimeFocusIdentity), "\(node.runtimeFocusIdentity)")
+      if node.label?.hasPrefix("Select row") != true, node.role != .stepper {
+        #expect(node.runtimeFocusIdentity == node.actionIdentity ?? node.identity)
+      }
+    }
+    let first = try #require(Self.nodes(h).first { $0.label == "Select row 1" })
+    #expect(
+      first.runtimeFocusIdentity == listRowIdentity(for: testIdentity("setD", "w4j24"), rowIndex: 0)
+    )
+  }
+
+  // wave4j25: hiding the first duplicate leaves the later one's runtime
+  // identity as it was (the SwiftUI host's scenario).
+  @Test func wave4j25HidingTheFirstDuplicateKeepsTheLaterIdentity() throws {
+    let model = Wave4FJHideModel()
+    let box = SetDSelection<String?>(nil)
+    let h = try SetDLiveHarness("w4j25", size: .init(width: 30, height: 10)) {
+      List(selection: box.binding) {
+        ForEach(Array(["Same", "Same"].enumerated()), id: \.element) { entry in
+          Text(entry.element).tag(entry.element)
+            .accessibilityHidden(model.hideFirst && entry.offset == 0)
+        }
+      }
+    }
+    defer { h.shutdown() }
+    func later() throws -> (text: Identity, selector: Identity) {
+      let nodes = Self.nodes(h)
+      let text = try #require(nodes.last { $0.label == "Same" })
+      let selector = try #require(nodes.first { $0.label == "Select row 2" })
+      return (text.runtimeFocusIdentity, selector.runtimeFocusIdentity)
+    }
+    let before = try later()
+    #expect(Self.carriesOccurrence(before.text) && Self.carriesOccurrence(before.selector))
+    model.hideFirst = true
+    try h.renderRoot()
+    #expect(Self.nodes(h).filter { $0.label == "Same" }.count == 1)
+    let after = try later()
+    #expect(after.text == before.text)
+    #expect(after.selector == before.selector)
+  }
+}
+
+extension Wave4FJDuplicateRuntimeIdentityTests {
+  // wave4j26 (neighbour): rows of a List that is itself a later duplicate
+  // already carry its occurrence through the List's identity, and their
+  // routes gain nothing more.
+  @Test func wave4j26RowsOfADuplicateListKeepTheirRouteShape() throws {
+    let box = SetDSelection<String?>(nil)
+    let h = try SetDLiveHarness("w4j26", size: .init(width: 30, height: 14)) {
+      VStack {
+        ForEach(["L", "L"], id: \.self) { _ in
+          List(["A", "B"], id: \.self, selection: box.binding) { Text($0) }.frame(height: 5)
+        }
+      }
+    }
+    defer { h.shutdown() }
+    let selectors = h.runLoop.publishedAccessibilitySnapshot.accessibilityNodes.filter {
+      $0.label == "Select row 1"
+    }
+    try #require(selectors.count == 2)
+    #expect(selectors.allSatisfy { $0.runtimeFocusIdentity.lastComponent == "ListRow[0]" })
+    #expect(!Self.carriesOccurrence(selectors[0].runtimeFocusIdentity))
+    #expect(Self.carriesOccurrence(selectors[1].runtimeFocusIdentity))
+  }
+}
+
+@MainActor
+private final class Wave4FJHideModel {
+  var hideFirst = false
+}

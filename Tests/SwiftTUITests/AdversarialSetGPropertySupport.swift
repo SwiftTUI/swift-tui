@@ -24,10 +24,7 @@ func setGProperty<Value: Sendable>(
 }
 
 /// Reproduced pass-2 findings, keyed by scenario number.
-let setGKnownIssues: [Int: String] = [
-  130:
-    "NEW-6: visibleRowCount counts the row above a separator line that starts the published window (window 1..<3 over rows 0..<1 and 2..<3 counts 2); the exact branch takes row(atOrBeforeLine:) of the first line; contract: CollectionScrollState.swift:116-125, :76-78; adjacent STUI-1239, STUI-1262",
-]
+let setGKnownIssues: [Int: String] = [:]
 
 /// `count` independent draws in `range`; properties derive their inputs from
 /// them so every input shrinks towards the smallest draw.
