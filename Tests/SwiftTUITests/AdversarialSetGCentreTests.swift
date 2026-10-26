@@ -96,12 +96,18 @@ struct AdversarialSetGCentreTests {
         if overshoot { return { dimensions in dimensions.width + shift } }
         return { _ in -shift }
       }
+      // Every label is six cells wide, as "header" is, so any three measured
+      // rows carry every guide value and the measured line is the eager line.
+      // A wider unmeasured row ("row 10" beside "row 9") with a larger
+      // past-the-width guide may move the line once measured
+      // (Divergences-And-Gaps.md:398-404); that is not this property.
+      func label(_ index: Int) -> String { index < 10 ? "row 0\(index)" : "row \(index)" }
       let lazy = setGLines(
         ScrollView {
           LazyVStack(alignment: .leading, spacing: 0) {
             Text("header").alignmentGuide(.leading, computeValue: guide(0))
             ForEach(0..<count, id: \.self) { index in
-              Text("row \(index)").alignmentGuide(.leading, computeValue: guide(index))
+              Text(label(index)).alignmentGuide(.leading, computeValue: guide(index))
             }
           }
         }, width: 30, height: 8)
@@ -110,7 +116,7 @@ struct AdversarialSetGCentreTests {
           VStack(alignment: .leading, spacing: 0) {
             Text("header").alignmentGuide(.leading, computeValue: guide(0))
             ForEach(0..<count, id: \.self) { index in
-              Text("row \(index)").alignmentGuide(.leading, computeValue: guide(index))
+              Text(label(index)).alignmentGuide(.leading, computeValue: guide(index))
             }
           }
         }, width: 30, height: 8)

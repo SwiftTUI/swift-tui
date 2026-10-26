@@ -216,8 +216,10 @@ extension LayoutEngine {
     var localOffsets: [Int: [Int]] = [:]
     // The cross line through every measured run. Each child places against
     // this line alone, so a run measured later can move the line, as a wider
-    // row does, but cannot change how the other rows round.
-    var crossLine = AlignmentLine(leading: 0, trailing: 0, isHalfCell: false)
+    // row does, but cannot change how the other rows round. It starts from
+    // the empty line, as the eager stack's line is built from its children
+    // alone: a zero seed would clamp negative guides and remainders to 0.
+    var crossLine = AlignmentLine(guides: [])
     for (index, run) in context.known {
       let spacings = run.children.map { effectiveSpacing(for: $0, passContext: passContext) }
       var cursor = 0

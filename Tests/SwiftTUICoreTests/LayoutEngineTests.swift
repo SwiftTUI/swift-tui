@@ -2088,6 +2088,46 @@ struct LayoutEngineTests {
     }
   }
 
+  @Test(
+    "STUI-1311: a half-cell child moved toward leading does not widen its container",
+    arguments: [Axis.horizontal, .vertical])
+  func halfCellChildMovedTowardLeadingKeepsTheUnion(axis: Axis) {
+    // The filler's centre guide is the integer 2, its far edge. The dot's
+    // exact centre is half a cell in, so on line 2 it would start at 1.5; it
+    // moves to 1 and ends at 2, inside the filler's two cells. The container
+    // spans the union of its placed children: 2 cells, not 3.
+    func cross(_ point: CellPoint) -> Int { axis == .vertical ? point.x : point.y }
+    func cross(_ size: CellSize) -> Int { axis == .vertical ? size.width : size.height }
+    let metadata =
+      axis == .vertical
+      ? LayoutMetadata().settingHorizontalAlignmentGuide(
+        .center, debugName: "center", computeValue: { _ in 2 })
+      : LayoutMetadata().settingVerticalAlignmentGuide(
+        .center, debugName: "center", computeValue: { _ in 2 })
+    let filler = leaf(
+      "filler",
+      size: axis == .vertical ? .init(width: 2, height: 1) : .init(width: 1, height: 2),
+      layoutMetadata: metadata)
+    let dot = leaf("dot", size: .init(width: 1, height: 1))
+    let engine = LayoutEngine()
+    let containers: [(String, LayoutBehavior)] = [
+      (
+        "stack",
+        .stack(axis: axis, spacing: 0, horizontalAlignment: .center, verticalAlignment: .center)
+      ),
+      ("zstack", .overlay(alignment: .center)),
+    ]
+    for (name, behavior) in containers {
+      let node = ResolvedNode(
+        identity: testIdentity(name), kind: .view(name), children: [filler, dot],
+        layoutBehavior: behavior)
+      let measured = engine.measure(node)
+      #expect(cross(measured.measuredSize) == 2, "\(name) \(measured.measuredSize)")
+      let placed = engine.place(node, measured: measured, origin: .zero)
+      #expect(placed.children.map { cross($0.bounds.origin) } == [0, 1], "\(name)")
+    }
+  }
+
   @Test("ViewThatFits selects the first child that fits the proposal")
   func viewThatFitsSelectsFirstFittingChild() {
     let engine = LayoutEngine()
