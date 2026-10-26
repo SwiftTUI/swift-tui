@@ -1301,3 +1301,47 @@ private struct W4HostedCollection: View {
     }
   }
 }
+
+// MARK: - Wave 4 (W4-FB): centre anchors (STUI-1322, fourth site)
+
+extension Wave4ScrollCommandRepairTests {
+  // STUI-1322 (fourth site, from FW-A): `scrollTo(_:anchor: .center)` in a
+  // ScrollView puts the target at the nearest line to the centre, ties toward
+  // the top, as frames and List anchors centre (Authoring-Views.md:92-99). An
+  // odd remainder (4 - 1, 6 - 3) used to land one line low; even remainders
+  // and setD146's 7-line viewport with a 2-line row are controls.
+  @Test(arguments: [(4, 1, 1), (6, 3, 1), (7, 2, 2), (5, 1, 2)])
+  func wave4b11CentreAnchorRoundsOddRemaindersTowardTheTop(
+    _ shape: (viewport: Int, rowLines: Int, line: Int)
+  ) throws {
+    let h = try StressRuntimeHarness(
+      rootIdentity: testIdentity("wave4b11", "\(shape.viewport)x\(shape.rowLines)"),
+      size: .init(width: 20, height: shape.viewport + 2)
+    ) {
+      ScrollViewReader { proxy in
+        VStack(alignment: .leading, spacing: 0) {
+          Button("go") { _ = proxy.scrollTo("t20", anchor: .center) }
+          ScrollView {
+            VStack(alignment: .leading, spacing: 0) {
+              ForEach(0..<40, id: \.self) { i in
+                VStack(alignment: .leading, spacing: 0) {
+                  Text(setDPadded(i, "u", digits: 2))
+                  ForEach(1..<shape.rowLines, id: \.self) { _ in Text("-") }
+                }
+                .id("t\(i)")
+              }
+            }
+          }
+          .scrollIndicators(.hidden)
+          .frame(height: shape.viewport)
+        }
+      }
+    }
+    defer { h.shutdown() }
+    _ = try h.clickText("go")
+    let point = try #require(h.point(forText: "u20"), "\(h.frame)")
+    #expect(
+      point.containingCell.y - 1 == shape.line,
+      "\(shape.viewport)-line viewport, \(shape.rowLines)-line row:\n\(h.frame)")
+  }
+}

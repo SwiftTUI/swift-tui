@@ -138,8 +138,11 @@ wheel, the keyboard and dragging. Mark targets with
 `id(_:)`, then reach them with ``ScrollViewProxy``'s `scrollTo(_:anchor:)`. A
 `nil` anchor reveals the target with the smallest possible movement; `.top`,
 `.center`, or `.bottom` align it to the viewport, clamped at the content
-edges. The proxy also jumps to an edge with `scrollTo(edge:)`, steps by cells
-with `scrollBy(x:y:)`, and sets absolute offsets with `scrollTo(x:y:)`.
+edges. When `.center` leaves an odd number of spare lines, the extra line goes
+below the target, as a frame centres its content, in a `ScrollView`, `List`
+and `Table` alike. The proxy also jumps to an edge with `scrollTo(edge:)`,
+steps by cells with `scrollBy(x:y:)`, and sets absolute offsets with
+`scrollTo(x:y:)`.
 
 ```swift
 ScrollViewReader { proxy in

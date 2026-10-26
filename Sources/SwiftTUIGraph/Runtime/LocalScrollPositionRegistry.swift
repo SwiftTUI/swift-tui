@@ -1215,14 +1215,18 @@ package final class LocalScrollPositionRegistry: Equatable {
     }
 
     var next = currentOffset
-    next.x +=
-      anchoredCoordinate(in: targetRect.origin.x, length: targetRect.size.width, anchor.x)
-      - anchoredCoordinate(
-        in: route.viewportRect.origin.x, length: route.viewportRect.size.width, anchor.x)
-    next.y +=
-      anchoredCoordinate(in: targetRect.origin.y, length: targetRect.size.height, anchor.y)
-      - anchoredCoordinate(
-        in: route.viewportRect.origin.y, length: route.viewportRect.size.height, anchor.y)
+    next.x = SaturatingConversion.adding(
+      next.x,
+      anchoredDelta(
+        targetOrigin: targetRect.origin.x, targetLength: targetRect.size.width,
+        viewportOrigin: route.viewportRect.origin.x, viewportLength: route.viewportRect.size.width,
+        anchor.x))
+    next.y = SaturatingConversion.adding(
+      next.y,
+      anchoredDelta(
+        targetOrigin: targetRect.origin.y, targetLength: targetRect.size.height,
+        viewportOrigin: route.viewportRect.origin.y,
+        viewportLength: route.viewportRect.size.height, anchor.y))
 
     return clampedOffset(next, in: route)
   }
@@ -1341,15 +1345,25 @@ package final class LocalScrollPositionRegistry: Equatable {
     return false
   }
 
-  private func anchoredCoordinate(
-    in origin: Int,
-    length: Int,
+  /// How far to scroll so that `unit` of the target meets `unit` of the
+  /// viewport. The target lands `unit` of the remainder (viewport minus
+  /// target) from the viewport's leading edge, on the nearest line, with a
+  /// tie toward leading: an odd remainder under `.center` puts the extra line
+  /// after the target, the frame-centring rule (`Authoring-Views.md:92-99`)
+  /// that `List` and `Table` anchors also follow (STUI-1322). Rounding the
+  /// target's and the viewport's anchor points separately put a one-line row
+  /// on line 2 of a four-line viewport instead of line 1.
+  private func anchoredDelta(
+    targetOrigin: Int,
+    targetLength: Int,
+    viewportOrigin: Int,
+    viewportLength: Int,
     _ unit: Double
   ) -> Int {
     // A huge finite anchor saturates here; `clampedOffset` then bounds it.
-    origin
-      + SaturatingConversion.int(
-        Double(max(0, length - 1)) * unit, rounding: .toNearestOrAwayFromZero)
+    let inset = SaturatingConversion.int(
+      Double(viewportLength - targetLength) * unit - 0.5, rounding: .up)
+    return SaturatingConversion.adding(targetOrigin - viewportOrigin, -inset)
   }
 
   private func clampedOffset(_ offset: ScrollOffset, in route: ScrollRoute) -> ScrollOffset {
