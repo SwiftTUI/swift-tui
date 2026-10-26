@@ -26,6 +26,11 @@ public struct FocusRegion: Equatable, Sendable {
   package var ownerIdentity: Identity?
   /// The authored item behind positional list focus or a table's active row.
   package var collectionFocusTarget: CollectionFocusTarget? = nil
+  /// Whether this collection row is its collection's active row (the
+  /// selection, or the keyboard cursor of a multiple selection). Initial
+  /// adoption and linear traversal that land on another row of the same
+  /// collection enter it here instead.
+  package var isCollectionEntry = false
   package var scopePath: [Identity]
   package var sectionIdentity: Identity?
   package var modalFocusScopePath: [Identity]?

@@ -314,14 +314,14 @@ struct AdversarialSetDCollectionMutationTests {
     defer { h.shutdown() }
     try #require(h.frame.contains("r000") && h.frame.contains("r005"), "\(h.frame)")
     setDKnown(
-      "duplicate of wave-3 hunt FB observation O1 (filed within STUI-1261-1295): a viewport-backed plain List draws separators its rows hide; the line builder emits a separator at every odd position (CollectionStylePresentationLayout.swift:843-851); contract: StyleModifiers.swift:1616-1647; adjacent STUI-1209"
+      "STUI-1291 (wave-3 hunt FB observation O1): a viewport-backed plain List draws separators its rows hide; the line builder emits a separator at every odd position (CollectionStylePresentationLayout.swift:843-851); contract: StyleModifiers.swift:1616-1647; adjacent STUI-1209"
     ) {
       #expect(!h.frame.contains("─"), "\(h.frame)")
     }
     let first = try #require(h.cell(of: "r000")).y
     let second = try #require(h.cell(of: "r001")).y
     setDKnown(
-      "duplicate of wave-3 hunt FB observation O1 (filed within STUI-1261-1295): a viewport-backed plain List draws separators its rows hide; the line builder emits a separator at every odd position (CollectionStylePresentationLayout.swift:843-851); contract: StyleModifiers.swift:1616-1647; adjacent STUI-1209"
+      "STUI-1291 (wave-3 hunt FB observation O1): a viewport-backed plain List draws separators its rows hide; the line builder emits a separator at every odd position (CollectionStylePresentationLayout.swift:843-851); contract: StyleModifiers.swift:1616-1647; adjacent STUI-1209"
     ) {
       #expect(second - first == 1, "rows \(first), \(second)\n\(h.frame)")
     }
@@ -344,7 +344,7 @@ struct AdversarialSetDCollectionMutationTests {
       try #require(h.cell(of: $0), "\(h.frame)").y
     }
     setDKnown(
-      "duplicate of wave-3 hunt FB observation O1 (filed within STUI-1261-1295): a viewport-backed plain List draws separators its rows hide; the line builder emits a separator at every odd position (CollectionStylePresentationLayout.swift:843-851); contract: StyleModifiers.swift:1616-1647; adjacent STUI-1209"
+      "STUI-1291 (wave-3 hunt FB observation O1): a viewport-backed plain List draws separators its rows hide; the line builder emits a separator at every odd position (CollectionStylePresentationLayout.swift:843-851); contract: StyleModifiers.swift:1616-1647; adjacent STUI-1209"
     ) {
       #expect(zip(y.dropFirst(), y).map { $0 - $1 } == [2, 1, 2], "rows \(y)\n\(h.frame)")
     }
@@ -725,5 +725,131 @@ struct Wave4FJCollectionBandTests {
     let rowNumber = try #require(Int(target.dropFirst())) + 1
     #expect(try h.activate(label: "Select row \(rowNumber)") == .accepted, "\(target)")
     #expect(box.value == target, "selected \(target); visible \(visible.first!)…\(visible.last!)")
+  }
+}
+
+// MARK: - Wave 4 FW-J: a List's window and keyboard cursor follow its selection
+
+@MainActor
+@Suite("Wave 4 FW-J: list focus entry and click selection", .serialized)
+struct Wave4FJListFocusTests {
+  private static func list(
+    _ name: String, box: SetDSelection<String?>, plain: Bool = false,
+    size: CellSize = .init(width: 30, height: 64)
+  ) throws -> SetDLiveHarness<some View> {
+    let rows = setDRows(200)
+    return try SetDLiveHarness(name, size: size) {
+      List(rows, selection: box.binding) { row in Text(row.id) }
+        .listStyle(plain ? .plain : .automatic).scrollIndicators(.hidden)
+    }
+  }
+
+  private static func focusedRow<V: View>(_ h: SetDLiveHarness<V>) -> String? {
+    h.runLoop.focusTracker.currentFocusIdentity?.lastComponent
+  }
+
+  // wave4j10 (STUI-1290): initial focus enters the list at its selected row,
+  // so the selection-centred window keeps the selection and Down moves from it.
+  @Test(arguments: [false, true])
+  func wave4j10InitialFocusEntersAtTheSelectedRow(plain: Bool) throws {
+    let box = SetDSelection<String?>("r100")
+    let h = try Self.list("w4j10-\(plain)", box: box, plain: plain)
+    defer { h.shutdown() }
+    let visible = h.tokens(prefix: "r")
+    #expect(visible.contains("r100"), "window \(visible.first ?? "-")…\(visible.last ?? "-")")
+    #expect(Self.focusedRow(h) == "ListRow[100]")
+    try h.key(.arrowDown)
+    #expect(box.value == "r101")
+  }
+
+  // wave4j11 (STUI-1290): Tab and Shift-Tab into the list land on its
+  // selected row; neighbour: with the selection scrolled out of the window
+  // the first visible row takes focus, as before.
+  @Test func wave4j11TraversalEntersAtTheSelectedRow() throws {
+    let box = SetDSelection<String?>("r012")
+    let rows = setDRows(200)
+    let h = try SetDLiveHarness("w4j11", size: .init(width: 30, height: 24)) {
+      VStack(spacing: 0) {
+        Button("before") {}
+        List(rows, selection: box.binding) { row in Text(row.id) }.scrollIndicators(.hidden)
+          .frame(height: 20)
+        Button("after") {}
+      }
+    }
+    defer { h.shutdown() }
+    try h.focusText("before")
+    try h.key(.tab)
+    #expect(Self.focusedRow(h) == "ListRow[12]")
+    try h.key(.tab)
+    try #require(h.runLoop.focusTracker.currentFocusIdentity?.lastComponent != "ListRow[12]")
+    #expect(
+      h.runLoop.withRuntimeRegistrationScope {
+        h.runLoop.handleKeyPress(KeyPress(.tab, modifiers: .shift))
+      } == nil)
+    try h.render()
+    #expect(Self.focusedRow(h) == "ListRow[12]")
+    let cell = try #require(h.cell(of: "r012"))
+    for _ in 0..<6 { try h.wheel(at: cell, deltaY: 3) }
+    let visible = h.tokens(prefix: "r")
+    try #require(!visible.contains("r012"), "\(visible)")
+    try h.focusText("before")
+    try h.key(.tab)
+    #expect(Self.focusedRow(h) == "ListRow[\(Int(visible[0].dropFirst())!)]")
+  }
+
+  // wave4j12 (STUI-1291): a click on a low visible row selects it and leaves
+  // the window where it was. Neighbour: a click on a top row.
+  @Test func wave4j12ClickOnALowListRowSelectsIt() throws {
+    let box = SetDSelection<String?>("r000")
+    let h = try Self.list("w4j12", box: box, size: .init(width: 30, height: 20))
+    defer { h.shutdown() }
+    let visible = h.tokens(prefix: "r")
+    try #require(visible.first == "r000" && visible.count >= 12, "\(visible)")
+    for target in [visible[2], visible[visible.count - 2]] {
+      try h.clickText(target)
+      #expect(box.value == target, "clicked \(target)")
+      #expect(h.tokens(prefix: "r").first == "r000", "the window stays: \(h.tokens(prefix: "r"))")
+    }
+  }
+
+  // wave4j13 (STUI-1291, Table parity): a click on a low row of an unanchored
+  // table selects it without re-centring the window under the pointer.
+  @Test func wave4j13ClickOnALowTableRowKeepsTheWindow() throws {
+    let box = SetDSelection<String?>("r100")
+    let rows = setDRows(200)
+    let h = try SetDLiveHarness("w4j13", size: .init(width: 30, height: 24)) {
+      Table(rows, selection: box.binding, columns: [TableColumn("Name")]) { row in
+        Text(row.id)
+      }.tableHeaders(.hidden).scrollIndicators(.hidden)
+    }
+    defer { h.shutdown() }
+    let visible = h.tokens(prefix: "r")
+    try #require(visible.count >= 8, "\(visible)")
+    let target = visible[visible.count - 2]
+    try h.clickText(target)
+    #expect(box.value == target, "clicked \(target)")
+    #expect(h.tokens(prefix: "r") == visible, "the window stays: \(h.tokens(prefix: "r"))")
+  }
+
+  // wave4j14 (STUI-1291): a selectable row whose content is only a shape still
+  // publishes its list item and selector. Neighbour: a non-selectable
+  // shape-only list publishes no row nodes, as before.
+  @Test func wave4j14ShapeOnlyRowsPublishTheirSelectors() throws {
+    let box = SetDSelection<String?>(nil)
+    let rows = setDRows(4)
+    let h = try SetDLiveHarness("w4j14", size: .init(width: 20, height: 10)) {
+      List(rows, selection: box.binding) { _ in Rectangle().frame(width: 4, height: 1) }
+    }
+    defer { h.shutdown() }
+    let nodes = h.runLoop.publishedAccessibilitySnapshot.accessibilityNodes
+    #expect(nodes.filter { $0.role == .custom("listitem") }.count == 4, "\(nodes.map(\.role))")
+    #expect(try h.activate(label: "Select row 2") == .accepted)
+    #expect(box.value == "r001")
+    let plain = try SetDLiveHarness("w4j14-plain", size: .init(width: 20, height: 10)) {
+      List(rows) { _ in Rectangle().frame(width: 4, height: 1) }
+    }
+    defer { plain.shutdown() }
+    let plainNodes = plain.runLoop.publishedAccessibilitySnapshot.accessibilityNodes
+    #expect(!plainNodes.contains { $0.role == .custom("listitem") }, "\(plainNodes.map(\.role))")
   }
 }

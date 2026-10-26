@@ -106,7 +106,7 @@ public final class FocusTracker {
     } else if prefersNoFocus {
       currentIndex = nil
     } else {
-      currentIndex = regions.isEmpty ? nil : 0
+      currentIndex = regions.isEmpty ? nil : collectionEntryIndex(landingAt: 0, in: regions)
     }
 
     // Initial adoption belongs to the caller's region-resolution pass. Report
@@ -162,12 +162,12 @@ public final class FocusTracker {
     let count = focusRegions.count
     precondition(count > 0, "indexEscapingCurrentSection called with no regions")
     guard let startIndex = currentIndex else {
-      return step > 0 ? 0 : count - 1
+      return collectionEntryIndex(landingAt: step > 0 ? 0 : count - 1, in: focusRegions)
     }
 
     let linearNext = (startIndex + step + count) % count
     guard let section = focusRegions[startIndex].sectionIdentity else {
-      return linearNext
+      return collectionEntryIndex(landingAt: linearNext, in: focusRegions)
     }
 
     // Walk forward (or backward) past every region that shares the
@@ -185,7 +185,23 @@ public final class FocusTracker {
     if focusRegions[candidate].sectionIdentity == section {
       return linearNext
     }
-    return candidate
+    return collectionEntryIndex(landingAt: candidate, in: focusRegions)
+  }
+
+  /// Where a traversal or initial adoption that lands on `index` takes focus.
+  /// Landing on a row of a collection that publishes its active row (the
+  /// selection) enters at that row, so the keyboard cursor, the selected-row
+  /// chrome and a selection-centred window stay on the selection
+  /// (STUI-1290). Otherwise, and when the active row is outside the window,
+  /// focus stays where it landed.
+  private func collectionEntryIndex(landingAt index: Int, in regions: [FocusRegion]) -> Int {
+    let landing = regions[index]
+    guard landing.collectionFocusTarget != nil, !landing.isCollectionEntry,
+      let owner = landing.ownerIdentity
+    else { return index }
+    return regions.firstIndex {
+      $0.isCollectionEntry && $0.ownerIdentity == owner && $0.ownerNodeID == landing.ownerNodeID
+    } ?? index
   }
 
   @discardableResult

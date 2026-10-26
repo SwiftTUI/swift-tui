@@ -756,13 +756,15 @@ struct InteractiveRuntimeTests {
       InteractiveDemoIdentity.textLabScrollPreview,
       verticalScrollIndicatorIdentity(for: InteractiveDemoIdentity.textLabScrollPreview),
     ]
+    // Tab enters the preset list at its selected row (preset 12, row 7),
+    // not at its first visible row (STUI-1290).
     let traversalOrder: [Identity] = [
       InteractiveDemoIdentity.incrementButton,
       InteractiveDemoIdentity.decrementButton,
       InteractiveDemoIdentity.resetButton,
       InteractiveDemoIdentity.accentToggle,
       InteractiveDemoIdentity.presetMenu,
-      listRowIdentity(for: InteractiveDemoIdentity.presetList, rowIndex: 6),
+      listRowIdentity(for: InteractiveDemoIdentity.presetList, rowIndex: 7),
       InteractiveDemoIdentity.inputField,
       InteractiveDemoIdentity.selectionModePicker,
       InteractiveDemoIdentity.textLabDisclosure,
@@ -912,9 +914,11 @@ struct InteractiveRuntimeTests {
     let terminal = RecordingTerminalHost()
     let result = try await makeRuntimeHarness(
       terminal: terminal,
+      // Tab enters the list at its selected row (preset 0, STUI-1290), so one
+      // Down reaches preset 2.
       events: [
         KeyPress(.tab), KeyPress(.tab), KeyPress(.tab), KeyPress(.tab),
-        KeyPress(.arrowDown), KeyPress(.arrowDown), KeyPress(.return),
+        KeyPress(.arrowDown), KeyPress(.return),
         KeyPress(.character("c"), modifiers: .ctrl),
       ]
     )

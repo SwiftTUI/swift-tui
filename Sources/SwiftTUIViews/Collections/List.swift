@@ -280,6 +280,14 @@ extension List {
 
           let rootRouteID = runtimePrimaryRouteID(for: context.identity)
           intake.registerPointerHandler(routeID: rootRouteID) { event in
+            if case .down(.primary) = event.kind {
+              // A press click-focuses the row under it, and while nothing is
+              // stored the window centres on the focused row. Pin the shown
+              // window first, as the arrow keys do, so the release lands on
+              // the pressed row (STUI-1291). The press itself stays unclaimed.
+              scrollCurrency.pinCurrentAnchor()
+              return .ignored
+            }
             guard case .scrolled(let deltaX, let deltaY) = event.kind,
               let delta = pointerSelectionDelta(deltaX: deltaX, deltaY: deltaY)
             else {

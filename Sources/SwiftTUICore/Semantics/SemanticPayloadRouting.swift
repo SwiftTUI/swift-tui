@@ -225,6 +225,8 @@ extension SemanticExtractor {
             }
           )
         )
+        focusRegions[focusRegions.count - 1].isCollectionEntry =
+          rowIndex == payload.selectedRowIndex
       }
     }
   }
