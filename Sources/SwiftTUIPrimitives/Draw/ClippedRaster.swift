@@ -279,22 +279,36 @@ package enum ClippedRaster {
     guard let rows = clipped(y - Int128(radius), y + Int128(radius), limit: height) else {
       return
     }
-    let (squared, overflow) = radius.multipliedReportingOverflow(by: radius)
     for row in rows {
-      let dy = Int(Int128(row) - y)
-      let span: Int
-      if !overflow {
-        span = Int(Double(squared - dy * dy).squareRoot().rounded(.down))
-      } else {
-        let r = Double(radius)
-        let d = Double(dy.magnitude)
-        let root = ((r - d) * (r + d)).squareRoot().rounded(.down)
-        span = root >= r ? radius : Int(root)
-      }
+      let span = discHalfSpan(radius: radius, offset: Int(Int128(row) - y).magnitude)
       plotRow(
         Int128(row), from: x - Int128(span), through: x + Int128(span), width: width,
         height: height, plot: plot)
     }
+  }
+
+  /// `floor(sqrt(radius² - offset²))` for `0 <= offset <= radius`, exactly.
+  ///
+  /// Below 2^52 the operand is exact in `Double` and its correctly rounded
+  /// root cannot reach the next integer, so the `Double` root is the floor.
+  /// Above, the root can round up to `radius` itself, so one Newton step from
+  /// the `Double` estimate and a final correction give the exact floor.
+  private static func discHalfSpan(radius: Int, offset: UInt) -> Int {
+    let r = UInt128(radius)
+    let d = UInt128(offset)
+    let value = (r - d) * (r + d)
+    guard value >= 1 << 52 else {
+      return Int(Double(value).squareRoot().rounded(.down))
+    }
+    var root = UInt128(Double(value).squareRoot())
+    root = (root + value / root) / 2
+    while root * root > value {
+      root -= 1
+    }
+    while (root + 1) * (root + 1) <= value {
+      root += 1
+    }
+    return Int(root)
   }
 
   /// Fills an ellipse row by row with `EllipseRasterization` half-spans,

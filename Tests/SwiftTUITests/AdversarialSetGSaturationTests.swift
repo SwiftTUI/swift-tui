@@ -196,7 +196,11 @@ struct AdversarialSetGSaturationTests {
         guard fraction >= 0, fraction < 1 else {
           return "fractionInCell of \(coordinate) is \(fraction)"
         }
-        if coordinate.magnitude < 0x1p52, Double(cell) + fraction != coordinate {
+        // Oracle correction (wave 4, STUI-1314): for x in (-0.5, 0) the exact
+        // fraction 1 + x need not be representable, and for x in (-2^-53, 0)
+        // no fraction below 1 reconstructs x exactly. The nearest fraction is
+        // within half an ulp of one, 2^-53, of the exact one.
+        if coordinate.magnitude < 0x1p52, abs(Double(cell) + fraction - coordinate) > 0x1p-53 {
           return "cell \(cell) + fraction \(fraction) != \(coordinate)"
         }
       }

@@ -32,11 +32,18 @@ extension Point {
     )
   }
 
-  /// The normalized in-cell fraction for this point.
+  /// The normalized in-cell fraction for this point: each finite
+  /// coordinate's offset from the integer at or below it, in `0..<1`.
+  ///
+  /// A coordinate so little below an integer that its exact offset rounds up
+  /// to 1 (for example `-1e-17`) reports the largest fraction below 1
+  /// instead, so the fraction stays within ``containingCell``.
   public var fractionInCell: UnitPoint {
-    let floorX = x.rounded(.down)
-    let floorY = y.rounded(.down)
-    return UnitPoint(x: x - floorX, y: y - floorY)
+    func fraction(_ value: Double) -> Double {
+      let offset = value - value.rounded(.down)
+      return offset == 1 ? Double(1).nextDown : offset
+    }
+    return UnitPoint(x: fraction(x), y: fraction(y))
   }
 
   /// Snaps this point to an integer cell using `rule`.

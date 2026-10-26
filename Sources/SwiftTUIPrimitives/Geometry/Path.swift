@@ -647,8 +647,19 @@ extension Path {
 
     let x1 = segment.start.x
     let x2 = segment.end.x
-    let intersectionX = x1 + (point.y - y1) * (x2 - x1) / (y2 - y1)
-    guard intersectionX > point.x else {
+    let product = (point.y - y1) * (x2 - x1)
+    let crossesRight: Bool
+    if product.isFinite, (y2 - y1).isFinite {
+      crossesRight = x1 + product / (y2 - y1) > point.x
+    } else {
+      // Far coordinates: the product or a difference leaves the `Double`
+      // range. Compare at half scale and divide first. The fraction lies in
+      // 0...1, no halved difference overflows, and both steps scale exactly,
+      // so containment still commutes with power-of-two scaling.
+      let fraction = (point.y / 2 - y1 / 2) / (y2 / 2 - y1 / 2)
+      crossesRight = x1 / 2 + fraction * (x2 / 2 - x1 / 2) > point.x / 2
+    }
+    guard crossesRight else {
       return 0
     }
     return y2 > y1 ? 1 : -1
