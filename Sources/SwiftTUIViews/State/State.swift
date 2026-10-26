@@ -61,10 +61,10 @@ package enum StateSlotOrdinals {
     defaultFocusBase - ordinal
   }
 
-  package static func valueAnimation(
-    _ ordinal: Int
-  ) -> Int {
-    valueAnimationOrdinal - ordinal
+  /// The one slot holding a node's value-gated modifier records
+  /// (`ValueGateRecords`).
+  package static var valueGateRecords: Int {
+    valueAnimationOrdinal
   }
 
   package static var tabFocusedIndex: Int {

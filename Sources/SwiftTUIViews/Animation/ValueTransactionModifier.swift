@@ -86,90 +86,72 @@ package struct ValueTransactionModifier<Value: Equatable & Sendable>:
 // MARK: - ValueGatedTransactionSupport
 
 /// The value-gate mechanics shared by ``ValueAnimationModifier`` and
-/// ``ValueTransactionModifier``: the silent per-node slot that remembers the
-/// last value, the outer-first cursor reservation for stacked modifiers, the
-/// per-node ordinal claim, and the first-appearance baseline store.
+/// ``ValueTransactionModifier``: the remembered value each modifier compares
+/// against, its outer-first position among stacked modifiers at one
+/// identity, and the registration of the request it authors.
 package enum ValueGatedTransactionSupport {
   /// One opened gate: whether the value changed since the last resolve, the
-  /// child context to resolve under, and the reservation to complete once
-  /// the node exists.
+  /// child context to resolve under, and whether the value still has to be
+  /// recorded once the content resolved.
   package struct Gate {
     package let valueChanged: Bool
     package let childContext: ResolveContext
-    package let firstAppearanceOrdinal: Int?
+    let recordsAfterResolve: Bool
+    let key: ValueGateRecords.Key
 
-    /// Stores the reserved first-appearance baseline on the now-minted node.
-    /// Skips a slot already holding a *different* type: the outer-first
-    /// cursor keeps stacked modifiers' ordinals distinct so this cannot arise
-    /// from a well-formed chain, but leaving a foreign occupant untouched
-    /// keeps the slot's stored-type invariant (`AnyStateSlot.set`) trap-free
-    /// regardless.
+    /// Records the value after the content resolved, for a gate that found
+    /// no node to hold it before (a resolve with no evaluating node). A gate
+    /// that recorded before resolving does nothing here.
     @MainActor
     package func storeFirstAppearanceBaseline<Value: Equatable & Sendable>(
       _ value: Value,
       in context: ResolveContext
     ) {
-      guard let ordinal = firstAppearanceOrdinal,
-        let node = context.viewGraph?.nodeForIdentity(context.identity)
+      guard recordsAfterResolve, let owner = ValueGateRecords.owner(in: context),
+        let viewGraph = context.viewGraph
       else {
         return
       }
-      if let existing = node.stateSlotStorage(ordinal: ordinal),
-        existing.isInitialized,
-        !existing.stores(Value.self)
-      {
-        return
-      }
-      node.setStateSlotSilently(ordinal: ordinal, value: value)
+      _ = ValueGateRecords.observe(value, at: key, on: owner, in: viewGraph)
     }
   }
 
-  /// Reads the previous value from a non-invalidating state slot, stores the
-  /// current one without invalidating, and reserves the first-appearance
-  /// baseline when the node does not exist yet.
+  /// Compares `value` with the one this modifier saw before and records it.
+  /// The first value a modifier records is not a change: SwiftUI's
+  /// value-gated forms apply only when the value changes. Without a node to
+  /// hold values (a resolve outside a view graph) every resolve counts as a
+  /// change, as before.
   @MainActor
   package static func openGate<Value: Equatable & Sendable>(
     value: Value,
     in context: ResolveContext
   ) -> Gate {
-    let (previousValue, ordinal) = previousValueAndOrdinal(for: value, in: context)
-    let valueChanged = previousValue.map { $0 != value } ?? true
-
-    // Store the current value without invalidating.
-    if let ordinal, let node = context.viewGraph?.nodeForIdentity(context.identity) {
-      node.setStateSlotSilently(ordinal: ordinal, value: value)
+    let key = ValueGateRecords.Key(
+      identity: context.identity, position: context.valueAnimationOrdinalCursor)
+    let valueChanged: Bool
+    let recordsAfterResolve: Bool
+    if let owner = ValueGateRecords.owner(in: context), let viewGraph = context.viewGraph {
+      valueChanged = ValueGateRecords.observe(value, at: key, on: owner, in: viewGraph)
+      recordsAfterResolve = false
+    } else {
+      // Nothing can hold the value (no graph, or no node yet): treat it as a
+      // change, as before, and record it once the content resolved.
+      valueChanged = true
+      recordsAfterResolve = true
     }
-
-    // First-appearance baseline reservation. When the identity's node does not
-    // yet exist pre-resolve (a replacement `.id`, a freshly inserted entity),
-    // `previousValueAndOrdinal` returns `(nil, nil)` and no baseline is stored:
-    // the node mints deeper inside `content.resolveElements`, after this read.
-    // The next frame then re-seeds the still-empty slot with the *current*
-    // value, so a genuine change is never detected and the replacement owner
-    // never animates. Reserve this modifier's slot ordinal now from the
-    // identity-scoped context cursor — which advances OUTER-first, exactly
-    // mirroring the per-node `claimValueAnimationModifierOrdinal` order the
-    // steady-state read uses — and store the baseline post-resolve once the
-    // node exists. Claiming from the node counter post-resolve instead would
-    // reverse stacked modifiers' ordinals (post-resolve unwinds inner-first),
-    // desyncing the next frame's read; the pre-resolve cursor cannot.
-    let firstAppearanceOrdinal: Int? =
-      ordinal == nil
-      ? StateSlotOrdinals.valueAnimation(context.valueAnimationOrdinalCursor)
-      : nil
 
     var childContext = context
     // Advance the cursor so a stacked inner value-gated modifier at this same
-    // identity reserves the next index, matching the per-node counter's
-    // outer-first claim sequence. Reset to 0 across every identity boundary
-    // (the cursor is a direct `ResolveContext` field, so `child` /
-    // `replacingIdentity` drop it) — one identity is one node, one counter.
+    // identity takes the next position. It resets to 0 across every identity
+    // boundary (the cursor is a direct `ResolveContext` field, so `child` /
+    // `replacingIdentity` drop it).
     childContext.valueAnimationOrdinalCursor = context.valueAnimationOrdinalCursor + 1
 
     return Gate(
       valueChanged: valueChanged,
       childContext: childContext,
-      firstAppearanceOrdinal: firstAppearanceOrdinal
+      recordsAfterResolve: recordsAfterResolve,
+      key: key
     )
   }
 
@@ -210,31 +192,170 @@ package enum ValueGatedTransactionSupport {
     }
     return transaction.request
   }
+}
+
+// MARK: - ValueGateRecords
+
+/// The values the value-gated modifiers resolved in one node's evaluation
+/// last saw, held in one silent slot of that node.
+///
+/// The node is the one evaluating the modifier (`ViewNodeContext.current`),
+/// not the node the identity index names. The index moves an identity to the
+/// node that absorbs it when a view's body root is a conditional or a
+/// `Group` (the absorber's output is the branch), while the evaluation stays
+/// with the authored node, so a slot found through the index was a different
+/// slot on the next frame and the first change after appearance never
+/// animated (STUI-1335). One node's evaluation can resolve modifiers at
+/// several identities, the branches of its body-root conditional, so a
+/// record is keyed by the identity and the modifier's outer-first position
+/// there; a single per-node counter let two branches share one slot, and a
+/// branch flip between value types trapped.
+///
+/// Records are pass-stable like `onChange`'s: the first write in a pass moves
+/// the previous value into the baseline, and a same-pass re-resolve (a
+/// navigation destination resolves twice in its write frame) compares
+/// against that baseline instead of the value the first resolve stored.
+///
+/// A branch that leaves and comes back is a new view, as in SwiftUI: a
+/// record whose identity is neither in the graph's identity index nor in the
+/// owner's last committed output is a departed view's and is replaced.
+package struct ValueGateRecords {
+  package struct Key: Hashable, Sendable {
+    let identity: Identity
+    let position: Int
+  }
+
+  private struct Record {
+    /// The value before this pass's first write; `nil` when the record was
+    /// created in this pass.
+    var baseline: Any?
+    var current: Any
+    var passID: UInt64
+  }
+
+  private var records: [Key: Record] = [:]
+
+  /// The node that holds the records of the modifiers resolving in
+  /// `context`: the evaluating node when it belongs to the context's graph,
+  /// else the identity's node.
+  @MainActor
+  static func owner(in context: ResolveContext) -> SwiftTUICore.ViewNode? {
+    guard let viewGraph = context.viewGraph else {
+      return nil
+    }
+    if let current = ViewNodeContext.current, current.ownerGraph === viewGraph {
+      return current
+    }
+    return viewGraph.nodeForIdentity(context.identity)
+  }
+
+  /// Compares `value` with the value recorded at `key` on `owner` and
+  /// records it. Returns whether it changed. A missing or departed record,
+  /// or one of another value type, is a first appearance and reports no
+  /// change.
+  @MainActor
+  static func observe<Value: Equatable & Sendable>(
+    _ value: Value,
+    at key: Key,
+    on owner: SwiftTUICore.ViewNode,
+    in viewGraph: ViewGraph
+  ) -> Bool {
+    let pass = viewGraph.resolvePassID
+    var gates = records(on: owner)
+    if gates.records[key] == nil {
+      adoptRecord(at: key, into: &gates, owner: owner, in: viewGraph)
+    }
+    let changed: Bool
+    if var record = gates.records[key], isLive(key.identity, owner: owner, in: viewGraph) {
+      let previous: Any? = record.passID == pass ? record.baseline : .some(record.current)
+      changed = (previous as? Value).map { $0 != value } ?? false
+      if record.passID != pass {
+        record.baseline = record.current
+        record.passID = pass
+      }
+      record.current = value
+      gates.records[key] = record
+    } else {
+      changed = false
+      gates.records[key] = Record(baseline: nil, current: value, passID: pass)
+    }
+    owner.setStateSlotSilently(ordinal: StateSlotOrdinals.valueGateRecords, value: gates)
+    return changed
+  }
+
+  /// Whether the view at `identity` is still the one a record there was
+  /// written for: the identity is in the graph's identity index, or in the
+  /// output `owner` committed last (a branch content without a node of its
+  /// own). A branch that was replaced by its sibling is in neither.
+  @MainActor
+  private static func isLive(
+    _ identity: Identity,
+    owner: SwiftTUICore.ViewNode,
+    in viewGraph: ViewGraph
+  ) -> Bool {
+    if viewGraph.nodeForIdentity(identity) != nil {
+      return true
+    }
+    var node = owner.committed
+    while node.identity != identity {
+      guard node.identity.isAncestor(of: identity),
+        let next = node.children.first(where: { $0.identity.isAncestor(of: identity) })
+      else {
+        return false
+      }
+      node = next
+    }
+    return true
+  }
+
+  /// Moves the record at `key` to `owner` from another node that held it.
+  ///
+  /// Flattening can move the evaluation of an identity between the node
+  /// authored there and a node that absorbs it: an explicit `.id` inside a
+  /// view hosted by its parent's body-root conditional re-routes to the
+  /// absorber after the first commit. The candidates are the nodes at the
+  /// identities the owner's evaluation spans down to the key's identity
+  /// (index occupants and flattening's authored owners).
+  @MainActor
+  private static func adoptRecord(
+    at key: Key,
+    into gates: inout ValueGateRecords,
+    owner: SwiftTUICore.ViewNode,
+    in viewGraph: ViewGraph
+  ) {
+    var identity: Identity? = key.identity
+    while let candidateIdentity = identity {
+      for candidate in [
+        viewGraph.flattenedAuthoredOwnerNode(for: candidateIdentity),
+        viewGraph.nodeForIdentity(candidateIdentity),
+      ] {
+        guard let candidate, candidate !== owner else {
+          continue
+        }
+        var other = records(on: candidate)
+        if let moved = other.records.removeValue(forKey: key) {
+          gates.records[key] = moved
+          candidate.setStateSlotSilently(ordinal: StateSlotOrdinals.valueGateRecords, value: other)
+          return
+        }
+      }
+      // Stop at the owner's own identity, or at once when the owner's
+      // evaluation does not span the key (a foreign evaluating node).
+      guard candidateIdentity != owner.identity, owner.identity.isAncestor(of: candidateIdentity)
+      else {
+        return
+      }
+      identity = candidateIdentity.parent
+    }
+  }
 
   @MainActor
-  private static func previousValueAndOrdinal<Value: Equatable & Sendable>(
-    for value: Value,
-    in context: ResolveContext
-  ) -> (Value?, Int?) {
-    guard let viewGraph = context.viewGraph,
-      let node = viewGraph.nodeForIdentity(context.identity)
+  private static func records(on node: SwiftTUICore.ViewNode) -> ValueGateRecords {
+    guard let slot = node.stateSlotStorage(ordinal: StateSlotOrdinals.valueGateRecords),
+      slot.stores(ValueGateRecords.self)
     else {
-      return (nil, nil)
+      return ValueGateRecords()
     }
-    // Each stacked value-gated modifier on one node claims its own
-    // per-resolve ordinal (reset with the node's other modifier-ordinal
-    // counters): a shared slot would alias two stacked modifiers'
-    // baselines — each write invalidates the other's comparison, so every
-    // steady-state resolve manufactures a phantom "value changed" — and
-    // would trap on the slot's stored-type check when the watched values
-    // have different types.
-    let ordinal = StateSlotOrdinals.valueAnimation(
-      node.claimValueAnimationModifierOrdinal()
-    )
-    let stored: Value = node.stateSlot(
-      ordinal: ordinal,
-      seed: value
-    )
-    return (stored, ordinal)
+    return slot.value(as: ValueGateRecords.self)
   }
 }

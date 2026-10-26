@@ -213,10 +213,10 @@ public struct ValueAnimationModifier<Value: Equatable & Sendable>: IterativePrim
     content: ModifierContentInputs<Base>,
     in context: ResolveContext
   ) -> ResolveWork<[ResolvedNode]> {
-    // The value-gate mechanics (silent per-node slot, outer-first cursor
-    // reservation, per-node ordinal claim, first-appearance baseline) are
-    // shared with `ValueTransactionModifier` through
-    // `ValueGatedTransactionSupport`; this modifier keeps its public shape.
+    // The value-gate mechanics (the remembered value on the evaluating node,
+    // keyed by identity and outer-first position, pass-stable) are shared
+    // with `ValueTransactionModifier` through `ValueGatedTransactionSupport`;
+    // this modifier keeps its public shape.
     let gate = ValueGatedTransactionSupport.openGate(value: value, in: context)
 
     guard gate.valueChanged else {

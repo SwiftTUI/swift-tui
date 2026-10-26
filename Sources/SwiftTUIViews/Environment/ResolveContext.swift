@@ -75,17 +75,16 @@ public struct ResolveContext: Equatable, Sendable {
   /// suppressed; adopting the prior entity node as the host-content node is the
   /// entity-routing collapse that keeps `@State` alive across wrapper toggles.
   package var entityHosting: Bool = false
-  /// Outer-first index a `.animation(_, value:)` modifier reserves for its
-  /// baseline state slot when the identity's node does not yet exist during
-  /// resolve (a first-appearing `.id` replacement or inserted entity). It is a
-  /// direct field — `child` / `replacingIdentity` rebuild the context and drop
-  /// it, so it resets to 0 at every identity boundary (one identity is one
-  /// node), while a modifier chain's `var childContext = context` copy carries
-  /// it forward so stacked `.animation` modifiers at one identity reserve
-  /// distinct, ascending indices. This mirrors ``ViewNode``'s per-node
-  /// `claimValueAnimationModifierOrdinal` counter for exactly the frame where
-  /// that counter is unreachable (no node yet). Deliberately excluded from
-  /// ``ResolveContext``'s `Equatable` conformance so it never gates reuse.
+  /// Outer-first position of a value-gated modifier (`.animation(_:value:)`,
+  /// `.transaction(value:_:)`) among the stacked ones at this identity; with
+  /// the identity it keys the modifier's remembered value
+  /// (`ValueGateRecords`). It is a direct field — `child` /
+  /// `replacingIdentity` rebuild the context and drop it, so it resets to 0
+  /// at every identity boundary, while a modifier chain's
+  /// `var childContext = context` copy carries it forward so stacked
+  /// modifiers at one identity take distinct, ascending positions.
+  /// Deliberately excluded from ``ResolveContext``'s `Equatable` conformance
+  /// so it never gates reuse.
   package var valueAnimationOrdinalCursor: Int = 0
 
   /// Runtime registries and lowering seams propagated unchanged from a parent
@@ -596,13 +595,49 @@ public struct ResolveContext: Equatable, Sendable {
     // for that subtree the captured transaction IS the current value (F137,
     // the transaction analog of the authored focus/press exemption above).
     if !propagated.authoredTransactionOverride {
-      refreshed.transaction = FrameAnimationTransactionPlan(
-        base: inputs.transaction,
-        segments: inputs.animationSegments
-      ).transaction(for: refreshed.identity)
+      refreshed.transaction = inputs.frameTransaction(for: refreshed.identity)
     }
     refreshed.resolveWorkTracker = inputs.resolveWorkTracker
     return refreshed
+  }
+
+  /// Returns this context with the frame transaction of a write to `node`'s
+  /// state, for the evaluation of `node` this context begins.
+  ///
+  /// A write's frame segment names the identity the reading node is indexed
+  /// at. For a view whose body root is a conditional (or a lone `Group`
+  /// child), the commit re-keys the view's node to its output, the branch, so
+  /// the segment names an identity below the view's own and the refresh at
+  /// the view's identity selects the base transaction. The write's
+  /// transaction belongs to the node's whole evaluation: the branch content,
+  /// which resolves without a view boundary of its own, and, when the write
+  /// flips the branch, the branch it produces now (STUI-1335). An authored
+  /// transaction above this context keeps winning (F137).
+  @MainActor
+  package func stampingFrameTransaction(
+    forEvaluationOf node: SwiftTUICore.ViewNode
+  ) -> Self {
+    guard !propagated.authoredTransactionOverride,
+      let inputs = effectiveFrameResolveInputs,
+      !inputs.animationSegments.isEmpty,
+      let viewGraph
+    else {
+      return self
+    }
+    let readerIdentity = viewGraph.stateReaderIdentity(of: node)
+    guard readerIdentity != identity else {
+      return self
+    }
+    let plan = FrameAnimationTransactionPlan(
+      base: inputs.transaction, segments: inputs.animationSegments)
+    guard let segment = plan.segment(for: readerIdentity),
+      segment != plan.segment(for: identity)
+    else {
+      return self
+    }
+    var stamped = self
+    stamped.transaction = plan.transaction(for: readerIdentity)
+    return stamped
   }
 
   /// Stores an invalidation set together with the summary already built from

@@ -220,6 +220,13 @@ package struct FrameResolveInputs {
     self.retainedReuseSuppressionScope = retainedReuseSuppressionScope
   }
 
+  /// The transaction a resolve context at `identity` carries this frame: the
+  /// deepest animation segment that contains `identity`, else the base.
+  package func frameTransaction(for identity: Identity) -> TransactionSnapshot {
+    FrameAnimationTransactionPlan(base: transaction, segments: animationSegments)
+      .transaction(for: identity)
+  }
+
   /// Disabled-reason diagnostic names with `frame_state_force_root` enriched
   /// by its attribution, e.g. `frame_state_force_root(focus_sync_rerender)`.
   /// Consumers matching on the plain reason substring keep matching.

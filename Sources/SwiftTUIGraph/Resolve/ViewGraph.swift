@@ -445,6 +445,11 @@ package final class ViewGraph {
     set { frameCommit.currentFrameID = newValue }
     _modify { yield &frameCommit.currentFrameID }
   }
+  /// Identifies the current frame's resolve pass: every resolve in one frame,
+  /// including a same-pass re-resolve, reads the same value. Value-gated
+  /// modifiers key a pass-stable baseline on it, as `onChange` does with
+  /// ``changeObservationValue(entityIdentity:identity:ordinal:as:)``.
+  package var resolvePassID: UInt64 { currentFrameID }
   package var animationInputMutationToken: UInt64 {
     frameCommit.animationInputMutationToken
   }
@@ -3943,9 +3948,16 @@ package final class ViewGraph {
         guard let node = nodesByOwnerLifetimeID[ownerLifetimeID] else {
           return nil
         }
-        return identityByNodeID[node.viewNodeID] ?? node.resolvedIdentity
+        return stateReaderIdentity(of: node)
       }
     )
+  }
+
+  /// The identity a state write names for `node` as a reader: the identity
+  /// the node is indexed at, which a flattening commit re-keys to the node's
+  /// output (a body-root conditional's branch).
+  package func stateReaderIdentity(of node: ViewNode) -> Identity {
+    identityByNodeID[node.viewNodeID] ?? node.resolvedIdentity
   }
 
   package func environmentDependentIdentities(
