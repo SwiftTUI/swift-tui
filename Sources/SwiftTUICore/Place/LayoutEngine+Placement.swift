@@ -95,7 +95,8 @@ extension LayoutEngine {
     {
       let viewportHeight = (node.scrollViewportRect ?? bounds).size.height
       let fixedHeight = max(0, viewportHeight - navigation.visibleLines.count)
-      node.contentBounds.size.height = navigation.geometry.displayLineCount + fixedHeight
+      node.contentBounds.size.height = SaturatingConversion.adding(
+        navigation.geometry.displayLineCount, fixedHeight)
     }
     return node
   }
@@ -138,7 +139,8 @@ extension LayoutEngine {
     }
 
     let placedIdentities = Set(placedChildren.map(\.identity))
-    let crossLength = max(0, snapshot.crossLeading + snapshot.crossTrailing)
+    let crossLength = max(
+      0, SaturatingConversion.adding(snapshot.crossLeading, snapshot.crossTrailing))
     var estimates: [LazyChildScrollEstimate] = []
     estimates.reserveCapacity(max(0, snapshot.childIdentities.count - placedChildren.count))
     for (index, identity) in snapshot.childIdentities.enumerated()
@@ -154,14 +156,14 @@ extension LayoutEngine {
           CellRect(
             origin: CellPoint(
               x: bounds.origin.x,
-              y: bounds.origin.y + snapshot.childMainOffsets[index]
+              y: SaturatingConversion.adding(bounds.origin.y, snapshot.childMainOffsets[index])
             ),
             size: CellSize(width: crossLength, height: snapshot.childMainLengths[index])
           )
         case .horizontal:
           CellRect(
             origin: CellPoint(
-              x: bounds.origin.x + snapshot.childMainOffsets[index],
+              x: SaturatingConversion.adding(bounds.origin.x, snapshot.childMainOffsets[index]),
               y: bounds.origin.y
             ),
             size: CellSize(width: snapshot.childMainLengths[index], height: crossLength)
@@ -225,14 +227,16 @@ extension LayoutEngine {
       return childContentBounds
     case .list(let payload):
       var idealSize = measuredListIdealSize(for: payload)
-      idealSize.height += knownTallRowExtraCells(in: measured)
+      idealSize.height = SaturatingConversion.adding(
+        idealSize.height, knownTallRowExtraCells(in: measured))
       return union(
         childContentBounds,
         CellRect(origin: bounds.origin, size: idealSize)
       )
     case .table(let payload):
       var idealSize = measuredTableIdealSize(for: payload)
-      idealSize.height += knownTallRowExtraCells(in: measured)
+      idealSize.height = SaturatingConversion.adding(
+        idealSize.height, knownTallRowExtraCells(in: measured))
       if payload.isViewportBacked,
         let edges = measured.containerAllocationSnapshot?.hostedCollection?.hiddenRowSeparatorEdges,
         !edges.isEmpty
@@ -277,13 +281,13 @@ extension LayoutEngine {
         switch axis {
         case .vertical:
           .init(
-            width: snapshot.crossLeading + snapshot.crossTrailing,
+            width: SaturatingConversion.adding(snapshot.crossLeading, snapshot.crossTrailing),
             height: snapshot.contentMainLength
           )
         case .horizontal:
           .init(
             width: snapshot.contentMainLength,
-            height: snapshot.crossLeading + snapshot.crossTrailing
+            height: SaturatingConversion.adding(snapshot.crossLeading, snapshot.crossTrailing)
           )
         }
       let contentBounds = CellRect(origin: bounds.origin, size: contentSize)
@@ -319,22 +323,50 @@ extension LayoutEngine {
   /// geometry immediately and keeps the untranslated children as placeholders;
   /// completed children are written back into the parent frame's value-typed
   /// `children[index]` one at a time, so the tree is rebuilt bottom-up without
-  /// call-stack frames.
+  /// call-stack frames. Coordinates saturate at `Int.min` and `Int.max`.
   package func translatedPlacement(
     _ node: PlacedNode,
     by delta: CellPoint
   ) -> PlacedNode {
+    // The saturating move never declines a node.
+    rebuiltPlacement(node) { translatedNodeItself($0, by: delta, exactly: false) }!
+  }
+
+  /// `translatedPlacement(_:by:)`, or `nil` when a node's bounds or content
+  /// bounds hold saturated geometry (an origin or far edge at `Int.min` or
+  /// `Int.max`) or would overflow when moved. Saturating sums do not commute
+  /// with a later move, so the retained viewport-translation leg places such a
+  /// subtree afresh instead of translating it (STUI-1333).
+  package func exactlyTranslatedPlacement(
+    _ node: PlacedNode,
+    by delta: CellPoint
+  ) -> PlacedNode? {
+    rebuiltPlacement(node) { translatedNodeItself($0, by: delta, exactly: true) }
+  }
+
+  /// The iterative rebuild behind both translations: `translate` moves one
+  /// node's own geometry, and a `nil` from it abandons the rebuild.
+  private func rebuiltPlacement(
+    _ node: PlacedNode,
+    translatingEach translate: (PlacedNode) -> PlacedNode?
+  ) -> PlacedNode? {
     struct Frame {
       var node: PlacedNode
       var nextChildIndex: Int
     }
 
-    var stack: [Frame] = [Frame(node: translatedNodeItself(node, by: delta), nextChildIndex: 0)]
+    guard let root = translate(node) else {
+      return nil
+    }
+    var stack: [Frame] = [Frame(node: root, nextChildIndex: 0)]
     while true {
       let index = stack.count - 1
       if stack[index].nextChildIndex < stack[index].node.children.count {
         let child = stack[index].node.children[stack[index].nextChildIndex]
-        stack.append(Frame(node: translatedNodeItself(child, by: delta), nextChildIndex: 0))
+        guard let translatedChild = translate(child) else {
+          return nil
+        }
+        stack.append(Frame(node: translatedChild, nextChildIndex: 0))
         continue
       }
 
@@ -348,14 +380,26 @@ extension LayoutEngine {
   }
 
   /// Translates one node's own geometry, leaving `children` untouched for the
-  /// caller to replace as each is rebuilt.
+  /// caller to replace as each is rebuilt. `exactly` declines (`nil`) a node
+  /// whose bounds or content bounds cannot move exactly.
   private func translatedNodeItself(
     _ node: PlacedNode,
-    by delta: CellPoint
-  ) -> PlacedNode {
+    by delta: CellPoint,
+    exactly: Bool
+  ) -> PlacedNode? {
     var translatedNode = node
-    translatedNode.bounds = translated(node.bounds, by: delta)
-    translatedNode.contentBounds = translated(node.contentBounds, by: delta)
+    if exactly {
+      guard let bounds = exactlyTranslated(node.bounds, by: delta),
+        let contentBounds = exactlyTranslated(node.contentBounds, by: delta)
+      else {
+        return nil
+      }
+      translatedNode.bounds = bounds
+      translatedNode.contentBounds = contentBounds
+    } else {
+      translatedNode.bounds = translated(node.bounds, by: delta)
+      translatedNode.contentBounds = translated(node.contentBounds, by: delta)
+    }
     translatedNode.clipBounds = node.clipBounds.map { translated($0, by: delta) }
     var metadata = node.placementMetadata
     metadata.scrollViewportRect = metadata.scrollViewportRect.map { translated($0, by: delta) }
@@ -389,5 +433,23 @@ extension LayoutEngine {
       ),
       size: rect.size
     )
+  }
+
+  /// `rect` moved by `delta`, or `nil` when `rect` holds saturated geometry
+  /// (an origin or far edge at `Int.min` or `Int.max`) or the move overflows.
+  private func exactlyTranslated(
+    _ rect: CellRect,
+    by delta: CellPoint
+  ) -> CellRect? {
+    for edge in [rect.origin.x, rect.origin.y, rect.maxX, rect.maxY]
+    where edge == .min || edge == .max {
+      return nil
+    }
+    let (x, xOverflow) = rect.origin.x.addingReportingOverflow(delta.x)
+    let (y, yOverflow) = rect.origin.y.addingReportingOverflow(delta.y)
+    guard !xOverflow, !yOverflow else {
+      return nil
+    }
+    return CellRect(origin: .init(x: x, y: y), size: rect.size)
   }
 }

@@ -42,12 +42,12 @@ extension Rasterizer {
     let count = min(max(0, lineCount), max(0, bounds.size.height))
     // Find the visible screen rows where the surface and clip overlap.
     let top = max(0, clip?.origin.y ?? 0)
-    let bottom = min(
-      surfaceSize.height, clip.map { $0.origin.y + $0.size.height } ?? surfaceSize.height)
+    let bottom = min(surfaceSize.height, clip.map(\.maxY) ?? surfaceSize.height)
     // Convert screen rows back to indices in the original text. For example,
     // a block starting at y = -1000 shows its line 1000 at screen row zero.
-    let lower = min(count, max(0, top - bounds.origin.y))
-    let upper = min(count, max(0, bottom - bounds.origin.y))
+    // Far blocks and clips saturate instead of trapping (STUI-1333).
+    let lower = min(count, max(0, SaturatingConversion.subtracting(top, bounds.origin.y)))
+    let upper = min(count, max(0, SaturatingConversion.subtracting(bottom, bounds.origin.y)))
     // A clip that misses the block must produce an empty, valid range.
     return lower..<max(lower, upper)
   }

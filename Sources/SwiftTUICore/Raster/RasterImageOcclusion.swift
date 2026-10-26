@@ -114,9 +114,11 @@ enum RasterImageOcclusion {
     }
 
     var best: CellRect?
-    var bestArea = 0
+    var bestArea: Int128 = 0
     func consider(_ candidate: CellRect) {
-      let area = candidate.size.width * candidate.size.height
+      // Exact in 128 bits: an image framed at an extreme extent overflows
+      // `width * height` (STUI-1333).
+      let area = Int128(candidate.size.width) * Int128(candidate.size.height)
       if area > bestArea {
         best = candidate
         bestArea = area
@@ -129,7 +131,7 @@ enum RasterImageOcclusion {
           origin: visible.origin,
           size: CellSize(
             width: visible.size.width,
-            height: overlapMinY - visible.origin.y
+            height: SaturatingConversion.subtracting(overlapMinY, visible.origin.y)
           )
         )
       )
@@ -140,7 +142,7 @@ enum RasterImageOcclusion {
           origin: CellPoint(x: visible.origin.x, y: overlapMaxY),
           size: CellSize(
             width: visible.size.width,
-            height: visible.maxY - overlapMaxY
+            height: SaturatingConversion.subtracting(visible.maxY, overlapMaxY)
           )
         )
       )
@@ -150,7 +152,7 @@ enum RasterImageOcclusion {
         CellRect(
           origin: visible.origin,
           size: CellSize(
-            width: overlapMinX - visible.origin.x,
+            width: SaturatingConversion.subtracting(overlapMinX, visible.origin.x),
             height: visible.size.height
           )
         )
@@ -161,7 +163,7 @@ enum RasterImageOcclusion {
         CellRect(
           origin: CellPoint(x: overlapMaxX, y: visible.origin.y),
           size: CellSize(
-            width: visible.maxX - overlapMaxX,
+            width: SaturatingConversion.subtracting(visible.maxX, overlapMaxX),
             height: visible.size.height
           )
         )

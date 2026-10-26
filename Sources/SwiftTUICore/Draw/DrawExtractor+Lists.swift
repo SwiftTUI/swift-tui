@@ -77,7 +77,7 @@ package final class CollectionScrollLayoutMetadata: Equatable, Sendable {
   package func bodyClip(in bounds: CellRect) -> CellRect? {
     guard let bodyStart, let navigation else { return nil }
     return .init(
-      origin: .init(x: bounds.origin.x, y: bounds.origin.y + bodyStart),
+      origin: .init(x: bounds.origin.x, y: SaturatingConversion.adding(bounds.origin.y, bodyStart)),
       size: .init(width: bounds.size.width, height: navigation.visibleLines.count))
   }
 
@@ -114,19 +114,23 @@ package struct ListVisibleLayout: Equatable, Sendable {
     self.lines = lines
     self.sectionChromeBounds = sectionChromeBounds
     self.totalContentHeight =
-      totalContentHeight ?? lines.reduce(0) { $0 + max(1, $1.height) }
+      totalContentHeight ?? SaturatingConversion.sum(lines.lazy.map { max(1, $0.height) })
   }
 
   /// Returns a copy translated into absolute coordinates by `delta`.
   package func translated(by delta: CellPoint) -> ListVisibleLayout {
     var copy = self
     copy.contentBounds = CellRect(
-      origin: .init(x: contentBounds.origin.x + delta.x, y: contentBounds.origin.y + delta.y),
+      origin: .init(
+        x: SaturatingConversion.adding(contentBounds.origin.x, delta.x),
+        y: SaturatingConversion.adding(contentBounds.origin.y, delta.y)),
       size: contentBounds.size
     )
     copy.sectionChromeBounds = sectionChromeBounds.map { rect in
       CellRect(
-        origin: .init(x: rect.origin.x + delta.x, y: rect.origin.y + delta.y),
+        origin: .init(
+          x: SaturatingConversion.adding(rect.origin.x, delta.x),
+          y: SaturatingConversion.adding(rect.origin.y, delta.y)),
         size: rect.size
       )
     }
@@ -177,7 +181,9 @@ extension DrawExtractor {
 
     for line in lines {
       var lineBounds = CellRect(
-        origin: .init(x: contentBounds.origin.x, y: contentBounds.origin.y + line.yOffset),
+        origin: .init(
+          x: contentBounds.origin.x,
+          y: SaturatingConversion.adding(contentBounds.origin.y, line.yOffset)),
         size: .init(width: contentBounds.size.width, height: max(1, line.height))
       )
       if let clip = layout.bodyClip, line.itemIndex != nil || line.rowIndex != nil {
@@ -219,7 +225,9 @@ extension DrawExtractor {
             width: min(lineBounds.size.width, markerWidth), height: lineBounds.size.height)
         )
         let textBounds = CellRect(
-          origin: .init(x: lineBounds.origin.x + markerBounds.size.width, y: lineBounds.origin.y),
+          origin: .init(
+            x: SaturatingConversion.adding(lineBounds.origin.x, markerBounds.size.width),
+            y: lineBounds.origin.y),
           size: .init(width: max(0, lineBounds.size.width - markerBounds.size.width), height: 1)
         )
 
@@ -313,8 +321,10 @@ extension DrawExtractor {
 
     let appearance = drawMetadata.scrollIndicatorAppearance
     let viewportBounds = appearance?.insetBounds(bounds) ?? bounds
-    let offsetX = max(0, viewportBounds.origin.x - content.bounds.origin.x)
-    let offsetY = max(0, viewportBounds.origin.y - content.bounds.origin.y)
+    let offsetX = max(
+      0, SaturatingConversion.subtracting(viewportBounds.origin.x, content.bounds.origin.x))
+    let offsetY = max(
+      0, SaturatingConversion.subtracting(viewportBounds.origin.y, content.bounds.origin.y))
     var commands: [DrawCommand] = []
     if let metrics = resolvedScrollIndicatorMetrics(
       viewportRect: viewportBounds,

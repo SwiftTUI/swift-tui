@@ -189,10 +189,14 @@ extension LayoutEngine {
       return nil
     }
 
-    let delta = CellPoint(
-      x: bounds.origin.x - previousPlaced.bounds.origin.x,
-      y: bounds.origin.y - previousPlaced.bounds.origin.y
-    )
+    let (deltaX, xOverflow) = bounds.origin.x.subtractingReportingOverflow(
+      previousPlaced.bounds.origin.x)
+    let (deltaY, yOverflow) = bounds.origin.y.subtractingReportingOverflow(
+      previousPlaced.bounds.origin.y)
+    guard !xOverflow, !yOverflow else {
+      return nil
+    }
+    let delta = CellPoint(x: deltaX, y: deltaY)
     if delta == .zero {
       return .init(
         placed: reuse(previousPlaced),
@@ -200,8 +204,12 @@ extension LayoutEngine {
       )
     }
 
+    // Saturated geometry is placed afresh: see `exactlyTranslatedPlacement(_:by:)`.
+    guard let translated = exactlyTranslatedPlacement(previousPlaced, by: delta) else {
+      return nil
+    }
     return .init(
-      placed: reuse(translatedPlacement(previousPlaced, by: delta)),
+      placed: reuse(translated),
       placedFrameFragment: retainedFrameFragment?.translated(by: delta)
     )
   }

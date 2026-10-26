@@ -103,8 +103,8 @@ extension LayoutEngine {
           let viewport = viewportContext.viewportRect
           let offset =
             axis == .vertical
-            ? viewport.origin.y - bounds.origin.y
-            : viewport.origin.x - bounds.origin.x
+            ? SaturatingConversion.subtracting(viewport.origin.y, bounds.origin.y)
+            : SaturatingConversion.subtracting(viewport.origin.x, bounds.origin.x)
           let length = mainDimension(of: viewport.size, for: axis)
           let storedOffset =
             snapshot.correctedContentOffset
@@ -137,19 +137,23 @@ extension LayoutEngine {
             )
             .filter { request in
               let start = mainDimension(of: request.bounds.origin, for: axis)
-              let end = start + mainDimension(of: request.bounds.size, for: axis)
+              let end = SaturatingConversion.adding(
+                start, mainDimension(of: request.bounds.size, for: axis))
               let visibleStart = mainDimension(of: viewport.origin, for: axis)
-              return end > visibleStart && start < visibleStart + length
+              return end > visibleStart
+                && start < SaturatingConversion.adding(visibleStart, length)
             }
           }
         }
         return fragments.compactMap { fragment in
           if let viewportContext {
-            let start = mainDimension(of: bounds.origin, for: axis) + fragment.mainOffset
-            let end = start + mainDimension(of: fragment.measurement.measuredSize, for: axis)
+            let start = SaturatingConversion.adding(
+              mainDimension(of: bounds.origin, for: axis), fragment.mainOffset)
+            let end = SaturatingConversion.adding(
+              start, mainDimension(of: fragment.measurement.measuredSize, for: axis))
             let visibleStart = mainDimension(of: viewportContext.viewportRect.origin, for: axis)
-            let visibleEnd =
-              visibleStart + mainDimension(of: viewportContext.viewportRect.size, for: axis)
+            let visibleEnd = SaturatingConversion.adding(
+              visibleStart, mainDimension(of: viewportContext.viewportRect.size, for: axis))
             if end <= visibleStart || start >= visibleEnd { return nil }
           }
           let children = source.childElements(at: fragment.elementIndex)
@@ -161,13 +165,15 @@ extension LayoutEngine {
           let origin =
             axis == .vertical
             ? CellPoint(
-              x: bounds.origin.x
-                + snapshot.crossLine.offset(of: dimensions, on: horizontalAlignment),
-              y: bounds.origin.y + fragment.mainOffset)
+              x: SaturatingConversion.adding(
+                bounds.origin.x,
+                snapshot.crossLine.offset(of: dimensions, on: horizontalAlignment)),
+              y: SaturatingConversion.adding(bounds.origin.y, fragment.mainOffset))
             : CellPoint(
-              x: bounds.origin.x + fragment.mainOffset,
-              y: bounds.origin.y
-                + snapshot.crossLine.offset(of: dimensions, on: verticalAlignment))
+              x: SaturatingConversion.adding(bounds.origin.x, fragment.mainOffset),
+              y: SaturatingConversion.adding(
+                bounds.origin.y,
+                snapshot.crossLine.offset(of: dimensions, on: verticalAlignment)))
           return PlacementRequest(
             resolved: child, measured: fragment.measurement,
             bounds: CellRect(origin: origin, size: fragment.measurement.measuredSize))
@@ -261,9 +267,9 @@ extension LayoutEngine {
           measured: childMeasurement,
           bounds: CellRect(
             origin: CellPoint(
-              x: bounds.origin.x
-                + crossMetrics.offset(of: dimensions, on: horizontalAlignment),
-              y: bounds.origin.y + snapshot.childMainOffsets[index]
+              x: SaturatingConversion.adding(
+                bounds.origin.x, crossMetrics.offset(of: dimensions, on: horizontalAlignment)),
+              y: SaturatingConversion.adding(bounds.origin.y, snapshot.childMainOffsets[index])
             ),
             size: childMeasurement.measuredSize
           )
@@ -282,9 +288,9 @@ extension LayoutEngine {
           measured: childMeasurement,
           bounds: CellRect(
             origin: CellPoint(
-              x: bounds.origin.x + snapshot.childMainOffsets[index],
-              y: bounds.origin.y
-                + crossMetrics.offset(of: dimensions, on: verticalAlignment)
+              x: SaturatingConversion.adding(bounds.origin.x, snapshot.childMainOffsets[index]),
+              y: SaturatingConversion.adding(
+                bounds.origin.y, crossMetrics.offset(of: dimensions, on: verticalAlignment))
             ),
             size: childMeasurement.measuredSize
           )
@@ -323,13 +329,13 @@ extension LayoutEngine {
       let origin =
         axis == .vertical
         ? CellPoint(
-          x: bounds.origin.x
-            + snapshot.crossLine.offset(of: dimensions, on: horizontalAlignment),
-          y: bounds.origin.y + snapshot.childMainOffsets[index])
+          x: SaturatingConversion.adding(
+            bounds.origin.x, snapshot.crossLine.offset(of: dimensions, on: horizontalAlignment)),
+          y: SaturatingConversion.adding(bounds.origin.y, snapshot.childMainOffsets[index]))
         : CellPoint(
-          x: bounds.origin.x + snapshot.childMainOffsets[index],
-          y: bounds.origin.y
-            + snapshot.crossLine.offset(of: dimensions, on: verticalAlignment))
+          x: SaturatingConversion.adding(bounds.origin.x, snapshot.childMainOffsets[index]),
+          y: SaturatingConversion.adding(
+            bounds.origin.y, snapshot.crossLine.offset(of: dimensions, on: verticalAlignment)))
       return PlacementRequest(
         resolved: child, measured: measurement,
         bounds: CellRect(origin: origin, size: measurement.measuredSize))

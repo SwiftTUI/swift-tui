@@ -57,9 +57,11 @@ final class WindowedLazyStackMeasurementContext {
           uniquingKeysWith: { first, _ in first })
         let visible =
           fragments.firstIndex {
-            $0.mainOffset
-              + (axis == .vertical
-                ? $0.measurement.measuredSize.height : $0.measurement.measuredSize.width) > previous
+            SaturatingConversion.adding(
+              $0.mainOffset,
+              axis == .vertical
+                ? $0.measurement.measuredSize.height : $0.measurement.measuredSize.width)
+              > previous
           } ?? 0
         let candidates =
           Array(fragments.dropFirst(visible)) + Array(fragments.prefix(visible).reversed())
@@ -67,7 +69,10 @@ final class WindowedLazyStackMeasurementContext {
           guard old.childIdentities.indices.contains(fragment.elementIndex),
             let index = byIdentity[old.childIdentities[fragment.elementIndex]]
           else { continue }
-          anchor = (index, fragment.identity, fragment.mainOffset - requested)
+          anchor = (
+            index, fragment.identity,
+            SaturatingConversion.subtracting(fragment.mainOffset, requested)
+          )
           break
         }
       }
@@ -107,7 +112,8 @@ extension LayoutEngine {
     )
     let old = context.retainedSnapshot
     let previousMean = old.map {
-      ($0.contentMainLength + (spacing ?? 0)) / max(1, $0.childMainLengths.count)
+      SaturatingConversion.adding($0.contentMainLength, spacing ?? 0)
+        / max(1, $0.childMainLengths.count)
     }
     let seed = max(1, old?.estimatedRowStride ?? previousMean ?? (axis == .vertical ? 1 : 2))
     let initial =
@@ -119,7 +125,10 @@ extension LayoutEngine {
     let lower = context.anchor == nil ? initial.lowerBound : max(0, start - 1)
     let upper =
       context.anchor == nil
-      ? initial.upperBound : min(source.count, start + max(2, length / seed + 2))
+      ? initial.upperBound
+      : min(
+        source.count,
+        SaturatingConversion.adding(start, max(2, SaturatingConversion.adding(length / seed, 2))))
     scheduleLazyElements(
       context, indices: Array(lower..<upper), localMetrics: &localMetrics, work: &work)
     return true
@@ -169,12 +178,15 @@ extension LayoutEngine {
     let requested =
       allocation.correctedContentOffset
       ?? mainDimension(of: context.hint.contentOffset, for: context.axis)
-    let offset = min(max(0, requested), max(0, allocation.contentMainLength - viewport))
+    let offset = min(
+      max(0, requested),
+      max(0, SaturatingConversion.subtracting(allocation.contentMainLength, viewport)))
+    let bandEnd = SaturatingConversion.sum([offset, viewport, 1])
     var needed: [Int] = []
     for index in 0..<count where context.known[index] == nil {
       let start = allocation.childMainOffsets[index]
-      let end = start + allocation.childMainLengths[index]
-      if end >= max(0, offset - 1) && start <= offset + viewport + 1 { needed.append(index) }
+      let end = SaturatingConversion.adding(start, allocation.childMainLengths[index])
+      if end >= max(0, offset - 1) && start <= bandEnd { needed.append(index) }
     }
     // Empty runs still advance logical indices; discovery continues until the
     // viewport is filled or the source ends. No phantom cell is assigned to empties.
@@ -182,7 +194,8 @@ extension LayoutEngine {
       scheduleLazyElements(context, indices: needed, localMetrics: &localMetrics, work: &work)
       return
     }
-    let cross = max(0, allocation.crossLeading + allocation.crossTrailing)
+    let cross = max(
+      0, SaturatingConversion.adding(allocation.crossLeading, allocation.crossTrailing))
     let size =
       context.axis == .vertical
       ? CellSize(width: cross, height: allocation.contentMainLength)
@@ -232,16 +245,19 @@ extension LayoutEngine {
               from: spacings[ordinal - 1],
               to: spacings[ordinal], axis: axis)
           if gap < 0 { return nil }
-          cursor += gap
+          cursor = SaturatingConversion.adding(cursor, gap)
         }
         offsets.append(cursor)
-        cursor += mainDimension(of: run.measurements[ordinal].measuredSize, for: axis)
+        cursor = SaturatingConversion.adding(
+          cursor, mainDimension(of: run.measurements[ordinal].measuredSize, for: axis))
       }
       localOffsets[index] = offsets
       summaries[index] = (cursor, spacings.first, spacings.last)
       if !run.children.isEmpty {
         let old = samples[context.segments[index]] ?? (0, 0)
-        samples[context.segments[index]] = (old.sum + cursor, old.count + 1)
+        samples[context.segments[index]] = (
+          SaturatingConversion.adding(old.sum, cursor), old.count + 1
+        )
       }
       let cross = stackCrossMetrics(
         for: run.children, childMeasurements: run.measurements,
@@ -273,11 +289,14 @@ extension LayoutEngine {
           gap = fallback
         }
         if gap < 0 { return nil }
-        cursor += gap
+        cursor = SaturatingConversion.adding(cursor, gap)
       }
       offsets.append(cursor)
       let sample = samples[context.segments[index]]
-      let estimate = sample.map { max(1, ($0.sum + $0.count / 2) / $0.count) } ?? 1
+      let estimate =
+        sample.map {
+          max(1, SaturatingConversion.adding($0.sum, $0.count / 2) / $0.count)
+        } ?? 1
       // Old extents seed geometry only. Exact observations are always measured
       // from current producers and proposals; identity equality is not currency.
       let length =
@@ -292,11 +311,11 @@ extension LayoutEngine {
             .init(
               elementIndex: index, fragmentIndex: ordinal,
               identity: run.children[ordinal].identity,
-              mainOffset: cursor + localOffsets[index]![ordinal],
+              mainOffset: SaturatingConversion.adding(cursor, localOffsets[index]![ordinal]),
               measurement: run.measurements[ordinal]))
         }
       }
-      cursor += length
+      cursor = SaturatingConversion.adding(cursor, length)
       if !isEmpty {
         previous = summary?.last
         hasPrevious = true
@@ -309,7 +328,9 @@ extension LayoutEngine {
       crossLineIsHalfCell: crossLine.isHalfCell,
       measuredWindow: (context.known.keys.min() ?? 0)..<((context.known.keys.max() ?? -1) + 1),
       estimatedRowStride: max(
-        1, (cursor + context.identities.count / 2) / max(1, context.identities.count)),
+        1,
+        SaturatingConversion.adding(cursor, context.identities.count / 2)
+          / max(1, context.identities.count)),
       windowHint: context.hint)
     snapshot.fragments = fragments
     snapshot.exactElementIndices = Set(context.known.keys)
@@ -328,8 +349,8 @@ extension LayoutEngine {
         for old in candidates {
           if let surviving = byIdentity[old.identity] {
             matching = surviving
-            viewportOffset =
-              old.mainOffset - mainDimension(of: context.hint.contentOffset, for: axis)
+            viewportOffset = SaturatingConversion.subtracting(
+              old.mainOffset, mainDimension(of: context.hint.contentOffset, for: axis))
             break
           }
         }
@@ -340,7 +361,8 @@ extension LayoutEngine {
         // extent (`cursor - viewport`) snapped such content back on every
         // re-render at an unchanged offset and undid focus reveals
         // (STUI-1270). The applying scroll layout clamps to its content.
-        snapshot.correctedContentOffset = max(0, matching.mainOffset - viewportOffset)
+        snapshot.correctedContentOffset = max(
+          0, SaturatingConversion.subtracting(matching.mainOffset, viewportOffset))
       } else {
         snapshot.correctedContentOffset = 0
       }
@@ -434,7 +456,8 @@ extension LayoutEngine {
           effectiveProposal: effectiveProposal,
           axis: axis,
           contentMainLength: snapshot.contentMainLength,
-          crossLength: max(0, snapshot.crossLeading + snapshot.crossTrailing)
+          crossLength: max(
+            0, SaturatingConversion.adding(snapshot.crossLeading, snapshot.crossTrailing))
         )
       )
       return true
@@ -474,7 +497,9 @@ extension LayoutEngine {
     probeMeasurement: MeasuredNode
   ) -> MeasuredNode {
     let extent = max(1, mainDimension(of: probeMeasurement.measuredSize, for: axis))
-    let contentMainLength = count * extent + max(0, count - 1) * spacing
+    let contentMainLength = SaturatingConversion.adding(
+      SaturatingConversion.multiplying(count, extent),
+      SaturatingConversion.multiplying(max(0, count - 1), spacing))
     return lazyStackIdealEstimateProduct(
       for: node,
       originalProposal: originalProposal,
@@ -633,9 +658,10 @@ extension LayoutEngine {
     let offset = max(0, mainDimension(of: hint.contentOffset, for: axis))
     let overscan = 1
     let anchor = min(max(0, count - 1), offset / stride)
-    let rowsPerViewport = (viewportLength + stride - 1) / stride
+    // Ceiling division without the overflowing `viewportLength + stride - 1`.
+    let rowsPerViewport = viewportLength / stride + (viewportLength % stride == 0 ? 0 : 1)
     let lower = max(0, anchor - overscan)
-    let upper = min(count, anchor + rowsPerViewport + overscan + 1)
+    let upper = min(count, SaturatingConversion.sum([anchor, rowsPerViewport, overscan, 1]))
     guard lower < upper else {
       return nil
     }

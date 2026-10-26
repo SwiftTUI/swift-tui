@@ -248,8 +248,12 @@ enum FrameTailPresentationDamageResolver {
     }
     textRows(
       for: CellRect(
-        origin: .init(x: bounds.origin.x - 1, y: bounds.origin.y - 1),
-        size: .init(width: bounds.size.width + 2, height: bounds.size.height + 2)
+        origin: .init(
+          x: SaturatingConversion.subtracting(bounds.origin.x, 1),
+          y: SaturatingConversion.subtracting(bounds.origin.y, 1)),
+        size: .init(
+          width: SaturatingConversion.adding(bounds.size.width, 2),
+          height: SaturatingConversion.adding(bounds.size.height, 2))
       ),
       into: &textRowRanges
     )
@@ -329,10 +333,14 @@ enum FrameTailPresentationDamageResolver {
       return
     }
 
-    let lowerBound = max(0, bounds.origin.y)
-    let upperBound = max(lowerBound, bounds.origin.y + bounds.size.height)
-    let leadingColumn = max(0, bounds.origin.x)
-    let trailingColumn = max(leadingColumn, bounds.origin.x + bounds.size.width)
+    // No surface has a row or column at or past `Rasterizer.maximumSurfaceExtent`,
+    // so damage stops there: a node framed or padded at an extreme extent
+    // (STUI-1333) would otherwise record one entry per row of it.
+    let extent = Rasterizer.maximumSurfaceExtent
+    let lowerBound = min(max(0, bounds.origin.y), extent)
+    let upperBound = max(lowerBound, min(bounds.maxY, extent))
+    let leadingColumn = min(max(0, bounds.origin.x), extent)
+    let trailingColumn = max(leadingColumn, min(bounds.maxX, extent))
     guard leadingColumn < trailingColumn else {
       return
     }

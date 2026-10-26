@@ -73,23 +73,28 @@ extension LayoutEngine {
       guard pair.item.kind != .sectionBreak else {
         return partial
       }
-      return partial + max(0, pair.measurement.measuredSize.height - 1)
+      return SaturatingConversion.adding(
+        partial, max(0, SaturatingConversion.subtracting(pair.measurement.measuredSize.height, 1)))
     }
     let measuredIndices = Set(sourceIndices ?? [])
-    idealSize.height += extraHeight
-    idealSize.height += tallRowExtraCells(in: retainedTallRowHeights) { index in
-      !measuredIndices.contains(index) && item(at: index).kind != .sectionBreak
-    }
+    idealSize.height = SaturatingConversion.adding(idealSize.height, extraHeight)
+    idealSize.height = SaturatingConversion.adding(
+      idealSize.height,
+      tallRowExtraCells(in: retainedTallRowHeights) { index in
+        !measuredIndices.contains(index) && item(at: index).kind != .sectionBreak
+      })
 
     let markerWidth = payload.showsSelectionMarker ? 2 : 0
     let widestChild = pairs.reduce(0) { partial, pair in
       let rowMarkerWidth = pair.item.kind == .row ? markerWidth : 0
-      return max(partial, pair.measurement.measuredSize.width + rowMarkerWidth)
+      return max(
+        partial, SaturatingConversion.adding(pair.measurement.measuredSize.width, rowMarkerWidth))
     }
     idealSize.width = max(
       idealSize.width,
-      widestChild + payload.style.contentInsets.leading
-        + payload.style.contentInsets.trailing
+      SaturatingConversion.sum([
+        widestChild, payload.style.contentInsets.leading, payload.style.contentInsets.trailing,
+      ])
     )
 
     return CellSize(

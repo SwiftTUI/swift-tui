@@ -45,7 +45,8 @@ package struct CollectionScrollGeometry: Equatable, Sendable {
       guard height > 1 || extra != 0 else { return nil }
       let row = MeasuredRow(
         index: index, height: height, precedingExtraLines: extraLines, extraLines: extra)
-      extraLines += extra
+      // A row measured at an extreme height saturates the lines after it.
+      extraLines = SaturatingConversion.adding(extraLines, extra)
       return row
     }
     rows = .indexed(count: count, span: span, measured: measured)
@@ -80,9 +81,11 @@ package struct CollectionScrollGeometry: Equatable, Sendable {
     case .indexed(let count, let span, let measured):
       guard count > 0 else { return 0 }
       let last = measured.last
-      let extraLines = last.map { $0.precedingExtraLines + $0.extraLines } ?? 0
-      return count * span - (span - 1) + extraLines
-        - unmeasuredSeparatorLines(before: count - 1, measuredBefore: measured, span: span)
+      let extraLines =
+        last.map { SaturatingConversion.adding($0.precedingExtraLines, $0.extraLines) } ?? 0
+      return SaturatingConversion.subtracting(
+        SaturatingConversion.adding(count * span - (span - 1), extraLines),
+        unmeasuredSeparatorLines(before: count - 1, measuredBefore: measured, span: span))
     case .materialized(_, let displayLineCount):
       return displayLineCount
     }
@@ -100,14 +103,15 @@ package struct CollectionScrollGeometry: Equatable, Sendable {
       guard count > 0 else { return 0..<0 }
       let insertion = firstMeasuredRow(atOrAfter: index, in: measured)
       let previous = insertion > 0 ? measured[insertion - 1] : nil
-      let extraLines = previous.map { $0.precedingExtraLines + $0.extraLines } ?? 0
-      let start =
-        index * span + extraLines
-        - (estimatesUnmeasuredSeparatorsHidden ? (index - insertion) * (span - 1) : 0)
+      let extraLines =
+        previous.map { SaturatingConversion.adding($0.precedingExtraLines, $0.extraLines) } ?? 0
+      let start = SaturatingConversion.subtracting(
+        SaturatingConversion.adding(index * span, extraLines),
+        estimatesUnmeasuredSeparatorsHidden ? (index - insertion) * (span - 1) : 0)
       let height =
         insertion < measured.count && measured[insertion].index == index
         ? measured[insertion].height : 1
-      return start..<(start + height)
+      return start..<SaturatingConversion.adding(start, height)
     case .materialized(let ranges, _):
       return ranges.isEmpty ? 0..<0 : ranges[index]
     }
@@ -143,7 +147,7 @@ package struct CollectionScrollGeometry: Equatable, Sendable {
     switch anchor {
     case .end: return maximum
     case .position(let row, let offset):
-      return min(max(0, line(forRow: row) + offset), maximum)
+      return min(max(0, SaturatingConversion.adding(line(forRow: row), offset)), maximum)
     default: return nil
     }
   }

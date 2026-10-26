@@ -1159,19 +1159,26 @@ package final class LocalScrollPositionRegistry: Equatable {
     var next = preservesProducerOffset ? currentOffset : clampedOffset(currentOffset, in: route)
 
     let exceedsViewportWidth = focusRect.size.width > route.viewportRect.size.width
+    // Far focus geometry saturates instead of trapping (STUI-1333).
     if focusRect.origin.x < route.viewportRect.origin.x || exceedsViewportWidth {
-      next.x += focusRect.origin.x - route.viewportRect.origin.x
+      next.x = SaturatingConversion.adding(
+        next.x,
+        SaturatingConversion.subtracting(focusRect.origin.x, route.viewportRect.origin.x))
     } else if focusRect.maxX > route.viewportRect.maxX {
-      next.x += focusRect.maxX - route.viewportRect.maxX
+      next.x = SaturatingConversion.adding(
+        next.x, SaturatingConversion.subtracting(focusRect.maxX, route.viewportRect.maxX))
     }
 
     // A target taller than the viewport cannot show both edges. Keep its
     // start visible instead of moving past it to reveal the bottom.
     let exceedsViewportHeight = focusRect.size.height > route.viewportRect.size.height
     if focusRect.origin.y < route.viewportRect.origin.y || exceedsViewportHeight {
-      next.y += focusRect.origin.y - route.viewportRect.origin.y
+      next.y = SaturatingConversion.adding(
+        next.y,
+        SaturatingConversion.subtracting(focusRect.origin.y, route.viewportRect.origin.y))
     } else if focusRect.maxY > route.viewportRect.maxY {
-      next.y += focusRect.maxY - route.viewportRect.maxY
+      next.y = SaturatingConversion.adding(
+        next.y, SaturatingConversion.subtracting(focusRect.maxY, route.viewportRect.maxY))
     }
 
     // Collections own their usable viewport, which can exclude fixed chrome
@@ -1362,8 +1369,10 @@ package final class LocalScrollPositionRegistry: Equatable {
   ) -> Int {
     // A huge finite anchor saturates here; `clampedOffset` then bounds it.
     let inset = SaturatingConversion.int(
-      Double(viewportLength - targetLength) * unit - 0.5, rounding: .up)
-    return SaturatingConversion.adding(targetOrigin - viewportOrigin, -inset)
+      Double(SaturatingConversion.subtracting(viewportLength, targetLength)) * unit - 0.5,
+      rounding: .up)
+    return SaturatingConversion.adding(
+      SaturatingConversion.subtracting(targetOrigin, viewportOrigin), -inset)
   }
 
   private func clampedOffset(_ offset: ScrollOffset, in route: ScrollRoute) -> ScrollOffset {
@@ -1386,7 +1395,7 @@ package final class LocalScrollPositionRegistry: Equatable {
     contentLength: Int,
     viewportLength: Int
   ) -> Int {
-    min(max(0, offset), max(0, contentLength - viewportLength))
+    min(max(0, offset), max(0, SaturatingConversion.subtracting(contentLength, viewportLength)))
   }
 }
 

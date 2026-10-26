@@ -51,9 +51,9 @@ extension LayoutEngine {
       let length = mainDimension(of: measurement.measuredSize, for: axis)
       childMainOffsets.append(nextOffset)
       childMainLengths.append(length)
-      nextOffset += length
+      nextOffset = SaturatingConversion.adding(nextOffset, length)
       if index < stackSpacings.count {
-        nextOffset += stackSpacings[index]
+        nextOffset = SaturatingConversion.adding(nextOffset, stackSpacings[index])
       }
     }
 
@@ -117,11 +117,14 @@ extension LayoutEngine {
       mainDimension(of: viewportContext.viewportRect.origin, for: snapshot.axis)
     let visibleStart = max(
       0,
-      min(viewportStart - stackStart, snapshot.contentMainLength)
+      min(
+        SaturatingConversion.subtracting(viewportStart, stackStart),
+        snapshot.contentMainLength)
     )
     let visibleEnd = min(
       snapshot.contentMainLength,
-      viewportStart + viewportLength - stackStart
+      SaturatingConversion.subtracting(
+        SaturatingConversion.adding(viewportStart, viewportLength), stackStart)
     )
     guard visibleStart < visibleEnd else {
       return 0..<0
@@ -130,8 +133,9 @@ extension LayoutEngine {
     // Overlapping layouts need exact interval traversal. Binary search is
     // invalid when either starts or ends are nonmonotone.
     if (1..<childCount).contains(where: {
-      snapshot.childMainOffsets[$0] < snapshot.childMainOffsets[$0 - 1]
-        + snapshot.childMainLengths[$0 - 1]
+      snapshot.childMainOffsets[$0]
+        < SaturatingConversion.adding(
+          snapshot.childMainOffsets[$0 - 1], snapshot.childMainLengths[$0 - 1])
     }) {
       return 0..<childCount
     }
@@ -168,7 +172,8 @@ extension LayoutEngine {
 
     while lower < upper {
       let mid = (lower + upper) / 2
-      let childEnd = snapshot.childMainOffsets[mid] + snapshot.childMainLengths[mid]
+      let childEnd = SaturatingConversion.adding(
+        snapshot.childMainOffsets[mid], snapshot.childMainLengths[mid])
       if childEnd <= target {
         lower = mid + 1
       } else {

@@ -582,12 +582,17 @@ extension LayoutEngine {
       hiddenSeparators: hiddenSeparators)
     let anchor = geometry.row(atOrBeforeLine: offset)
     // Rows whose separators are hidden pack one line closer each.
+    // Ceiling division without the overflowing `height + stride - 1`.
     let rowsPerViewport =
       hiddenSeparators.isEmpty
-      ? (hint.viewportSize.height + stride - 1) / stride
-      : max(1, geometry.row(atOrBeforeLine: offset + hint.viewportSize.height) - anchor + 1)
+      ? hint.viewportSize.height / stride + (hint.viewportSize.height % stride == 0 ? 0 : 1)
+      : max(
+        1,
+        geometry.row(
+          atOrBeforeLine: SaturatingConversion.adding(offset, hint.viewportSize.height))
+          - anchor + 1)
     let lower = max(0, anchor - overscan)
-    let upper = min(count, anchor + rowsPerViewport + overscan + 1)
+    let upper = min(count, SaturatingConversion.sum([anchor, rowsPerViewport, overscan, 1]))
     guard lower < upper else {
       return nil
     }
@@ -604,7 +609,10 @@ package func tallRowExtraCells(
   where isIncluded: (Int) -> Bool
 ) -> Int {
   tallRowHeights.reduce(0) { partial, entry in
-    isIncluded(entry.key) ? partial + max(0, entry.value - 1) : partial
+    isIncluded(entry.key)
+      ? SaturatingConversion.adding(
+        partial, max(0, SaturatingConversion.subtracting(entry.value, 1)))
+      : partial
   }
 }
 
