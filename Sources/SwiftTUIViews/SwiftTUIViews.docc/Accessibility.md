@@ -131,6 +131,16 @@ the complete text and nested controls inside their rows. Eager and indexed
 collections use the same semantics for realized rows; indexed collections retain
 bounded materialization and do not expose unrealized rows as hidden controls.
 
+A row that cannot be selected publishes a disabled selection button, and
+activating it reports that the operation is disabled. This covers a row view
+marked `.disabled`, a table row whose cells are all disabled and a List row
+whose tagged content is disabled. The structural list item and
+table row around that button take the enabled state of the row view itself:
+`.disabled` on the whole row disables them, while a row that is ineligible only
+because of its tagged content or its cells keeps them enabled. They describe
+structure and carry no operation of their own, and the disabled content keeps
+its own disabled state.
+
 `OutlineGroup` exposes hierarchical list items. Branches begin expanded and offer a
 separate button to collapse or expand children; terminal keyboard, pointer and
 browser assistive input use the same state. Items expose level and sibling

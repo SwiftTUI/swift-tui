@@ -229,6 +229,11 @@ public struct AccessibilityNode: Equatable, Sendable {
   /// Authored named navigation groups, in addition to native role navigation.
   public var navigationCategories: [String] = []
   package var actionIdentity: Identity? = nil
+  /// The node's own occurrence-qualified identity when it lies in a later
+  /// duplicate (an `ID[x#n]` component) and differs from the reported,
+  /// occurrence-free ``identity``: static text, structural list items and
+  /// cells. `nil` for every other node.
+  package var occurrenceIdentity: Identity? = nil
   /// Combined descendants retain their own committed routing and lifetime checks.
   package var combinedActions: [String: AccessibilityCombinedAction] = [:]
   package var viewNodeID: ViewNodeID?

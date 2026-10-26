@@ -141,7 +141,7 @@ package struct JSONFrameRenderer: Equatable, Sendable {
       ("hint", optionalString(node.hint)),
       ("rect", rect(node.rect)),
       ("hidden", bool(node.hidden)),
-      ("focused", bool((node.actionIdentity ?? node.identity) == focusedIdentity)),
+      ("focused", bool(node.runtimeFocusIdentity == focusedIdentity)),
       ("liveRegion", optionalString(node.liveRegion?.description)),
       ("cursorAnchor", optionalPoint(node.cursorAnchor)),
     ])

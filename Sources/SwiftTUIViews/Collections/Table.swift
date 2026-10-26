@@ -188,7 +188,8 @@ extension Table {
         guard let tag = resolvedRows[index].tag else { continue }
         resolvedContent.children[index].semanticMetadata.hostedCollectionItem?.selection = .init(
           isSelected: selectionPolicy.contains(tag),
-          actionIdentity: tableRowIdentity(for: context.identity, rowIndex: index),
+          actionIdentity: tableRowIdentity(
+            for: context.identity, rowIndex: index, rowIdentity: resolvedRows[index].identity),
           ownerNodeID: ownerNode?.viewNodeID)
       }
       let keyboardValue: SelectionValue? = withPersistentDormantStateSlot {
@@ -449,7 +450,9 @@ extension Table {
               continue
             }
 
-            let identity = tableRowIdentity(for: context.identity, rowIndex: rowIndex)
+            let identity = tableRowIdentity(
+              for: context.identity, rowIndex: rowIndex,
+              rowIdentity: resolvedRows[rowIndex].identity)
             intake.registerAction(
               identity: identity,
               accessibilityHandler: { action in
@@ -463,12 +466,7 @@ extension Table {
               return policy.isMultiple ? policy.toggle(tag) : policy.select(tag)
             }
 
-            let routeID = runtimePrimaryRouteID(
-              for: tableRowIdentity(
-                for: context.identity,
-                rowIndex: rowIndex
-              )
-            )
+            let routeID = runtimePrimaryRouteID(for: identity)
             intake.registerPointerHandler(routeID: routeID) { event in
               // A disabled row has no pointer action, like a disabled control.
               guard rowIsEnabled(rowIndex) else { return .ignored }
@@ -720,7 +718,8 @@ extension Table {
       if let compatibleTag {
         node.semanticMetadata.hostedCollectionItem?.selection = .init(
           isSelected: policy.isMultiple ? policy.contains(compatibleTag) : selectedIndex == index,
-          actionIdentity: tableRowIdentity(for: context.identity, rowIndex: index),
+          actionIdentity: tableRowIdentity(
+            for: context.identity, rowIndex: index, rowIdentity: node.identity),
           ownerNodeID: selectionOwner)
       }
       node =

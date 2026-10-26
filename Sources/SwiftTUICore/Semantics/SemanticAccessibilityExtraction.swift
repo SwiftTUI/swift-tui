@@ -694,6 +694,7 @@ extension SemanticExtractor {
       cursorAnchor: textInputPresentations[node.identity]?.anchor
         ?? accessibilityCursorAnchor(for: node)
     )
+    if node.identity != result.identity { result.occurrenceIdentity = node.identity }
     result.textInput = role == .secureField ? nil : textInputPresentations[node.identity]?.textInput
     result.properties =
       suppressingPresentation ? nil : node.semanticMetadata.accessibilityProperties

@@ -869,6 +869,15 @@ public struct Identity: Hashable, Comparable, Sendable, Codable, CustomStringCon
     return changed ? Self(components: stripped) : self
   }
 
+  /// The explicit-ID components that carry a duplicate-occurrence qualifier
+  /// (`ID[x#2]`), in order. Empty for every identity outside a later
+  /// duplicate, including the first occurrence.
+  package var entityOccurrenceComponents: [String] {
+    let stripped = strippingEntityOccurrences
+    guard stripped != self else { return [] }
+    return zip(components, stripped.components).compactMap { $0 == $1 ? nil : $0 }
+  }
+
   public func isAncestor(of other: Self) -> Bool {
     guard components.count <= other.components.count else {
       return false

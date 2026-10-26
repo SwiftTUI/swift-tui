@@ -160,7 +160,8 @@ extension List {
         else { continue }
         resolvedContent.children[index].semanticMetadata.hostedCollectionItem?.selection = .init(
           isSelected: selectionPolicy.contains(tag),
-          actionIdentity: listRowIdentity(for: context.identity, rowIndex: rowIndex),
+          actionIdentity: listRowIdentity(
+            for: context.identity, rowIndex: rowIndex, rowIdentity: rows[rowIndex].identity),
           ownerNodeID: ownerNode?.viewNodeID)
       }
       var scrollCurrency: CollectionScrollCurrency?
@@ -415,7 +416,10 @@ extension List {
               scrollCurrency.pinCurrentAnchor()
               scrollCurrency.reveal(row: targetIndex)
             }
-            return .focus(listRowIdentity(for: context.identity, rowIndex: targetIndex))
+            return .focus(
+              listRowIdentity(
+                for: context.identity, rowIndex: targetIndex,
+                rowIdentity: rows[targetIndex].identity))
           }
           if resolvedContent.indexedSource != nil {
             let window = scrollCurrency?.interactionWindow
@@ -434,7 +438,8 @@ extension List {
             }
             let rowIdentity = listRowIdentity(
               for: context.identity,
-              rowIndex: rowIndex
+              rowIndex: rowIndex,
+              rowIdentity: row.identity
             )
             intake.registerAction(
               identity: rowIdentity,
@@ -588,7 +593,8 @@ extension List {
       if let compatibleTag {
         node.semanticMetadata.hostedCollectionItem?.selection = .init(
           isSelected: policy.isMultiple ? policy.contains(compatibleTag) : selectedIndex == index,
-          actionIdentity: listRowIdentity(for: context.identity, rowIndex: index),
+          actionIdentity: listRowIdentity(
+            for: context.identity, rowIndex: index, rowIdentity: node.identity),
           ownerNodeID: selectionOwner)
       }
       return node

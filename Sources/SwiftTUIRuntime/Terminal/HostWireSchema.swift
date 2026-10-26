@@ -199,6 +199,10 @@ package enum HostWireSchema {
       .init(
         "actionIdentity", wire: .notSerialized("runtime dispatch uses the opaque actionTarget")),
       .init(
+        "occurrenceIdentity",
+        wire: .notSerialized(
+          "a later duplicate's runtime focus identity; the wire keys focus by focusedIdentity")),
+      .init(
         "viewNodeID",
         wire: .notSerialized("package-internal graph plumbing")),
       .init("identity", wire: .key("id")),
