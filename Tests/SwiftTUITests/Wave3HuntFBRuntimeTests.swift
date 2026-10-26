@@ -656,9 +656,10 @@ struct Wave3HuntFBCentringTests {
       }, "w3fb020-guided")
     try #require(W3FB.position(of: "B", in: unguided)?.row == 1, "\(unguided)")
     w3fbKnown(
-      "NEW-6: the guide { $0.height - $0[.center] } (exactly the centre in SwiftUI) puts a one-cell child beside a three-cell sibling on row 0 instead of the default row 1; halfCellPosition calls a guide half-cell only when it moves by +1 between the rounding modes, and this one moves by -1 (GeometryTypes.swift:440-470); contract: Authoring-Views.md:94-99, FW3-F residual (only a dependence not +-1 per mode degrades); adjacent STUI-1242"
+      "STUI-1267 (NEW-6; not repairable without a public API change): the guide { $0.height - $0[.center] } (exactly the centre in SwiftUI) puts a one-cell child beside a three-cell sibling on row 0 instead of the default row 1; guide values are integers, so it reads d[.center] == 0 and returns 1, exactly as { $0[.center] + 1 } does, and provenance makes it half a cell past 1 (1.5) instead of the centre 0.5 (GeometryTypes.swift halfCellPosition, evaluatingGuide); contract: Authoring-Views.md:86-110, SwiftUI alignmentGuide; adjacent STUI-1242"
     ) {
-      // Contract: Authoring-Views.md:94-99; FW3-F residual ("not ±1 cell per mode").
+      // Contract: SwiftUI alignmentGuide ($0.height - $0[.center] is the
+      // centre); Authoring-Views.md records the integer behaviour.
       #expect(guided == unguided, "guided \(guided) default \(unguided)")
     }
   }
@@ -682,13 +683,9 @@ struct Wave3HuntFBCentringTests {
         Text("B").alignmentGuide(VerticalAlignment.center) { $0[VerticalAlignment.center] }
       }, "w3fb021-identity")
     try #require(identity == unwrapped, "identity \(identity) unwrapped \(unwrapped)")
-    w3fbKnown(
-      "NEW-7: a custom Layout whose explicitAlignment forwards its subview's centre puts the one-cell subview beside a two-cell sibling on row 1 instead of row 0; ownDimensions installs the layout's answers through the mode-blind overridingVerticalGuides(with:), and LayoutSubview.dimensions(in:) answers in the normal mode, so the forwarded centre is an integer guide (LayoutEngine+Alignment.swift:232-265; CustomLayout.swift:143-148); contract: CustomLayout.swift:355-368, Authoring-Views.md:94-99; adjacent STUI-1242"
-    ) {
-      // Contract: CustomLayout.swift:355-368 (answer "exactly as an
-      // alignmentGuide closure does"); Authoring-Views.md:94-99.
-      #expect(forwarded == unwrapped, "forwarded \(forwarded) unwrapped \(unwrapped)")
-    }
+    // Contract: CustomLayout.swift:355-368 (answer "exactly as an
+    // alignmentGuide closure does"); Authoring-Views.md:94-99.
+    #expect(forwarded == unwrapped, "forwarded \(forwarded) unwrapped \(unwrapped)")
   }
 
   // w3fb022: an identity guide propagated through padding keeps its half cell:
@@ -728,15 +725,11 @@ struct Wave3HuntFBCentringTests {
     }
     let unguided = row(false)
     let guided = row(true)
-    w3fbKnown(
-      "NEW-8: an identity centre guide on a child inside .frame(height: \(oddFrame ? 5 : 4)) moves the stack's other children by one row (\(oddFrame ? "A and C up" : "C up")); frame propagation adds the child's already-rounded integer origin to its guide, so the frame reports \(oddFrame ? "2 instead of its exact centre 2.5" : "1.5 instead of its exact centre 2.0") (LayoutEngine+Alignment.swift:436-447); contract: Authoring-Views.md:86-99; adjacent STUI-1242"
-    ) {
-      // Contract: Authoring-Views.md:86-99 (guides propagate through nested
-      // frames; an identity guide places exactly like the built-in centre).
-      #expect(
-        guided == unguided,
-        "\(oddFrame ? "odd" : "even") frame: guided \(guided) unguided \(unguided)")
-    }
+    // Contract: Authoring-Views.md:86-99 (guides propagate through nested
+    // frames; an identity guide places exactly like the built-in centre).
+    #expect(
+      guided == unguided,
+      "\(oddFrame ? "odd" : "even") frame: guided \(guided) unguided \(unguided)")
   }
 
   // w3fb024: a centre-derived guided row outside the lazy window moves the line
@@ -821,16 +814,78 @@ struct Wave3HuntFBCentringTests {
           }
         }, "w3fb026")
     }
-    let comment: Comment =
-      "NEW-9: an alignment guide closure on a three-cell view reads d[.center] == 2 as well as the public 1, and a closure indexing a two-element array by d[.center] traps (SIGTRAP); explicit guide closures are evaluated a second time with the centre default rounded up (LayoutMetadata.swift:151-165, GeometryTypes.swift:440-470); contract: FW3-F report (public ViewDimensions values unchanged), GeometryTypes.swift:382-389; adjacent STUI-1242"
-    w3fbKnown(comment) {
-      // Contract: FW3-F report ("public ViewDimensions values ... unchanged");
-      // GeometryTypes.swift:382-389 (the public centre is length / 2 truncated).
-      #expect(observed.value == [1], "observed \(observed.value.sorted())")
-    }
-    await w3fbKnown(comment) {
-      await w3fbExpectGuideClosureDoesNotTrap()
-    }
+    // Contract: FW3-F report ("public ViewDimensions values ... unchanged");
+    // GeometryTypes.swift (the public centre is length / 2 truncated).
+    #expect(observed.value == [1], "observed \(observed.value.sorted())")
+    await w3fbExpectGuideClosureDoesNotTrap()
+  }
+
+  // Wave 4 (STUI-1261): a custom alignment's default is user code too; it
+  // runs on the view's public dimensions only.
+  @Test func w4faCustomAlignmentDefaultSeesOnlyPublicCentreValues() {
+    W4FALoggedMidY.observed.withLock { $0 = [] }
+    _ = W3FB.raster(
+      HStack(alignment: .w4faLoggedMidY, spacing: 1) {
+        Text("A").frame(width: 1, height: 2)
+        Text("B").frame(width: 1, height: 3)
+      }, "w4fa-custom-default")
+    // Contract: the public centre is length / 2 truncated (1 for both).
+    #expect(
+      W4FALoggedMidY.observed.value == [1],
+      "observed \(W4FALoggedMidY.observed.value.sorted())")
+  }
+
+  // Wave 4 (STUI-1261, STUI-1267): a custom layout's explicitAlignment reads
+  // its subview's public values only, also now that it forwards half cells.
+  @Test func w4faCustomLayoutAlignmentSeesOnlyPublicValues() {
+    let observed = LockedBox<Set<Int>>([])
+    _ = W3FB.raster(
+      HStack(alignment: .center, spacing: 1) {
+        Text("A").frame(width: 1, height: 2)
+        W4FALoggingForwardingLayout(observed: observed) {
+          Text("B").frame(width: 1, height: 3)
+        }
+      }, "w4fa-custom-layout")
+    #expect(observed.value == [1], "observed \(observed.value.sorted())")
+  }
+
+  // Wave 4 (STUI-1267, STUI-1261): a guide on a frame whose child declares the
+  // frame's own guide reads the frame's exact centre, its public 4 / 2, and
+  // the frame places like the unguided frame.
+  @Test func w4faOuterGuideReadsTheFramesOwnCentre() {
+    let observed = LockedBox<Set<Int>>([])
+    let guided = W3FB.raster(
+      HStack(alignment: .center, spacing: 1) {
+        Text("A").frame(width: 3, height: 3)
+        Text("B").alignmentGuide(VerticalAlignment.center) { $0[VerticalAlignment.center] }
+          .frame(width: 1, height: 4)
+          .alignmentGuide(VerticalAlignment.center) { d in
+            observed.withLock { _ = $0.insert(d[VerticalAlignment.center]) }
+            return d[VerticalAlignment.center]
+          }
+        Text("C").frame(width: 1, height: 2)
+      }, "w4fa-outer-guided", height: 6)
+    let unguided = W3FB.raster(
+      HStack(alignment: .center, spacing: 1) {
+        Text("A").frame(width: 3, height: 3)
+        Text("B").frame(width: 1, height: 4)
+        Text("C").frame(width: 1, height: 2)
+      }, "w4fa-outer-unguided", height: 6)
+    #expect(observed.value == [2], "observed \(observed.value.sorted())")
+    #expect(guided == unguided, "guided \(guided) unguided \(unguided)")
+  }
+
+  // Wave 4 control (FW3-F residual, unchanged): integer arithmetic on the
+  // public size is an integer guide. `{ $0.height / 2 }` is 0 on a one-row
+  // view, so B's top sits on the four-row sibling's line, row 2; the default
+  // centre would put it on row 1.
+  @Test func w4faSizeArithmeticGuideStaysInteger() {
+    let lines = W3FB.raster(
+      HStack(alignment: .center, spacing: 1) {
+        Text("A").frame(width: 3, height: 4)
+        Text("B").alignmentGuide(VerticalAlignment.center) { $0.height / 2 }
+      }, "w4fa-size-arithmetic", height: 4)
+    #expect(W3FB.position(of: "B", in: lines)?.row == 2, "\(lines)")
   }
 
   // w3fb039 (FW3-F x FW3-G): an identity-guided trimmed fill places like the
@@ -1229,6 +1284,58 @@ private enum W3FBMidX: AlignmentID {
 
 extension HorizontalAlignment {
   fileprivate static let w3fbMidX = HorizontalAlignment(W3FBMidX.self)
+}
+
+/// A custom vertical alignment whose default logs the centre it reads.
+private enum W4FALoggedMidY: AlignmentID {
+  static let observed = LockedBox<Set<Int>>([])
+
+  static func defaultValue(in context: ViewDimensions) -> Int {
+    let centre = context[VerticalAlignment.center]
+    observed.withLock { _ = $0.insert(centre) }
+    return centre
+  }
+}
+
+extension VerticalAlignment {
+  fileprivate static let w4faLoggedMidY = VerticalAlignment(W4FALoggedMidY.self)
+}
+
+/// Forwards its single subview's vertical guides and logs the values it reads.
+private struct W4FALoggingForwardingLayout: Layout {
+  let observed: LockedBox<Set<Int>>
+
+  func sizeThatFits(
+    proposal: ProposedViewSize,
+    subviews: LayoutSubviews,
+    cache _: inout Void
+  ) -> LayoutSize {
+    subviews.first?.sizeThatFits(proposal) ?? .zero
+  }
+
+  func placeSubviews(
+    in bounds: LayoutRect,
+    proposal: ProposedViewSize,
+    subviews: LayoutSubviews,
+    cache _: inout Void
+  ) {
+    for subview in subviews {
+      subview.place(at: bounds.origin, proposal: proposal)
+    }
+  }
+
+  func explicitAlignment(
+    of guide: VerticalAlignment,
+    in bounds: LayoutRect,
+    proposal: ProposedViewSize,
+    subviews: LayoutSubviews,
+    cache _: inout Void
+  ) -> Int? {
+    guard let subview = subviews.first else { return nil }
+    let value = subview.dimensions(in: proposal)[guide]
+    observed.withLock { _ = $0.insert(value) }
+    return bounds.origin.y + value
+  }
 }
 
 /// Sizes to its single subview and forwards the subview's guides, as a

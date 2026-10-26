@@ -99,6 +99,19 @@ extension LayoutEngine {
     return reference.value - child.value - (startsHalfCellIn ? 1 : 0)
   }
 
+  /// The exact offset that puts the child's exact guide on the reference's,
+  /// before `alignedOffset` rounds it: `reference - child` in half cells, as
+  /// an integer value (rounded down) and whether it is half a cell past it.
+  package static func exactAlignedOffset(
+    child: (value: Int, isHalfCell: Bool),
+    reference: (value: Int, isHalfCell: Bool)
+  ) -> (value: Int, isHalfCell: Bool) {
+    (
+      reference.value - child.value - (child.isHalfCell && !reference.isHalfCell ? 1 : 0),
+      reference.isHalfCell != child.isHalfCell
+    )
+  }
+
   package func alignedOrigin(
     for childDimensions: ViewDimensions,
     in bounds: CellRect,
@@ -242,9 +255,12 @@ extension LayoutEngine {
       return plain
     }
     let engine = self
+    // The handle answers exact positions: the layout's answer is user code,
+    // classified by what it read like an `alignmentGuide` closure, so a
+    // forwarded subview centre keeps its half cell.
     return
       plain
-      .overridingHorizontalGuides { guide in
+      .overridingHorizontalGuides(positions: { guide in
         handle.explicitAlignment(
           engine: engine,
           node: node,
@@ -252,8 +268,8 @@ extension LayoutEngine {
           horizontalGuide: guide,
           passContext: passContext
         )
-      }
-      .overridingVerticalGuides { guide in
+      })
+      .overridingVerticalGuides(positions: { guide in
         handle.explicitAlignment(
           engine: engine,
           node: node,
@@ -261,7 +277,7 @@ extension LayoutEngine {
           verticalGuide: guide,
           passContext: passContext
         )
-      }
+      })
   }
 
   package func simpleAlignedCoordinate(
@@ -434,16 +450,23 @@ extension LayoutEngine {
             offsetY: insets.top
           )
         case .frame(_, _, let alignment), .flexibleFrame(_, _, _, _, _, _, let alignment):
-          let childOrigin = alignedOrigin(
-            for: child,
-            in: CellRect(origin: .zero, size: levelMeasured.measuredSize),
-            alignment: alignment
+          // The child's exact guide sits on the frame's (SwiftUI), so its
+          // guides propagate from the exact origin. Placement rounds that
+          // origin (`alignedOrigin`); propagating the rounded one would report
+          // a guide half a cell off the frame's own.
+          let reference = ViewDimensions(
+            width: levelMeasured.measuredSize.width,
+            height: levelMeasured.measuredSize.height
           )
           baseDimensions = propagatedViewDimensions(
             size: levelMeasured.measuredSize,
             from: child,
-            offsetX: childOrigin.x,
-            offsetY: childOrigin.y
+            exactOffsetX: Self.exactAlignedOffset(
+              child: child.halfCellPosition(of: alignment.horizontal),
+              reference: reference.halfCellPosition(of: alignment.horizontal)),
+            exactOffsetY: Self.exactAlignedOffset(
+              child: child.halfCellPosition(of: alignment.vertical),
+              reference: reference.halfCellPosition(of: alignment.vertical))
           )
         case .offset, .decoration:
           baseDimensions = propagatedViewDimensions(
@@ -502,16 +525,44 @@ extension LayoutEngine {
     offsetX: Int,
     offsetY: Int
   ) -> ViewDimensions {
-    // The child's guides are read in the centre-rounding mode the wrapper's
-    // guide is read in, so a propagated guide keeps its half cell.
+    propagatedViewDimensions(
+      size: size,
+      from: childDimensions,
+      exactOffsetX: (offsetX, false),
+      exactOffsetY: (offsetY, false)
+    )
+  }
+
+  /// A wrapper's dimensions with the child's explicit guides translated by
+  /// exact offsets, so a propagated guide keeps its exact position.
+  package func propagatedViewDimensions(
+    size: CellSize,
+    from childDimensions: ViewDimensions,
+    exactOffsetX: (value: Int, isHalfCell: Bool),
+    exactOffsetY: (value: Int, isHalfCell: Bool)
+  ) -> ViewDimensions {
     ViewDimensions(width: size.width, height: size.height)
-      .overridingHorizontalGuides(modeAware: { alignment, roundsUp in
-        childDimensions.roundingDefaultCentreUp(roundsUp).explicitValue(for: alignment)
-          .map { $0 + offsetX }
+      .overridingHorizontalGuides(positions: { alignment in
+        childDimensions.explicitPosition(for: alignment).map {
+          Self.translated($0, by: exactOffsetX)
+        }
       })
-      .overridingVerticalGuides(modeAware: { alignment, roundsUp in
-        childDimensions.roundingDefaultCentreUp(roundsUp).explicitValue(for: alignment)
-          .map { $0 + offsetY }
+      .overridingVerticalGuides(positions: { alignment in
+        childDimensions.explicitPosition(for: alignment).map {
+          Self.translated($0, by: exactOffsetY)
+        }
       })
+  }
+
+  /// An exact guide position moved by an exact offset.
+  private static func translated(
+    _ position: (value: Int, isHalfCell: Bool),
+    by offset: (value: Int, isHalfCell: Bool)
+  ) -> (value: Int, isHalfCell: Bool) {
+    (
+      SaturatingConversion.adding(
+        position.value + offset.value, position.isHalfCell && offset.isHalfCell ? 1 : 0),
+      position.isHalfCell != offset.isHalfCell
+    )
   }
 }
