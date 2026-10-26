@@ -62,6 +62,10 @@ private enum SetDMaskMode: Sendable {
   case trimmed
   case emptyToEmpty
   case staticEmptyMaskOpacity
+  case innerTransactionDisabledWithInnerOpacity
+  case insideTransactionDisabled
+  case scopedBodyDisabled
+  case scopedBodyAnimated
 }
 
 private struct SetDMaskRoot: View {
@@ -100,6 +104,20 @@ private struct SetDMaskRoot: View {
       rows("#").clipShape(SetDZeroWidthMaskShape(height: fraction))
     case .staticEmptyMaskOpacity:
       rows("#").opacity(fraction).clipShape(SetDMaskShape(fraction: 0))
+    case .innerTransactionDisabledWithInnerOpacity:
+      rows("#").opacity(fraction).transaction { $0.disablesAnimations = true }
+        .clipShape(SetDMaskShape(fraction: fraction))
+    case .insideTransactionDisabled:
+      rows("#").clipShape(SetDMaskShape(fraction: fraction))
+        .transaction { $0.disablesAnimations = true }
+    case .scopedBodyDisabled:
+      rows("#").transaction({ $0.disablesAnimations = true }) { content in
+        content.clipShape(SetDMaskShape(fraction: fraction))
+      }
+    case .scopedBodyAnimated:
+      rows("#").animation(.linear(duration: .seconds(1))) { content in
+        content.clipShape(SetDMaskShape(fraction: fraction))
+      }
     }
   }
 
@@ -255,13 +273,10 @@ struct AdversarialSetDClipTrimModeTests {
     let expected = SetDMask.staticExtent(0.625)
     let result = try await SetDMask.reveal(
       "154", start: 0.25, mode: .innerTransactionDisabled, sampleAt: .milliseconds(500))
-    setDKnown(
-      "STUI-1319: a clip mask applied outside .transaction { disablesAnimations } snaps instead of morphing; clipShape merges its mask into the clipped content's node, which carries the inner transaction (ViewLayoutModifiers.swift:64-72, AnimationModifiers.swift:262-289); contract: Animating-Views.md:92-101, Shapes.md:125-127; adjacent STUI-1218"
-    ) {
-      #expect(
-        SetDMask.lastPaintedX(result.mid) == expected,
-        "mid \(SetDMask.lastPaintedX(result.mid)) of \(expected)")
-    }
+    // STUI-1319: the mask animates in the scope where clipShape is applied.
+    #expect(
+      SetDMask.lastPaintedX(result.mid) == expected,
+      "mid \(SetDMask.lastPaintedX(result.mid)) of \(expected)")
   }
 
   @Test("setD155: a mask outside an inner .animation(value:) snaps on a plain write")
@@ -394,6 +409,48 @@ struct AdversarialSetDClipTrimModeTests {
     #expect(SetDMask.lastPaintedX(result.mid) == -1)
     #expect(SetDMask.lastPaintedX(result.end) == -1)
     #expect(result.elided > 0, "content hidden by a static empty mask stays elidable")
+  }
+
+  @Test("w4fk04: a mask outside a disabling .transaction morphs; the content inside snaps")
+  func w4fk04OuterMaskMorphsInnerOpacitySnaps() async throws {
+    let expected = SetDMask.staticExtent(0.625)
+    let result = try await SetDMask.reveal(
+      "w4fk04", start: 0.25, mode: .innerTransactionDisabledWithInnerOpacity,
+      sampleAt: .milliseconds(500))
+    #expect(result.slots.contains(.clipShapePaths), "\(result.slots)")
+    #expect(!result.slots.contains(.opacity), "the content keeps the inner transaction")
+    #expect(
+      SetDMask.lastPaintedX(result.mid) == expected,
+      "mid \(SetDMask.lastPaintedX(result.mid)) of \(expected)")
+    #expect(SetDMask.lastPaintedX(result.end) == 19)
+  }
+
+  @Test("w4fk05: a mask inside a disabling .transaction snaps")
+  func w4fk05MaskInsideDisablingTransactionSnaps() async throws {
+    let result = try await SetDMask.reveal(
+      "w4fk05", start: 0.25, mode: .insideTransactionDisabled, sampleAt: .milliseconds(500))
+    #expect(!result.slots.contains(.clipShapePaths), "\(result.slots)")
+    #expect(SetDMask.lastPaintedX(result.mid) == 19, "mid \(SetDMask.lastPaintedX(result.mid))")
+  }
+
+  @Test("w4fk06: a mask in a disabling scoped transaction body snaps")
+  func w4fk06MaskInScopedDisablingBodySnaps() async throws {
+    let result = try await SetDMask.reveal(
+      "w4fk06", start: 0.25, mode: .scopedBodyDisabled, sampleAt: .milliseconds(500))
+    #expect(!result.slots.contains(.clipShapePaths), "\(result.slots)")
+    #expect(SetDMask.lastPaintedX(result.mid) == 19, "mid \(SetDMask.lastPaintedX(result.mid))")
+  }
+
+  @Test("w4fk07: a mask in an animating scoped body morphs on a plain write")
+  func w4fk07MaskInScopedAnimatingBodyMorphs() async throws {
+    let expected = SetDMask.staticExtent(0.625)
+    let result = try await SetDMask.reveal(
+      "w4fk07", start: 0.25, mode: .scopedBodyAnimated, sampleAt: .milliseconds(500),
+      write: { $0.wrappedValue = 1 })
+    #expect(
+      SetDMask.lastPaintedX(result.mid) == expected,
+      "mid \(SetDMask.lastPaintedX(result.mid)) of \(expected)")
+    #expect(SetDMask.lastPaintedX(result.end) == 19)
   }
 }
 

@@ -2150,41 +2150,8 @@ package final class AnimationController: Sendable {
       node.transactionSnapshot.scopeRole == .restoresOuter
       ? (scopeOuterTransaction ?? transaction)
       : transaction
-    var effectiveTransaction = node.transactionSnapshot
-    if effectiveTransaction.animationRequest == .inherit {
-      // Metadata fields (`isContinuous`, custom key values) inherit with
-      // the request; the node's own resolve-stamped values win per key.
-      if let frameSegment {
-        effectiveTransaction.animationRequest = frameSegment.animationRequest
-        effectiveTransaction.animationBatchID = frameSegment.animationBatchID
-        effectiveTransaction.isContinuous =
-          effectiveTransaction.isContinuous || frameSegment.isContinuous
-        effectiveTransaction.tracksVelocity =
-          effectiveTransaction.tracksVelocity || frameSegment.tracksVelocity
-        effectiveTransaction.customValues = frameSegment.customValues.merging(
-          effectiveTransaction.customValues
-        ) { _, node in node }
-      } else {
-        effectiveTransaction.animationRequest = transaction.animationRequest
-        effectiveTransaction.animationBatchID = transaction.animationBatchID
-        effectiveTransaction.isContinuous =
-          effectiveTransaction.isContinuous || transaction.isContinuous
-        effectiveTransaction.tracksVelocity =
-          effectiveTransaction.tracksVelocity || transaction.tracksVelocity
-        effectiveTransaction.customValues = transaction.customValues.merging(
-          effectiveTransaction.customValues
-        ) { _, node in node }
-      }
-    } else if effectiveTransaction.animationBatchID == nil {
-      let isFrameSegmentBoundary =
-        frameSegment.map { segment in
-          segment.animationRequest == effectiveTransaction.animationRequest
-            && segment.animationBatchID == nil
-        } ?? false
-      if !isFrameSegmentBoundary {
-        effectiveTransaction.animationBatchID = transaction.animationBatchID
-      }
-    }
+    var effectiveTransaction = Self.effectiveTransaction(
+      of: node.transactionSnapshot, frameSegment: frameSegment, inherited: transaction)
 
     let reducesMotion = node.environmentSnapshot.style.renderingReduceMotion
     if reducesMotion {
@@ -2215,6 +2182,28 @@ package final class AnimationController: Sendable {
           styleIntents[slot] = intent
         }
       }
+    }
+    // `clipShape` merges its mask into the clipped content's node; when the
+    // two scopes differ the modifier recorded its own (STUI-1319), so the mask
+    // slot animates under the transaction where `clipShape` was applied.
+    if !node.transactionSnapshot.customValues.isEmpty,
+      let scope = node.transactionSnapshot.customValues[
+        ObjectIdentifier(ClipShapeAnimationScopeKey.self)]?.unwrap(
+          as: ScopedStyleAnimationIntent.self),
+      snapshot[.clipShapePaths] != nil || previous?[.clipShapePaths] != nil
+    {
+      var clipSnapshot = node.transactionSnapshot
+      clipSnapshot.animationRequest = scope.request
+      clipSnapshot.animationBatchID = scope.batchID
+      let clipTransaction = Self.effectiveTransaction(
+        of: clipSnapshot, frameSegment: frameSegment, inherited: transaction)
+      // A clip scope that inherits nothing must not fall back to the node's
+      // own request; `.disabled` snaps exactly as `.inherit` does.
+      let request =
+        reducesMotion || clipTransaction.animationRequest == .inherit
+        ? AnimationRequest.disabled : clipTransaction.animationRequest
+      styleIntents[.clipShapePaths] = ScopedStyleAnimationIntent(
+        isScoped: true, request: request, batchID: clipTransaction.animationBatchID)
     }
     if let previous {
       diffAndEnqueue(
@@ -2269,6 +2258,52 @@ package final class AnimationController: Sendable {
         activeKeysByOwnerNodeID: activeKeysByOwnerNodeID
       )
     }
+  }
+
+  /// `snapshot` with an `.inherit` request resolved the way a node's is: from
+  /// the frame-selected segment when one covers the node, else from the
+  /// inherited (parent or scope-outer) transaction. Metadata fields
+  /// (`isContinuous`, custom key values) inherit with the request; the
+  /// snapshot's own resolve-stamped values win per key.
+  private static func effectiveTransaction(
+    of snapshot: TransactionSnapshot,
+    frameSegment: AnimationInvalidationSegment?,
+    inherited transaction: TransactionSnapshot
+  ) -> TransactionSnapshot {
+    var effective = snapshot
+    if effective.animationRequest == .inherit {
+      if let frameSegment {
+        effective.animationRequest = frameSegment.animationRequest
+        effective.animationBatchID = frameSegment.animationBatchID
+        effective.isContinuous =
+          effective.isContinuous || frameSegment.isContinuous
+        effective.tracksVelocity =
+          effective.tracksVelocity || frameSegment.tracksVelocity
+        effective.customValues = frameSegment.customValues.merging(
+          effective.customValues
+        ) { _, node in node }
+      } else {
+        effective.animationRequest = transaction.animationRequest
+        effective.animationBatchID = transaction.animationBatchID
+        effective.isContinuous =
+          effective.isContinuous || transaction.isContinuous
+        effective.tracksVelocity =
+          effective.tracksVelocity || transaction.tracksVelocity
+        effective.customValues = transaction.customValues.merging(
+          effective.customValues
+        ) { _, node in node }
+      }
+    } else if effective.animationBatchID == nil {
+      let isFrameSegmentBoundary =
+        frameSegment.map { segment in
+          segment.animationRequest == effective.animationRequest
+            && segment.animationBatchID == nil
+        } ?? false
+      if !isFrameSegmentBoundary {
+        effective.animationBatchID = transaction.animationBatchID
+      }
+    }
+    return effective
   }
 
   private func diffAndEnqueue(
