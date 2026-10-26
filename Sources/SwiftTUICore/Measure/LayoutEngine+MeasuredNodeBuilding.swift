@@ -90,7 +90,7 @@ extension LayoutEngine {
     let lazyStackSnapshot: LazyStackAllocationSnapshot?
     switch resolved.layoutBehavior {
     case .lazyStack(let axis, let spacing, let horizontalAlignment, let verticalAlignment):
-      lazyStackSnapshot = lazyStackAllocationSnapshot(
+      var snapshot = lazyStackAllocationSnapshot(
         for: stackChildren,
         childMeasurements: childMeasurements,
         axis: axis,
@@ -98,6 +98,16 @@ extension LayoutEngine {
         horizontalAlignment: horizontalAlignment,
         verticalAlignment: verticalAlignment
       )
+      // An indexed stack claims the innermost hint before it tests whether
+      // it can window (`scheduleWindowedLazyStackMeasurement`). Holding the
+      // claim while measuring exhaustively means the viewport was ineligible
+      // (zero length) or the window fell back, so this product is valid only
+      // for that hint (STUI-1269).
+      if resolved.indexedChildSource != nil {
+        snapshot.claimedHint = passContext?.currentMeasureViewportHint(
+          claimedBy: resolved.identity)
+      }
+      lazyStackSnapshot = snapshot
     default:
       lazyStackSnapshot = nil
     }

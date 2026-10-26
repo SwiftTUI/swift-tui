@@ -111,6 +111,179 @@ struct LazyStackViewportCacheTests {
     }
   }
 
+  // MARK: - Viewport-dependent lazy products (STUI-1269)
+
+  // The scroll layout's zero-height first round makes the first lazy stack
+  // claim a hint it cannot window, so it measures exhaustively. A cache
+  // serve of that product to the finite round skipped the claim, and the
+  // claim-denied second stack claimed and windowed instead: production
+  // windowed the wrong stack, and the fresh shadow (first windowed) diverged
+  // wherever the first stack's later rows are wider than its window.
+  @Test("the outermost lazy stack keeps the viewport claim across measure rounds")
+  func outermostLazyStackKeepsTheViewportClaim() throws {
+    let snapshot = renderWithoutLayoutShadow(
+      ClaimOrderProbe(), identity: testIdentity("ClaimOrderProbe"), rows: 8)
+    var stacks: [MeasuredNode] = []
+    var pending = [snapshot.measuredTree]
+    while let node = pending.popLast() {
+      if node.containerAllocationSnapshot?.lazyStack != nil { stacks.append(node) }
+      pending.append(contentsOf: node.childMeasurements.reversed())
+    }
+    try #require(stacks.count == 2)
+    #expect(
+      stacks[0].containerAllocationSnapshot?.lazyStack?.measuredWindow != nil,
+      "the first (outermost) lazy stack measured exhaustively")
+    #expect(
+      stacks[1].containerAllocationSnapshot?.lazyStack?.measuredWindow == nil,
+      "the claim-denied second stack windowed")
+  }
+
+  @Test(
+    "the layout shadow agrees with viewport-dependent lazy shapes (probe armed)",
+    arguments: [
+      "claim-order", "framed-outline", "horizontal", "wrapped", "vacuous-then-finite",
+      "empty-first",
+    ])
+  func layoutShadowAgreesWithViewportDependentLazyShapes(shape: String) async {
+    // Rows of varying width or height, both axes, wrapped and fixed-frame
+    // stacks, and a zero-height viewport followed by a finite one under one
+    // renderer (the retained session then holds the vacuous product). A
+    // divergence traps the child, which fails this case alone.
+    await #expect(processExitsWith: .success) { [shape] in
+      await MainActor.run {
+        SoundnessProbeConfiguration.isEnabled = true
+        SoundnessProbeConfiguration.sampleEveryNFrames = 1
+        let failures: [String]
+        switch shape {
+        case "claim-order":
+          failures = LazyStackViewportCacheTests.armedDivergences(
+            ClaimOrderProbe(), name: shape, sizes: [(40, 6), (40, 8), (40, 10)])
+        case "framed-outline":
+          failures = LazyStackViewportCacheTests.armedDivergences(
+            FramedOutlineProbe(), name: shape, sizes: (4...9).map { (60, $0) })
+        case "horizontal":
+          failures = LazyStackViewportCacheTests.armedDivergences(
+            HorizontalClaimProbe(), name: shape, sizes: [(24, 3), (24, 4)])
+        case "wrapped":
+          failures = LazyStackViewportCacheTests.armedDivergences(
+            WrappedLazyProbe(), name: shape, sizes: [(40, 6), (40, 8)])
+        case "empty-first":
+          failures = LazyStackViewportCacheTests.armedDivergences(
+            ClaimOrderProbe(firstCount: 0, fillerCount: 2, secondCount: 20), name: shape,
+            sizes: [(40, 6), (40, 8)])
+        default:
+          failures = LazyStackViewportCacheTests.armedDivergences(
+            ClaimOrderProbe(), name: shape, sizes: [(40, 1), (40, 8), (40, 1)])
+        }
+        #expect(failures.isEmpty, "\(failures.joined(separator: "\n"))")
+      }
+    }
+  }
+
+  /// Renders `view` at each size in turn with one renderer (twice per size)
+  /// and returns a line per layout-shadow divergence.
+  private static func armedDivergences(
+    _ view: some View, name: String, sizes: [(Int, Int)]
+  ) -> [String] {
+    let renderer = DefaultRenderer()
+    let identity = testIdentity("ViewportDependentShadow", name)
+    var failures: [String] = []
+    for (width, height) in sizes {
+      for _ in 0..<2 {
+        let before = SoundnessProbeConfiguration.layoutShadowDivergenceCount
+        _ = renderer.render(
+          view,
+          context: .init(identity: identity, invalidatedIdentities: [identity]),
+          proposal: .init(width: .finite(width), height: .finite(height)))
+        if SoundnessProbeConfiguration.layoutShadowDivergenceCount != before {
+          failures.append(
+            "\(name) \(width)x\(height): "
+              + (SoundnessProbeConfiguration.lastViolationDetailByKind["layout-shadow-divergence"]
+                ?? ""))
+        }
+      }
+    }
+    return failures
+  }
+
+  // MARK: - Anchor preservation inside longer scroll content (STUI-1270)
+
+  // A windowed lazy stack followed by other content preserved its anchor on
+  // a re-render at an unchanged offset and clamped the correction to its OWN
+  // scroll range, so the scroll view snapped back (to 0 for a stack shorter
+  // than the viewport). The same reset undid the focus-sync reveal of a
+  // claim-denied row after a viewport shrink (STUI-1270).
+  @Test(
+    "a re-render keeps the offset of content scrolled past a windowed lazy stack",
+    arguments: [(4, 3), (20, 16)])
+  func reRenderKeepsAnOffsetPastAWindowedLazyStack(firstCount: Int, offset: Int) throws {
+    let h = try StressRuntimeHarness(
+      rootIdentity: testIdentity("AnchorPastStack", "\(firstCount)"),
+      size: .init(width: 40, height: 8)
+    ) { ClaimOrderProbe(firstCount: firstCount, wideFrom: firstCount, fillerCount: 18) }
+    defer { h.shutdown() }
+    func currentOffset() -> Int? {
+      h.runLoop.localScrollPositionRegistry.routesWithCurrentOffsets(
+        h.runLoop.latestSemanticSnapshot.scrollRoutes
+      ).first?.contentOffset.y
+    }
+    _ = try h.scrollPointer(at: .init(x: 2.5, y: 3.5), deltaY: offset)
+    try #require(currentOffset() == offset, "\(h.frame)")
+    let scrolled = h.frame
+    _ = try h.renderAfterExternalMutation()
+    #expect(currentOffset() == offset)
+    _ = try h.renderAfterExternalMutation()
+    #expect(currentOffset() == offset)
+    #expect(h.frame == scrolled, "\(h.frame)")
+  }
+
+  // Neighbours of STUI-1270: viewport growth after the reveal, and a shrink
+  // that leaves the claim-denied stack partly visible, keep the row shown
+  // and focused (Scrolling.md, "A viewport change ... can also reveal a
+  // previously visible focused control").
+  @Test("a focused claim-denied row stays revealed and focused across resizes")
+  func focusedClaimDeniedRowSurvivesResizes() throws {
+    let log = W3FAStackLog()
+    let h = try W3FAResizeHarness(name: "ClaimDeniedResize", size: .init(width: 40, height: 16)) {
+      W3FATwoStacks(firstCount: 4, log: log)
+    }
+    defer { h.shutdown() }
+    try h.focusText("second 2")
+    let focus = try #require(h.loop.focusTracker.currentFocusIdentity)
+    for height in [12, 6, 16, 5, 9] {
+      try h.resize(width: 40, height: height)
+      #expect(h.frame.contains("second 2"), "40x\(height): \(h.frame)")
+      #expect(h.loop.focusTracker.currentFocusIdentity == focus, "40x\(height)")
+    }
+  }
+
+  // Cost neighbour: the repaired cache rule must not make a scroll-hosted
+  // lazy stack realize or measure more per steady frame.
+  @Test("scroll-hosted lazy stacks keep their per-frame layout work", arguments: [40, 1000])
+  func scrollHostedLazyStacksKeepTheirPerFrameWork(count: Int) {
+    let saved = SoundnessProbeConfiguration.isEnabled
+    SoundnessProbeConfiguration.isEnabled = false
+    defer { SoundnessProbeConfiguration.isEnabled = saved }
+    let renderer = DefaultRenderer()
+    let identity = testIdentity("ScrollHostedLazyWork", "\(count)")
+    for (frame, offset) in [0, 0, 5, 9].enumerated() {
+      IndexedChildRealizationProbe.reset()
+      let result = renderer.render(
+        PositionedLazyWorkProbe(count: count, offset: offset),
+        context: .init(identity: identity, invalidatedIdentities: frame == 0 ? [] : [identity]),
+        proposal: .init(width: .finite(40), height: .finite(8)))
+      let realized = IndexedChildRealizationProbe.realizedChildCount
+      if frame == 0 {
+        #expect(realized <= min(count, 40), "frame 0 realized \(realized)")
+      } else {
+        #expect(realized <= 12, "frame \(frame) realized \(realized)")
+        #expect(
+          result.diagnostics.work.measuredNodesComputed <= 31,
+          "frame \(frame) computed \(result.diagnostics.work.measuredNodesComputed)")
+      }
+    }
+  }
+
   private func outlinePlacement(_ probe: OffscreenOutlineProbe, rows: Int) throws -> PlacedNode {
     let snapshot = renderWithoutLayoutShadow(
       probe, identity: testIdentity("OffscreenOutlineProbe", "\(rows)"), rows: rows)
@@ -239,4 +412,145 @@ private struct LazyStackScrollProbe: View {
       }.frame(height: 24).border(.separator)
     }.padding(1)
   }
+}
+
+/// Header, then a scroll view holding a windowed lazy stack (rows from
+/// `wideFrom` on are wider), fillers and an optional claim-denied second
+/// lazy stack.
+private struct ClaimOrderProbe: View {
+  var firstCount = 20
+  var wideFrom = 10
+  var fillerCount = 6
+  var secondCount = 5
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Text("Header")
+      ScrollView {
+        VStack(alignment: .leading, spacing: 0) {
+          LazyVStack(alignment: .leading, spacing: 0) {
+            ForEach(0..<firstCount, id: \.self) { index in
+              Text(index < wideFrom ? "first \(index)" : "first \(index) wide")
+            }
+          }
+          ForEach(0..<fillerCount, id: \.self) { index in
+            Text("filler \(index)")
+          }
+          if secondCount > 0 {
+            LazyVStack(alignment: .leading, spacing: 0) {
+              ForEach(0..<secondCount, id: \.self) { index in
+                Text("second \(index)")
+              }
+            }
+          }
+        }
+      }.scrollIndicators(.hidden)
+    }
+  }
+}
+
+/// The gallery's Navigation & Collections shape, reduced: a fixed-frame
+/// outline whose last row is its widest, in a scroll view below a header.
+private struct FramedOutlineProbe: View {
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Text("Header")
+      ScrollView {
+        VStack(alignment: .leading, spacing: 1) {
+          Text("Navigation")
+          HStack(alignment: .top, spacing: 2) {
+            Text("Side")
+            OutlineGroup(OffscreenOutlineNode.wideLast, children: \.children) { node in
+              Text(node.title)
+            }
+            .frame(width: 34, height: 8, alignment: .topLeading)
+          }
+        }
+      }
+    }
+  }
+}
+
+/// A horizontal scroll view after a leading label: its first measure round
+/// has a zero-width viewport. The first LazyHStack's later cells are taller
+/// (its cross axis), at one width so the main-axis estimate is exact.
+private struct HorizontalClaimProbe: View {
+  var body: some View {
+    HStack(alignment: .top, spacing: 0) {
+      Text("H")
+      ScrollView(.horizontal) {
+        HStack(alignment: .top, spacing: 1) {
+          LazyHStack(alignment: .top, spacing: 1) {
+            ForEach(0..<20, id: \.self) { index in
+              VStack(alignment: .leading, spacing: 0) {
+                Text("a\(index % 10)")
+                if index >= 10 { Text("+") }
+              }
+            }
+          }
+          ForEach(0..<4, id: \.self) { index in
+            Text("f\(index)")
+          }
+          LazyHStack(spacing: 1) {
+            ForEach(0..<5, id: \.self) { index in
+              Text("b\(index)")
+            }
+          }
+        }
+      }.scrollIndicators(.hidden)
+    }
+  }
+}
+
+/// A windowed lazy stack of varying-width rows inside padding and a fixed
+/// frame, followed by fillers.
+private struct WrappedLazyProbe: View {
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Text("Header")
+      ScrollView {
+        VStack(alignment: .leading, spacing: 0) {
+          LazyVStack(alignment: .leading, spacing: 0) {
+            ForEach(0..<20, id: \.self) { index in
+              Text(index < 10 ? "row \(index)" : "row \(index) is wider")
+            }
+          }
+          .padding(.horizontal, 1)
+          .frame(width: 30, alignment: .leading)
+          ForEach(0..<6, id: \.self) { index in
+            Text("filler \(index)")
+          }
+        }
+      }.scrollIndicators(.hidden)
+    }
+  }
+}
+
+private struct PositionedLazyWorkProbe: View {
+  let count: Int
+  let offset: Int
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Text("Header")
+      ScrollView(position: .constant(ScrollCellOffset(y: offset))) {
+        LazyVStack(alignment: .leading, spacing: 0) {
+          ForEach(0..<count, id: \.self) { index in
+            Text("row \(index)")
+          }
+        }
+      }
+    }
+  }
+}
+
+extension OffscreenOutlineNode {
+  fileprivate static let wideLast: [OffscreenOutlineNode] = [
+    .init(
+      id: "Examples",
+      children: [.init(id: "Terminal"), .init(id: "SwiftUI host"), .init(id: "Web/WASI")]),
+    .init(
+      id: "Coverage",
+      children: [.init(id: "Build lanes"), .init(id: "Focused tests and more")]),
+  ]
 }

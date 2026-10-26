@@ -43,7 +43,7 @@ extension LayoutEngine {
     // A retained wrapper skips its descendants' hint gates. It must descend
     // until the consuming allocation can validate the current viewport; its
     // ordinary rows remain independently reusable.
-    if previousMeasured.childMeasurements.contains(where: { $0.containsWindowedMeasurement }) {
+    if previousMeasured.childMeasurements.contains(where: { $0.consumesMeasureViewport }) {
       return nil
     }
 
@@ -55,12 +55,16 @@ extension LayoutEngine {
     // the reused product stands in for the fresh measure that would have
     // claimed (scroll-latency Stage 2, plan 2026-07-31-002 — the stored
     // hint replaced a stride-based window recompute, which was no longer
-    // self-consistent once the stride became a running refinement).
+    // self-consistent once the stride became a running refinement). An
+    // exhaustive product that claimed a hint it could not window (a
+    // zero-length viewport) is valid only for that hint on the same terms:
+    // under a finite hint the fresh measure would window, and the claim it
+    // made must be made again (STUI-1269).
     if let lazySnapshot = previousMeasured.containerAllocationSnapshot?.lazyStack,
-      lazySnapshot.measuredWindow != nil
+      lazySnapshot.consumesMeasureViewport
     {
       guard let passContext,
-        let storedHint = lazySnapshot.windowHint,
+        let storedHint = lazySnapshot.windowHint ?? lazySnapshot.claimedHint,
         passContext.currentMeasureViewportHint == storedHint,
         passContext.claimCurrentMeasureViewportHint(for: resolved.identity) == storedHint
       else {
