@@ -205,9 +205,9 @@ internal struct PreparedRadialGradient: Sendable {
   /// maximum over the rectangle's cell centers is attained at a corner cell.
   func farthestCellCenterDistance(in rect: CellRect) -> Double {
     let minX = Double(rect.origin.x) + 0.5
-    let maxX = Double(rect.origin.x + rect.size.width - 1) + 0.5
+    let maxX = Double(rect.maxX - 1) + 0.5
     let minY = Double(rect.origin.y) + 0.5
-    let maxY = Double(rect.origin.y + rect.size.height - 1) + 0.5
+    let maxY = Double(rect.maxY - 1) + 0.5
     var farthest = 0.0
     for (px, py) in [(minX, minY), (maxX, minY), (minX, maxY), (maxX, maxY)] {
       let dx = px - centerX

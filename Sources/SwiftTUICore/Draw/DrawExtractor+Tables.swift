@@ -173,7 +173,7 @@ extension DrawExtractor {
       let cellCount = hostsCommittedItems && line.role == .row ? lineBounds.size.height : 1
       for cellOffset in 0..<max(1, cellCount) {
         var cursorX = lineBounds.origin.x
-        let lineMaxX = lineBounds.origin.x + lineBounds.size.width
+        let lineMaxX = lineBounds.maxX
 
         for segment in segments {
           let segmentWidth = layoutText(for: segment.content, width: nil).size.width

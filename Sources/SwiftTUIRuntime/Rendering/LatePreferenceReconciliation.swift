@@ -369,7 +369,8 @@ struct LatePreferenceReconciliationStage {
       animationRedrawIdentities: input.animationRedrawIdentities,
       animationSegmentTargetIdentities: input.animationSegmentTargetIdentities,
       verifyLayoutShadow: input.verifyLayoutShadow,
-      imperativeRuntimeIssues: input.imperativeRuntimeIssues
+      imperativeRuntimeIssues: input.imperativeRuntimeIssues,
+      boundsRasterSurfaceToProposal: input.boundsRasterSurfaceToProposal
     )
   }
 }

@@ -44,29 +44,42 @@ extension LayoutEngine {
       case .leading, .trailing:
         insetMeasurement.measuredSize.width
       }
-    let consumed = max(0, insetLength + spacing - safeArea.value(for: edge))
+    let consumed = max(
+      0,
+      SaturatingConversion.subtracting(
+        SaturatingConversion.adding(insetLength, spacing), safeArea.value(for: edge)))
 
     let baseBounds: CellRect =
       switch edge {
       case .top:
         CellRect(
-          origin: CellPoint(x: bounds.origin.x, y: bounds.origin.y + consumed),
-          size: CellSize(width: bounds.size.width, height: max(0, bounds.size.height - consumed))
+          origin: CellPoint(
+            x: bounds.origin.x, y: SaturatingConversion.adding(bounds.origin.y, consumed)),
+          size: CellSize(
+            width: bounds.size.width,
+            height: max(0, SaturatingConversion.subtracting(bounds.size.height, consumed)))
         )
       case .leading:
         CellRect(
-          origin: CellPoint(x: bounds.origin.x + consumed, y: bounds.origin.y),
-          size: CellSize(width: max(0, bounds.size.width - consumed), height: bounds.size.height)
+          origin: CellPoint(
+            x: SaturatingConversion.adding(bounds.origin.x, consumed), y: bounds.origin.y),
+          size: CellSize(
+            width: max(0, SaturatingConversion.subtracting(bounds.size.width, consumed)),
+            height: bounds.size.height)
         )
       case .bottom:
         CellRect(
           origin: bounds.origin,
-          size: CellSize(width: bounds.size.width, height: max(0, bounds.size.height - consumed))
+          size: CellSize(
+            width: bounds.size.width,
+            height: max(0, SaturatingConversion.subtracting(bounds.size.height, consumed)))
         )
       case .trailing:
         CellRect(
           origin: bounds.origin,
-          size: CellSize(width: max(0, bounds.size.width - consumed), height: bounds.size.height)
+          size: CellSize(
+            width: max(0, SaturatingConversion.subtracting(bounds.size.width, consumed)),
+            height: bounds.size.height)
         )
       }
 
@@ -82,21 +95,25 @@ extension LayoutEngine {
       case .top:
         CellPoint(
           x: alignedInsetOrigin.x,
-          y: bounds.origin.y - safeArea.top
+          y: SaturatingConversion.subtracting(bounds.origin.y, safeArea.top)
         )
       case .bottom:
         CellPoint(
           x: alignedInsetOrigin.x,
-          y: bounds.maxY - insetMeasurement.measuredSize.height + safeArea.bottom
+          y: SaturatingConversion.adding(
+            SaturatingConversion.subtracting(bounds.maxY, insetMeasurement.measuredSize.height),
+            safeArea.bottom)
         )
       case .leading:
         CellPoint(
-          x: bounds.origin.x - safeArea.leading,
+          x: SaturatingConversion.subtracting(bounds.origin.x, safeArea.leading),
           y: alignedInsetOrigin.y
         )
       case .trailing:
         CellPoint(
-          x: bounds.maxX - insetMeasurement.measuredSize.width + safeArea.trailing,
+          x: SaturatingConversion.adding(
+            SaturatingConversion.subtracting(bounds.maxX, insetMeasurement.measuredSize.width),
+            safeArea.trailing),
           y: alignedInsetOrigin.y
         )
       }

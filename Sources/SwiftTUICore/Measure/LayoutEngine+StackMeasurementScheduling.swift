@@ -44,13 +44,14 @@ extension LayoutEngine {
       return
     }
 
-    let spacingBudget = resolvedStackSpacings(
-      for: children,
-      axis: axis,
-      spacingOverride: spacing,
-      passContext: passContext
-    ).reduce(0, +)
-    let availableMain = max(0, proposedMain - spacingBudget)
+    let spacingBudget = SaturatingConversion.sum(
+      resolvedStackSpacings(
+        for: children,
+        axis: axis,
+        spacingOverride: spacing,
+        passContext: passContext
+      ))
+    let availableMain = max(0, SaturatingConversion.subtracting(proposedMain, spacingBudget))
 
     let plan = makeStackAllocationPlan(
       children: children,

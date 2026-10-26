@@ -332,6 +332,12 @@ extension FrameResolveInputBox {
 package final class FrameResolveState {
   package var selectiveEvaluationEnabled: Bool
 
+  /// Whether frames rasterize to at most the proposal's finite dimensions
+  /// (STUI-796). An interactive run loop sets this for its renderer, so a host
+  /// surface never receives more cells than it has; a one-shot render keeps
+  /// its natural extent.
+  package var boundsRasterSurfaceToProposal = false
+
   /// When true, the next call to ``prepareInputs(from:proposal:)`` will force
   /// root evaluation regardless of whether environment values changed. The
   /// RunLoop sets this when the view builder's input changed (state mutation)

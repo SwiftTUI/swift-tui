@@ -21,7 +21,7 @@ extension LayoutEngine {
     case .infinity:
       return .infinity
     case .finite(let value):
-      return .finite(max(0, value - amount))
+      return .finite(max(0, SaturatingConversion.subtracting(value, amount)))
     }
   }
 
@@ -45,7 +45,7 @@ extension LayoutEngine {
     case .infinity:
       return .infinity
     case .finite(let value):
-      return .finite(max(0, value + amount))
+      return .finite(max(0, SaturatingConversion.adding(value, amount)))
     }
   }
 
@@ -92,7 +92,10 @@ extension LayoutEngine {
       case .leading, .trailing:
         contentSize.width
       }
-    return max(0, contentLength + max(0, spacing) - safeArea.value(for: edge))
+    return max(
+      0,
+      SaturatingConversion.subtracting(
+        SaturatingConversion.adding(contentLength, max(0, spacing)), safeArea.value(for: edge)))
   }
 
   internal func safeAreaInsetConsumedInsets(

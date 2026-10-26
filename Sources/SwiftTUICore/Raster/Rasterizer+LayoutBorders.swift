@@ -171,7 +171,8 @@ extension Rasterizer {
       pen: StrokePen(borderSet: set, roundsCorners: stroke.lineJoin == .round),
       sides: drawnSides,
       mask: StrokeMask(stroke),
-      rows: dirtyRows.map { dirtyRows in { dirtyRows.contains(outer.origin.y + $0) } }
+      rows: dirtyRows.map { dirtyRows in { dirtyRows.contains(outer.origin.y + $0) } },
+      within: strokeWindow(for: outer, cells: cells, clip: clip)
     ) { ink in
       let cell = ink.cell
       let glyph = mergedGlyph(

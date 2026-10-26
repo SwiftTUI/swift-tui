@@ -819,8 +819,8 @@ extension SemanticExtractor {
   ) -> CellRect {
     CellRect(
       origin: .init(
-        x: rect.origin.x + delta.x,
-        y: rect.origin.y + delta.y
+        x: SaturatingConversion.adding(rect.origin.x, delta.x),
+        y: SaturatingConversion.adding(rect.origin.y, delta.y)
       ),
       size: rect.size
     )

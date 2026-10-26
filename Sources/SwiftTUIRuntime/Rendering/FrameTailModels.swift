@@ -173,6 +173,9 @@ struct FrameTailInput {
   /// pass of one frame shares it, so a relayout pass and an abandoned frame
   /// can account for them.
   var imperativeRuntimeIssues = FrameImperativeRuntimeIssues()
+  /// Latched from `FrameResolveState.boundsRasterSurfaceToProposal`: the
+  /// raster surface never exceeds the proposal's finite dimensions.
+  var boundsRasterSurfaceToProposal: Bool = false
 }
 
 /// The `ImperativeRuntimeIssueQueue` issues one frame drained into its issue

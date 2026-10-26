@@ -261,7 +261,9 @@ extension LayoutEngine {
           isStackSpacer(children[childIndex], axis: axis)
           ? state.allocatedMainSizes[childIndex]
           : mainDimension(of: measurement.measuredSize, for: axis)
-        state.remainingMain = max(0, state.remainingMain - consumed)
+        // A negative padding can make a child's response negative.
+        state.remainingMain = max(
+          0, SaturatingConversion.subtracting(state.remainingMain, consumed))
         state.position += 1
         continueStackAllocation(
           node,

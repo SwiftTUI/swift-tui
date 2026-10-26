@@ -158,14 +158,14 @@ extension Rasterizer {
     }
 
     let rowStart = max(walkRect.origin.x, 0)
-    for y in walkRect.origin.y..<(walkRect.origin.y + walkRect.size.height) {
+    for y in walkRect.origin.y..<walkRect.maxY {
       // Per-row cull (D70): skips `shapeContains` and the per-cell colour
       // resolution below for rows `write` would clamp away anyway.
       if let dirtyRows, !dirtyRows.contains(y) {
         continue
       }
       var x = rowStart
-      let rowEnd = min(walkRect.origin.x + walkRect.size.width, cells[y].count)
+      let rowEnd = min(walkRect.maxX, cells[y].count)
       while x < rowEnd {
         work.visitedCells += 1
         guard
@@ -451,12 +451,12 @@ extension Rasterizer {
     let rowStart = max(walkRect.origin.x, 0)
     var segmentHint = 0
 
-    for y in walkRect.origin.y..<(walkRect.origin.y + walkRect.size.height) {
+    for y in walkRect.origin.y..<walkRect.maxY {
       if let dirtyRows, !dirtyRows.contains(y) {
         work.skippedRows += 1
         continue
       }
-      let rowEnd = min(walkRect.origin.x + walkRect.size.width, cells[y].count)
+      let rowEnd = min(walkRect.maxX, cells[y].count)
       guard rowStart < rowEnd else {
         continue
       }
@@ -1027,9 +1027,9 @@ extension Rasterizer {
     if let clip {
       guard
         x >= clip.origin.x,
-        x < clip.origin.x + clip.size.width,
+        x < clip.maxX,
         y >= clip.origin.y,
-        y < clip.origin.y + clip.size.height
+        y < clip.maxY
       else {
         return
       }

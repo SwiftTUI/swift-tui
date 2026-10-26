@@ -68,7 +68,9 @@ extension LayoutEngine {
     let widestChild = childMeasurements.map(\.measuredSize.width).max() ?? 0
     idealSize.width = max(
       idealSize.width,
-      leftWidth + 1 + widestChild + 1 + rightWidth + payload.style.contentInsets.horizontal)
+      SaturatingConversion.sum([
+        leftWidth, 1, widestChild, 1, rightWidth, payload.style.contentInsets.horizontal,
+      ]))
 
     return CellSize(
       width: resolvedExpandingListDimension(idealSize.width, proposal: proposal.width),
@@ -124,7 +126,7 @@ extension LayoutEngine {
     }
 
     return CellSize(
-      width: lineMetrics.width + payload.style.contentInsets.horizontal,
+      width: SaturatingConversion.adding(lineMetrics.width, payload.style.contentInsets.horizontal),
       height: lineMetrics.height + payload.style.contentInsets.vertical
     )
   }

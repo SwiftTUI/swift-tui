@@ -387,7 +387,7 @@ extension DrawExtractor {
       return []
     }
 
-    let x = bounds.origin.x + bounds.size.width - 1
+    let x = bounds.maxX - 1
     return thumbRange.flatMap { y in
       singleCellIndicatorCommand(x: x, y: y, glyph: glyph, style: style)
     }
@@ -409,7 +409,7 @@ extension DrawExtractor {
       return []
     }
 
-    let y = bounds.origin.y + bounds.size.height - 1
+    let y = bounds.maxY - 1
     return thumbRange.flatMap { x in
       singleCellIndicatorCommand(x: x, y: y, glyph: glyph, style: style)
     }

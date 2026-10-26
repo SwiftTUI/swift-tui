@@ -114,7 +114,7 @@ extension Rasterizer {
     }
 
     let lowerBound = bounds.origin.y
-    let upperBound = bounds.origin.y + bounds.size.height
+    let upperBound = bounds.maxY
     return dirtyRows.contains(where: { row in
       row >= lowerBound && row < upperBound
     })

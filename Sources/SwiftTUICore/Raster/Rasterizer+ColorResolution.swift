@@ -42,9 +42,9 @@ extension Rasterizer {
     {
     case .rectangle:
       return x >= targetBounds.origin.x
-        && x < targetBounds.origin.x + targetBounds.size.width
+        && x < targetBounds.maxX
         && y >= targetBounds.origin.y
-        && y < targetBounds.origin.y + targetBounds.size.height
+        && y < targetBounds.maxY
     case .circle, .ellipse, .capsule:
       return curvedShapeContains(
         pointX: x,
@@ -56,14 +56,14 @@ extension Rasterizer {
     case .roundedRectangle(let cornerRadius):
       if case .interior = fillMode {
         return x >= targetBounds.origin.x
-          && x < targetBounds.origin.x + targetBounds.size.width
+          && x < targetBounds.maxX
           && y >= targetBounds.origin.y
-          && y < targetBounds.origin.y + targetBounds.size.height
+          && y < targetBounds.maxY
       }
       guard targetBounds.origin.x <= x,
-        x < targetBounds.origin.x + targetBounds.size.width,
+        x < targetBounds.maxX,
         targetBounds.origin.y <= y,
-        y < targetBounds.origin.y + targetBounds.size.height
+        y < targetBounds.maxY
       else {
         return false
       }
@@ -71,9 +71,9 @@ extension Rasterizer {
         return true
       }
       let minX = targetBounds.origin.x
-      let maxX = targetBounds.origin.x + targetBounds.size.width - 1
+      let maxX = targetBounds.maxX - 1
       let minY = targetBounds.origin.y
-      let maxY = targetBounds.origin.y + targetBounds.size.height - 1
+      let maxY = targetBounds.maxY - 1
       let isCorner =
         (x == minX || x == maxX) && (y == minY || y == maxY)
       return !isCorner

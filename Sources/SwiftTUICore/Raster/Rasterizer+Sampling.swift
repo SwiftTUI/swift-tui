@@ -128,6 +128,40 @@ extension Rasterizer {
     return stops.last?.color
   }
 
+  /// The part of `rect` a stroke along it can paint, in `rect`-local cells:
+  /// the surface narrowed by `clip`, widened by a few cells so that a wide
+  /// glyph starting just outside still reaches its visible half. Empty when
+  /// none of it is visible. A track walks only this window, so a stroke
+  /// around a rectangle far larger than the surface costs only its visible
+  /// cells (STUI-796); every cell left out would be clipped by its write.
+  internal func strokeWindow(
+    for rect: CellRect,
+    cells: [[RasterCell]],
+    clip: CellRect?
+  ) -> CellRect {
+    let surface = CellRect(
+      origin: .zero, size: .init(width: cells.first?.count ?? 0, height: cells.count))
+    let margin = 4
+    guard let paintable = intersect(surface, clip),
+      let visible = intersect(
+        CellRect(
+          origin: .init(
+            x: SaturatingConversion.subtracting(paintable.origin.x, margin),
+            y: SaturatingConversion.subtracting(paintable.origin.y, margin)),
+          size: .init(
+            width: SaturatingConversion.adding(paintable.size.width, 2 * margin),
+            height: SaturatingConversion.adding(paintable.size.height, 2 * margin))),
+        rect)
+    else {
+      return .zero
+    }
+    return CellRect(
+      origin: .init(
+        x: SaturatingConversion.subtracting(visible.origin.x, rect.origin.x),
+        y: SaturatingConversion.subtracting(visible.origin.y, rect.origin.y)),
+      size: visible.size)
+  }
+
   internal func intersect(
     _ lhs: CellRect?,
     _ rhs: CellRect?
@@ -148,8 +182,8 @@ extension Rasterizer {
   ) -> CellRect? {
     let minX = max(lhs.origin.x, rhs.origin.x)
     let minY = max(lhs.origin.y, rhs.origin.y)
-    let maxX = min(lhs.origin.x + lhs.size.width, rhs.origin.x + rhs.size.width)
-    let maxY = min(lhs.origin.y + lhs.size.height, rhs.origin.y + rhs.size.height)
+    let maxX = min(lhs.maxX, rhs.maxX)
+    let maxY = min(lhs.maxY, rhs.maxY)
 
     guard maxX > minX, maxY > minY else {
       return nil
@@ -157,7 +191,9 @@ extension Rasterizer {
 
     return CellRect(
       origin: CellPoint(x: minX, y: minY),
-      size: CellSize(width: maxX - minX, height: maxY - minY)
+      size: CellSize(
+        width: SaturatingConversion.subtracting(maxX, minX),
+        height: SaturatingConversion.subtracting(maxY, minY))
     )
   }
 
@@ -196,9 +232,9 @@ extension Rasterizer {
     }
     if let clip {
       guard x >= clip.origin.x,
-        x + glyphWidth <= clip.origin.x + clip.size.width,
+        x + glyphWidth <= clip.maxX,
         y >= clip.origin.y,
-        y < clip.origin.y + clip.size.height
+        y < clip.maxY
       else {
         return
       }

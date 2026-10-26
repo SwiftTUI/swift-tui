@@ -204,6 +204,11 @@ public struct DefaultRenderer {
   /// For interactive rendering, drive frames through the run loop
   /// (`TerminalRunner`/host integration), which suppresses reuse of focus/press
   /// cones. Use `render(_:)` for snapshots, previews, and tests.
+  ///
+  /// The snapshot's raster surface keeps the content's natural extent, which
+  /// can exceed `proposal`, up to 65,536 cells on either axis and 1,048,576
+  /// cells in all; content beyond that bound is clipped. An interactive run
+  /// loop instead clips its frames to the host's size.
   @MainActor
   public func render<V: View>(
     _ root: V,
@@ -932,6 +937,14 @@ public struct DefaultRenderer {
   @MainActor
   func storeCommittedPresentationPortalState() {
     committedPresentationDismissStack.store(presentationPortalState.dismissStack())
+  }
+
+  /// Bounds every later frame's raster surface by the proposal's finite
+  /// dimensions; content beyond them clips (STUI-796). The interactive run
+  /// loop calls this for its renderer.
+  @MainActor
+  package func boundRasterSurfaceToProposal() {
+    frameState.boundsRasterSurfaceToProposal = true
   }
 
   /// Enables selective dirty-frontier evaluation for subsequent frames.

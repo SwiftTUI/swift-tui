@@ -62,8 +62,11 @@ public struct KeyframeTimeline<Value> {
   }
 
   /// The value at a fraction of ``duration``.
+  ///
+  /// A progress beyond either end samples that end, and NaN samples the
+  /// start: the time saturates instead of trapping.
   public func value(progress: Double) -> Value {
-    value(time: .seconds(duration.totalSeconds * progress))
+    value(time: SaturatingConversion.duration(seconds: duration.totalSeconds * progress))
   }
 
   // MARK: - Retrigger continuity

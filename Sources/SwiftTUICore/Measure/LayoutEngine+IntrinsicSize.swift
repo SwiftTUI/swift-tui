@@ -109,8 +109,10 @@ extension LayoutEngine {
       // fill rounds UP so the image fully covers it.
       let rounding: FloatingPointRoundingRule =
         payload.scalingMode == .fit ? .down : .up
+      // An `Int.max` frame makes the pixel quotient exceed `Int`; the cell
+      // count saturates instead of trapping.
       func cellsFromPixels(_ value: Double, per cellPixel: Double) -> Int {
-        max(1, Int((value / cellPixel).rounded(rounding)))
+        max(1, SaturatingConversion.int(value / cellPixel, rounding: rounding))
       }
 
       switch (proposedWidth, proposedHeight) {
@@ -138,14 +140,14 @@ extension LayoutEngine {
         }
         return CellSize(
           width: width,
-          height: max(1, Int((Double(width) / cellAspect).rounded(rounding)))
+          height: max(1, SaturatingConversion.int(Double(width) / cellAspect, rounding: rounding))
         )
       case (nil, let height?):
         guard height > 0 else {
           return .zero
         }
         return CellSize(
-          width: max(1, Int((Double(height) * cellAspect).rounded(rounding))),
+          width: max(1, SaturatingConversion.int(Double(height) * cellAspect, rounding: rounding)),
           height: height
         )
       case (nil, nil):

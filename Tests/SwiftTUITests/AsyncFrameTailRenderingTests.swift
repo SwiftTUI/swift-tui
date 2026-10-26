@@ -1188,7 +1188,9 @@ struct AsyncFrameTailRenderingTests {
     let rootIdentity = testIdentity("AsyncSendableLayoutFocusRoot")
     let recorder = AsyncFrameTailSendableLayoutRecorder()
     let inputReader = InjectedTerminalInputReader()
-    let terminal = AsyncFrameTailTerminalHost()
+    // The focus readout is 40 cells wide; an interactive surface clips at the
+    // host's width (STUI-796), so the host must be wide enough to show it.
+    let terminal = AsyncFrameTailTerminalHost(size: .init(width: 48, height: 6))
     let runLoop = RunLoop(
       rootIdentity: rootIdentity,
       renderer: DefaultRenderer(),

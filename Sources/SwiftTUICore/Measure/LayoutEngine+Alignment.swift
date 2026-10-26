@@ -55,9 +55,12 @@ package struct AlignmentLine: Equatable, Sendable {
       leading: leading,
       isHalfCell: guides.contains { $0.value == leading && $0.isHalfCell },
       remainderPastIntegerLine: guides.map {
-        $0.length - $0.value - ($0.isHalfCell ? 1 : 0)
+        SaturatingConversion.subtracting(
+          SaturatingConversion.subtracting($0.length, $0.value), $0.isHalfCell ? 1 : 0)
       }.max() ?? 0,
-      remainderPastHalfCellLine: guides.map { $0.length - $0.value }.max() ?? 0,
+      remainderPastHalfCellLine: guides.map {
+        SaturatingConversion.subtracting($0.length, $0.value)
+      }.max() ?? 0,
       isEmpty: false)
   }
 
@@ -66,7 +69,7 @@ package struct AlignmentLine: Equatable, Sendable {
     isHalfCell ? remainderPastHalfCellLine : remainderPastIntegerLine
   }
 
-  package var extent: Int { leading + trailing }
+  package var extent: Int { SaturatingConversion.adding(leading, trailing) }
 
   /// The line through the union of the children behind `self` and `other`,
   /// as a windowed product accumulates measured runs. The empty line is its
@@ -91,7 +94,8 @@ package struct AlignmentLine: Equatable, Sendable {
   /// The offset is never negative: a half-cell child whose value is `leading`
   /// makes the line half-cell too.
   package func offset(guideValue: Int, isHalfCell childIsHalfCell: Bool) -> Int {
-    leading - guideValue - (childIsHalfCell && !isHalfCell ? 1 : 0)
+    SaturatingConversion.subtracting(
+      SaturatingConversion.subtracting(leading, guideValue), childIsHalfCell && !isHalfCell ? 1 : 0)
   }
 
   package func offset(of dimensions: ViewDimensions, on guide: HorizontalAlignment) -> Int {
@@ -116,7 +120,7 @@ extension LayoutEngine {
   /// truncates toward zero, so the odd cell falls on the container's trailing
   /// (or bottom) side whether it is a gap or an overflow.
   package static func centredOffset(length: Int, in extent: Int) -> Int {
-    (extent - length) / 2
+    SaturatingConversion.subtracting(extent, length) / 2
   }
 
   /// The offset of a child in a frame, decoration or inset reference, each
@@ -128,16 +132,20 @@ extension LayoutEngine {
     child: (value: Int, isHalfCell: Bool), length: Int,
     reference: (value: Int, isHalfCell: Bool), referenceLength: Int
   ) -> Int {
-    if 2 * child.value + (child.isHalfCell ? 1 : 0) == length,
-      2 * reference.value + (reference.isHalfCell ? 1 : 0) == referenceLength
-    {
+    func isExactCentre(_ guide: (value: Int, isHalfCell: Bool), of length: Int) -> Bool {
+      let doubled = guide.value.multipliedReportingOverflow(by: 2)
+      return !doubled.overflow
+        && SaturatingConversion.adding(doubled.partialValue, guide.isHalfCell ? 1 : 0) == length
+    }
+    if isExactCentre(child, of: length), isExactCentre(reference, of: referenceLength) {
       return centredOffset(length: length, in: referenceLength)
     }
     // Only a gap moves: an overflowing half-cell child keeps the integer
     // difference, the truncation toward zero `centredOffset` applies.
     let startsHalfCellIn =
       child.isHalfCell && !reference.isHalfCell && reference.value > child.value
-    return reference.value - child.value - (startsHalfCellIn ? 1 : 0)
+    return SaturatingConversion.subtracting(
+      SaturatingConversion.subtracting(reference.value, child.value), startsHalfCellIn ? 1 : 0)
   }
 
   /// The exact offset that puts the child's exact guide on the reference's,
@@ -148,7 +156,9 @@ extension LayoutEngine {
     reference: (value: Int, isHalfCell: Bool)
   ) -> (value: Int, isHalfCell: Bool) {
     (
-      reference.value - child.value - (child.isHalfCell && !reference.isHalfCell ? 1 : 0),
+      SaturatingConversion.subtracting(
+        SaturatingConversion.subtracting(reference.value, child.value),
+        child.isHalfCell && !reference.isHalfCell ? 1 : 0),
       reference.isHalfCell != child.isHalfCell
     )
   }
@@ -175,20 +185,20 @@ extension LayoutEngine {
     // Content larger than its container overflows both edges, as in SwiftUI,
     // so centred and trailing offsets go negative. Centring follows
     // `alignedOffset`, the rule stacks and ZStacks share.
-    let x =
-      bounds.origin.x
-      + Self.alignedOffset(
+    let x = SaturatingConversion.adding(
+      bounds.origin.x,
+      Self.alignedOffset(
         child: childDimensions.halfCellPosition(of: alignment.horizontal),
         length: childDimensions.width,
         reference: referenceDimensions.halfCellPosition(of: alignment.horizontal),
-        referenceLength: referenceDimensions.width)
-    let y =
-      bounds.origin.y
-      + Self.alignedOffset(
+        referenceLength: referenceDimensions.width))
+    let y = SaturatingConversion.adding(
+      bounds.origin.y,
+      Self.alignedOffset(
         child: childDimensions.halfCellPosition(of: alignment.vertical),
         length: childDimensions.height,
         reference: referenceDimensions.halfCellPosition(of: alignment.vertical),
-        referenceLength: referenceDimensions.height)
+        referenceLength: referenceDimensions.height))
 
     return CellPoint(
       x: x,
@@ -336,9 +346,11 @@ extension LayoutEngine {
     case .leading:
       return origin
     case .center:
-      return origin + Self.centredOffset(length: childSize, in: availableSize)
+      return SaturatingConversion.adding(
+        origin, Self.centredOffset(length: childSize, in: availableSize))
     case .trailing:
-      return origin + availableSize - childSize
+      return SaturatingConversion.adding(
+        origin, SaturatingConversion.subtracting(availableSize, childSize))
     default:
       return nil
     }
@@ -359,9 +371,11 @@ extension LayoutEngine {
     case .top:
       return origin
     case .center:
-      return origin + Self.centredOffset(length: childSize, in: availableSize)
+      return SaturatingConversion.adding(
+        origin, Self.centredOffset(length: childSize, in: availableSize))
     case .bottom:
-      return origin + availableSize - childSize
+      return SaturatingConversion.adding(
+        origin, SaturatingConversion.subtracting(availableSize, childSize))
     default:
       return nil
     }
@@ -462,8 +476,8 @@ extension LayoutEngine {
           baseDimensions = propagatedViewDimensions(
             size: levelMeasured.measuredSize,
             from: child,
-            offsetX: -insets.leading,
-            offsetY: -insets.top
+            offsetX: SaturatingConversion.negated(insets.leading),
+            offsetY: SaturatingConversion.negated(insets.top)
           )
         case .safeAreaInset(let edge, _, let spacing, let safeArea):
           let insetSize =
@@ -471,9 +485,16 @@ extension LayoutEngine {
           let consumed =
             switch edge {
             case .top, .bottom:
-              max(0, insetSize.height + spacing - safeArea.value(for: edge))
+              max(
+                0,
+                SaturatingConversion.subtracting(
+                  SaturatingConversion.adding(insetSize.height, spacing), safeArea.value(for: edge)
+                ))
             case .leading, .trailing:
-              max(0, insetSize.width + spacing - safeArea.value(for: edge))
+              max(
+                0,
+                SaturatingConversion.subtracting(
+                  SaturatingConversion.adding(insetSize.width, spacing), safeArea.value(for: edge)))
             }
           baseDimensions = propagatedViewDimensions(
             size: levelMeasured.measuredSize,
@@ -602,7 +623,8 @@ extension LayoutEngine {
   ) -> (value: Int, isHalfCell: Bool) {
     (
       SaturatingConversion.adding(
-        position.value + offset.value, position.isHalfCell && offset.isHalfCell ? 1 : 0),
+        SaturatingConversion.adding(position.value, offset.value),
+        position.isHalfCell && offset.isHalfCell ? 1 : 0),
       position.isHalfCell != offset.isHalfCell
     )
   }

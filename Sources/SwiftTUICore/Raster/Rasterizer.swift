@@ -200,15 +200,22 @@ package struct Rasterizer: Sendable {
   ///   so the F13 oracle — historically DEBUG/env-only — also runs on a sampled
   ///   fraction of release frames when the probe is opted in. Defaults to
   ///   `false`, preserving the policy-only behavior for every other caller.
+  /// - Parameter maximumSize: the proposal's finite dimensions, which the
+  ///   surface never exceeds; content beyond them clips. A dimension the host
+  ///   did not propose passes `Int.max`, and `nil` leaves both unbounded. Every
+  ///   surface is also held within ``maximumSurfaceExtent`` and
+  ///   ``maximumSurfaceCellCount``.
   package func rasterizeCollectingVisibleIdentities(
     _ draw: DrawNode,
     minimumSize: CellSize,
+    maximumSize: CellSize? = nil,
     previousSurface: RasterSurface?,
     damage: PresentationDamage?,
     verifyIncrementalRasterDamage: Bool = false,
     translation: RasterTranslationPlan? = nil
   ) -> RasterizationResult {
-    let surfaceSize = rasterSurfaceSize(for: draw, minimumSize: minimumSize)
+    let surfaceSize = rasterSurfaceSize(
+      for: draw, minimumSize: minimumSize, maximumSize: maximumSize)
     guard surfaceSize.width > 0, surfaceSize.height > 0 else {
       return (RasterSurface(), [], nil, nil, .fresh)
     }
@@ -239,15 +246,37 @@ package struct Rasterizer: Sendable {
     )
   }
 
+  /// The largest extent, in cells, a raster surface takes on either axis
+  /// (STUI-796). Content placed beyond it clips.
+  package static let maximumSurfaceExtent = 1 << 16
+
+  /// The most cells a raster surface holds (STUI-796). A surface whose width
+  /// would exceed this budget keeps its width and gives up rows.
+  package static let maximumSurfaceCellCount = 1 << 20
+
   private func rasterSurfaceSize(
     for draw: DrawNode,
-    minimumSize: CellSize
+    minimumSize: CellSize,
+    maximumSize: CellSize?
   ) -> CellSize {
     let extent = maximumExtent(for: draw, clip: nil)
-    return CellSize(
-      width: max(extent.x, max(0, minimumSize.width)),
-      height: max(extent.y, max(0, minimumSize.height))
+    return Self.boundedSurfaceSize(
+      CellSize(
+        width: max(extent.x, max(0, minimumSize.width)),
+        height: max(extent.y, max(0, minimumSize.height))
+      ),
+      maximum: maximumSize
     )
+  }
+
+  /// `natural` held within `maximum` (the proposal's finite dimensions) and
+  /// within ``maximumSurfaceExtent`` and ``maximumSurfaceCellCount``. A
+  /// surface inside the proposal and the caps keeps its natural size.
+  package static func boundedSurfaceSize(_ natural: CellSize, maximum: CellSize?) -> CellSize {
+    let width = min(natural.width, maximum?.width ?? .max, maximumSurfaceExtent)
+    let rowBudget = width > 0 ? maximumSurfaceCellCount / width : .max
+    let height = min(natural.height, maximum?.height ?? .max, maximumSurfaceExtent, rowBudget)
+    return CellSize(width: width, height: height)
   }
 
   private func rasterizeFreshCollectingVisibleIdentities(

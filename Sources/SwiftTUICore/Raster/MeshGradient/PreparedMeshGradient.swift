@@ -345,7 +345,7 @@ package struct PreparedMeshGradient: Sendable {
         SaturatingConversion.int(Double((minY - 0.5).rounded(.up)), rounding: .up)
       )
       let last = min(
-        bounds.origin.y + bounds.size.height - 1,
+        bounds.maxY - 1,
         SaturatingConversion.int(Double((maxY - 0.5).rounded(.down)), rounding: .down)
       )
       guard first <= last else { continue }
@@ -407,9 +407,9 @@ package struct PreparedMeshGradient: Sendable {
   package func color(atCellX x: Int, y: Int) -> Color {
     guard
       x >= bounds.origin.x,
-      x < bounds.origin.x + bounds.size.width,
+      x < bounds.maxX,
       y >= bounds.origin.y,
-      y < bounds.origin.y + bounds.size.height
+      y < bounds.maxY
     else {
       return background
     }

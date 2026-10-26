@@ -751,7 +751,8 @@ struct DefaultRendererFrameHeadCoordinator {
       // Latch the layout shadow oracle's per-frame sampling decision here on
       // the main actor; the layout stage may run off-main, where this
       // `@MainActor` state is unreadable (same latch as the raster oracle's).
-      verifyLayoutShadow: SoundnessProbeConfiguration.isSampledFrame
+      verifyLayoutShadow: SoundnessProbeConfiguration.isSampledFrame,
+      boundsRasterSurfaceToProposal: frameState.boundsRasterSurfaceToProposal
     )
     return (frameContext, frameTailInput)
   }

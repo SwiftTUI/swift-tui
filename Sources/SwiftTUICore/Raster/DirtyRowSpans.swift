@@ -89,7 +89,7 @@ internal struct DirtyRowSpans: Sendable, Equatable {
     guard bounds.size.height > 0 else {
       return false
     }
-    return intersects(rows: bounds.origin.y..<(bounds.origin.y + bounds.size.height))
+    return intersects(rows: bounds.origin.y..<bounds.maxY)
   }
 }
 

@@ -85,10 +85,12 @@ extension LayoutEngine {
           measured: childMeasurement,
           bounds: CellRect(
             origin: CellPoint(
-              x: bounds.origin.x
-                + alignmentMetrics.horizontal.offset(of: childDimensions, on: alignment.horizontal),
-              y: bounds.origin.y
-                + alignmentMetrics.vertical.offset(of: childDimensions, on: alignment.vertical)
+              x: SaturatingConversion.adding(
+                bounds.origin.x,
+                alignmentMetrics.horizontal.offset(of: childDimensions, on: alignment.horizontal)),
+              y: SaturatingConversion.adding(
+                bounds.origin.y,
+                alignmentMetrics.vertical.offset(of: childDimensions, on: alignment.vertical))
             ),
             size: childMeasurement.measuredSize
           )
@@ -173,12 +175,12 @@ extension LayoutEngine {
           measured: childMeasurement,
           bounds: CellRect(
             origin: CellPoint(
-              x: bounds.origin.x + insets.leading,
-              y: bounds.origin.y + insets.top
+              x: SaturatingConversion.adding(bounds.origin.x, insets.leading),
+              y: SaturatingConversion.adding(bounds.origin.y, insets.top)
             ),
             size: CellSize(
-              width: max(0, bounds.size.width - insets.horizontal),
-              height: max(0, bounds.size.height - insets.vertical)
+              width: max(0, SaturatingConversion.subtracting(bounds.size.width, insets.horizontal)),
+              height: max(0, SaturatingConversion.subtracting(bounds.size.height, insets.vertical))
             )
           )
         )
@@ -204,12 +206,12 @@ extension LayoutEngine {
           measured: childMeasurement,
           bounds: CellRect(
             origin: CellPoint(
-              x: bounds.origin.x - insets.leading,
-              y: bounds.origin.y - insets.top
+              x: SaturatingConversion.subtracting(bounds.origin.x, insets.leading),
+              y: SaturatingConversion.subtracting(bounds.origin.y, insets.top)
             ),
             size: CellSize(
-              width: bounds.size.width + insets.horizontal,
-              height: bounds.size.height + insets.vertical
+              width: SaturatingConversion.adding(bounds.size.width, insets.horizontal),
+              height: SaturatingConversion.adding(bounds.size.height, insets.vertical)
             )
           )
         )
@@ -265,12 +267,12 @@ extension LayoutEngine {
           measured: childMeasurement,
           bounds: CellRect(
             origin: CellPoint(
-              x: bounds.origin.x + insets.leading,
-              y: bounds.origin.y + insets.top
+              x: SaturatingConversion.adding(bounds.origin.x, insets.leading),
+              y: SaturatingConversion.adding(bounds.origin.y, insets.top)
             ),
             size: CellSize(
-              width: max(0, bounds.size.width - insets.horizontal),
-              height: max(0, bounds.size.height - insets.vertical)
+              width: max(0, SaturatingConversion.subtracting(bounds.size.width, insets.horizontal)),
+              height: max(0, SaturatingConversion.subtracting(bounds.size.height, insets.vertical))
             )
           )
         )
@@ -344,8 +346,8 @@ extension LayoutEngine {
           measured: childMeasurement,
           bounds: CellRect(
             origin: .init(
-              x: bounds.origin.x + x,
-              y: bounds.origin.y + y
+              x: SaturatingConversion.adding(bounds.origin.x, x),
+              y: SaturatingConversion.adding(bounds.origin.y, y)
             ),
             size: childMeasurement.measuredSize
           )
@@ -372,8 +374,10 @@ extension LayoutEngine {
           measured: childMeasurement,
           bounds: CellRect(
             origin: .init(
-              x: bounds.origin.x + Self.positionedOffset(centre: x, length: childSize.width),
-              y: bounds.origin.y + Self.positionedOffset(centre: y, length: childSize.height)
+              x: SaturatingConversion.adding(
+                bounds.origin.x, Self.positionedOffset(centre: x, length: childSize.width)),
+              y: SaturatingConversion.adding(
+                bounds.origin.y, Self.positionedOffset(centre: y, length: childSize.height))
             ),
             size: childSize
           )
@@ -658,7 +662,7 @@ extension LayoutEngine {
   /// toward zero otherwise, as `centredOffset(length:in:)` does in a span of
   /// `2 * centre` cells.
   package static func positionedOffset(centre: Int, length: Int) -> Int {
-    let offset = centre - length / 2
+    let offset = SaturatingConversion.subtracting(centre, length / 2)
     return offset - (length % 2 != 0 && offset > 0 ? 1 : 0)
   }
 }

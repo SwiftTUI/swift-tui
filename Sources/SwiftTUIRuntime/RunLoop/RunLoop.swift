@@ -284,6 +284,8 @@ public final class RunLoop<State: Equatable & Sendable, Content: View>:
   ) {
     self.rootIdentity = rootIdentity
     self.renderer = renderer
+    // A host surface never receives more cells than it has (STUI-796).
+    renderer.boundRasterSurfaceToProposal()
     self.presentationSurface = presentationSurface
     self.terminalInputReader = terminalInputReader
     self.signalReader = signalReader

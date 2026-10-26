@@ -72,7 +72,7 @@ extension Rasterizer {
     guard let clip else { return true }
     // An explicit clip is stricter: the full character must fit inside it.
     // Zero-width characters still need one destination cell.
-    return x >= clip.origin.x && x + max(1, width) <= clip.origin.x + clip.size.width
-      && y >= clip.origin.y && y < clip.origin.y + clip.size.height
+    return x >= clip.origin.x && x + max(1, width) <= clip.maxX
+      && y >= clip.origin.y && y < clip.maxY
   }
 }

@@ -83,7 +83,10 @@ package struct ScrollIndicatorMetrics: Equatable, Sendable {
     )
     let progress =
       (clampedCoordinate - Double(trackRange.lowerBound)) / Double(trackLength - 1)
-    return Int((progress * Double(maxOffset)).rounded())
+    // `Double(maxOffset)` rounds up to 2^63 for the largest offsets, past
+    // `Int.max`; such a target is the end of the range.
+    let target = (progress * Double(maxOffset)).rounded()
+    return target < Double(Int.max) ? Int(target) : maxOffset
   }
 
   private var axisOrigin: Int {
@@ -122,7 +125,7 @@ package struct ScrollIndicatorMetrics: Equatable, Sendable {
 
   private var thumbTrackRange: Range<Int> {
     let start = axisOrigin
-    let end = axisOrigin + axisLength
+    let end = SaturatingConversion.adding(axisOrigin, axisLength)
     return start..<max(start, end)
   }
 
@@ -134,10 +137,11 @@ package struct ScrollIndicatorMetrics: Equatable, Sendable {
 
     let ratio = Double(viewportLength) / Double(contentLength)
     let minimumThumbLength = trackLength > 3 ? 2 : 1
-    return min(
-      trackLength,
-      max(minimumThumbLength, Int((ratio * Double(trackLength)).rounded(.up)))
-    )
+    // A viewport far longer than its content fills the track; the product is
+    // compared before it is converted.
+    let scaled = (ratio * Double(trackLength)).rounded(.up)
+    guard scaled < Double(trackLength) else { return trackLength }
+    return min(trackLength, max(minimumThumbLength, Int(scaled)))
   }
 }
 
@@ -209,7 +213,7 @@ package func resolvedScrollIndicatorMetrics(
       axis: .vertical,
       rect: .init(
         origin: .init(
-          x: viewportRect.origin.x + viewportRect.size.width - 1, y: viewportRect.origin.y),
+          x: viewportRect.maxX - 1, y: viewportRect.origin.y),
         size: .init(width: 1, height: viewportRect.size.height)
       ),
       maxOffset: maxOffset,
@@ -239,7 +243,7 @@ package func resolvedScrollIndicatorMetrics(
       axis: .horizontal,
       rect: .init(
         origin: .init(
-          x: viewportRect.origin.x, y: viewportRect.origin.y + viewportRect.size.height - 1),
+          x: viewportRect.origin.x, y: viewportRect.maxY - 1),
         size: .init(width: trackWidth, height: 1)
       ),
       maxOffset: maxOffset,

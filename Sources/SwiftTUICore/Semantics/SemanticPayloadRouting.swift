@@ -471,7 +471,9 @@ extension SemanticExtractor {
 
     return CellRect(
       origin: .init(x: minX, y: minY),
-      size: .init(width: maxX - minX, height: maxY - minY)
+      size: .init(
+        width: SaturatingConversion.subtracting(maxX, minX),
+        height: SaturatingConversion.subtracting(maxY, minY))
     )
   }
 }
