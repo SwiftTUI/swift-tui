@@ -3501,6 +3501,34 @@
     "Tests/SwiftTUITests/AdversarialSetHTerminalPOSIXTests.swift": {
       "category": "runtime-integration",
       "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Platforms/CLI/Tests/SwiftTUICLITests/AdversarialSetEAttachLifetimeTests.swift": {
+      "category": "target-contract",
+      "reason": "Campaign two F3 pass 2: attach discovery server pre-bind cleanup, start/cancel lifecycle and descriptor counts (STUI-1227 neighbors)."
+    },
+    "Tests/SwiftTUITests/AdversarialSetECarriedHandlerTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Campaign two F3 pass 2: lifecycle handlers carried past committed and superseded focus re-renders (STUI-1234 neighbors) through the stress run loop."
+    },
+    "Tests/SwiftTUITests/AdversarialSetEDepartureCarryTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Campaign two F3 pass 2: departing tasks and timers cancelled at the retiring commit under a held focus re-render (STUI-1233 neighbors)."
+    },
+    "Tests/SwiftTUITests/AdversarialSetELayoutHopTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Campaign two F3 pass 2: main-actor writes during an offloaded relayout of a tab switch reach live owners and archives (STUI-1233 neighbors)."
+    },
+    "Tests/SwiftTUITests/AdversarialSetEPresentationRefusalTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Campaign two F3 pass 2: imperative presentation mutations refused during view updates and toast deadline task lifetimes (STUI-1226 neighbors)."
+    },
+    "Tests/SwiftTUITests/AdversarialSetERawEntryTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Campaign two F3 pass 2: raw-mode entry failure through RunLoop and TerminalHost, and real-PTY termios round trips in exit-test children (STUI-1182 neighbors)."
+    },
+    "Tests/SwiftTUITests/AdversarialSetERetiredStateTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Campaign two F3 pass 2: writes from retired State owners across tasks, disappear handlers, sheets, modifiers and nested dynamic properties (STUI-1173/1241 neighbors)."
     }
   }
 }
