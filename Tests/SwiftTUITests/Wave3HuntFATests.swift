@@ -404,12 +404,10 @@ struct Wave3HuntFATableClipBindingTests {
       #expect(log.namedCauses("W3FAKeyPathReader") == ["_value"], "\(log.records)")
       let element = log.namedCauses("W3FAElementReader")
       let positional = log.namedCauses("W3FAPositionalReader")
-      w3faKnown(
-        "NEW-2: _printChanges/_logChanges name no property for a reader of a collection-element binding of a state (ForEach($items) row bindings and $items[0]): the state/exact cause carries property nil; mechanism: projectedElementBinding (ForEachBinding.swift:84-145) and Binding's positional Collection subscript (BindingCollection.swift:42-51) copy the transaction and value identity but not bindingSourceID, so bodyDebugStateSlot's derivationRoot (State.swift:847) has no source to peel; contract: Logging-And-Diagnostics.md:213-214, CHANGELOG.md:46-47; adjacent STUI-1131"
-      ) {
-        #expect(element == ["_value"], "\(element)")
-        #expect(positional == ["_value"], "\(positional)")
-      }
+      // STUI-1272 (repaired): element bindings derive their source from the
+      // collection binding's.
+      #expect(element == ["_value"], "\(element)")
+      #expect(positional == ["_value"], "\(positional)")
     #else
       #expect(log.records.isEmpty)
     #endif
@@ -443,6 +441,35 @@ struct Wave3HuntFATableClipBindingTests {
     #expect(h.frame.contains("u 7"), "\(h.frame)")
     #if DEBUG
       #expect(log.namedCauses("W3FAUnwrappedReader") == ["_value"], "\(log.records)")
+    #else
+      #expect(log.records.isEmpty)
+    #endif
+  }
+
+  // w4fe01 (STUI-1272 neighbours): element-of-member and element-of-element
+  // chains name their readers like a member projection: ForEach rows of
+  // `$model.items`, `$model.items[1].count` and `$model.grid[0][1]`.
+  @Test func w4fe01ElementBindingChainReadersAreNamed() throws {
+    let log = W4FEChainDiagnosticLog()
+    let h = try BodyChangeOutput.$sink.withValue(log.sink) {
+      try StressRuntimeHarness(
+        rootIdentity: testIdentity("w4fe01"), size: .init(width: 30, height: 6)
+      ) { W4FEChainDiagnosticRoot(log: log) }
+    }
+    defer { h.shutdown() }
+    let model = try #require(log.model)
+    log.records.removeAll()
+    try BodyChangeOutput.$sink.withValue(log.sink) {
+      model.wrappedValue.items[1].count = 7
+      model.wrappedValue.grid[0][1] = 7
+      _ = try h.render()
+    }
+    #expect(
+      h.frame.contains("r 7") && h.frame.contains("p 7") && h.frame.contains("g 7"), "\(h.frame)")
+    #if DEBUG
+      for reader in ["W4FERowReader", "W4FEPositionalReader", "W4FEGridReader"] {
+        #expect(log.namedCauses(reader) == ["_value"], "\(reader): \(log.records)")
+      }
     #else
       #expect(log.records.isEmpty)
     #endif
@@ -1389,6 +1416,73 @@ struct W3FAImplicitClipRoot: View {
 
   private func capture() {
     log.fraction = $fraction
+  }
+}
+
+// MARK: - Diagnostic fixtures (w4fe01)
+
+struct W4FEChainModel: Equatable, Sendable {
+  var items = [W3FAItem(id: 0, count: 1), W3FAItem(id: 1, count: 1)]
+  var grid = [[1, 1], [1, 1]]
+}
+
+@MainActor
+final class W4FEChainDiagnosticLog {
+  var records: [BodyChangeRecord] = []
+  var model: Binding<W4FEChainModel>?
+  var sink: BodyChangeSink { .init { [self] record, _ in records.append(record) } }
+
+  /// The properties named by state/exact causes of the readers of `type`.
+  func namedCauses(_ type: String) -> Set<String> {
+    Set(
+      records.filter { $0.typeName.contains(type) }.flatMap(\.causes)
+        .filter { $0.category == "state" && $0.precision == "exact" }.compactMap(\.property))
+  }
+}
+
+struct W4FEChainDiagnosticRoot: View {
+  @State private var model = W4FEChainModel()
+  let log: W4FEChainDiagnosticLog
+
+  var body: some View {
+    let _ = capture()
+    VStack(alignment: .leading, spacing: 0) {
+      ForEach($model.items) { item in
+        if item.wrappedValue.id == 1 {
+          W4FERowReader(value: item.count)
+        }
+      }
+      W4FEPositionalReader(value: $model.items[1].count)
+      W4FEGridReader(value: $model.grid[0][1])
+    }
+  }
+
+  private func capture() {
+    log.model = $model
+  }
+}
+
+struct W4FERowReader: View {
+  @Binding var value: Int
+  var body: some View {
+    Self._printChanges()
+    return Text("r \(value)")
+  }
+}
+
+struct W4FEPositionalReader: View {
+  @Binding var value: Int
+  var body: some View {
+    Self._printChanges()
+    return Text("p \(value)")
+  }
+}
+
+struct W4FEGridReader: View {
+  @Binding var value: Int
+  var body: some View {
+    Self._printChanges()
+    return Text("g \(value)")
   }
 }
 

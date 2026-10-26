@@ -138,10 +138,19 @@ where C: MutableCollection & RandomAccessCollection {
   )
   // Mirror the member projection: the collection binding's stored transaction
   // rides the element binding, and writes funnel through the collection
-  // binding's setter either way.
+  // binding's setter either way. The row's source derives from the
+  // collection's, keyed the way the row relocates.
   projected.transaction = collection.transaction
   projected.valueIdentity = lookup.valueIdentity
+  projected.bindingSourceID = collection.elementBindingSource(
+    ForEachBindingRowKey(elementID: elementID, occurrence: occurrence))
   return projected
+}
+
+/// The key of a row binding's source within its collection binding's.
+private struct ForEachBindingRowKey<ID: Hashable & Sendable>: Hashable, Sendable {
+  let elementID: ID
+  let occurrence: Int
 }
 
 // These standard collections guarantee that membership and indices cannot

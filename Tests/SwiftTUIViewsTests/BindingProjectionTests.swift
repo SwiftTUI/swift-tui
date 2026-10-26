@@ -144,6 +144,58 @@ struct BindingProjectionTests {
     #expect(member.bindingSourceID == nil)
   }
 
+  // STUI-1272: collection-element bindings derive their source from the
+  // collection's, so body diagnostics can peel it back to the state slot, and
+  // source consumers (navigation keys, focused values, scroll momentum) tell
+  // two elements apart.
+  @Test("element bindings derive a stable, distinct source from their collection's")
+  func elementBindingsDeriveStableDistinctSources() throws {
+    struct Item: Identifiable {
+      var id: Int
+      var count = 0
+    }
+    @MainActor final class Box {
+      var items = [Item(id: 0), Item(id: 1)]
+      var rows: [Binding<Item>] = []
+      func capture(_ row: Binding<Item>) -> EmptyView {
+        rows.append(row)
+        return EmptyView()
+      }
+    }
+    let box = Box()
+    let base = Binding(get: { box.items }, set: { box.items = $0 }).withBindingSource("items")
+    let root = try #require(base.bindingSourceID)
+
+    // Positional element bindings are index-denominated, as in SwiftUI.
+    let first = base[0]
+    #expect(first.bindingSourceID != nil)
+    #expect(first.bindingSourceID == base[0].bindingSourceID)
+    #expect(first.bindingSourceID != base[1].bindingSourceID)
+    #expect(first.bindingSourceID?.derivationRoot == root)
+    #expect(first.count.bindingSourceID?.derivationRoot == root)
+
+    // ForEach row bindings are keyed by element ID, the way rows relocate.
+    func rowSources() -> [AnyID?] {
+      box.rows = []
+      let forEach = ForEach(base) { row in box.capture(row) }
+      for element in forEach.data {
+        _ = forEach.content(element)
+      }
+      return box.rows.map(\.bindingSourceID)
+    }
+    let rows = rowSources()
+    #expect(rows.count == 2 && rows.allSatisfy { $0 != nil } && rows[0] != rows[1], "\(rows)")
+    #expect(rows.allSatisfy { $0?.derivationRoot == root })
+    #expect(rowSources() == rows)
+    box.items.reverse()
+    #expect(rowSources() == [rows[1], rows[0]])
+    #expect(rows[0] != first.bindingSourceID)
+
+    // A collection binding without a source gives its elements none.
+    let sourceless = Binding(get: { box.items }, set: { box.items = $0 })
+    #expect(sourceless[0].bindingSourceID == nil)
+  }
+
   // MARK: - Write-time precedence (SwiftUI probe 2026-08-05)
 
   @Test("the stored transaction governs writes outside any explicit scope")

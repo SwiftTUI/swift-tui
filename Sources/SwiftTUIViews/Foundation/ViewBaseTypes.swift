@@ -231,6 +231,25 @@ private struct BindingProjectionSource: AnyIDDerivation {
   var derivationBase: AnyID { base }
 }
 
+// An element binding derives from its collection binding: a `ForEach` row by
+// element ID and occurrence, a positional binding by position. The same
+// element of the same source agrees when re-created, two elements differ, and
+// body-change diagnostics peel it back to the source (STUI-1272).
+private struct BindingElementSource: AnyIDDerivation {
+  let base: AnyID
+  let element: AnyID
+
+  var derivationBase: AnyID { base }
+}
+
+extension Binding {
+  /// The source of this collection binding's element binding keyed by
+  /// `element`, or `nil` when this binding has no source.
+  func elementBindingSource<Key: Hashable & Sendable>(_ element: Key) -> AnyID? {
+    bindingSourceID.map { AnyID(BindingElementSource(base: $0, element: AnyID(element))) }
+  }
+}
+
 @MainActor
 private final class BindingProjectionPath: Hashable, CustomDebugStringConvertible {
   private struct WeakToken { weak var value: BindingProjectionPath? }
