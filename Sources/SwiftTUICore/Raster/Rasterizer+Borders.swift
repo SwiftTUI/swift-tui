@@ -93,7 +93,8 @@ extension Rasterizer {
           ? StrokeMask(strokeStyle, origin: track.trailingEdgeMidpoint)
           : StrokeMask(strokeStyle, trimOrigin: track.leadingCornerVertex),
         // Per-row cull (D70).
-        rows: dirtyRows.map { dirtyRows in { dirtyRows.contains(insetRect.origin.y + $0) } }
+        rows: dirtyRows.map { dirtyRows in { dirtyRows.contains(insetRect.origin.y + $0) } },
+        within: strokeWindow(for: insetRect, cells: cells, clip: clip)
       ) { ink in
         let cell = ink.cell
         let side = track.paintSide(for: cell, sides: .all)
@@ -171,7 +172,8 @@ extension Rasterizer {
         borderSet: strokeStyle.borderSet, roundsCorners: strokeStyle.lineJoin == .round),
       mask: StrokeMask(strokeStyle),
       // Per-row cull (D70).
-      rows: dirtyRows.map { dirtyRows in { dirtyRows.contains(line.origin.y + $0) } }
+      rows: dirtyRows.map { dirtyRows in { dirtyRows.contains(line.origin.y + $0) } },
+      within: strokeWindow(for: line, cells: cells, clip: clip)
     ) { ink in
       let cell = ink.cell
       writeStrokeGlyph(

@@ -169,6 +169,9 @@ struct FrameTailInput {
   /// stage re-runs measure/place with all reuse disabled and compares — the
   /// `layout-shadow-divergence` oracle.
   var verifyLayoutShadow: Bool = false
+  /// Latched from `FrameResolveState.boundsRasterSurfaceToProposal`: the
+  /// raster surface never exceeds the proposal's finite dimensions.
+  var boundsRasterSurfaceToProposal: Bool = false
 }
 
 struct FrameTailDiagnostics {

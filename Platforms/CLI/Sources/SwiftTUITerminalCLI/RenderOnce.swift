@@ -21,7 +21,9 @@ import SwiftTUIRuntime
 /// to stdout and survives piping to `less`, `tee`, or files.
 ///
 /// Width defaults to the live terminal width (`TIOCGWINSZ`), then `$COLUMNS`,
-/// then 80. Color and glyph policy honors `SwiftTUIOptions` plus the standard
+/// then 80. The output keeps the content's natural extent, up to 65,536 cells
+/// on either axis and 1,048,576 cells in all; content beyond that bound is
+/// clipped. Color and glyph policy honors `SwiftTUIOptions` plus the standard
 /// env-var precedence (`NO_COLOR`, `CLICOLOR`, `FORCE_COLOR`, `CLICOLOR_FORCE`,
 /// `TERM=dumb`, `LANG`/`LC_*` for Unicode).
 public enum RenderOnce {

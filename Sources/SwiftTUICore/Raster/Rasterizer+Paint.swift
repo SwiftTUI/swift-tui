@@ -47,8 +47,18 @@ extension Rasterizer {
         continue
       }
 
-      let nodeMaxX = visibility.bounds.origin.x + visibility.bounds.size.width
-      let nodeMaxY = visibility.bounds.origin.y + visibility.bounds.size.height
+      // Content that starts past the surface cap can never be shown, so it
+      // does not size the surface (STUI-796); its children still may.
+      guard visibility.bounds.origin.x < Self.maximumSurfaceExtent,
+        visibility.bounds.origin.y < Self.maximumSurfaceExtent
+      else {
+        for child in frame.node.children.reversed() {
+          stack.append(Frame(node: child, clip: visibility.clip))
+        }
+        continue
+      }
+      let nodeMaxX = visibility.bounds.maxX
+      let nodeMaxY = visibility.bounds.maxY
       if hasVisibleExtent {
         maxX = max(maxX, nodeMaxX)
         maxY = max(maxY, nodeMaxY)
@@ -617,7 +627,7 @@ extension Rasterizer {
           }
           var x = bounds.origin.x
           for cluster in line.clusters {
-            guard x + cluster.cellWidth <= bounds.origin.x + bounds.size.width else {
+            guard x + cluster.cellWidth <= bounds.maxX else {
               break
             }
 
@@ -628,7 +638,7 @@ extension Rasterizer {
               clip: frame.clip, surfaceSize: surfaceSize)
             {
               x += cluster.cellWidth
-              if x >= bounds.origin.x + bounds.size.width {
+              if x >= bounds.maxX {
                 break
               }
               continue
@@ -664,7 +674,7 @@ extension Rasterizer {
               presentationEffects: presentationEffects
             )
             x += cluster.cellWidth
-            if x >= bounds.origin.x + bounds.size.width {
+            if x >= bounds.maxX {
               break
             }
           }
@@ -707,7 +717,7 @@ extension Rasterizer {
           let clusters = clusterize(line)
           var x = bounds.origin.x
           for cluster in clusters {
-            guard x + cluster.cellWidth <= bounds.origin.x + bounds.size.width else {
+            guard x + cluster.cellWidth <= bounds.maxX else {
               break
             }
 
@@ -796,7 +806,7 @@ extension Rasterizer {
             let clusters = clusterize(run.content)
 
             for cluster in clusters {
-              guard x + cluster.cellWidth <= bounds.origin.x + bounds.size.width else {
+              guard x + cluster.cellWidth <= bounds.maxX else {
                 break
               }
 
@@ -842,7 +852,7 @@ extension Rasterizer {
               x += cluster.cellWidth
             }
 
-            if x >= bounds.origin.x + bounds.size.width {
+            if x >= bounds.maxX {
               break
             }
           }
@@ -906,7 +916,7 @@ extension Rasterizer {
           }
           var x = bounds.origin.x
           for cluster in line.clusters {
-            guard x + cluster.cellWidth <= bounds.origin.x + bounds.size.width else {
+            guard x + cluster.cellWidth <= bounds.maxX else {
               break
             }
 
@@ -924,7 +934,7 @@ extension Rasterizer {
               clip: frame.clip, surfaceSize: surfaceSize)
             {
               x += cluster.cellWidth
-              if x >= bounds.origin.x + bounds.size.width {
+              if x >= bounds.maxX {
                 break
               }
               continue
@@ -961,7 +971,7 @@ extension Rasterizer {
               presentationEffects: presentationEffects
             )
             x += cluster.cellWidth
-            if x >= bounds.origin.x + bounds.size.width {
+            if x >= bounds.maxX {
               break
             }
           }
@@ -1114,7 +1124,7 @@ extension Rasterizer {
         let effectiveClip = frame.clip ?? bounds
         for row in 0..<min(grid.size.height, bounds.size.height) {
           let y = bounds.origin.y + row
-          if y < effectiveClip.origin.y || y >= effectiveClip.origin.y + effectiveClip.size.height {
+          if y < effectiveClip.origin.y || y >= effectiveClip.maxY {
             continue
           }
           // Incremental exact-set clamp (F125) for the direct-write leg
@@ -1128,8 +1138,7 @@ extension Rasterizer {
           let sourceRow = grid.cells[row]
           for col in 0..<min(grid.size.width, bounds.size.width) {
             let x = bounds.origin.x + col
-            if x < effectiveClip.origin.x || x >= effectiveClip.origin.x + effectiveClip.size.width
-            {
+            if x < effectiveClip.origin.x || x >= effectiveClip.maxX {
               continue
             }
             guard col < sourceRow.count else {
@@ -1152,7 +1161,7 @@ extension Rasterizer {
             if leadColumn < 0 || span < 1 || leadColumn + span > copyEnd
               || leadX < max(0, effectiveClip.origin.x)
               || leadX + span
-                > min(cells[y].count, effectiveClip.origin.x + effectiveClip.size.width)
+                > min(cells[y].count, effectiveClip.maxX)
             {
               copied = RasterCell(character: " ", style: sourceCell.style)
             }
@@ -1262,8 +1271,8 @@ extension Rasterizer {
 
     var backdropCells: [RasterImageBackdropCell] = []
     backdropCells.reserveCapacity(bounds.size.width * bounds.size.height)
-    for y in bounds.origin.y..<(bounds.origin.y + bounds.size.height) {
-      for x in bounds.origin.x..<(bounds.origin.x + bounds.size.width) {
+    for y in bounds.origin.y..<bounds.maxY {
+      for x in bounds.origin.x..<bounds.maxX {
         let backdropCell: RasterImageBackdropCell =
           if y >= 0, y < cells.count, x >= 0, x < cells[y].count {
             if let leadX = cells[y][x].continuationLeadX,

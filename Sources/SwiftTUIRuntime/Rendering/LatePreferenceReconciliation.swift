@@ -364,7 +364,8 @@ struct LatePreferenceReconciliationStage {
       evaluatedNodeIDs: input.evaluatedNodeIDs,
       animationRedrawIdentities: input.animationRedrawIdentities,
       animationSegmentTargetIdentities: input.animationSegmentTargetIdentities,
-      verifyLayoutShadow: input.verifyLayoutShadow
+      verifyLayoutShadow: input.verifyLayoutShadow,
+      boundsRasterSurfaceToProposal: input.boundsRasterSurfaceToProposal
     )
   }
 }

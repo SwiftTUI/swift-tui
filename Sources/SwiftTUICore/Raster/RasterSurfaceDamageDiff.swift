@@ -199,9 +199,9 @@ package enum RasterSurfaceDamageDiff {
       return
     }
     let lowerRow = max(0, rect.origin.y)
-    let upperRow = max(lowerRow, rect.origin.y + rect.size.height)
+    let upperRow = max(lowerRow, rect.maxY)
     let lowerColumn = max(0, rect.origin.x)
-    let upperColumn = max(lowerColumn, rect.origin.x + rect.size.width)
+    let upperColumn = max(lowerColumn, rect.maxX)
     guard lowerColumn < upperColumn else {
       return
     }

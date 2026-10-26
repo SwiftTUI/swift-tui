@@ -70,9 +70,11 @@ struct AdversarialSetCCaptureClassificationTests {
 
   @Test func setC169BindingOwnershipNotTransferred() throws {
     let log = SetCCaptureLog()
+    // Seven rows of content: an interactive surface clips at the host's
+    // height (STUI-796), so the host is eight rows tall to show "child 7".
     let h = try StressRuntimeHarness(
       rootIdentity: testIdentity("setC169"),
-      size: .init(width: 30, height: 6)
+      size: .init(width: 30, height: 8)
     ) { SetCCaptureRoot(log: log) }
     defer { h.shutdown() }
     let first = try #require(log.childBinding)

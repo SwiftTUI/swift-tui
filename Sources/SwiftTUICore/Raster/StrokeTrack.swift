@@ -245,12 +245,23 @@ package struct RectangleStrokeTrack: Equatable, Sendable {
     return verticalCellLength * Double(height)
   }
 
-  package func forEachCell(_ body: (Cell) -> Void) {
+  /// Calls `body` for each cell of the track, in track order.
+  ///
+  /// - Parameter window: The track-local rectangle whose cells are visited,
+  ///   or `nil` for all. Every other cell is skipped without being formed, so
+  ///   a track far larger than its surface costs only the visible cells; the
+  ///   visited cells, their track positions and their order are unchanged.
+  package func forEachCell(within window: CellRect? = nil, _ body: (Cell) -> Void) {
     guard width > 0, height > 0 else {
       return
     }
+    let columns = window.map { Self.clamped(0..<width, to: $0.origin.x, $0.maxX) } ?? 0..<width
+    let rows = window.map { Self.clamped(0..<height, to: $0.origin.y, $0.maxY) } ?? 0..<height
+    guard !columns.isEmpty, !rows.isEmpty else {
+      return
+    }
     guard isRing else {
-      forEachLineCell(body)
+      forEachLineCell(columns: columns, rows: rows, body)
       return
     }
     let vertical = verticalCellLength
@@ -258,8 +269,10 @@ package struct RectangleStrokeTrack: Equatable, Sendable {
     let right = Arm(direction: .south, side: .right)
     let bottom = Arm(direction: .west, side: .bottom)
     let left = Arm(direction: .north, side: .left)
+    let noColumns = 0..<0
+    let noRows = 0..<0
 
-    for x in 0..<(width - 1) {
+    for x in rows.contains(0) ? Self.clamped(0..<(width - 1), to: columns) : noColumns {
       body(
         Cell(
           x: x, y: 0,
@@ -269,7 +282,7 @@ package struct RectangleStrokeTrack: Equatable, Sendable {
           start: Double(x), length: 1, isCorner: x == 0))
     }
     let rightStart = Double(width - 1)
-    for y in 0..<(height - 1) {
+    for y in columns.contains(width - 1) ? Self.clamped(0..<(height - 1), to: rows) : noRows {
       body(
         Cell(
           x: width - 1, y: y,
@@ -279,7 +292,10 @@ package struct RectangleStrokeTrack: Equatable, Sendable {
           start: rightStart + vertical * Double(y), length: vertical, isCorner: y == 0))
     }
     let bottomStart = rightStart + vertical * Double(height - 1)
-    for step in 0..<(width - 1) {
+    // `step` walks the bottom edge right to left: column `width - 1 - step`.
+    let bottomSteps = Self.clamped(
+      0..<(width - 1), to: width - columns.upperBound, width - columns.lowerBound)
+    for step in rows.contains(height - 1) ? bottomSteps : noColumns {
       body(
         Cell(
           x: width - 1 - step, y: height - 1,
@@ -289,7 +305,10 @@ package struct RectangleStrokeTrack: Equatable, Sendable {
           start: bottomStart + Double(step), length: 1, isCorner: step == 0))
     }
     let leftStart = bottomStart + Double(width - 1)
-    for step in 0..<(height - 1) {
+    // `step` walks the leading edge bottom to top: row `height - 1 - step`.
+    let leftSteps = Self.clamped(
+      0..<(height - 1), to: height - rows.upperBound, height - rows.lowerBound)
+    for step in columns.contains(0) ? leftSteps : noRows {
       body(
         Cell(
           x: 0, y: height - 1 - step,
@@ -300,9 +319,23 @@ package struct RectangleStrokeTrack: Equatable, Sendable {
     }
   }
 
-  private func forEachLineCell(_ body: (Cell) -> Void) {
+  /// `range` limited to `lower..<upper`, empty when they do not meet.
+  private static func clamped(_ range: Range<Int>, to lower: Int, _ upper: Int) -> Range<Int> {
+    let start = max(range.lowerBound, lower)
+    let end = min(range.upperBound, upper)
+    return start < end ? start..<end : range.lowerBound..<range.lowerBound
+  }
+
+  private static func clamped(_ range: Range<Int>, to limit: Range<Int>) -> Range<Int> {
+    clamped(range, to: limit.lowerBound, limit.upperBound)
+  }
+
+  private func forEachLineCell(columns: Range<Int>, rows: Range<Int>, _ body: (Cell) -> Void) {
     if isHorizontalLine {
-      for x in 0..<width {
+      guard rows.contains(0) else {
+        return
+      }
+      for x in columns {
         body(
           Cell(
             x: x, y: 0,
@@ -313,7 +346,10 @@ package struct RectangleStrokeTrack: Equatable, Sendable {
       }
       return
     }
-    for y in 0..<height {
+    guard columns.contains(0) else {
+      return
+    }
+    for y in rows {
       body(
         Cell(
           x: 0, y: y,
@@ -476,10 +512,11 @@ extension RectangleStrokeTrack {
     sides: Edge.Set = .all,
     mask: StrokeMask = .init(),
     rows: ((Int) -> Bool)? = nil,
+    within window: CellRect? = nil,
     _ body: (Ink) -> Void
   ) {
     let samplesEachArm = pen.samplesEachArm
-    forEachCell { cell in
+    forEachCell(within: window) { cell in
       if let rows, !rows(cell.y) {
         return
       }

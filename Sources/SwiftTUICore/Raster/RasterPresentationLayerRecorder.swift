@@ -41,11 +41,11 @@ final class RasterPresentationLayerRecorder {
       case .cells = last.content,
       last.bounds.origin.y == y,
       last.effects == effects,
-      lower <= last.bounds.origin.x + last.bounds.size.width,
+      lower <= last.bounds.maxX,
       upper >= last.bounds.origin.x
     {
       let mergedLower = min(lower, last.bounds.origin.x)
-      let mergedUpper = max(upper, last.bounds.origin.x + last.bounds.size.width)
+      let mergedUpper = max(upper, last.bounds.maxX)
       let mergedBounds = CellRect(
         origin: CellPoint(x: mergedLower, y: y),
         size: CellSize(width: mergedUpper - mergedLower, height: 1)

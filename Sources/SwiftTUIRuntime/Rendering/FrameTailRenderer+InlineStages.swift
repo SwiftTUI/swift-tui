@@ -294,6 +294,8 @@ struct FrameTailInlineStageRenderer: Sendable {
       rasterizer.rasterizeCollectingVisibleIdentities(
         draw,
         minimumSize: minimumRasterSurfaceSize(for: input.proposal),
+        maximumSize: input.boundsRasterSurfaceToProposal
+          ? maximumRasterSurfaceSize(for: input.proposal) : nil,
         previousSurface: previousSurface,
         damage: rasterReuseDamage,
         verifyIncrementalRasterDamage: verifyIncrementalRasterDamage,
@@ -326,6 +328,22 @@ struct FrameTailInlineStageRenderer: Sendable {
     let start = clock.now
     let value = operation()
     return (value, start.duration(to: clock.now))
+  }
+
+  /// The proposal's finite dimensions bound an interactive surface
+  /// (STUI-796): with a finite host proposal the surface never exceeds it and
+  /// content beyond it clips. An unproposed dimension keeps its natural
+  /// extent, within the rasterizer's caps.
+  private func maximumRasterSurfaceSize(
+    for proposal: ProposedSize
+  ) -> CellSize {
+    func bound(_ dimension: ProposedDimension) -> Int {
+      if case .finite(let value) = dimension {
+        return max(0, value)
+      }
+      return .max
+    }
+    return CellSize(width: bound(proposal.width), height: bound(proposal.height))
   }
 
   private func minimumRasterSurfaceSize(
