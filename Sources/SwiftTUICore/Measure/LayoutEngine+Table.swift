@@ -50,13 +50,18 @@ extension LayoutEngine {
     if payload.isViewportBacked {
       idealSize.height -= min(hiddenSeparatorCount, max(0, payload.rowCount - 1))
     }
-    idealSize.height += childMeasurements.reduce(0) {
-      $0 + max(0, $1.measuredSize.height - 1)
-    }
+    idealSize.height = SaturatingConversion.adding(
+      idealSize.height,
+      SaturatingConversion.sum(
+        childMeasurements.map {
+          max(0, SaturatingConversion.subtracting($0.measuredSize.height, 1))
+        }))
     let measuredIndices = Set(sourceIndices ?? [])
-    idealSize.height += tallRowExtraCells(in: retainedTallRowHeights) {
-      !measuredIndices.contains($0)
-    }
+    idealSize.height = SaturatingConversion.adding(
+      idealSize.height,
+      tallRowExtraCells(in: retainedTallRowHeights) {
+        !measuredIndices.contains($0)
+      })
     let leftWidth = layoutText(
       for: payload.style.borderGlyphs.left,
       width: nil

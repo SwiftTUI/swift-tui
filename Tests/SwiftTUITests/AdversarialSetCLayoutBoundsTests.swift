@@ -442,6 +442,105 @@ struct AdversarialSetCLayoutBoundsTests {
     #expect(back.contains("row 0"), "\(back)")
   }
 
+  /// STUI-1333: a List or Table row measured at an extreme height renders,
+  /// takes selection, page, End and wheel input, and keeps the host-sized
+  /// surface, hosted directly, inside a scroll view, eager or indexed.
+  @Test(arguments: SetCExtremeCollection.allCases)
+  func extremeCollectionRowRenders(_ shape: SetCExtremeCollection) throws {
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("setCCollection", "\(shape)"),
+      size: .init(width: 20, height: 8)
+    ) { shape.view }
+    defer { harness.shutdown() }
+    var frames = [harness.frame]
+    frames.append(try harness.click(.init(x: 2, y: 2)))
+    for key in shape.keys {
+      frames.append(try harness.pressKey(key))
+    }
+    frames.append(try harness.scrollPointer(at: .init(x: 2, y: 2), deltaY: 3))
+    frames.append(try harness.scrollPointer(at: .init(x: 2, y: 2), deltaY: -3))
+    frames.append(try harness.render())
+    for frame in frames {
+      #expect(frame.split(separator: "\n", omittingEmptySubsequences: false).count == 8)
+    }
+  }
+
+  /// STUI-1333: `scrollTo` across rows framed at `Int.max`, or whose heights
+  /// sum past it, resolves in a List and a Table on a host-sized surface.
+  /// Scrolling back to the first row shows it whenever the content's extent
+  /// is representable (twenty rows of 10^12 cells). Past `Int.max` every
+  /// later row starts at the saturated line, so the round trip is not
+  /// asserted there (wave-4 FW-M evidence, oracle note O5).
+  @Test(arguments: [false, true], [Int.max, Int.max / 4, 1_000_000_000_000])
+  func scrollToAcrossExtremeCollectionRows(table: Bool, tall: Int) throws {
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("setCCollectionScrollTo", "\(table)"),
+      size: .init(width: 20, height: 10)
+    ) {
+      ScrollViewReader { proxy in
+        VStack(alignment: .leading, spacing: 0) {
+          HStack {
+            Button("last") { proxy.scrollTo(19) }
+            Button("first") { proxy.scrollTo(0) }
+          }
+          if table {
+            Table(Array(0..<20), id: \.self, columns: [TableColumn("Name", width: 12)]) { row in
+              Text("row \(row)").frame(height: tall, alignment: .top).id(row)
+            }
+          } else {
+            List {
+              ForEach(0..<20, id: \.self) { row in
+                Text("row \(row)").frame(height: tall, alignment: .top).id(row)
+              }
+            }
+          }
+        }
+      }
+    }
+    defer { harness.shutdown() }
+    #expect(harness.frame.contains("row 0"), "\(harness.frame)")
+    let last = try harness.clickText("last")
+    let back = try harness.clickText("first")
+    for frame in [last, back] {
+      #expect(frame.split(separator: "\n", omittingEmptySubsequences: false).count == 10)
+    }
+    if !tall.multipliedReportingOverflow(by: 20).overflow {
+      #expect(last.contains("row 19"), "\(last)")
+      #expect(back.contains("row 0"), "\(back)")
+    }
+  }
+
+  /// STUI-1333: a row taller than the viewport by an extreme amount is shown
+  /// and selected exactly as one taller by an in-range amount: the same first
+  /// frame, and the same selections under arrow keys. Rows are selected by
+  /// index, so saturated heights below the viewport cannot change them.
+  @Test(arguments: [false, true])
+  func extremeTallRowMatchesInRangeTallRow(table: Bool) throws {
+    func run(tall: Int) throws -> (frame: String, selections: [Int?]) {
+      let box = SetCSelectionBox()
+      let harness = try StressRuntimeHarness(
+        rootIdentity: testIdentity("setCTallRow", "\(table)"),
+        size: .init(width: 20, height: 8)
+      ) { setCTallRowCollection(table: table, tall: tall, box: box) }
+      defer { harness.shutdown() }
+      let frame = harness.frame
+      _ = try harness.clickText("row 0")
+      var selections = [box.selection]
+      for _ in 0..<3 {
+        _ = try harness.pressKey(.init(.arrowDown))
+        selections.append(box.selection)
+      }
+      _ = try harness.pressKey(.init(.arrowUp))
+      selections.append(box.selection)
+      return (frame, selections)
+    }
+    let extreme = try run(tall: Int.max)
+    let inRange = try run(tall: 100)
+    #expect(extreme.frame == inRange.frame)
+    #expect(extreme.selections == inRange.selections)
+    #expect(extreme.selections == [0, 1, 2, 3, 2])
+  }
+
   /// STUI-1333: directional focus moves to and from a button at an extreme
   /// offset, position or frame exactly as to a merely distant twin. Moving
   /// focus repaints both buttons, so the presentation damage of the far one
@@ -499,7 +598,7 @@ struct AdversarialSetCLayoutBoundsTests {
   /// STUI-1333: scrolling content that holds a saturated coordinate places it
   /// afresh instead of translating the retained placement, so production and
   /// the DEBUG layout shadow agree (the shadow oracle asserts on divergence).
-  @Test(arguments: [false])
+  @Test(arguments: [false, true])
   func scrolledSaturatedContentMatchesAFreshPlacement(list: Bool) throws {
     let harness = try StressRuntimeHarness(
       rootIdentity: testIdentity("setCSaturatedScroll", "\(list)"),
@@ -775,6 +874,155 @@ enum SetCExtremeLazyStack: CaseIterable, Sendable, CustomTestStringConvertible {
         })
     }
   }
+}
+
+/// Lists and tables with a row measured at an extreme height (STUI-1333).
+enum SetCExtremeCollection: CaseIterable, Sendable, CustomTestStringConvertible {
+  case listRowPaddingMax, listRowFrameHeightMax, listRowTopPaddingMax, scrolledList
+  case eagerList, scrolledEagerList, sectionHeaderPaddingMax, listPaddingMax, listOfButtons
+  case tableRowPaddingMax, tableRowFrameHeightMax, scrolledTable, eagerTable, scrolledEagerTable
+  case listRowsSumOverflow, eagerListRowsSumOverflow, tableRowsSumOverflow
+
+  var testDescription: String { "\(self)" }
+
+  /// A table hosted in a scroll view is laid out at its saturated content
+  /// height, so each frame paints, damages and translates its tall row up to
+  /// the raster's 65,536-row cap (a debug frame takes about a second); two
+  /// keys keep the case inside the test budget.
+  var keys: [KeyPress] {
+    switch self {
+    case .scrolledTable, .scrolledEagerTable: [KeyPress(.arrowDown), KeyPress(.end)]
+    default:
+      [
+        KeyPress(.arrowDown), KeyPress(.pageDown), KeyPress(.end), KeyPress(.pageUp),
+        KeyPress(.tab),
+      ]
+    }
+  }
+
+  @MainActor
+  var view: AnyView {
+    func rows(_ modify: @escaping @MainActor (Text) -> AnyView) -> some View {
+      ForEach(0..<30, id: \.self) { modify(Text("row \($0)")).tag($0) }
+    }
+    func table(_ modify: @escaping @MainActor (Text) -> AnyView) -> some View {
+      Table(Array(0..<30), id: \.self, columns: [TableColumn("Name", width: 12)]) { row in
+        modify(Text("row\(row)"))
+      }
+    }
+    let selection = Binding<Int?>(get: { nil }, set: { _ in })
+    switch self {
+    case .listRowPaddingMax:
+      return AnyView(List(selection: selection) { rows { AnyView($0.padding(Int.max)) } })
+    case .listRowFrameHeightMax:
+      return AnyView(List(selection: selection) { rows { AnyView($0.frame(height: Int.max)) } })
+    case .listRowTopPaddingMax:
+      return AnyView(List(selection: selection) { rows { AnyView($0.padding(.top, Int.max)) } })
+    case .scrolledList:
+      return AnyView(ScrollView { List { rows { AnyView($0.padding(Int.max)) } } })
+    case .eagerList:
+      return AnyView(
+        List {
+          Text("a").padding(Int.max)
+          Text("b")
+          Text("c").frame(height: Int.max)
+        })
+    case .scrolledEagerList:
+      return AnyView(
+        ScrollView {
+          List {
+            Text("a").padding(Int.max)
+            Text("b")
+          }
+        })
+    case .sectionHeaderPaddingMax:
+      return AnyView(
+        List {
+          Section {
+            ForEach(0..<10, id: \.self) { Text("row \($0)") }
+          } header: {
+            Text("head").padding(Int.max)
+          }
+        })
+    case .listPaddingMax:
+      return AnyView(List { ForEach(0..<30, id: \.self) { Text("row \($0)") } }.padding(Int.max))
+    case .listOfButtons:
+      return AnyView(
+        List { ForEach(0..<20, id: \.self) { row in Button("b\(row)") {}.padding(Int.max) } })
+    case .tableRowPaddingMax:
+      return AnyView(table { AnyView($0.padding(Int.max)) })
+    case .tableRowFrameHeightMax:
+      return AnyView(table { AnyView($0.frame(height: Int.max)) })
+    case .scrolledTable:
+      return AnyView(ScrollView { table { AnyView($0.padding(Int.max)) } })
+    case .eagerTable:
+      return AnyView(
+        Table(columns: [TableColumn("A", width: 6), TableColumn("B", width: 6)]) {
+          TableRow {
+            Text("a").padding(Int.max)
+            Text("b")
+          }
+          TableRow {
+            Text("c")
+            Text("d").frame(height: Int.max)
+          }
+        })
+    case .scrolledEagerTable:
+      return AnyView(
+        ScrollView {
+          Table(columns: [TableColumn("A", width: 6)]) {
+            TableRow { Text("a").padding(Int.max) }
+            TableRow { Text("b") }
+          }
+        })
+    // Each row is in range; their heights sum past `Int.max`.
+    case .listRowsSumOverflow:
+      return AnyView(
+        List(selection: selection) {
+          rows { AnyView($0.frame(height: Int.max / 4, alignment: .top)) }
+        })
+    case .eagerListRowsSumOverflow:
+      return AnyView(
+        VStack {
+          List {
+            Text("a").frame(height: Int.max / 4, alignment: .top)
+            Text("b").frame(height: Int.max / 4, alignment: .top)
+            Text("c").frame(height: Int.max / 4, alignment: .top)
+            Text("d").frame(height: Int.max / 4, alignment: .top)
+            Text("e").frame(height: Int.max / 4, alignment: .top)
+          }
+        })
+    case .tableRowsSumOverflow:
+      return AnyView(table { AnyView($0.frame(height: Int.max / 4, alignment: .top)) })
+    }
+  }
+}
+
+@MainActor
+private final class SetCSelectionBox {
+  var selection: Int?
+  var binding: Binding<Int?> {
+    Binding(get: { self.selection }, set: { self.selection = $0 })
+  }
+}
+
+@MainActor
+private func setCTallRowCollection(table: Bool, tall: Int, box: SetCSelectionBox) -> AnyView {
+  if table {
+    return AnyView(
+      Table(
+        Array(0..<10), id: \.self, selection: box.binding,
+        columns: [TableColumn("Name", width: 12)]
+      ) { row in
+        Text("row \(row)").padding(.bottom, row == 1 ? tall : 0)
+      })
+  }
+  return AnyView(
+    List(selection: box.binding) {
+      ForEach(0..<10, id: \.self) { row in
+        Text("row \(row)").padding(.bottom, row == 1 ? tall : 0).tag(row)
+      }
+    })
 }
 
 /// Buttons at extreme geometry, each beside a distant twin (STUI-1333).

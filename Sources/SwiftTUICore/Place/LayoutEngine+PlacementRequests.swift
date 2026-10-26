@@ -487,14 +487,11 @@ extension LayoutEngine {
       let childMeasurement = measured.childMeasurements[measurementIndex]
       let markerWidth = line.rowIndex == nil || !payload.showsSelectionMarker ? 0 : 2
       let origin = CellPoint(
-        x: layout.contentBounds.origin.x + markerWidth,
-        y: layout.contentBounds.origin.y + line.yOffset
+        x: SaturatingConversion.adding(layout.contentBounds.origin.x, markerWidth),
+        y: SaturatingConversion.adding(layout.contentBounds.origin.y, line.yOffset)
       )
       let childBounds = CellRect(origin: origin, size: childMeasurement.measuredSize)
-      let collectionBottom = bounds.origin.y + bounds.size.height
-      if childBounds.origin.y < collectionBottom,
-        childBounds.origin.y + childBounds.size.height > bounds.origin.y
-      {
+      if childBounds.origin.y < bounds.maxY, childBounds.maxY > bounds.origin.y {
         requests.append(
           PlacementRequest(
             resolved: child,
@@ -567,15 +564,12 @@ extension LayoutEngine {
       let childMeasurement = measured.childMeasurements[measurementIndex]
       let childBounds = CellRect(
         origin: .init(
-          x: layout.contentBounds.origin.x + leftWidth + 1,
-          y: layout.contentBounds.origin.y + line.yOffset
+          x: SaturatingConversion.sum([layout.contentBounds.origin.x, leftWidth, 1]),
+          y: SaturatingConversion.adding(layout.contentBounds.origin.y, line.yOffset)
         ),
         size: childMeasurement.measuredSize
       )
-      let collectionBottom = bounds.origin.y + bounds.size.height
-      if childBounds.origin.y < collectionBottom,
-        childBounds.origin.y + childBounds.size.height > bounds.origin.y
-      {
+      if childBounds.origin.y < bounds.maxY, childBounds.maxY > bounds.origin.y {
         requests.append(
           PlacementRequest(
             resolved: child,

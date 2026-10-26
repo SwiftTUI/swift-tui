@@ -95,7 +95,8 @@ extension LayoutEngine {
     {
       let viewportHeight = (node.scrollViewportRect ?? bounds).size.height
       let fixedHeight = max(0, viewportHeight - navigation.visibleLines.count)
-      node.contentBounds.size.height = navigation.geometry.displayLineCount + fixedHeight
+      node.contentBounds.size.height = SaturatingConversion.adding(
+        navigation.geometry.displayLineCount, fixedHeight)
     }
     return node
   }
@@ -226,14 +227,16 @@ extension LayoutEngine {
       return childContentBounds
     case .list(let payload):
       var idealSize = measuredListIdealSize(for: payload)
-      idealSize.height += knownTallRowExtraCells(in: measured)
+      idealSize.height = SaturatingConversion.adding(
+        idealSize.height, knownTallRowExtraCells(in: measured))
       return union(
         childContentBounds,
         CellRect(origin: bounds.origin, size: idealSize)
       )
     case .table(let payload):
       var idealSize = measuredTableIdealSize(for: payload)
-      idealSize.height += knownTallRowExtraCells(in: measured)
+      idealSize.height = SaturatingConversion.adding(
+        idealSize.height, knownTallRowExtraCells(in: measured))
       if payload.isViewportBacked,
         let edges = measured.containerAllocationSnapshot?.hostedCollection?.hiddenRowSeparatorEdges,
         !edges.isEmpty

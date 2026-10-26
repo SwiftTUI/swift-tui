@@ -55,14 +55,16 @@ package struct TableVisibleLayout: Equatable, Sendable {
     self.lines = lines
     self.widths = widths
     self.totalContentHeight =
-      totalContentHeight ?? lines.reduce(0) { $0 + max(1, $1.height) }
+      totalContentHeight ?? SaturatingConversion.sum(lines.lazy.map { max(1, $0.height) })
   }
 
   /// Returns a copy translated into absolute coordinates by `delta`.
   package func translated(by delta: CellPoint) -> TableVisibleLayout {
     var copy = self
     copy.contentBounds = CellRect(
-      origin: .init(x: contentBounds.origin.x + delta.x, y: contentBounds.origin.y + delta.y),
+      origin: .init(
+        x: SaturatingConversion.adding(contentBounds.origin.x, delta.x),
+        y: SaturatingConversion.adding(contentBounds.origin.y, delta.y)),
       size: contentBounds.size
     )
     return copy
@@ -126,7 +128,9 @@ extension DrawExtractor {
 
     for line in lines {
       var lineBounds = CellRect(
-        origin: .init(x: contentBounds.origin.x, y: contentBounds.origin.y + line.yOffset),
+        origin: .init(
+          x: contentBounds.origin.x,
+          y: SaturatingConversion.adding(contentBounds.origin.y, line.yOffset)),
         size: .init(width: contentBounds.size.width, height: max(1, line.height))
       )
       if let clip = layout.bodyClip, line.role == .row {
@@ -171,7 +175,18 @@ extension DrawExtractor {
       // it spans, not just its first — the border is chrome the table owns,
       // and the committed child only paints the interior.
       let cellCount = hostsCommittedItems && line.role == .row ? lineBounds.size.height : 1
-      for cellOffset in 0..<max(1, cellCount) {
+      // A table clips its commands to its bounds, and no surface has a row
+      // past the raster's per-axis cap, so only rows inside both can be
+      // painted. A row measured at an extreme height (STUI-1333) would
+      // otherwise emit a border per cell of its `Int.max` extent; every
+      // paintable row is emitted as before.
+      let paintableTop = max(bounds.origin.y, 0)
+      let paintableBottom = max(paintableTop, min(bounds.maxY, Rasterizer.maximumSurfaceExtent))
+      let reachableCells = (0..<max(1, cellCount)).clamped(
+        to: SaturatingConversion.subtracting(
+          paintableTop, lineBounds.origin.y)..<SaturatingConversion.subtracting(
+            paintableBottom, lineBounds.origin.y))
+      for cellOffset in reachableCells {
         var cursorX = lineBounds.origin.x
         let lineMaxX = lineBounds.maxX
 
@@ -339,12 +354,14 @@ extension DrawExtractor {
       ? [] : lines.filter { $0.role == .row }.compactMap(\.rowIndex)
     var extraCells =
       windowRows.min().map { first in
-        geometry.line(forRow: first) - first * geometry.rowSpan
+        SaturatingConversion.subtracting(geometry.line(forRow: first), first * geometry.rowSpan)
       } ?? 0
     let extraAfter =
       windowRows.max().map { last in
-        geometry.displayLineCount - geometry.lineRange(forRow: last).upperBound
-          - (geometry.rowCount - last - 1) * geometry.rowSpan
+        SaturatingConversion.subtracting(
+          SaturatingConversion.subtracting(
+            geometry.displayLineCount, geometry.lineRange(forRow: last).upperBound),
+          (geometry.rowCount - last - 1) * geometry.rowSpan)
       } ?? 0
     for index in lines.indices {
       let height =
@@ -352,14 +369,17 @@ extension DrawExtractor {
         ? (lines[index].rowIndex.flatMap { rowHeights?[$0] }.map { max(1, $0) } ?? 1)
         : 1
       lines[index].height = height
-      lines[index].yOffset = (generated.linePositions?[index] ?? index) + extraCells
-      extraCells += height - 1
+      lines[index].yOffset = SaturatingConversion.adding(
+        generated.linePositions?[index] ?? index, extraCells)
+      extraCells = SaturatingConversion.adding(extraCells, height - 1)
     }
     var layout = TableVisibleLayout(
       contentBounds: bounds,
       lines: lines,
       widths: widths,
-      totalContentHeight: generated.totalLineCount + extraCells + extraAfter
+      totalContentHeight: SaturatingConversion.sum([
+        generated.totalLineCount, extraCells, extraAfter,
+      ])
     )
     // Consume the exact body capacity used by whole-row fitting. Small tables
     // may omit an overflow indicator to preserve a row; recomputing capacity
@@ -374,7 +394,9 @@ extension DrawExtractor {
       }
       navigation = CollectionScrollLayout(
         geometry: geometry,
-        visibleLines: offset..<(offset + generated.visibleBodyLineCount),
+        visibleLines:
+          offset..<SaturatingConversion.adding(
+            offset, generated.visibleBodyLineCount),
         anchor: payload.scrollAnchor,
         realizedRows: realizedRows)
     } else {
@@ -407,8 +429,9 @@ extension DrawExtractor {
       for index in body.indices {
         body[index].height = body[index].rowIndex.flatMap { rowHeights[$0] }.map { max(1, $0) } ?? 1
         body[index].yOffset = cursor
-        if body[index].rowIndex != nil { ranges.append(cursor..<(cursor + body[index].height)) }
-        cursor += body[index].height
+        let next = SaturatingConversion.adding(cursor, body[index].height)
+        if body[index].rowIndex != nil { ranges.append(cursor..<next) }
+        cursor = next
       }
       geometry = .init(rowRanges: ranges, displayLineCount: cursor)
     }
@@ -418,7 +441,7 @@ extension DrawExtractor {
       && bodyCapacity >= 3
     let capacity = bodyCapacity - (indicators ? 2 : 0)
     let offset = geometry.positionedOffset(for: payload.scrollAnchor, capacity: capacity) ?? 0
-    let end = offset + capacity
+    let end = SaturatingConversion.adding(offset, capacity)
     if payload.isViewportBacked, geometry.rowCount > 0 {
       let first = geometry.row(atOrBeforeLine: offset)
       var last = first
@@ -439,8 +462,13 @@ extension DrawExtractor {
     let bodyStart = top.count + (indicators ? 1 : 0)
     var lines = top
     for index in lines.indices { lines[index].yOffset = index }
-    var visible = body.filter { $0.yOffset < end && $0.yOffset + $0.height > offset }
-    for index in visible.indices { visible[index].yOffset += bodyStart - offset }
+    var visible = body.filter {
+      $0.yOffset < end && SaturatingConversion.adding($0.yOffset, $0.height) > offset
+    }
+    for index in visible.indices {
+      visible[index].yOffset = SaturatingConversion.adding(
+        SaturatingConversion.subtracting(visible[index].yOffset, offset), bodyStart)
+    }
     lines.append(contentsOf: visible)
     if indicators {
       var above = overflowIndicatorLine(
@@ -491,8 +519,9 @@ extension DrawExtractor {
       let height = body[index].rowIndex.flatMap { rowHeights[$0] }.map { max(1, $0) } ?? 1
       body[index].height = height
       body[index].yOffset = cursor
-      if body[index].rowIndex != nil { rowRanges.append(cursor..<(cursor + height)) }
-      cursor += height
+      let next = SaturatingConversion.adding(cursor, height)
+      if body[index].rowIndex != nil { rowRanges.append(cursor..<next) }
+      cursor = next
     }
     let geometry = CollectionScrollGeometry(rowRanges: rowRanges, displayLineCount: cursor)
     let bodyCapacity = max(0, bounds.size.height - topCount - bottomCount)
@@ -506,7 +535,9 @@ extension DrawExtractor {
     func window(capacity: Int) -> (offset: Int, end: Int, maximum: Int) {
       var maximum = body.count
       var tailCells = 0
-      while maximum > 0, tailCells + body[maximum - 1].height <= capacity {
+      while maximum > 0,
+        SaturatingConversion.adding(tailCells, body[maximum - 1].height) <= capacity
+      {
         maximum -= 1
         tailCells += body[maximum].height
       }
@@ -528,8 +559,9 @@ extension DrawExtractor {
         let selected = selectedTableLineIndex(in: body, rowIndex: payload.selectedRowIndex) ?? 0
         let startCell = max(0, body[selected].yOffset - capacity / 2)
         let centred = body.lastIndex { $0.yOffset <= startCell } ?? 0
-        let selectedEnd = body[selected].yOffset + min(capacity, body[selected].height)
-        if selectedEnd <= body[centred].yOffset + capacity {
+        let selectedEnd = SaturatingConversion.adding(
+          body[selected].yOffset, min(capacity, body[selected].height))
+        if selectedEnd <= SaturatingConversion.adding(body[centred].yOffset, capacity) {
           offset = min(centred, maximum)
         } else {
           let fitted = body.firstIndex { $0.yOffset >= selectedEnd - capacity } ?? selected
@@ -538,7 +570,7 @@ extension DrawExtractor {
       }
       var end = offset
       var cells = 0
-      while end < body.count, cells + body[end].height <= capacity {
+      while end < body.count, SaturatingConversion.adding(cells, body[end].height) <= capacity {
         cells += body[end].height
         end += 1
       }
@@ -581,13 +613,15 @@ extension DrawExtractor {
     visibleBody.append(contentsOf: body[range.offset..<range.end])
     let hasRoomForLowerIndicator = !hidesAbove || maximumIndicators > 1
     let hidesBelow = showsIndicators && range.end < body.count && hasRoomForLowerIndicator
-    let usedCells = visibleBody.reduce(0) { $0 + $1.height }
+    let usedCells = SaturatingConversion.sum(visibleBody.lazy.map(\.height))
     if cursor > bodyCapacity {
-      let padding = max(0, bodyCapacity - usedCells - (hidesBelow ? 1 : 0))
+      let padding = max(
+        0, SaturatingConversion.subtracting(bodyCapacity - (hidesBelow ? 1 : 0), usedCells))
+      // Past the raster's per-axis cap no padding line is drawn (STUI-1333).
       visibleBody.append(
         contentsOf: Array(
           repeating: overflowIndicatorLine(widths: widths, payload: payload, symbol: ""),
-          count: padding))
+          count: min(padding, Rasterizer.maximumSurfaceExtent)))
     }
     if hidesBelow {
       visibleBody.append(overflowIndicatorLine(widths: widths, payload: payload, symbol: "↓"))
@@ -596,13 +630,14 @@ extension DrawExtractor {
     var yOffset = 0
     for index in lines.indices {
       lines[index].yOffset = yOffset
-      yOffset += lines[index].height
+      yOffset = SaturatingConversion.adding(yOffset, lines[index].height)
     }
     let offset = body[range.offset].yOffset
     let position = CollectionScrollPosition(
       cellOffset: offset, isAtStart: range.offset == 0, isAtEnd: range.offset == range.maximum)
     let navigation = CollectionScrollLayout(
-      geometry: geometry, visibleLines: offset..<(offset + capacity), anchor: payload.scrollAnchor)
+      geometry: geometry, visibleLines: offset..<SaturatingConversion.adding(offset, capacity),
+      anchor: payload.scrollAnchor)
     var layout = TableVisibleLayout(
       contentBounds: bounds, lines: lines, widths: widths, totalContentHeight: yOffset)
     layout.scrollMetadata = CollectionScrollLayoutMetadata(
@@ -700,7 +735,8 @@ extension DrawExtractor {
       from: bodyLines, selectedRowIndex: payload.selectedRowIndex, lineCapacity: bodyCapacity,
       anchorLine: anchorLine
     ).offset
-    let anchoredEnd = min(bodyLines.count, anchoredOffset + bodyCapacity)
+    let anchoredEnd = min(
+      bodyLines.count, SaturatingConversion.adding(anchoredOffset, bodyCapacity))
     let initialHiddenAbove = anchoredOffset > 0
     let initialHiddenBelow = anchoredEnd < bodyLines.count
     let reservedIndicators =
@@ -716,7 +752,7 @@ extension DrawExtractor {
     let hiddenBelow = window.offset + window.lines.count < bodyLines.count
 
     var visibleBody: [TableDisplayLine] = []
-    visibleBody.reserveCapacity(bodyCapacity)
+    visibleBody.reserveCapacity(min(bodyCapacity, Rasterizer.maximumSurfaceExtent))
     if hiddenAbove {
       visibleBody.append(
         overflowIndicatorLine(
@@ -861,7 +897,9 @@ extension DrawExtractor {
       // shows the bottom of the table. At least the last line is shown.
       var maxOffset = bodyLineCount
       var tailCells = 0
-      while maxOffset > 0, tailCells + lineHeight(maxOffset - 1) <= capacity {
+      while maxOffset > 0,
+        SaturatingConversion.adding(tailCells, lineHeight(maxOffset - 1)) <= capacity
+      {
         maxOffset -= 1
         tailCells += lineHeight(maxOffset)
       }
@@ -874,7 +912,7 @@ extension DrawExtractor {
         }
       var end = offset
       var cells = 0
-      while end < bodyLineCount, cells + lineHeight(end) <= capacity {
+      while end < bodyLineCount, SaturatingConversion.adding(cells, lineHeight(end)) <= capacity {
         cells += lineHeight(end)
         end += 1
       }
@@ -897,14 +935,18 @@ extension DrawExtractor {
     // lines fill them, so the overflow indicator and the closing border stay
     // on the table's last lines instead of floating up under the rows.
     func filled(_ body: [TableDisplayLine], capacity: Int) -> [TableDisplayLine] {
-      let used = body.reduce(0) { $0 + ($1.rowIndex.map { max(1, rowHeights?[$0] ?? 1) } ?? 1) }
+      let used = SaturatingConversion.sum(
+        body.lazy.map { $0.rowIndex.map { max(1, rowHeights?[$0] ?? 1) } ?? 1 })
       guard used < capacity else {
         return body
       }
+      // A body whose rows saturated past `Int.max` cells (STUI-1333) leaves a
+      // capacity no surface can show; lines past the raster's per-axis cap are
+      // never drawn, so the fill stops there.
       return body
         + Array(
           repeating: overflowIndicatorLine(widths: widths, payload: payload, symbol: ""),
-          count: capacity - used)
+          count: min(capacity - used, Rasterizer.maximumSurfaceExtent))
     }
 
     guard showsIndicators else {
@@ -933,7 +975,7 @@ extension DrawExtractor {
     let bodyWindowCapacity = max(1, bodyCapacity - reservedIndicators)
     let range = window(capacity: bodyWindowCapacity)
     var visibleBody: [TableDisplayLine] = []
-    visibleBody.reserveCapacity(bodyCapacity)
+    visibleBody.reserveCapacity(min(bodyCapacity, Rasterizer.maximumSurfaceExtent))
     if range.offset > 0 {
       visibleBody.append(
         overflowIndicatorLine(widths: widths, payload: payload, symbol: "↑")

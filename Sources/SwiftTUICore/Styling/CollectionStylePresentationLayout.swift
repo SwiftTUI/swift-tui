@@ -80,7 +80,7 @@ package struct ListLineWindow: Equatable, Sendable {
   package var rowSpan: Int
 
   package var end: Int {
-    min(displayLineCount, offset + visibleLineCount)
+    min(displayLineCount, SaturatingConversion.adding(offset, visibleLineCount))
   }
 }
 
@@ -184,22 +184,26 @@ extension ListStylePresentation {
     let windowRows = generated.isWindowed ? lines.compactMap(\.rowIndex) : []
     let extraBefore =
       windowRows.min().map { first in
-        geometry.line(forRow: first) - first * geometry.rowSpan
+        SaturatingConversion.subtracting(geometry.line(forRow: first), first * geometry.rowSpan)
       } ?? 0
     let extraAfter =
       windowRows.max().map { last in
-        geometry.displayLineCount - geometry.lineRange(forRow: last).upperBound
-          - (geometry.rowCount - last - 1) * geometry.rowSpan
+        SaturatingConversion.subtracting(
+          SaturatingConversion.subtracting(
+            geometry.displayLineCount, geometry.lineRange(forRow: last).upperBound),
+          (geometry.rowCount - last - 1) * geometry.rowSpan)
       } ?? 0
-    var cursor = generated.firstLinePosition + extraBefore
+    var cursor = SaturatingConversion.adding(generated.firstLinePosition, extraBefore)
     for index in lines.indices {
       let height = listLineHeight(
         lines[index], rowHeights: rowHeights, itemSizes: itemSizes)
       lines[index].height = height
       lines[index].yOffset = cursor
-      cursor += height
+      cursor = SaturatingConversion.adding(cursor, height)
     }
-    let totalContentHeight = cursor + generated.trailingLineCount + extraAfter
+    let totalContentHeight = SaturatingConversion.sum([
+      cursor, generated.trailingLineCount, extraAfter,
+    ])
 
     var layout = ListVisibleLayout(
       contentBounds: contentBounds,
@@ -244,7 +248,7 @@ extension ListStylePresentation {
       }
       navigation = CollectionScrollLayout(
         geometry: geometry,
-        visibleLines: offset..<(offset + capacity),
+        visibleLines: offset..<SaturatingConversion.adding(offset, capacity),
         anchor: payload.scrollAnchor,
         realizedRows: realizedRows)
     } else {
@@ -275,8 +279,9 @@ extension ListStylePresentation {
         body[index].height = listLineHeight(
           body[index], rowHeights: rowHeights, itemSizes: itemSizes)
         body[index].yOffset = cursor
-        if body[index].rowIndex != nil { ranges.append(cursor..<(cursor + body[index].height)) }
-        cursor += body[index].height
+        let next = SaturatingConversion.adding(cursor, body[index].height)
+        if body[index].rowIndex != nil { ranges.append(cursor..<next) }
+        cursor = next
       }
       geometry = .init(rowRanges: ranges, displayLineCount: cursor)
     }
@@ -285,7 +290,7 @@ extension ListStylePresentation {
       && bounds.size.height >= 3
     let capacity = bounds.size.height - (indicators ? 2 : 0)
     let offset = geometry.positionedOffset(for: payload.scrollAnchor, capacity: capacity) ?? 0
-    let end = offset + capacity
+    let end = SaturatingConversion.adding(offset, capacity)
     if payload.isViewportBacked, geometry.rowCount > 0 {
       var row = geometry.row(atOrBeforeLine: offset)
       while row < geometry.rowCount, geometry.line(forRow: row) < end {
@@ -308,8 +313,13 @@ extension ListStylePresentation {
         row += 1
       }
     }
-    var lines = body.filter { $0.yOffset < end && $0.yOffset + $0.height > offset }
-    for index in lines.indices { lines[index].yOffset += (indicators ? 1 : 0) - offset }
+    var lines = body.filter {
+      $0.yOffset < end && SaturatingConversion.adding($0.yOffset, $0.height) > offset
+    }
+    for index in lines.indices {
+      lines[index].yOffset = SaturatingConversion.adding(
+        SaturatingConversion.subtracting(lines[index].yOffset, offset), indicators ? 1 : 0)
+    }
     if indicators {
       let style = TextStyle(foregroundStyle: .semantic(.separator), opacity: payload.opacity)
       lines.insert(
@@ -357,18 +367,18 @@ extension ListStylePresentation {
     for payload: ListPayload
   ) -> CellSize {
     if payload.isViewportBacked {
-      let horizontalInset = contentInsets.leading + contentInsets.trailing
-      let verticalInset = contentInsets.top + contentInsets.bottom
+      let horizontalInset = contentInsets.horizontal
+      let verticalInset = contentInsets.vertical
       let rowCount = payload.rowCount
       let separatorCount = showsRowSeparators ? max(0, rowCount - 1) : 0
       let markerWidth = payload.showsSelectionMarker && rowCount > 0 ? 2 : 0
       return CellSize(
-        width: markerWidth + horizontalInset,
-        height: rowCount + separatorCount + verticalInset
+        width: SaturatingConversion.adding(markerWidth, horizontalInset),
+        height: SaturatingConversion.sum([rowCount, separatorCount, verticalInset])
       )
     }
-    let horizontalInset = contentInsets.leading + contentInsets.trailing
-    let perSectionVerticalInset = contentInsets.top + contentInsets.bottom
+    let horizontalInset = contentInsets.horizontal
+    let perSectionVerticalInset = contentInsets.vertical
     let usesSectionChrome = container != nil && chromeScope == .eachSection
     let lineMetrics = payload.items.enumerated().reduce(
       into: (width: 0, height: 0, rowIndex: 0, sectionCount: 0, sectionHasContent: false)
@@ -425,14 +435,14 @@ extension ListStylePresentation {
       }
     let verticalInset =
       if usesSectionChrome {
-        max(1, sectionCount) * perSectionVerticalInset
+        SaturatingConversion.multiplying(max(1, sectionCount), perSectionVerticalInset)
       } else {
         perSectionVerticalInset
       }
 
     return CellSize(
-      width: lineMetrics.width + horizontalInset,
-      height: lineMetrics.height + verticalInset
+      width: SaturatingConversion.adding(lineMetrics.width, horizontalInset),
+      height: SaturatingConversion.adding(lineMetrics.height, verticalInset)
     )
   }
 
@@ -478,12 +488,20 @@ extension ListStylePresentation {
     // contiguous window) and the row erased the border's horizontal run.
     CellRect(
       origin: .init(
-        x: bounds.origin.x + contentInsets.leading,
-        y: bounds.origin.y + contentInsets.top
+        x: SaturatingConversion.adding(bounds.origin.x, contentInsets.leading),
+        y: SaturatingConversion.adding(bounds.origin.y, contentInsets.top)
       ),
       size: .init(
-        width: max(0, bounds.size.width - contentInsets.leading - contentInsets.trailing),
-        height: max(0, bounds.size.height - contentInsets.top - contentInsets.bottom)
+        width: max(
+          0,
+          SaturatingConversion.subtracting(
+            SaturatingConversion.subtracting(bounds.size.width, contentInsets.leading),
+            contentInsets.trailing)),
+        height: max(
+          0,
+          SaturatingConversion.subtracting(
+            SaturatingConversion.subtracting(bounds.size.height, contentInsets.top),
+            contentInsets.bottom))
       )
     )
   }
@@ -559,10 +577,11 @@ extension ListStylePresentation {
         displayLines[index], rowHeights: rowHeights, itemSizes: itemSizes)
       displayLines[index].height = height
       displayLines[index].yOffset = cursor
+      let next = SaturatingConversion.adding(cursor, height)
       if displayLines[index].rowIndex != nil {
-        rowRanges.append(cursor..<(cursor + height))
+        rowRanges.append(cursor..<next)
       }
-      cursor += height
+      cursor = next
     }
     let geometry = CollectionScrollGeometry(rowRanges: rowRanges, displayLineCount: cursor)
     guard viewportLineCount > 0, !displayLines.isEmpty else {
@@ -576,7 +595,9 @@ extension ListStylePresentation {
     let capacity = showsIndicatorLines ? max(1, viewportLineCount - 2) : viewportLineCount
     var maxOffset = displayLines.count
     var tailCells = 0
-    while maxOffset > 0, tailCells + displayLines[maxOffset - 1].height <= capacity {
+    while maxOffset > 0,
+      SaturatingConversion.adding(tailCells, displayLines[maxOffset - 1].height) <= capacity
+    {
       maxOffset -= 1
       tailCells += displayLines[maxOffset].height
     }
@@ -605,8 +626,8 @@ extension ListStylePresentation {
       let startCell = max(0, selectedCell - capacity / 2)
       let centredLine = displayLines.lastIndex { $0.yOffset <= startCell } ?? 0
       let selectedHeight = min(capacity, displayLines[selectedLine].height)
-      let selectedEnd = selectedCell + selectedHeight
-      let centredEnd = displayLines[centredLine].yOffset + capacity
+      let selectedEnd = SaturatingConversion.adding(selectedCell, selectedHeight)
+      let centredEnd = SaturatingConversion.adding(displayLines[centredLine].yOffset, capacity)
       if selectedEnd <= centredEnd {
         offset = min(centredLine, maxOffset)
       } else {
@@ -622,7 +643,9 @@ extension ListStylePresentation {
     }
     var end = offset
     var cells = 0
-    while end < displayLines.count, cells + displayLines[end].height <= capacity {
+    while end < displayLines.count,
+      SaturatingConversion.adding(cells, displayLines[end].height) <= capacity
+    {
       cells += displayLines[end].height
       end += 1
     }
@@ -636,7 +659,7 @@ extension ListStylePresentation {
       // Section chrome taller than a viewport can never fit as a whole.
       // Show its leading cells after the final row rather than leaving an
       // artificial blank gap before the end-positioned footer window.
-      cells += displayLines[end].height
+      cells = SaturatingConversion.adding(cells, displayLines[end].height)
       end += 1
     }
     var visible = Array(displayLines[offset..<end])
@@ -645,14 +668,21 @@ extension ListStylePresentation {
     let position = CollectionScrollPosition(
       cellOffset: cellOffset, isAtStart: offset == 0, isAtEnd: offset == maxOffset)
     let navigation = CollectionScrollLayout(
-      geometry: geometry, visibleLines: cellOffset..<(cellOffset + capacity),
+      geometry: geometry,
+      visibleLines: cellOffset..<SaturatingConversion.adding(cellOffset, capacity),
       anchor: payload.scrollAnchor)
     if showsIndicatorLines {
       let style = TextStyle(foregroundStyle: .semantic(.separator), opacity: payload.opacity)
       func indicator(_ symbol: String) -> ListDisplayLine {
         ListDisplayLine(kind: .text(symbol, style), isHeader: true, rowIndex: nil)
       }
-      visible.append(contentsOf: Array(repeating: indicator(""), count: max(0, capacity - cells)))
+      // A list laid out at a saturated content height (STUI-1333) has a
+      // capacity no surface shows; fill lines past the raster's per-axis cap
+      // are never drawn.
+      visible.append(
+        contentsOf: Array(
+          repeating: indicator(""),
+          count: min(max(0, capacity - cells), Rasterizer.maximumSurfaceExtent)))
       visible.insert(indicator(offset == 0 ? "" : "↑"), at: 0)
       visible.append(indicator(end >= displayLines.count ? "" : "↓"))
     }
@@ -793,7 +823,9 @@ extension ListStylePresentation {
     // shows its last row. At least the last line is shown.
     var maxOffset = displayLineCount
     var tailCells = 0
-    while maxOffset > 0, tailCells + lineHeight(maxOffset - 1) <= capacity {
+    while maxOffset > 0,
+      SaturatingConversion.adding(tailCells, lineHeight(maxOffset - 1)) <= capacity
+    {
       maxOffset -= 1
       tailCells += lineHeight(maxOffset)
     }
@@ -806,7 +838,7 @@ extension ListStylePresentation {
       }
     var end = offset
     var cells = 0
-    while end < displayLineCount, cells + lineHeight(end) <= capacity {
+    while end < displayLineCount, SaturatingConversion.adding(cells, lineHeight(end)) <= capacity {
       cells += lineHeight(end)
       end += 1
     }
@@ -835,7 +867,10 @@ extension ListStylePresentation {
     }
     // Blank lines take the cells a row that did not fit leaves, so the lower
     // indicator stays on the viewport's last line.
-    visible.append(contentsOf: Array(repeating: indicator(""), count: max(0, capacity - cells)))
+    visible.append(
+      contentsOf: Array(
+        repeating: indicator(""),
+        count: min(max(0, capacity - cells), Rasterizer.maximumSurfaceExtent)))
     visible.insert(indicator(offset == 0 ? "" : "↑"), at: 0)
     visible.append(indicator(end >= displayLineCount ? "" : "↓"))
     return (visible, 0, 0, false, maximumAnchorRow, position, nil)
@@ -1093,13 +1128,18 @@ extension ListStylePresentation {
     func chromeRect(fromLine start: Int, toLine end: Int) -> CellRect {
       CellRect(
         origin: .init(
-          x: contentBounds.origin.x - contentInsets.leading,
-          y: contentBounds.origin.y + start - contentInsets.top
+          x: SaturatingConversion.subtracting(contentBounds.origin.x, contentInsets.leading),
+          y: SaturatingConversion.subtracting(
+            SaturatingConversion.adding(contentBounds.origin.y, start), contentInsets.top)
         ),
         size: .init(
-          width: contentBounds.size.width + contentInsets.leading
-            + contentInsets.trailing,
-          height: end - start + contentInsets.top + contentInsets.bottom
+          width: SaturatingConversion.sum([
+            contentBounds.size.width, contentInsets.leading, contentInsets.trailing,
+          ]),
+          height: SaturatingConversion.sum([
+            SaturatingConversion.subtracting(end, start), contentInsets.top,
+            contentInsets.bottom,
+          ])
         )
       )
     }
@@ -1147,7 +1187,9 @@ extension ListStylePresentation {
       }
     }
 
-    appendRange(endingAt: lines.last.map { $0.yOffset + max(1, $0.height) } ?? 0)
+    appendRange(
+      endingAt: lines.last.map { SaturatingConversion.adding($0.yOffset, max(1, $0.height)) }
+        ?? 0)
 
     // When the visible slice's outermost lines carry no section index (an
     // overflow indicator, or a window boundary that landed on a spacer), the
@@ -1159,24 +1201,27 @@ extension ListStylePresentation {
     if !bounds.isEmpty {
       if lines.first?.sectionIndex == nil {
         let first = bounds[0]
-        let bandTop = contentBounds.origin.y - contentInsets.top
+        let bandTop = SaturatingConversion.subtracting(contentBounds.origin.y, contentInsets.top)
         bounds[0] = CellRect(
           origin: .init(x: first.origin.x, y: bandTop),
           size: .init(
             width: first.size.width,
-            height: first.size.height + (first.origin.y - bandTop)
+            height: SaturatingConversion.adding(
+              first.size.height, SaturatingConversion.subtracting(first.origin.y, bandTop))
           )
         )
       }
       if lines.last?.sectionIndex == nil {
         let last = bounds[bounds.count - 1]
-        let bandBottom =
-          contentBounds.origin.y + contentBounds.size.height + contentInsets.bottom
+        let bandBottom = SaturatingConversion.sum([
+          contentBounds.origin.y, contentBounds.size.height, contentInsets.bottom,
+        ])
         bounds[bounds.count - 1] = CellRect(
           origin: last.origin,
           size: .init(
             width: last.size.width,
-            height: max(last.size.height, bandBottom - last.origin.y)
+            height: max(
+              last.size.height, SaturatingConversion.subtracting(bandBottom, last.origin.y))
           )
         )
       }
