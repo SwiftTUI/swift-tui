@@ -26,6 +26,19 @@ package struct StrokeDashPattern: Equatable, Sendable {
     self.phase = reduced < 0 ? reduced + period : reduced
   }
 
+  private init(runs: [Double], period: Double, phase: Double) {
+    self.runs = runs
+    self.period = period
+    self.phase = phase
+  }
+
+  /// The same pattern measured in units `factor` times as long, for a power
+  /// of two `factor`: every length scales exactly.
+  package func scaled(by factor: Double) -> StrokeDashPattern {
+    StrokeDashPattern(
+      runs: runs.map { $0 * factor }, period: period * factor, phase: phase * factor)
+  }
+
   package func isOn(at position: Double) -> Bool {
     var offset = position.isFinite ? position.truncatingRemainder(dividingBy: period) : 0
     if offset < 0 { offset += period }
@@ -88,6 +101,17 @@ package struct StrokeMask: Equatable, Sendable {
   /// Whether every position is on, so the stroke can skip the test.
   package var isSolid: Bool {
     dash == nil && trim == nil
+  }
+
+  /// The same test on a track measured in units `factor` times as long, for
+  /// a power of two `factor`: a trim is a fraction of the length, and the
+  /// dash and both origins scale exactly.
+  package func scaled(by factor: Double) -> StrokeMask {
+    var copy = self
+    copy.dash = dash?.scaled(by: factor)
+    copy.origin = origin * factor
+    copy.trimOrigin = trimOrigin * factor
+    return copy
   }
 
   package func isOn(at position: Double, trackLength: Double) -> Bool {

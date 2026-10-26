@@ -25,12 +25,6 @@ func setGProperty<Value: Sendable>(
 
 /// Reproduced pass-2 findings, keyed by scenario number.
 let setGKnownIssues: [Int: String] = [
-  102:
-    "STUI-1249 (duplicate): a segment with both endpoints beyond the clip square is clipped off its own line (residual 2^23 at 2^73 endpoints); the crossing interpolates from an endpoint far from the boundary; contract: SaturatingConversion.swift:57-61; adjacent STUI-1245",
-  105:
-    "NEW-5: the half-scale clip of a horizontal far segment turns its odd subnormal y into its even neighbour (5e-324 becomes 0); halving rounds to even before doubling back; contract: SaturatingConversion.swift:63-67; adjacent STUI-1245",
-  107:
-    "STUI-1249 (duplicate): a Canvas line through the canvas drawn from endpoints beyond 2^60 cells lights no sample; the clipped endpoints leave the line; contract: CanvasDrawing.swift:188-191, :455-457; adjacent STUI-1245",
   110:
     "NEW-3: BrailleCanvas.fillCircle lights column cx - r on rows near the centre once r >= 2^26 (span r, exact floor(sqrt(r^2 - dy^2)) is r - 1); the Double square root rounds up to r; contract: BrailleCanvas.swift:197-200; adjacent STUI-753",
   111:

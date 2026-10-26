@@ -164,6 +164,28 @@ struct CanvasGridTests {
     #expect(litGridSamples(flat.canvas) == clippedRasterPixels((0..<8).map { ($0, 0) }))
   }
 
+  // STUI-1249: a sloped line whose endpoints both lie far outside the canvas
+  // lights the samples of the in-range line with the same exact direction.
+  // The diagonal from the Double extremes drew nothing. Dyadic slopes keep the
+  // clipped endpoints exact, so the walks agree sample for sample.
+  @Test("CanvasContext sloped lines with both endpoints far outside keep their position")
+  func contextFarSlopedLinesKeepTheirPosition() {
+    func lit(_ start: Point, _ end: Point) -> Set<ClippedRasterPixel> {
+      var context = brailleGridContext()
+      context.line(from: start, to: end)
+      return litGridSamples(context.canvas)
+    }
+    for (dx, dy) in [(1.0, 1.0), (2.0, 1.0), (1.0, 2.0), (4.0, -1.0)] {
+      let near = lit(Point(x: -8 * dx, y: -8 * dy), Point(x: 8 * dx, y: 8 * dy))
+      #expect(!near.isEmpty, "direction \(dx), \(dy)")
+      for far in [1e300, 0x1p70, 0x1p1020] {
+        #expect(
+          lit(Point(x: -far * dx, y: -far * dy), Point(x: far * dx, y: far * dy)) == near,
+          "direction \(dx), \(dy), far \(far)")
+      }
+    }
+  }
+
   @Test("CanvasGridBuffer primitives that overhang the buffer match the unclipped walks")
   func gridPrimitivesMatchReference() {
     var random = ClippedRasterReference.Random(state: 0xC0FF_EE11)

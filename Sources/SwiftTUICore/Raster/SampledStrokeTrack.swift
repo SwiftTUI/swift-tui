@@ -29,11 +29,15 @@
 /// The stroke is still rasterized the way it always was. The track only decides
 /// which of the lit subpixels a mask keeps, so an unmasked stroke is untouched.
 package struct SampledStrokeTrack: Equatable, Sendable {
-  /// Outline samples, in subpixel coordinates.
+  /// Outline samples, in subpixel coordinates times ``scale``.
   package private(set) var points: [Point] = []
-  /// The track position of each sample.
+  /// The track position of each sample, times ``scale``.
   package private(set) var positions: [Double] = []
   package private(set) var length: Double = 0
+  /// A power of two that every coordinate and length of the track is
+  /// multiplied by: 1, unless the outline would leave the `Double` range at
+  /// subpixel scale.
+  package private(set) var scale: Double = 1
 
   /// Track units per subpixel. A cell is two subpixels wide and four tall.
   private let unitX: Double
@@ -60,12 +64,19 @@ package struct SampledStrokeTrack: Equatable, Sendable {
   ///     will be asked about. A segment longer than the sampling cap is
   ///     sampled only near this window; without one it contributes just its
   ///     end point. Shorter segments are sampled in full either way.
-  package init(polylines: [[Point]], aspectRatio: Double, samplingWindow: Rect? = nil) {
+  ///   - scale: A power of two the polylines and the window are already
+  ///     multiplied by. The sampling step and the window's margin scale alike,
+  ///     so the track is the exact image of the unscaled one.
+  package init(
+    polylines: [[Point]], aspectRatio: Double, samplingWindow: Rect? = nil, scale: Double = 1
+  ) {
     unitX = 0.5
     unitY = RectangleStrokeTrack.snappedAspectRatio(aspectRatio) / 4
+    self.scale = scale
+    let maximumStep = Self.maximumStep * scale
     // Pad the window so that no sample outside it can be the nearest one to a
     // subpixel inside it, whatever the aspect ratio.
-    let margin = 2 + 4 * max(unitX, unitY) / min(unitX, unitY)
+    let margin = (2 + 4 * max(unitX, unitY) / min(unitX, unitY)) * scale
     let window = samplingWindow.map {
       (
         minX: $0.origin.x - margin, minY: $0.origin.y - margin,
@@ -92,7 +103,7 @@ package struct SampledStrokeTrack: Equatable, Sendable {
             Point(x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t),
             at: travelled + segment * t)
         }
-        let stepCount = (raw / Self.maximumStep).rounded(.up)
+        let stepCount = (raw / maximumStep).rounded(.up)
         if stepCount <= Double(Self.maximumSegmentSamples) {
           let steps = max(1, Int(stepCount))
           for step in 1...steps {
@@ -154,9 +165,10 @@ package struct SampledStrokeTrack: Equatable, Sendable {
     Self.length(dx: (b.x - a.x) * unitX, dy: (b.y - a.y) * unitY)
   }
 
-  /// The track position of the outline sample nearest a subpixel.
+  /// The track position, times ``scale``, of the outline sample nearest a
+  /// subpixel.
   package func position(nearestToX x: Int, y: Int) -> Double {
-    let target = Point(x: Double(x), y: Double(y))
+    let target = Point(x: Double(x) * scale, y: Double(y) * scale)
     var best = 0.0
     var bestDistance = Double.infinity
     for index in points.indices {
@@ -174,6 +186,8 @@ package struct SampledStrokeTrack: Equatable, Sendable {
     guard !mask.isSolid, !points.isEmpty else {
       return
     }
+    // A trim is a fraction of the length; a dash scales exactly with it.
+    let mask = scale == 1 ? mask : mask.scaled(by: scale)
     for y in 0..<canvas.subpixelHeight {
       for x in 0..<canvas.subpixelWidth {
         guard canvas.cell(x: x / 2, y: y / 4).contains(x: x % 2, y: y % 4) else {
@@ -255,21 +269,21 @@ extension SampledStrokeTrack {
     return SampledStrokeTrack(polylines: [outline], aspectRatio: aspectRatio)
   }
 
-  /// A custom path, mapped onto the subpixel grid as `strokePath` maps it.
+  /// A custom path, mapped onto the subpixel grid as `strokePath` maps it,
+  /// at the same power-of-two scale when its subpixel image would overflow.
   package static func path(
     _ unitPath: Path, subpixelWidth: Int, subpixelHeight: Int, aspectRatio: Double
   ) -> SampledStrokeTrack {
-    SampledStrokeTrack(
-      polylines:
-        unitPath
-        .scaledBy(
-          sx: Double(max(1, subpixelWidth - 1)), sy: Double(max(1, subpixelHeight - 1))
-        )
-        .flattened(tolerance: 0.3),
+    let route = unitPath.subpixelPolylines(
+      sx: Double(max(1, subpixelWidth - 1)), sy: Double(max(1, subpixelHeight - 1)))
+    return SampledStrokeTrack(
+      polylines: route.polylines,
       aspectRatio: aspectRatio,
       samplingWindow: Rect(
         origin: .zero,
         size: Size(
-          width: Double(max(0, subpixelWidth - 1)), height: Double(max(0, subpixelHeight - 1)))))
+          width: Double(max(0, subpixelWidth - 1)) * route.scale,
+          height: Double(max(0, subpixelHeight - 1)) * route.scale)),
+      scale: route.scale)
   }
 }

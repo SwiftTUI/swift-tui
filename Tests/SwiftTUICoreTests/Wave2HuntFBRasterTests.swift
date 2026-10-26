@@ -412,7 +412,7 @@ struct Wave2HuntFBRasterTests {
     #expect(lit(Point(x: -1e308, y: 50), Point(x: 1e308, y: 50)).isEmpty)
   }
 
-  @Test("wave3g07: segment clipping halves differences that leave the Double range")
+  @Test("wave3g07: segment clipping keeps segments whose differences leave the Double range")
   func wave3g07SegmentClippingHalvesOverflowingDifferences() {
     let limit = Double(Int.max / 16)
     func clip(_ start: Point, _ end: Point) -> [Point]? {
@@ -437,12 +437,18 @@ struct Wave2HuntFBRasterTests {
     #expect(clip(Point(x: -1e308, y: .nan), Point(x: 1e308, y: 0.5)) == nil)
   }
 
-  @Test("wave3g08: segments whose differences are finite clip exactly as before")
+  // Wave 4 oracle correction (STUI-1249): a segment with both endpoints
+  // outside the square no longer interpolates from a far endpoint, which
+  // cancelled, so it is excluded here. Its accuracy is measured by setG102,
+  // setG107 and the wave-4 FW-E probe. Every segment with an endpoint inside
+  // the square still clips exactly as before.
+  @Test("wave3g08: segments with an endpoint inside the square clip exactly as before")
   func wave3g08SegmentClippingIsUnchangedForFiniteDifferences() {
     var random = ClippedRasterReference.Random(state: 0x3_6E0D_F00D)
     let scales = [1.0, 30, 1e6, 1e18, 1e150, 1e300]
     let limits = [Double(Int.max / 16), Double(Int.max / 8), 10]
     var differing: [String] = []
+    var compared = 0
     for index in 0..<4_000 {
       func coordinate() -> Double {
         let scale = scales[random.next(0...(scales.count - 1))]
@@ -451,12 +457,16 @@ struct Wave2HuntFBRasterTests {
       let start = Point(x: coordinate(), y: coordinate())
       let end = Point(x: coordinate(), y: coordinate())
       let limit = limits[index % limits.count]
+      func inside(_ point: Point) -> Bool { abs(point.x) <= limit && abs(point.y) <= limit }
+      guard inside(start) || inside(end) else { continue }
+      compared += 1
       let repaired = SegmentClipping.clipped(from: start, to: end, within: limit)
       let reference = W3GPreFixSegmentClipping.clipped(from: start, to: end, within: limit)
       let same =
         repaired.map { [$0.start, $0.end] } == reference.map { [$0.start, $0.end] }
       if !same { differing.append("\(start) \(end) \(limit)") }
     }
+    #expect(compared > 1_000, "\(compared) segments compared")
     #expect(differing.isEmpty, "\(differing.count): \(differing.prefix(4))")
   }
 

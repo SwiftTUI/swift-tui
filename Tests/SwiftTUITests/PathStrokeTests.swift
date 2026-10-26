@@ -107,6 +107,97 @@ struct PathStrokeTests {
       await MainActor.run { checkFarFinitePathPointStrokes() }
     }
   }
+
+  // STUI-1268: a finite unit point so far out that scaling it to subpixels
+  // overflows drew nothing. It now draws what the same shape with a far but
+  // representable point draws: stroked, dashed, trimmed, inset and filled.
+  @Test("a custom path whose unit coordinates overflow the subpixel scale draws like a far one")
+  func overflowingPathPointDrawsLikeAFarFinitePoint() {
+    func line(to far: Double) -> UnitPathShape {
+      var path = Path()
+      path.move(to: Point(x: 0, y: 0.5))
+      path.addLine(to: Point(x: far, y: 0.5))
+      return UnitPathShape(pathValue: path)
+    }
+    func wedge(_ far: Double) -> UnitPathShape {
+      var path = Path()
+      path.move(to: .zero)
+      path.addLine(to: Point(x: far, y: 0))
+      path.addLine(to: Point(x: 0, y: 1))
+      path.close()
+      return UnitPathShape(pathValue: path)
+    }
+    let finite = line(to: 1e300)
+    let overflowing = line(to: 1.5e308)
+    let dash = StrokeStyle(dash: [1.2, 1.2])
+    #expect(
+      farPointDotRows(overflowing.stroke(Color.white), "OverflowSolid")
+        == [[0, 0, 0, 0], [2, 2, 2, 2]])
+    #expect(
+      farPointDotRows(overflowing.stroke(Color.white, style: dash), "OverflowDash")
+        == farPointDotRows(finite.stroke(Color.white, style: dash), "FiniteDash"))
+    for (from, to) in [(0.0, 0.5), (0.5, 1.0)] {
+      #expect(
+        farPointDotRows(overflowing.trim(from: from, to: to).stroke(Color.white), "OverflowTrim")
+          == farPointDotRows(finite.trim(from: from, to: to).stroke(Color.white), "FiniteTrim"),
+        "trim \(from)...\(to)")
+    }
+    let inset = farPointDotRows(wedge(1.5e308).strokeBorder(Color.white), "OverflowInset")
+    #expect(inset == farPointDotRows(wedge(1e300).strokeBorder(Color.white), "FiniteInset"))
+    #expect(inset.joined().reduce(0, +) > 0)
+    #expect(
+      farPointDotRows(wedge(1.5e308).fill(Color.white), "OverflowFill")
+        == farPointDotRows(wedge(1e300).fill(Color.white), "FiniteFill"))
+    // Clip and tile coverage uses the fill's scanline.
+    var triangle = Path()
+    triangle.move(to: .zero)
+    triangle.addLine(to: Point(x: 1, y: 0))
+    triangle.addLine(to: Point(x: 1, y: 1.5e308))
+    triangle.close()
+    for y in 0..<2 {
+      for x in 0..<4 {
+        #expect(
+          Rasterizer().pathContainsCell(
+            triangle, rule: .nonZero, cellRelX: x, cellRelY: y, subpixelWidth: 8,
+            subpixelHeight: 8), "cell \(x), \(y)")
+      }
+    }
+  }
+
+  // STUI-1249: a sloped segment whose endpoints both lie far outside the frame
+  // keeps its position: the stroke and the fill draw the in-range shape with
+  // the same exact direction, whether the far points overflow the subpixel
+  // scale or not.
+  @Test("custom path edges with both endpoints far outside the frame keep their position")
+  func farSlopedPathEdgesKeepTheirPosition() {
+    func shape(_ points: [(Double, Double)], closed: Bool = false) -> UnitPathShape {
+      var path = Path()
+      for (index, point) in points.enumerated() {
+        let p = Point(x: point.0, y: point.1)
+        if index == 0 { path.move(to: p) } else { path.addLine(to: p) }
+      }
+      if closed { path.close() }
+      return UnitPathShape(pathValue: path)
+    }
+    let diagonal = farPointDotRows(shape([(0, 0), (1, 1)]).stroke(Color.white), "NearDiagonal")
+    #expect(diagonal.joined().reduce(0, +) == 8)
+    for far in [1e300, 1.7e308] {
+      #expect(
+        farPointDotRows(shape([(-far, -far), (far, far)]).stroke(Color.white), "FarDiagonal")
+          == diagonal, "far \(far)")
+    }
+    // Half-plane above the diagonal: power-of-two vertices keep the near
+    // fill's crossings exact.
+    let nearFill = farPointDotRows(
+      shape([(-2, -2), (2, 2), (-2, 2)], closed: true).fill(Color.white), "NearHalfPlane")
+    #expect(nearFill.joined().reduce(0, +) > 0)
+    for far in [1e300, 1.7e308] {
+      #expect(
+        farPointDotRows(
+          shape([(-far, -far), (far, far), (-far, far)], closed: true).fill(Color.white),
+          "FarHalfPlane") == nearFill, "far \(far)")
+    }
+  }
 }
 
 /// Renders a 4 x 2 cell frame and returns the Braille dot count of each cell.

@@ -189,12 +189,16 @@ public struct CanvasContext: Sendable {
   ///
   /// A line with a non-finite endpoint draws nothing. Only the part of the
   /// line inside the canvas is rasterized, so its cost is bounded by the
-  /// canvas however far the endpoints lie.
+  /// canvas however far the endpoints lie, and the line keeps its position
+  /// there.
   public mutating func line(
     from start: Point,
     to end: Point
   ) {
-    guard let segment = SegmentClipping.clipped(from: start, to: end, within: Self.lineLimit)
+    guard
+      let segment = SegmentClipping.rasterSegment(
+        from: start, to: end, limit: Self.lineLimit,
+        reach: SegmentClipping.reach(width: size.width, height: size.height))
     else { return }
     let startPoint = gridSample(for: segment.start)
     let endPoint = gridSample(for: segment.end)
@@ -454,7 +458,10 @@ public struct CanvasContext: Sendable {
   }
 
   /// Lines are clipped to this many cells from the origin before sampling,
-  /// so their grid samples never saturate and keep the line's direction.
+  /// so their grid samples never saturate and keep the line's direction. A
+  /// line with both endpoints far outside the canvas is clipped to a square
+  /// around the canvas instead (`SegmentClipping.rasterSegment`), so it also
+  /// keeps its position.
   private static let lineLimit = Double(Int.max / 16)
 
   /// Scales a cell coordinate to grid samples. NaN and values outside

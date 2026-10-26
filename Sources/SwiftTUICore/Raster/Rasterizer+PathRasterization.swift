@@ -7,6 +7,8 @@ extension Rasterizer {
   /// to fill the placed frame. We scale the path first, then flatten in
   /// subpixel space so the curve tolerance is meaningful, then run a
   /// winding-rule scanline fill that reuses ``BrailleCanvas/setPixel(x:y:)``.
+  /// A polygon reaching far beyond the canvas is first clipped to a square
+  /// around it (`fillPolylines`).
   internal func fillPath(
     _ unitPath: Path,
     rule: FillRule,
@@ -17,10 +19,7 @@ extension Rasterizer {
     guard subW > 0, subH > 0 else {
       return
     }
-    let polylines =
-      unitPath
-      .scaledBy(sx: Double(subW), sy: Double(subH))
-      .flattened(tolerance: 0.3)
+    let polylines = Self.fillPolylines(unitPath, subpixelWidth: subW, subpixelHeight: subH)
     scanlineFillSubpixels(
       polylines,
       rule: rule,
@@ -45,31 +44,61 @@ extension Rasterizer {
     // shapes' `-1` bound) so an edge at unit 1.0 lands on the last valid
     // subpixel instead of being clipped off-grid. Fill uses the full `[0, sub)`
     // range via scanline center-sampling.
-    let polylines =
-      unitPath
-      .scaledBy(sx: Double(max(1, subW - 1)), sy: Double(max(1, subH - 1)))
-      .flattened(tolerance: 0.3)
-    for polyline in polylines where polyline.count >= 2 {
+    let route = unitPath.subpixelPolylines(
+      sx: Double(max(1, subW - 1)), sy: Double(max(1, subH - 1)))
+    let limit = Self.strokeCoordinateLimit * route.scale
+    let reach = SegmentClipping.reach(width: subW, height: subH) * route.scale
+    for polyline in route.polylines where polyline.count >= 2 {
       for index in 0..<(polyline.count - 1) {
         // A finite path point can lie far outside the frame. Clip the segment
         // far beyond the canvas (segments inside the limit pass unchanged), so
-        // rounding cannot trap and the line keeps its direction; the canvas
-        // walks only its own subpixels.
+        // rounding cannot trap and the line keeps its direction, or near the
+        // canvas when both endpoints are far, so it keeps its position; the
+        // canvas walks only its own subpixels.
         guard
-          let segment = SegmentClipping.clipped(
-            from: polyline[index], to: polyline[index + 1], within: Self.strokeCoordinateLimit)
+          let segment = SegmentClipping.rasterSegment(
+            from: polyline[index], to: polyline[index + 1], limit: limit, reach: reach)
         else {
           continue
         }
+        let start = route.subpixels(segment.start)
+        let end = route.subpixels(segment.end)
         canvas.line(
-          from: (x: roundToInt(segment.start.x), y: roundToInt(segment.start.y)),
-          to: (x: roundToInt(segment.end.x), y: roundToInt(segment.end.y)))
+          from: (x: roundToInt(start.x), y: roundToInt(start.y)),
+          to: (x: roundToInt(end.x), y: roundToInt(end.y)))
       }
     }
   }
 
   /// Stroke segments are clipped to this many subpixels from the origin.
   private static let strokeCoordinateLimit = Double(Int.max / 8)
+
+  /// The subpixel polygons a fill or a coverage test scans.
+  ///
+  /// A polygon within the canvas reach (`SegmentClipping.reach`) is the
+  /// flattened polyline itself, bit for bit. A polygon reaching beyond it is
+  /// clipped to the reach in the flattening's own coordinates first. A
+  /// polygon flattened at a shrunken scale is then scaled back to subpixels. The
+  /// clip keeps every sample's winding number and puts every crossing near
+  /// the canvas, where the scanline's interpolation cannot cancel.
+  private static func fillPolylines(
+    _ unitPath: Path, subpixelWidth subW: Int, subpixelHeight subH: Int
+  ) -> [[Point]] {
+    let route = unitPath.subpixelPolylines(sx: Double(subW), sy: Double(subH))
+    let reach = SegmentClipping.reach(width: subW, height: subH) * route.scale
+    func near(_ point: Point) -> Bool {
+      abs(point.x) <= reach && abs(point.y) <= reach
+    }
+    return route.polylines.compactMap { polyline in
+      let polygon =
+        polyline.allSatisfy(near)
+        ? polyline : SegmentClipping.clippedPolygon(polyline, within: reach)
+      guard polygon.count >= 2 else {
+        return nil
+      }
+      return route.scale == 1 ? polygon : polygon.map(route.subpixels)
+    }
+  }
 
   /// Strokes a border that stays inside the shape: the stroked outline
   /// intersected with the filled interior, so no part of the stroke spills
@@ -122,7 +151,7 @@ extension Rasterizer {
     guard cellRelX >= 0, cellRelY >= 0, cellRelX < subW / 2, cellRelY < subH / 4 else {
       return false
     }
-    let polylines = unitPath.scaledBy(sx: Double(subW), sy: Double(subH)).flattened(tolerance: 0.3)
+    let polylines = Self.fillPolylines(unitPath, subpixelWidth: subW, subpixelHeight: subH)
     return visitScanlineSpans(polylines, rule: rule, rows: (cellRelY * 4)..<(cellRelY * 4 + 4)) {
       start, end, _ in
       let first = max(Double(cellRelX * 2), (start - 0.5).rounded(.up))
@@ -239,5 +268,42 @@ extension Rasterizer {
 
   private func roundToInt(_ value: Double) -> Int {
     SaturatingConversion.int(value, rounding: .toNearestOrAwayFromZero)
+  }
+}
+
+extension Path {
+  /// A unit path scaled to subpixels and flattened there, with a curve
+  /// tolerance in subpixels, and the `scale` of the polylines' coordinates:
+  /// subpixels times `scale`.
+  ///
+  /// `scale` is 1 unless scaling takes a finite coordinate past the `Double`
+  /// range. The path is then scaled by a power of two below one as well, and
+  /// flattened with the tolerance scaled alike, as
+  /// `Path.physicallyTrimmedPath(from:to:aspectRatio:)` shrinks a trim. A
+  /// power-of-two scale changes only exponents, so the polylines are the exact
+  /// image of the ones the unoverflowed path would give. Callers clip in these
+  /// coordinates and map the clipped points back with `SubpixelPolylines.subpixels(_:)`.
+  func subpixelPolylines(sx: Double, sy: Double) -> SubpixelPolylines {
+    let scaled = scaledBy(sx: sx, sy: sy)
+    guard !scaled.hasFiniteCoordinates, hasFiniteCoordinates else {
+      return SubpixelPolylines(polylines: scaled.flattened(tolerance: 0.3), scale: 1)
+    }
+    let scale = Double(sign: .plus, exponent: -(max(sx, sy).exponent + 1), significand: 1)
+    return SubpixelPolylines(
+      polylines: scaledBy(sx: sx * scale, sy: sy * scale).flattened(tolerance: 0.3 * scale),
+      scale: scale)
+  }
+}
+
+/// Flattened subpixel polylines, in coordinates scaled by a power of two.
+struct SubpixelPolylines {
+  var polylines: [[Point]]
+  /// The coordinates are subpixels times this power of two.
+  var scale: Double
+
+  /// A point of these coordinates in subpixels; exact for a point that has a
+  /// finite subpixel image.
+  func subpixels(_ point: Point) -> Point {
+    scale == 1 ? point : Point(x: point.x / scale, y: point.y / scale)
   }
 }

@@ -468,7 +468,7 @@ public struct Path: Equatable, Sendable {
 
   // Invalid control points cannot define a finite outline. Reject the whole
   // path consistently for rendering, bounds and hit testing, before subdivision.
-  private var hasFiniteCoordinates: Bool {
+  package var hasFiniteCoordinates: Bool {
     func finite(_ point: Point) -> Bool { point.x.isFinite && point.y.isFinite }
     return elements.allSatisfy { element in
       switch element {

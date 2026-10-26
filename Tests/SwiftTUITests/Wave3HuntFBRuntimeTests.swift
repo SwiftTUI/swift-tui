@@ -866,13 +866,10 @@ struct Wave3HuntFBShapeTests {
     let far = W3FB.dotRows(
       W3FBPathShape(pathValue: W3FB.polyline([(0, 0.5), (1, 0.5), (3e307, 0.5)])).stroke(),
       "w3fb027-far")
-    w3fbKnown(
-      "NEW-10: a stroke of the finite unit path (0,0.5)->(1,0.5)->(3e307,0.5) in a 4x2 frame draws no dot, while the same path to 2e307 draws the full row; the rasterizer scales the unit path by the subpixel extent before flattening and flattened rejects the whole non-finite result, so nothing is clipped or drawn (Rasterizer+PathRasterization.swift:19-23, 48-51; Path.swift:353-354); contract: FW-E brief (a stroke draws the visible part of any finite path), Path.swift:11-17; adjacent STUI-1245, STUI-741"
-    ) {
-      // Contract: the FW-E brief (a stroke draws the visible part of any finite
-      // path), adopted by FW3-G for STUI-1245; Path.swift:11-17.
-      #expect(far == near, "far \(far)")
-    }
+    // STUI-1268 (repaired). Contract: the FW-E brief (a stroke draws the
+    // visible part of any finite path), adopted by FW3-G for STUI-1245;
+    // Path.swift:11-17.
+    #expect(far == near, "far \(far)")
   }
 
   // w3fb028: a fill of a finite unit triangle with a far vertex paints the
@@ -894,13 +891,10 @@ struct Wave3HuntFBShapeTests {
     let near = check(2e307, "w3fb028-near")
     try #require(!near.painted.isEmpty && near.painted == near.contained, "\(near)")
     let far = check(3e307, "w3fb028-far")
-    w3fbKnown(
-      "NEW-10: a fill of the finite unit triangle (0,0),(1,0),(1,3e307) paints no cell of a 4x2 frame while Path.contains holds for all 8 cells; the rasterizer scales the unit path by the subpixel extent before flattening and flattened rejects the whole non-finite result, so nothing is clipped or drawn (Rasterizer+PathRasterization.swift:19-23, 48-51; Path.swift:353-354); contract: Path.swift:11-17, FW-E brief; adjacent STUI-1245"
-    ) {
-      // Contract: Path.swift:11-17 (one Path for hit testing and rendering); the
-      // FW-E brief (a finite path paints its visible part).
-      #expect(far.painted == far.contained && far.painted == near.painted, "\(far)")
-    }
+    // STUI-1268 (repaired). Contract: Path.swift:11-17 (one Path for hit
+    // testing and rendering); the FW-E brief (a finite path paints its
+    // visible part).
+    #expect(far.painted == far.contained && far.painted == near.painted, "\(far)")
   }
 
   // w3fb029 (STUI-1244 x STUI-1248): a far custom shape's trimmed public path
@@ -918,12 +912,8 @@ struct Wave3HuntFBShapeTests {
     try #require(!covered.isEmpty, "the public path covers no cell")
     let painted = W3FB.paintedCells(
       shape.trim(from: 0, to: 0.5).fill(), "w3fb029", width: 10, height: 5)
-    w3fbKnown(
-      "NEW-10: the trimmed fill of a far custom unit path (1, 2e307) in a 10x5 frame paints 0 cells while its public trimmed path (non-empty since d751e650) covers 50; the fill's resolved unit path is rasterized through the same overflowing subpixel scale (Rasterizer+PathRasterization.swift:19-23, 48-51; Path.swift:353-354); contract: ShapePayload.swift:130-134; adjacent STUI-1244, STUI-1248"
-    ) {
-      // Contract: ShapePayload.swift:130-134.
-      #expect(painted == covered, "painted \(painted.count) covered \(covered.count)")
-    }
+    // STUI-1268 (repaired). Contract: ShapePayload.swift:130-134.
+    #expect(painted == covered, "painted \(painted.count) covered \(covered.count)")
   }
 
   // w3fb030: the physical trim of a far quadratic curve keeps its outline.
