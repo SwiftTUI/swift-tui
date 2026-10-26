@@ -646,6 +646,31 @@ package final class AnimationController: Sendable {
     }
   }
 
+  /// A clip mask animating toward a mask that encloses area can uncover
+  /// content its node never drew. The rasterizer records a masked node as
+  /// drawn only through its mask's regions (`Rasterizer+Paint.swift`), and an
+  /// empty mask has none, so a previous visibility snapshot cannot prove the
+  /// next sample stays hidden, just as it cannot for a geometry slot (T252).
+  /// The slot stays draw-only (it never needs layout); only elision consults
+  /// this. A mask whose destination encloses no area reveals nothing and keeps
+  /// elision (STUI-1318).
+  package var hasRevealingClipMaskAnimation: Bool {
+    activeAnimations.contains { key, animation in
+      guard key.scope == .property(.clipShapePaths),
+        case .property(_, let destination) = animation.kind
+      else { return false }
+      guard let mask = destination.unwrap(as: ClipMaskPaths.self) else { return true }
+      return !mask.enclosesNoArea
+    }
+  }
+
+  /// Whether some in-flight property animation makes the previous frame's
+  /// drawn identities unable to justify eliding a deadline frame: a
+  /// layout-affecting slot or a revealing clip mask.
+  package var blocksOffscreenFrameElision: Bool {
+    hasLayoutAffectingPropertyAnimation || hasRevealingClipMaskAnimation
+  }
+
   /// Number of insertion-offset animations currently in flight.
   /// Test hook so integration tests can pin the enqueue path
   /// without exposing the entire private map.

@@ -369,6 +369,19 @@ package struct ClipMaskPaths: Animatable, Equatable, Sendable {
     }
   }
 
+  /// Whether some clip's custom path encloses no area: it has no elements,
+  /// or its bounds have zero width or height (a collapsed reveal mask). Nested
+  /// clips intersect, so such a mask covers no cell. A path with non-finite
+  /// coordinates is not known to be empty.
+  package var enclosesNoArea: Bool {
+    paths.contains { path in
+      guard let path else { return false }
+      guard !path.elements.isEmpty else { return true }
+      guard let bounds = path.boundingRect else { return false }
+      return bounds.size.width <= 0 || bounds.size.height <= 0
+    }
+  }
+
   package func interpolated(to other: ClipMaskPaths, progress: Double) -> ClipMaskPaths {
     guard paths.count == other.paths.count else { return other }
     var result = other

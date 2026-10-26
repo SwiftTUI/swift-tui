@@ -166,6 +166,9 @@ extension Rasterizer {
         // `drawnIdentities`, after excluding geometry-changing animations.
         // A geometry slot can move content into view from an invisible
         // wrapper, so its prior visibility cannot justify elision (T252).
+        // A node behind an empty mask is never recorded either (the mask
+        // branch above has no region to visit), so an animating mask that
+        // gains area is an elision barrier too (STUI-1318).
         // Keep this set descriptive of positive post-clip paint extent.
         //
         // The extent is the node's subtree, not its own bounds: an

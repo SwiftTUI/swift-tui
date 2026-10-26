@@ -28,6 +28,23 @@ private struct SetDMaskShape: Shape {
   }
 }
 
+/// A zero-width rectangle whose height follows `height`: every value is an
+/// empty mask with the same topology, so a change animates between two empty
+/// masks.
+private struct SetDZeroWidthMaskShape: Shape {
+  var height: Double
+  func path(in rect: Rect) -> Path {
+    var path = Path()
+    let bottom = rect.origin.y + rect.size.height * height
+    path.move(to: Point(x: rect.origin.x, y: rect.origin.y))
+    path.addLine(to: Point(x: rect.origin.x, y: rect.origin.y))
+    path.addLine(to: Point(x: rect.origin.x, y: bottom))
+    path.addLine(to: Point(x: rect.origin.x, y: bottom))
+    path.closeSubpath()
+    return path
+  }
+}
+
 @MainActor
 private final class SetDMaskLog {
   var fraction: Binding<Double>?
@@ -42,6 +59,9 @@ private enum SetDMaskMode: Sendable {
   case innerValueAnimation
   case reducedMotion
   case wide
+  case trimmed
+  case emptyToEmpty
+  case staticEmptyMaskOpacity
 }
 
 private struct SetDMaskRoot: View {
@@ -74,6 +94,12 @@ private struct SetDMaskRoot: View {
         ForEach(0..<4, id: \.self) { _ in Text("日本語日本語日本語日本") }
       }
       .clipShape(SetDMaskShape(fraction: fraction))
+    case .trimmed:
+      rows("#").clipShape(SetDMaskShape(fraction: fraction).trim(from: 0, to: 0.75))
+    case .emptyToEmpty:
+      rows("#").clipShape(SetDZeroWidthMaskShape(height: fraction))
+    case .staticEmptyMaskOpacity:
+      rows("#").opacity(fraction).clipShape(SetDMaskShape(fraction: 0))
     }
   }
 
@@ -94,13 +120,19 @@ private enum SetDMask {
   }
 
   /// The last painted column of a static mask at `fraction`.
-  static func staticExtent(_ fraction: Double) -> Int {
-    let surface = DefaultRenderer().render(
-      VStack(spacing: 0) {
-        ForEach(0..<4, id: \.self) { _ in Text(String(repeating: "#", count: 20)) }
-      }.clipShape(SetDMaskShape(fraction: fraction)),
-      proposal: .init(width: 20, height: 4)
-    ).rasterSurface
+  static func staticExtent(_ fraction: Double, trimmed: Bool = false) -> Int {
+    let rows = VStack(spacing: 0) {
+      ForEach(0..<4, id: \.self) { _ in Text(String(repeating: "#", count: 20)) }
+    }
+    let surface =
+      trimmed
+      ? DefaultRenderer().render(
+        rows.clipShape(SetDMaskShape(fraction: fraction).trim(from: 0, to: 0.75)),
+        proposal: .init(width: 20, height: 4)
+      ).rasterSurface
+      : DefaultRenderer().render(
+        rows.clipShape(SetDMaskShape(fraction: fraction)), proposal: .init(width: 20, height: 4)
+      ).rasterSurface
     return lastPaintedX(surface)
   }
 
@@ -126,7 +158,8 @@ private enum SetDMask {
   }
 
   /// Animates the mask from `start` to 1 over one second on an injected clock
-  /// and returns the raster at `sampleAt` and, when asked, after completion.
+  /// and returns the raster at `sampleAt` and after completion, the elided
+  /// frame count, and the property slots animating after the write.
   /// `rootFrames` adds a root invalidation to every frame, so no frame is
   /// deadline-only.
   static func reveal(
@@ -135,7 +168,9 @@ private enum SetDMask {
     write: (Binding<Double>) -> Void = { binding in
       withAnimation(.linear(duration: .seconds(1))) { binding.wrappedValue = 1 }
     }
-  ) async throws -> (mid: RasterSurface?, end: RasterSurface?, elided: Int) {
+  ) async throws -> (
+    mid: RasterSurface?, end: RasterSurface?, elided: Int, slots: Set<AnimatableSlot>
+  ) {
     let log = SetDMaskLog()
     let (loop, surface, scheduler, root) = Self.loop(name, start: start, mode: mode, log: log)
     let clock = SetDMaskClock()
@@ -151,6 +186,12 @@ private enum SetDMask {
       let started = clock.now
       write(binding)
       _ = try await loop.renderPendingFramesAsync(renderedFrames: &rendered, eventPump: nil)
+      let slots = Set(
+        loop.renderer.internalAnimationController.debugStateSnapshot().activeAnimationKeys
+          .compactMap { key -> AnimatableSlot? in
+            guard case .property(let slot) = key.scope else { return nil }
+            return slot
+          })
       @MainActor func advance(to target: MonotonicInstant) async throws {
         var turns = 0
         while let wake = scheduler.nextWakeInstant(after: clock.now), wake < target, turns < 256 {
@@ -167,7 +208,7 @@ private enum SetDMask {
       try await advance(to: started.advanced(by: sample))
       let mid = surface.raster
       try await advance(to: started.advanced(by: .milliseconds(1_100)))
-      return (mid, surface.raster, loop.renderer.elidedFrameCount)
+      return (mid, surface.raster, loop.renderer.elidedFrameCount, slots)
     }
   }
 }
@@ -186,25 +227,19 @@ struct AdversarialSetDClipTrimModeTests {
     let expected = SetDMask.staticExtent(0.5)
     try #require(expected > 4 && expected < 19, "static midway extent \(expected)")
     let result = try await SetDMask.reveal("151", start: 0, sampleAt: .milliseconds(500))
-    setDKnown(
-      "NEW-5: a clip mask animated from an empty mask stays unpainted; an empty mask has no region, so its node is never recorded as drawn and every deadline frame of the reveal is elided (Rasterizer+Paint.swift:128-179, AnimationController.swift:631-647); contract: Shapes.md:121-127, OffscreenFrameElision.swift:1-25; adjacent STUI-1218"
-    ) {
-      #expect(
-        SetDMask.lastPaintedX(result.mid) == expected,
-        "mid \(SetDMask.lastPaintedX(result.mid)) of \(expected); elided \(result.elided)")
-    }
+    // STUI-1318: a mask animating toward area is an elision barrier.
+    #expect(
+      SetDMask.lastPaintedX(result.mid) == expected,
+      "mid \(SetDMask.lastPaintedX(result.mid)) of \(expected); elided \(result.elided)")
   }
 
   @Test("setD152: a reveal from an empty clip mask paints fully after it completes")
   func setD152EmptyMaskRevealPaintsAtEnd() async throws {
     let result = try await SetDMask.reveal("152", start: 0, sampleAt: .milliseconds(500))
-    setDKnown(
-      "NEW-5: a clip mask animated from an empty mask stays unpainted; an empty mask has no region, so its node is never recorded as drawn and every deadline frame of the reveal is elided (Rasterizer+Paint.swift:128-179, AnimationController.swift:631-647); contract: Shapes.md:121-127, OffscreenFrameElision.swift:1-25; adjacent STUI-1218"
-    ) {
-      #expect(
-        SetDMask.lastPaintedX(result.end) == 19,
-        "end \(SetDMask.lastPaintedX(result.end)); elided \(result.elided)")
-    }
+    // STUI-1318: the barrier holds through the completion frame.
+    #expect(
+      SetDMask.lastPaintedX(result.end) == 19,
+      "end \(SetDMask.lastPaintedX(result.end)); elided \(result.elided)")
   }
 
   @Test("setD153: the same reveal with root-invalidated frames paints midway")
@@ -221,7 +256,7 @@ struct AdversarialSetDClipTrimModeTests {
     let result = try await SetDMask.reveal(
       "154", start: 0.25, mode: .innerTransactionDisabled, sampleAt: .milliseconds(500))
     setDKnown(
-      "NEW-6: a clip mask applied outside .transaction { disablesAnimations } snaps instead of morphing; clipShape merges its mask into the clipped content's node, which carries the inner transaction (ViewLayoutModifiers.swift:64-72, AnimationModifiers.swift:262-289); contract: Animating-Views.md:92-101, Shapes.md:125-127; adjacent STUI-1218"
+      "STUI-1319: a clip mask applied outside .transaction { disablesAnimations } snaps instead of morphing; clipShape merges its mask into the clipped content's node, which carries the inner transaction (ViewLayoutModifiers.swift:64-72, AnimationModifiers.swift:262-289); contract: Animating-Views.md:92-101, Shapes.md:125-127; adjacent STUI-1218"
     ) {
       #expect(
         SetDMask.lastPaintedX(result.mid) == expected,
@@ -323,6 +358,42 @@ struct AdversarialSetDClipTrimModeTests {
     #expect(taps.count == 0, "an unpainted cell inside the frame does not activate")
     try h.click(CellPoint(x: painted.x, y: painted.y + 1))
     #expect(taps.count == 1, "a painted cell activates")
+  }
+
+  // Wave 4 (STUI-1318, STUI-1319): neighbours of the repaired mask cases.
+
+  @Test("w4fk01: a trimmed reveal from an empty clip mask paints midway and at the end")
+  func w4fk01TrimmedEmptyMaskRevealPaints() async throws {
+    let midway = SetDMask.staticExtent(0.5, trimmed: true)
+    let final = SetDMask.staticExtent(1, trimmed: true)
+    try #require(midway >= 0 && midway < final, "static trimmed extents \(midway), \(final)")
+    let result = try await SetDMask.reveal(
+      "w4fk01", start: 0, mode: .trimmed, sampleAt: .milliseconds(500))
+    #expect(
+      SetDMask.lastPaintedX(result.mid) == midway,
+      "mid \(SetDMask.lastPaintedX(result.mid)) of \(midway); elided \(result.elided)")
+    #expect(SetDMask.lastPaintedX(result.end) == final, "end \(SetDMask.lastPaintedX(result.end))")
+  }
+
+  @Test("w4fk02: an animation between two empty clip masks still elides its deadline frames")
+  func w4fk02EmptyToEmptyMaskStillElides() async throws {
+    let result = try await SetDMask.reveal(
+      "w4fk02", start: 0.25, mode: .emptyToEmpty, sampleAt: .milliseconds(500))
+    #expect(result.slots.contains(.clipShapePaths), "the empty mask animates: \(result.slots)")
+    #expect(SetDMask.lastPaintedX(result.mid) == -1)
+    #expect(SetDMask.lastPaintedX(result.end) == -1)
+    #expect(result.elided > 0, "an animation that ends in an empty mask reveals nothing")
+  }
+
+  @Test("w4fk03: a paint-only animation under a static empty clip mask still elides")
+  func w4fk03StaticEmptyMaskKeepsElision() async throws {
+    let result = try await SetDMask.reveal(
+      "w4fk03", start: 0.25, mode: .staticEmptyMaskOpacity, sampleAt: .milliseconds(500))
+    #expect(result.slots.contains(.opacity), "\(result.slots)")
+    #expect(!result.slots.contains(.clipShapePaths), "\(result.slots)")
+    #expect(SetDMask.lastPaintedX(result.mid) == -1)
+    #expect(SetDMask.lastPaintedX(result.end) == -1)
+    #expect(result.elided > 0, "content hidden by a static empty mask stays elidable")
   }
 }
 

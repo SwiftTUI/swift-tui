@@ -5,8 +5,9 @@
 /// *solely* by an animation deadline (no user input, no state invalidation)
 /// and carry no explicit animation transaction, provided every identity
 /// that would be redrawn is absent from the previous committed visible set.
-/// Callers must first exclude layout-changing property animations: prior
-/// visibility cannot predict where their next sample will place the content.
+/// Callers must first exclude layout-changing property animations and clip
+/// masks animating toward area: prior visibility cannot predict where the next
+/// sample will place the content, or what an empty mask will uncover.
 ///
 /// The predicate is a pure function with no runtime dependencies and is
 /// therefore unit-testable in isolation.
