@@ -267,6 +267,43 @@ struct PathAnimationIntegrationTests {
     }
   }
 
+  /// STUI-1318: an empty mask records no drawn identity, so a mask animating
+  /// toward area is an off-screen elision barrier while it runs. A mask whose
+  /// destination encloses no area reveals nothing and keeps elision. The slot
+  /// stays draw-only: it is never layout-affecting.
+  @Test("STUI-1318: a clip mask animating toward area blocks off-screen elision")
+  func clipMaskRevealBlocksOffscreenElision() throws {
+    let zero = Path(Rect(origin: .zero, size: .init(width: 0, height: 1)))
+    let flat = Path(Rect(origin: .zero, size: .init(width: 0, height: 0.4)))
+    let wide = Path(Rect(origin: .zero, size: .init(width: 1, height: 1)))
+    let cases: [(name: String, from: Path, to: Path, trim: Bool, reveals: Bool)] = [
+      ("empty to area", zero, wide, false, true),
+      ("trimmed empty to area", zero, wide, true, true),
+      ("area to empty", wide, zero, false, false),
+      ("empty to empty", zero, flat, false, false),
+    ]
+    for (name, from, to, trim, reveals) in cases {
+      let controller = AnimationController()
+      let animation = Animation.linear(duration: .milliseconds(200))
+      _ = controller.register(animation)
+      let time = MonotonicInstant.now()
+      func node(_ path: Path) -> ResolvedNode {
+        let geometry = ShapeGeometry.path(BoxedPath(path), .nonZero)
+        return Self.clipNode([
+          .init(geometry: trim ? .trimmed(geometry, from: 0, to: 0.75) : geometry, insetAmount: 0)
+        ])
+      }
+      controller.processResolvedTree(node(from), transaction: .init(), timestamp: time)
+      #expect(!controller.hasRevealingClipMaskAnimation, "\(name): nothing animates yet")
+      var transaction = TransactionSnapshot()
+      transaction.animationRequest = .animate(animation.animationBox)
+      controller.processResolvedTree(node(to), transaction: transaction, timestamp: time)
+      #expect(controller.activeAnimationCount == 1, "\(name)")
+      #expect(controller.hasRevealingClipMaskAnimation == reveals, "\(name)")
+      #expect(!controller.hasLayoutAffectingPropertyAnimation, "\(name): a mask is drawing only")
+    }
+  }
+
   private func render(_ path: Path) -> RasterSurface {
     DefaultRenderer().render(AuthoredPath(path: path).fill(Color.white).frame(width: 20, height: 8))
       .rasterSurface

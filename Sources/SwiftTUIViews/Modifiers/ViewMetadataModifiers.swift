@@ -495,6 +495,11 @@ public struct DrawMetadataModifier: IterativePrimitiveViewModifier, Sendable, Eq
     return content.resolveWork(in: context).map { completed in
       var node = completed
       node.drawMetadata = node.drawMetadata.merging(metadata)
+      if !metadata.shapeClips.isEmpty {
+        // The mask belongs to this modifier's scope, not the content's
+        // (STUI-1319).
+        node.recordClipShapeAnimationScope(context.transaction)
+      }
       return [node]
 
     }

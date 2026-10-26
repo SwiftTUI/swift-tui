@@ -174,7 +174,8 @@ convenience product.
 - If the host provides no theme, the runtime creates the default semantic
   theme.
 - Presentation lowers raster surfaces into ASCII, ANSI16, ANSI256, or
-  true-color output.
+  true-color output. ANSI256 and true-color output convert each color to sRGB
+  before quantizing it.
 - Presentation sanitizes authored text and OSC 8 hyperlink destinations before
   it emits terminal bytes, and percent-encodes destination bytes outside
   printable ASCII. Layout, semantics, and raster artifacts do not encode

@@ -769,6 +769,12 @@ are omitted even when SwiftUI exposes a corresponding API.
   stay unchanged; `contentShape` controls interaction separately. Frames
   containing shape masks and images rasterize afresh to preserve ordering of
   split image placements; cell-only masks support incremental rasterization.
+- **Consecutive clip masks share one animation scope.** *Provisional.* A
+  `clipShape(_:)` mask animates under the transaction in effect where
+  `clipShape` is applied, not under a `transaction(_:)` or
+  `animation(_:value:)` applied to the content inside it. Consecutive
+  `clipShape` masks share one animated value, so when a transaction modifier
+  separates two of them, the outermost mask's transaction decides for both.
 - **Compatible paths morph their anchor and control points.** *Ratified.*
   `Path` conforms to `Animatable`. Paths with identical ordered element kinds
   and finite coordinates interpolate inside an animation transaction;

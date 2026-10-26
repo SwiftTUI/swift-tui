@@ -646,6 +646,31 @@ package final class AnimationController: Sendable {
     }
   }
 
+  /// A clip mask animating toward a mask that encloses area can uncover
+  /// content its node never drew. The rasterizer records a masked node as
+  /// drawn only through its mask's regions (`Rasterizer+Paint.swift`), and an
+  /// empty mask has none, so a previous visibility snapshot cannot prove the
+  /// next sample stays hidden, just as it cannot for a geometry slot (T252).
+  /// The slot stays draw-only (it never needs layout); only elision consults
+  /// this. A mask whose destination encloses no area reveals nothing and keeps
+  /// elision (STUI-1318).
+  package var hasRevealingClipMaskAnimation: Bool {
+    activeAnimations.contains { key, animation in
+      guard key.scope == .property(.clipShapePaths),
+        case .property(_, let destination) = animation.kind
+      else { return false }
+      guard let mask = destination.unwrap(as: ClipMaskPaths.self) else { return true }
+      return !mask.enclosesNoArea
+    }
+  }
+
+  /// Whether some in-flight property animation makes the previous frame's
+  /// drawn identities unable to justify eliding a deadline frame: a
+  /// layout-affecting slot or a revealing clip mask.
+  package var blocksOffscreenFrameElision: Bool {
+    hasLayoutAffectingPropertyAnimation || hasRevealingClipMaskAnimation
+  }
+
   /// Number of insertion-offset animations currently in flight.
   /// Test hook so integration tests can pin the enqueue path
   /// without exposing the entire private map.
@@ -2125,41 +2150,8 @@ package final class AnimationController: Sendable {
       node.transactionSnapshot.scopeRole == .restoresOuter
       ? (scopeOuterTransaction ?? transaction)
       : transaction
-    var effectiveTransaction = node.transactionSnapshot
-    if effectiveTransaction.animationRequest == .inherit {
-      // Metadata fields (`isContinuous`, custom key values) inherit with
-      // the request; the node's own resolve-stamped values win per key.
-      if let frameSegment {
-        effectiveTransaction.animationRequest = frameSegment.animationRequest
-        effectiveTransaction.animationBatchID = frameSegment.animationBatchID
-        effectiveTransaction.isContinuous =
-          effectiveTransaction.isContinuous || frameSegment.isContinuous
-        effectiveTransaction.tracksVelocity =
-          effectiveTransaction.tracksVelocity || frameSegment.tracksVelocity
-        effectiveTransaction.customValues = frameSegment.customValues.merging(
-          effectiveTransaction.customValues
-        ) { _, node in node }
-      } else {
-        effectiveTransaction.animationRequest = transaction.animationRequest
-        effectiveTransaction.animationBatchID = transaction.animationBatchID
-        effectiveTransaction.isContinuous =
-          effectiveTransaction.isContinuous || transaction.isContinuous
-        effectiveTransaction.tracksVelocity =
-          effectiveTransaction.tracksVelocity || transaction.tracksVelocity
-        effectiveTransaction.customValues = transaction.customValues.merging(
-          effectiveTransaction.customValues
-        ) { _, node in node }
-      }
-    } else if effectiveTransaction.animationBatchID == nil {
-      let isFrameSegmentBoundary =
-        frameSegment.map { segment in
-          segment.animationRequest == effectiveTransaction.animationRequest
-            && segment.animationBatchID == nil
-        } ?? false
-      if !isFrameSegmentBoundary {
-        effectiveTransaction.animationBatchID = transaction.animationBatchID
-      }
-    }
+    var effectiveTransaction = Self.effectiveTransaction(
+      of: node.transactionSnapshot, frameSegment: frameSegment, inherited: transaction)
 
     let reducesMotion = node.environmentSnapshot.style.renderingReduceMotion
     if reducesMotion {
@@ -2190,6 +2182,28 @@ package final class AnimationController: Sendable {
           styleIntents[slot] = intent
         }
       }
+    }
+    // `clipShape` merges its mask into the clipped content's node; when the
+    // two scopes differ the modifier recorded its own (STUI-1319), so the mask
+    // slot animates under the transaction where `clipShape` was applied.
+    if !node.transactionSnapshot.customValues.isEmpty,
+      let scope = node.transactionSnapshot.customValues[
+        ObjectIdentifier(ClipShapeAnimationScopeKey.self)]?.unwrap(
+          as: ScopedStyleAnimationIntent.self),
+      snapshot[.clipShapePaths] != nil || previous?[.clipShapePaths] != nil
+    {
+      var clipSnapshot = node.transactionSnapshot
+      clipSnapshot.animationRequest = scope.request
+      clipSnapshot.animationBatchID = scope.batchID
+      let clipTransaction = Self.effectiveTransaction(
+        of: clipSnapshot, frameSegment: frameSegment, inherited: transaction)
+      // A clip scope that inherits nothing must not fall back to the node's
+      // own request; `.disabled` snaps exactly as `.inherit` does.
+      let request =
+        reducesMotion || clipTransaction.animationRequest == .inherit
+        ? AnimationRequest.disabled : clipTransaction.animationRequest
+      styleIntents[.clipShapePaths] = ScopedStyleAnimationIntent(
+        isScoped: true, request: request, batchID: clipTransaction.animationBatchID)
     }
     if let previous {
       diffAndEnqueue(
@@ -2244,6 +2258,52 @@ package final class AnimationController: Sendable {
         activeKeysByOwnerNodeID: activeKeysByOwnerNodeID
       )
     }
+  }
+
+  /// `snapshot` with an `.inherit` request resolved the way a node's is: from
+  /// the frame-selected segment when one covers the node, else from the
+  /// inherited (parent or scope-outer) transaction. Metadata fields
+  /// (`isContinuous`, custom key values) inherit with the request; the
+  /// snapshot's own resolve-stamped values win per key.
+  private static func effectiveTransaction(
+    of snapshot: TransactionSnapshot,
+    frameSegment: AnimationInvalidationSegment?,
+    inherited transaction: TransactionSnapshot
+  ) -> TransactionSnapshot {
+    var effective = snapshot
+    if effective.animationRequest == .inherit {
+      if let frameSegment {
+        effective.animationRequest = frameSegment.animationRequest
+        effective.animationBatchID = frameSegment.animationBatchID
+        effective.isContinuous =
+          effective.isContinuous || frameSegment.isContinuous
+        effective.tracksVelocity =
+          effective.tracksVelocity || frameSegment.tracksVelocity
+        effective.customValues = frameSegment.customValues.merging(
+          effective.customValues
+        ) { _, node in node }
+      } else {
+        effective.animationRequest = transaction.animationRequest
+        effective.animationBatchID = transaction.animationBatchID
+        effective.isContinuous =
+          effective.isContinuous || transaction.isContinuous
+        effective.tracksVelocity =
+          effective.tracksVelocity || transaction.tracksVelocity
+        effective.customValues = transaction.customValues.merging(
+          effective.customValues
+        ) { _, node in node }
+      }
+    } else if effective.animationBatchID == nil {
+      let isFrameSegmentBoundary =
+        frameSegment.map { segment in
+          segment.animationRequest == effective.animationRequest
+            && segment.animationBatchID == nil
+        } ?? false
+      if !isFrameSegmentBoundary {
+        effective.animationBatchID = transaction.animationBatchID
+      }
+    }
+    return effective
   }
 
   private func diffAndEnqueue(

@@ -604,15 +604,15 @@ public struct DefaultRenderer {
     proposalChanged: Bool
   ) -> (FrameHeadDraft) -> Bool {
     // Preserve the barrier through the last tick: animation injection may
-    // retire the slot before this closure runs, but its final geometry still
-    // needs layout and presentation on this frame.
-    let hadLayoutAnimation = animationController.hasLayoutAffectingPropertyAnimation
+    // retire the slot before this closure runs, but its final geometry (or
+    // final revealing mask) still needs presentation on this frame.
+    let hadElisionBarrier = animationController.blocksOffscreenFrameElision
     return { [self] draft in
       guard !proposalChanged else {
         return false
       }
       let controller = draft.animationDraft.controller
-      guard !hadLayoutAnimation, !controller.hasLayoutAffectingPropertyAnimation else {
+      guard !hadElisionBarrier, !controller.blocksOffscreenFrameElision else {
         return false
       }
       let tick = controller.lastTickResult
@@ -639,7 +639,7 @@ public struct DefaultRenderer {
     proposalChanged: Bool,
     frameInstant: MonotonicInstant
   ) -> Bool {
-    guard !animationController.hasLayoutAffectingPropertyAnimation else { return false }
+    guard !animationController.blocksOffscreenFrameElision else { return false }
     // A deadline tick that arrives while an unrendered proposal is
     // outstanding (a resize whose SIGWINCH frame was cancelled or dropped)
     // must run a real frame: eliding it presents nothing and leaves no other

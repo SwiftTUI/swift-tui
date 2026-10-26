@@ -42,6 +42,39 @@ private enum SetDTerminal {
     return parts.count == 3 ? parts : nil
   }
 
+  /// The `R;G;B` components that follow the first `selector` (`38;2;`,
+  /// `48;2;` or `58;2;`).
+  static func direct(_ selector: String, in bytes: String) -> [Int]? {
+    guard let range = bytes.range(of: selector) else { return nil }
+    let digits = bytes[range.upperBound...].prefix { $0.isNumber || $0 == ";" }
+    let parts = digits.split(separator: ";").prefix(3).compactMap { Int($0) }
+    return parts.count == 3 ? parts : nil
+  }
+
+  /// The host wire's sRGB export of `color` as byte components.
+  static func exported(_ color: Color) -> [Int] {
+    let hex = color.hexString(format: .rrggbb, prefix: false)
+    return stride(from: 0, to: 6, by: 2).map { offset -> Int in
+      let start = hex.index(hex.startIndex, offsetBy: offset)
+      return Int(hex[start..<hex.index(start, offsetBy: 2)], radix: 16) ?? -1
+    }
+  }
+
+  /// A one-cell surface styled with the given colours.
+  static func styled(foreground: Color?, background: Color?, underline: Color?) -> RasterSurface {
+    RasterSurface(
+      size: .init(width: 1, height: 1),
+      cells: [
+        [
+          RasterCell(
+            character: "X",
+            style: ResolvedTextStyle(
+              foregroundColor: foreground, backgroundColor: background,
+              underlineStyle: underline.map { TextLineStyle(color: $0) }))
+        ]
+      ])
+  }
+
   static func posix(_ environment: [String: String]) -> TerminalCapabilityProfile {
     TerminalCapabilityProfile.detectPOSIXTerminal(environment: environment, isTTY: true)
   }
@@ -140,13 +173,10 @@ struct AdversarialSetDTerminalCapabilityModeTests {
       return Int(hex[start..<hex.index(start, offsetBy: 2)], radix: 16) ?? -1
     }
     try #require(expected != [204, 102, 51], "the sRGB export differs from the raw components")
-    setDKnown(
-      "NEW-7: a Display P3 colour is written at true colour as its raw P3 components (204;102;51) instead of the sRGB values the host wire exports (219;94;31); true-colour SGR emission skips the sRGB conversion the 256-colour path applies (TerminalCellTextRenderer.swift:303-308); contract: HostWireStyleTable.swift:76-81, TerminalCellTextRenderer+ColorCodes.swift:96"
-    ) {
-      #expect(
-        zip(components, expected).allSatisfy { abs($0 - $1) <= 1 },
-        "terminal \(components) against the host-wire sRGB export \(expected)")
-    }
+    // STUI-1320: true colour converts to sRGB before writing components.
+    #expect(
+      zip(components, expected).allSatisfy { abs($0 - $1) <= 1 },
+      "terminal \(components) against the host-wire sRGB export \(expected)")
   }
 
   @Test("setD188: an ASCII locale with kitty degrades a link label but encodes its destination")
@@ -183,5 +213,56 @@ struct AdversarialSetDTerminalCapabilityModeTests {
       "LANG": "en_US.UTF-8",
     ])
     #expect(profile.supportsHyperlinks)
+  }
+
+  // Wave 4 (STUI-1320): true colour converts every colour to sRGB before
+  // writing its components.
+
+  @Test("w4fk09: Display P3 background and underline colours are written as sRGB components")
+  func w4fk09DisplayP3BackgroundAndUnderline() throws {
+    let color = Color(red: 0.8, green: 0.4, blue: 0.2, profile: .displayP3)
+    let bytes = SetDTerminal.bytes(
+      SetDTerminal.styled(foreground: color, background: color, underline: color))
+    let expected = SetDTerminal.exported(color)
+    try #require(expected == [219, 94, 31], "the host-wire export \(expected)")
+    for selector in ["38;2;", "48;2;", "58;2;"] {
+      let components = try #require(
+        SetDTerminal.direct(selector, in: bytes), "\(selector) in \(bytes.debugDescription)")
+      #expect(components == expected, "\(selector) \(components) against \(expected)")
+    }
+  }
+
+  @Test("w4fk10: greys stay neutral and whites stay white in every profile")
+  func w4fk10GreysAndWhitesAcrossProfiles() throws {
+    func foreground(_ color: Color) throws -> [Int] {
+      let bytes = SetDTerminal.bytes(
+        SetDTerminal.styled(foreground: color, background: nil, underline: nil))
+      return try #require(SetDTerminal.direct("38;2;", in: bytes), "\(bytes.debugDescription)")
+    }
+    let sRGBGrey = try foreground(Color(white: 0.5))
+    #expect(sRGBGrey == [127, 127, 127])
+    #expect(try foreground(Color(white: 0.5, profile: .displayP3)) == sRGBGrey)
+    let linear = Color(white: 0.5, profile: .linearSRGB)
+    let linearGrey = try foreground(linear)
+    #expect(Set(linearGrey).count == 1, "a linear grey stays neutral: \(linearGrey)")
+    #expect(
+      zip(linearGrey, SetDTerminal.exported(linear)).allSatisfy { abs($0 - $1) <= 1 },
+      "linear grey \(linearGrey) against \(SetDTerminal.exported(linear))")
+    for white in [Color(white: 1, profile: .displayP3), Color(white: 1, profile: .linearSRGB)] {
+      let components = try foreground(white)
+      #expect(components.allSatisfy { $0 >= 254 }, "\(white.profile.name) white: \(components)")
+    }
+  }
+
+  @Test("w4fk11: sRGB colours keep their bytes and extended components still clamp")
+  func w4fk11SRGBBytesUnchanged() {
+    let bytes = SetDTerminal.bytes(
+      SetDTerminal.styled(
+        foreground: Color(red: 1.05, green: 0.5, blue: -0.2),
+        background: Color(hexRGB: 0x56B6C2),
+        underline: Color(red: 2, green: -1, blue: 0.5)))
+    #expect(bytes.contains("38;2;255;127;0"), "\(bytes.debugDescription)")
+    #expect(bytes.contains("48;2;86;182;194"), "\(bytes.debugDescription)")
+    #expect(bytes.contains("58;2;255;0;127"), "\(bytes.debugDescription)")
   }
 }
