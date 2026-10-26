@@ -297,7 +297,9 @@ are omitted even when SwiftUI exposes a corresponding API.
 - **`ScrollViewProxy.scrollTo` returns `Bool` and adds offset forms;
   `ScrollViewReader` evaluates `content` once.** *Ratified.* The `Bool`
   reports whether a scroll target resolved: the fail-loud preference applied
-  to imperative scrolling. Cell-offset `scrollTo` overloads have no SwiftUI
+  to imperative scrolling. A command whose target or extent the same action
+  adds returns `false` and resolves after the next layout (see
+  <doc:Scrolling>). Cell-offset `scrollTo` overloads have no SwiftUI
   analog, and the reader's non-escaping content closure is evaluated once
   rather than kept re-callable.
 - **`contentShape(_:)` is dual-denominated.** *Provisional.* Rectangular
@@ -317,6 +319,12 @@ are omitted even when SwiftUI exposes a corresponding API.
   spacers collapse before content loses rows.
 - **Offers round half-up.** *Provisional.* Integer division of surplus is
   balanced across children rather than floored.
+- **Alignment guide values are whole cells.** *Gap.* `ViewDimensions` and
+  guide closures see integer values. A guide that reads the centre keeps the
+  centre's half cell, but arithmetic SwiftUI resolves fractionally does not:
+  `{ $0.height - $0[.center] }` sits one cell past the centre, and
+  `{ $0[.center] * 2 }` lands half a cell short of SwiftUI. Write
+  `{ $0[.center] }` for the centre (see <doc:Authoring-Views>).
 - **`Text` has a zero structural minimum on the horizontal axis.** *Ratified.*
   SwiftUI reserves the truncation minimum; in SwiftTUI a higher-priority
   flexible sibling can squeeze a `Text` to zero width. Recorded as the
