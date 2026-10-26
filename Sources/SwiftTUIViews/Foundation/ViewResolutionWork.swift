@@ -105,6 +105,11 @@ func resolveViewWork<V: View>(
         rebuilding: rebuilding
       )
     }
+    // The node's evaluation takes the transaction of a write to its state,
+    // which names the node's indexed identity (its output's after a
+    // flattening re-key) rather than this context's (STUI-1335).
+    let evaluationContext =
+      graphNode.map { context.stampingFrameTransaction(forEvaluationOf: $0) } ?? context
     let resolveFresh = { () -> ResolveWork<ResolvedNode> in
       context.recordResolvedComputation()
       // Memoization diagnostics: would this recomputed node have been memoizable?
@@ -136,7 +141,7 @@ func resolveViewWork<V: View>(
               // values — never a capture, and never a dynamic property's
               // in-place update (plan 2026-08-30-001).
               let resolve = {
-                resolveViewElementsWork(prepared, in: context).map {
+                resolveViewElementsWork(prepared, in: evaluationContext).map {
                   normalizeResolvedElements($0, in: context, loneForEachElementKeepsGroup: true)
                 }
               }
@@ -164,7 +169,7 @@ func resolveViewWork<V: View>(
               )
             return withAuthoringContext(authoringContext) {
               ordinalTracker = authoringContext.ordinalTracker
-              return resolveViewElementsWork(prepared, in: context).map {
+              return resolveViewElementsWork(prepared, in: evaluationContext).map {
                 normalizeResolvedElements($0, in: context, loneForEachElementKeepsGroup: true)
               }
             }
