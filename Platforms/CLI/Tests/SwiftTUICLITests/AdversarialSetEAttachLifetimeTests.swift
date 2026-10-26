@@ -23,8 +23,9 @@
 
   @Suite("Campaign F3 pass 2 attach discovery lifetimes", .serialized)
   struct AdversarialSetEAttachLifetimeTests {
-    // The server's pre-bind cleanup unlinks whatever is not a live socket
-    // (SocketServer.swift); discovery keeps non-socket entries (STUI-1227).
+    // The server's pre-bind cleanup removes only a stale socket and refuses
+    // any other entry with the name (STUI-1301, STUI-1302), as discovery
+    // keeps non-socket entries (STUI-1227).
     @Test func setE136ServerStartKeepsRegularSockNamedFile() async throws {
       let fixture = try SetEAttachDirectory()
       defer { fixture.remove() }
@@ -32,12 +33,10 @@
       try Data("keep".utf8).write(to: URL(fileURLWithPath: path))
       let run = await SetEServerRun.start(fixture.server(identifier: "blocked"))
       defer { run.cancel() }
-      setEKnownAttach(newFive) {
-        #expect(setEEntryType(path) == S_IFREG, "the regular file was replaced")
-        #expect(FileManager.default.contents(atPath: path) == Data("keep".utf8))
-      }
-      run.cancel()
-      _ = await run.finish()
+      #expect(setEEntryType(path) == S_IFREG, "the regular file was replaced")
+      #expect(FileManager.default.contents(atPath: path) == Data("keep".utf8))
+      if run.isReady { run.cancel() }
+      setEExpectRefusal(await run.finish(), naming: "regular file", at: path)
     }
 
     @Test func setE137ServerStartKeepsSockNamedSymlink() async throws {
@@ -49,12 +48,26 @@
       try #require(unsafe symlink(target, link) == 0)
       let run = await SetEServerRun.start(fixture.server(identifier: "linked"))
       defer { run.cancel() }
-      setEKnownAttach(newFive) {
-        #expect(setEEntryType(link) == S_IFLNK, "the symbolic link was replaced")
-      }
+      #expect(setEEntryType(link) == S_IFLNK, "the symbolic link was replaced")
       #expect(FileManager.default.contents(atPath: target) == Data("keep".utf8))
-      run.cancel()
-      _ = await run.finish()
+      if run.isReady { run.cancel() }
+      setEExpectRefusal(await run.finish(), naming: "symbolic link", at: link)
+    }
+
+    // STUI-1301 neighbour: access(2) follows a link, so a dangling one was
+    // invisible to the pre-bind check and bind's EADDRINUSE named a running
+    // instance. lstat(2) sees the link itself.
+    @Test func setE137DanglingSockNamedSymlinkIsNamed() async throws {
+      let fixture = try SetEAttachDirectory()
+      defer { fixture.remove() }
+      let link = fixture.path("dangling.sock")
+      try #require(unsafe symlink(fixture.path("missing-target"), link) == 0)
+      let run = await SetEServerRun.start(fixture.server(identifier: "dangling"))
+      defer { run.cancel() }
+      if run.isReady { run.cancel() }
+      let outcome = await run.finish()
+      #expect(setEEntryType(link) == S_IFLNK)
+      setEExpectRefusal(outcome, naming: "symbolic link", at: link)
     }
 
     @Test func setE138ServerStartOverSockNamedDirectoryNamesNoRunningInstance() async throws {
@@ -71,11 +84,25 @@
         Issue.record("the server bound over a directory: \(outcome)")
         return
       }
-      setEKnownAttach(newSix) {
-        if case .identifierAlreadyInUse = error as? SceneDiscoveryServerError {
-          Issue.record("no instance runs, but the error names one: \(error)")
-        }
+      if case .identifierAlreadyInUse = error as? SceneDiscoveryServerError {
+        Issue.record("no instance runs, but the error names one: \(error)")
       }
+      setEExpectRefusal(outcome, naming: "directory", at: path)
+    }
+
+    // STUI-1302 neighbour: a FIFO with the socket name is not ours either; it
+    // is kept, and the error names its type.
+    @Test func setE138ServerStartOverSockNamedFIFOKeepsIt() async throws {
+      let fixture = try SetEAttachDirectory()
+      defer { fixture.remove() }
+      let path = fixture.path("pipe.sock")
+      try #require(unsafe mkfifo(path, 0o600) == 0)
+      let run = await SetEServerRun.start(fixture.server(identifier: "pipe"))
+      defer { run.cancel() }
+      if run.isReady { run.cancel() }
+      let outcome = await run.finish()
+      #expect(setEEntryType(path) == S_IFIFO, "the FIFO was replaced")
+      setEExpectRefusal(outcome, naming: "FIFO", at: path)
     }
 
     @Test func setE139ServerLifecycleReturnsDescriptorsAndEntry() async throws {
@@ -234,17 +261,28 @@
     }
   }
 
-  private let newFive =
-    "NEW-5: discovery server start deletes a regular file or symbolic link that has its socket name; the pre-bind cleanup unlinks any existing non-live path without the lstat socket check (SocketServer.swift:210-215); contract: STUI-1227 stale-socket rule, SocketClient.swift:93-96; adjacent STUI-1227"
-  private let newSix =
-    "NEW-6: discovery server start over a *.sock directory fails as identifierAlreadyInUse (a running instance) although none runs; the failed unlink is ignored and bind EADDRINUSE maps to identifierAlreadyInUse (SocketServer.swift:210-237); contract: SceneDiscoveryServerError.identifierAlreadyInUse (SocketServer.swift:144-145); adjacent STUI-1227"
-
-  private func setEKnownAttach(_ message: String, _ body: () -> Void) {
-    if ProcessInfo.processInfo.environment["SWIFTTUI_SETE_UNMARKED"] == "1" {
-      body()
-    } else {
-      withKnownIssue(Comment(rawValue: message)) { body() }
+  /// The server refused to start over a non-socket entry, and its error says
+  /// which kind of entry, where, and that no running instance holds it.
+  private func setEExpectRefusal(
+    _ outcome: SetEServerRun.Outcome, naming fileType: String, at path: String
+  ) {
+    guard case .threw(let error) = outcome else {
+      Issue.record("the server started over a \(fileType): \(outcome)")
+      return
     }
+    // STUI-1301, STUI-1302 (repaired): only a socket is a stale instance.
+    guard
+      case .pathIsNotASocket(let refusedPath, let refusedType) = error as? SceneDiscoveryServerError
+    else {
+      Issue.record("expected pathIsNotASocket, got \(error)")
+      return
+    }
+    #expect(refusedPath == path)
+    #expect(refusedType == fileType)
+    let message = "\(error)"
+    #expect(message.contains(fileType), "\(message)")
+    #expect(message.contains(path), "\(message)")
+    #expect(!message.contains("running instance"), "\(message)")
   }
 
   /// Counts the process's open descriptors below 4096.

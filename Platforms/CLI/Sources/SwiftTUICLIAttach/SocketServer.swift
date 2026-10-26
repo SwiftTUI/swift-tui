@@ -134,6 +134,10 @@
   enum SceneDiscoveryServerError: Error, CustomStringConvertible, Sendable {
     case failedToCreateSocket(errno: Int32)
     case identifierAlreadyInUse(path: String)
+    /// Something other than a socket (a regular file, a symbolic link, a
+    /// directory, ...) has the socket's name. It is not a stale instance, so
+    /// the server leaves it in place.
+    case pathIsNotASocket(path: String, fileType: String)
     case failedToBind(path: String, errno: Int32)
     case failedToListen(errno: Int32)
 
@@ -143,6 +147,8 @@
         "Failed to create discovery socket: \(unsafe String(cString: strerror(errno)))"
       case .identifierAlreadyInUse(let path):
         "A running instance is already using discovery socket \(path)."
+      case .pathIsNotASocket(let path, let fileType):
+        "Discovery socket path \(path) is a \(fileType), not a socket; it was left in place."
       case .failedToBind(let path, let errno):
         "Failed to bind discovery socket \(path): \(unsafe String(cString: strerror(errno)))"
       case .failedToListen(let errno):
@@ -207,11 +213,14 @@
         }
       }
 
-      if pathExists(socketPath) {
-        if isSocketLive(socketPath) {
-          throw SceneDiscoveryServerError.identifierAlreadyInUse(path: socketPath)
+      // Only a socket can be a stale instance. lstat(2) does not follow a
+      // symbolic link, and any other entry with the name is not ours
+      // (STUI-1227's stale-socket rule, SocketClient.discoverInstances).
+      if let type = entryType(socketPath) {
+        if let error = occupiedPathError(type) { throw error }
+        guard sceneUnlink(socketPath) == 0 || errno == ENOENT else {
+          throw SceneDiscoveryServerError.failedToBind(path: socketPath, errno: errno)
         }
-        _ = sceneUnlink(socketPath)
       }
 
       let serverFD = sceneSocket()
@@ -230,10 +239,14 @@
       // Bind
       let bindResult = sceneBind(serverFD, &addr)
       guard bindResult == 0 else {
-        if errno == EADDRINUSE {
-          throw SceneDiscoveryServerError.identifierAlreadyInUse(path: socketPath)
+        let bindErrno = errno
+        // Something took the path after the check above: name what it is.
+        if bindErrno == EADDRINUSE, let type = entryType(socketPath),
+          let error = occupiedPathError(type)
+        {
+          throw error
         }
-        throw SceneDiscoveryServerError.failedToBind(path: socketPath, errno: errno)
+        throw SceneDiscoveryServerError.failedToBind(path: socketPath, errno: bindErrno)
       }
       shouldCleanupSocketPath = true
       if companionURL != nil {
@@ -309,8 +322,32 @@
       }
     }
 
-    private func pathExists(_ path: String) -> Bool {
-      sceneAccess(path, F_OK) == 0
+    /// The `lstat(2)` file type of the entry itself, or nil when it is absent.
+    private func entryType(_ path: String) -> mode_t? {
+      var status = stat()
+      guard path.withCString({ unsafe lstat($0, &status) }) == 0 else { return nil }
+      return status.st_mode & mode_t(S_IFMT)
+    }
+
+    /// The error for an entry of `type` at the socket path, or nil for a
+    /// socket nothing listens on (a stale instance the server may replace).
+    private func occupiedPathError(_ type: mode_t) -> SceneDiscoveryServerError? {
+      guard type == mode_t(S_IFSOCK) else {
+        return .pathIsNotASocket(path: socketPath, fileType: Self.fileTypeName(type))
+      }
+      return isSocketLive(socketPath) ? .identifierAlreadyInUse(path: socketPath) : nil
+    }
+
+    private static func fileTypeName(_ type: mode_t) -> String {
+      switch type {
+      case mode_t(S_IFREG): "regular file"
+      case mode_t(S_IFLNK): "symbolic link"
+      case mode_t(S_IFDIR): "directory"
+      case mode_t(S_IFIFO): "FIFO"
+      case mode_t(S_IFCHR): "character device"
+      case mode_t(S_IFBLK): "block device"
+      default: "file of unknown type"
+      }
     }
 
     private func isSocketLive(_ path: String) -> Bool {
