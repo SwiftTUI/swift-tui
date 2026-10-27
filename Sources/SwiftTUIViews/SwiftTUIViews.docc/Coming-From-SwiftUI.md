@@ -217,7 +217,6 @@ current status of each.
 | Scale transitions and matched size changes use placed bounds and clipping rather than re-layout or bitmap scaling | Expect whole-cell steps; content keeps its destination layout while the interpolated frame clips it |
 | Lazy stacks estimate unseen content | Compose static fragments and multiple `ForEach` sources directly; default spacing is exact between realized neighbors. Body-dependent empty rows and negative spacing can require exhaustive work |
 | Path morphing requires matching ordered element kinds; clipping samples cell centers | Use `Angle`, `Path.addArc`, `Path.interpolated(to:progress:)`, and `clipShape(_:)`; see <doc:Shapes> |
-| `Text` is not `Hashable` | Keep identity in your model instead of deriving it from a view |
 
 Beyond the recorded gaps sits a larger class of bare absences. The
 high-traffic ones include `searchable`, `refreshable`, `contextMenu`,

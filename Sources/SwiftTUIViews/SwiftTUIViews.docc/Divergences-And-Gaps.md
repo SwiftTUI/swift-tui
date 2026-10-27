@@ -292,16 +292,18 @@ are omitted even when SwiftUI exposes a corresponding API.
   edge, and anchor commands, including unrealized indexed rows. There is no
   additional bindable `ScrollPosition` model: an offset does not uniquely name
   a visible row, and commands can outlive or fail to resolve a target. The
-  proxy reports target resolution explicitly. A future identity-observation
-  API would need to define that separate contract; the name remains unclaimed.
+  proxy reports whether each command moved the offset. A future
+  identity-observation API would need to define that separate contract; the
+  name remains unclaimed.
 - **`ScrollViewProxy.scrollTo` returns `Bool` and adds offset forms;
   `ScrollViewReader` evaluates `content` once.** *Ratified.* The `Bool`
-  reports whether a scroll target resolved: the fail-loud preference applied
-  to imperative scrolling. A command whose target or extent the same action
-  adds returns `false` and resolves after the next layout (see
-  <doc:Scrolling>). Cell-offset `scrollTo` overloads have no SwiftUI
-  analog, and the reader's non-escaping content closure is evaluated once
-  rather than kept re-callable.
+  reports whether the command moved the offset, the fail-loud preference
+  applied to imperative scrolling: `false` means that no target matched the
+  ID or that the content was already in place. A command whose target or
+  extent the same action adds returns `false` and resolves after the next
+  layout (see <doc:Scrolling>). Cell-offset `scrollTo` overloads have no
+  SwiftUI analog, and the reader's non-escaping content closure is evaluated
+  once rather than kept re-callable.
 - **`contentShape(_:)` is dual-denominated.** *Provisional.* Rectangular
   content shapes are cell-denominated (`CellRect`); path content shapes use
   continuous cell space.
@@ -319,6 +321,16 @@ are omitted even when SwiftUI exposes a corresponding API.
   spacers collapse before content loses rows.
 - **Offers round half-up.** *Provisional.* Integer division of surplus is
   balanced across children rather than floored.
+- **Centring puts an odd spare cell after the content.** *Ratified.* A view
+  cannot start half a cell in, so when centring leaves an odd number of free
+  cells, the view moves toward the leading or top edge and the extra cell
+  falls after it. One direction everywhere keeps centred content aligned
+  across containers: frames, stacks, overlays and `ZStack` centre this way,
+  and so do `.position(x:y:)`, a subview that a custom layout does not place,
+  and `scrollTo(_:anchor: .center)` for a target that fits the viewport of a
+  `ScrollView`, `List` or `Table`. Because `.position(x:y:)` names the view's
+  centre, a one-row view at `y: 5` draws on row 4 (see <doc:Authoring-Views>
+  and <doc:Scrolling>).
 - **Alignment guide values are whole cells.** *Gap.* `ViewDimensions` and
   guide closures see integer values. A guide that reads the centre keeps the
   centre's half cell, but arithmetic SwiftUI resolves fractionally does not:
@@ -644,10 +656,19 @@ are omitted even when SwiftUI exposes a corresponding API.
   the vision document's restrained-chrome default applied to the modal
   family.
 - **`onDismiss` is observation, not command.** *Ratified.* It runs once after
-  a committed activation disappears: for state writes, Escape, built-in
-  actions, toast expiration, item-ID replacement, and removal of the
+  a committed activation disappears: for state writes, Escape, prompt and
+  built-in actions, toast expiration, item-ID replacement, and removal of the
   presenting subtree alike. This is the presenter-side half of the dismissal
   stance; see <doc:Dismissal-Is-Data>.
+- **Prompt actions dismiss, except beside a member-projected binding.** *Gap.*
+  Every `alert` or `confirmationDialog` action dismisses its prompt after it
+  runs, as in SwiftUI, unless the action took over the presentation: it
+  cleared it, presented a different item, or wrote the state behind the
+  binding, for instance to keep it presented. A projection of a stored member
+  of a `@State` struct, such as `$model.show` or `$model.item`, counts the
+  whole struct as that state, so an action that writes any other member of
+  `model` also keeps the prompt presented, and `onDismiss` does not run.
+  Clearing the binding in such an action dismisses the prompt (STUI-1371).
 - **Item presentations refresh on same-ID replacement.** *Ratified.* Replacing
   a presented item with an equal-ID value refreshes mounted content without
   losing state; changing the ID tears down and remounts. This is the
@@ -943,6 +964,26 @@ are omitted even when SwiftUI exposes a corresponding API.
   The wrapper exists with SwiftUI semantics, but
   `matchedGeometryEffect(id:in:)` also accepts `.default`, one global
   namespace, where SwiftUI requires a `Namespace.ID`.
+- **A body-root conditional switches branches without a transition.** *Gap.*
+  When a view's body is an `if`/`else` whose branches are modified primitives,
+  as in `if flag { Text("A").transition(.opacity) } else { Text("B") }`, a
+  branch switch inside `withAnimation` runs no insertion or removal
+  transition, and the text snaps. Both branches are the output of the view's
+  one node, so the switch reads as a content change. The same conditional
+  inside a `VStack` in that body animates (STUI-1350).
+- **Animated changes inside lazy rows snap.** *Gap.* Rows of a lazy stack or
+  a data-backed `List` are realized from their source during layout, outside
+  the tree the animation pass compares. An `opacity`, an `offset` or another
+  animated modifier on row content takes its new value at once under
+  `withAnimation`, `.animation(_:value:)` and an animating `.transaction`
+  alike, while the same content in an eager `VStack` animates. Content
+  transitions and `tint` styles still animate in those rows (STUI-1376).
+- **`withAnimation` does not animate `@Observable` writes.** *Gap.* A write to
+  an `@Observable` model inside `withAnimation` updates the views that read
+  it without animation, and a `.transaction` transform in them reads no
+  animation; the same write to `@State` animates. An observation change
+  reaches the frame as a plain invalidation of its readers, carrying no
+  transaction (STUI-1377).
 - **Memoized body reuse compares view inputs implicitly, with a narrower
   reach than SwiftUI's.** *Gap (narrowed).* The memo gate compares any view
   value whose type has a comparison plan: `Equatable` conformance, a
