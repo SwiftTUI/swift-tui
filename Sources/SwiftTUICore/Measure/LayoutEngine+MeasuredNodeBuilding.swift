@@ -35,6 +35,15 @@ extension LayoutEngine {
         } else {
           .zero
         }
+    } else if case .custom = node.layoutBehavior, node.layoutRealizedContent == nil {
+      // The author callback re-enters the engine on the native stack; route
+      // it around the built-in sizing switch so that frame is not live
+      // across the re-entry (see `customContainerMeasuredSize`).
+      rawSize = customContainerMeasuredSize(
+        for: node,
+        proposal: effectiveProposal,
+        passContext: sizingContext
+      )
     } else {
       rawSize = measuredSize(
         for: node,

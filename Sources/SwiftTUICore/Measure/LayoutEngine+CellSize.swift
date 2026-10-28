@@ -285,22 +285,47 @@ extension LayoutEngine {
       return childMeasurements[primaryIndex].measuredSize
     case .viewThatFits:
       return childMeasurements.first?.measuredSize ?? .zero
-    case .custom(let token):
-      guard let handle = token as? CustomLayoutHandle else {
-        preconditionFailure("LayoutBehavior.custom must carry a CustomLayoutHandle")
-      }
-      // Author probes: every `LayoutSubview.sizeThatFits` call made inside
-      // a custom layout's `sizeThatFits` is probe-grade (plan
-      // 2026-08-11-004 Stage 1) — the committed child products are the
-      // pre-measure round and the placement-time re-measures, both
-      // commit-grade on their own engines.
-      return handle.measureContainer(
-        engine: withDefaultMeasurementGrade(.probe),
-        node: resolved,
+    case .custom:
+      return customContainerMeasuredSize(
+        for: resolved,
         proposal: proposal,
         passContext: passContext
       )
     }
+  }
+
+  /// A custom layout's container size: the author's `sizeThatFits`, which
+  /// re-enters the engine through `LayoutSubview.sizeThatFits`.
+  ///
+  /// Out of line from
+  /// ``measuredSize(for:childMeasurements:proposal:passContext:)`` and
+  /// reached directly from `makeMeasuredNode`, so that function's -Onone
+  /// frame (about 25 KiB, 40 KiB under AddressSanitizer: every built-in
+  /// arm's temporaries are allocated statically) is not live across the
+  /// re-entry. A custom-layout chain on the frame-tail worker pays this
+  /// small frame per nesting level instead (STUI-1133).
+  @inline(never)
+  func customContainerMeasuredSize(
+    for resolved: ResolvedNode,
+    proposal: ProposedSize,
+    passContext: LayoutPassContext?
+  ) -> CellSize {
+    guard case .custom(let token) = resolved.layoutBehavior,
+      let handle = token as? CustomLayoutHandle
+    else {
+      preconditionFailure("LayoutBehavior.custom must carry a CustomLayoutHandle")
+    }
+    // Author probes: every `LayoutSubview.sizeThatFits` call made inside
+    // a custom layout's `sizeThatFits` is probe-grade (plan
+    // 2026-08-11-004 Stage 1) — the committed child products are the
+    // pre-measure round and the placement-time re-measures, both
+    // commit-grade on their own engines.
+    return handle.measureContainer(
+      engine: withDefaultMeasurementGrade(.probe),
+      node: resolved,
+      proposal: proposal,
+      passContext: passContext
+    )
   }
 
   internal func finiteValue(_ dim: ProposedDimension?) -> Int? {

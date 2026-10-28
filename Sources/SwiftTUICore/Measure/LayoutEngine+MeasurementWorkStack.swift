@@ -16,6 +16,17 @@ extension LayoutEngine {
     while let item = work.popLast() {
       localMetrics.measurementWorkStackSteps += 1
 
+      // Two-level dispatch on purpose. This frame is live across every
+      // custom-layout and hosted-collection re-entry (the author callback
+      // calls `measure` on the native stack), and -Onone allocates every
+      // case's pattern bindings statically, so one switch over all the
+      // finish items cost about 50 KiB per nesting level (63 KiB under
+      // AddressSanitizer) on the frame-tail worker. Only `.measure` and
+      // `.measureFresh` can re-enter; the finish items run through
+      // `finishMeasurementWorkItem`, whose frame is popped before the next
+      // item, and the leaf finish every chain ends in has its own small
+      // frame so the tip's peak is not every finish case's bindings
+      // (STUI-1133).
       switch item {
       case .measure(let node, let proposal, let grade):
         scheduleMeasurement(
@@ -39,344 +50,15 @@ extension LayoutEngine {
           work: &work,
           results: &results
         )
-      case .finishNode(let node, let originalProposal, let effectiveProposal, let childCount):
-        let childMeasurements = popMeasurements(from: &results, count: childCount)
-        results.append(
-          makeMeasuredNode(
-            for: node,
-            originalProposal: originalProposal,
-            effectiveProposal: effectiveProposal,
-            childMeasurements: childMeasurements,
-            selectedChildIndex: nil,
-            passContext: passContext
-          )
-        )
-      case .finishSafeAreaInsetAdornment(
-        let node,
-        let originalProposal,
-        let effectiveProposal,
-        let edge,
-        let spacing,
-        let safeArea,
-        let grade
-      ):
-        finishSafeAreaInsetAdornmentMeasurement(
-          node,
-          originalProposal: originalProposal,
-          effectiveProposal: effectiveProposal,
-          edge: edge,
-          spacing: spacing,
-          safeArea: safeArea,
-          grade: grade,
-          localMetrics: &localMetrics,
-          work: &work,
-          results: &results
-        )
-      case .finishSafeAreaInset(
-        let node,
-        let originalProposal,
-        let effectiveProposal,
-        let insetMeasurement
-      ):
-        let baseMeasurement = popMeasurement(from: &results)
-        results.append(
-          makeMeasuredNode(
-            for: node,
-            originalProposal: originalProposal,
-            effectiveProposal: effectiveProposal,
-            childMeasurements: [baseMeasurement, insetMeasurement],
-            selectedChildIndex: nil,
-            passContext: passContext
-          )
-        )
-      case .finishDecorationPrimary(
-        let node,
-        let originalProposal,
-        let effectiveProposal,
-        let primaryIndex,
-        let grade
-      ):
-        let primaryMeasurement = popMeasurement(from: &results)
-        let decorationProposal = ProposedSize(
-          width: .finite(primaryMeasurement.measuredSize.width),
-          height: .finite(primaryMeasurement.measuredSize.height)
-        )
-        let decorationIndices = node.children.indices.filter { $0 != primaryIndex }
-        localMetrics.branching.builtinChildMeasureRequests += decorationIndices.count
-        if grade == .probe {
-          localMetrics.branching.builtinChildMeasureRequestsProbe += decorationIndices.count
-        }
-        work.append(
-          .finishDecoration(
-            node,
-            originalProposal: originalProposal,
-            effectiveProposal: effectiveProposal,
-            primaryIndex: primaryIndex,
-            primaryMeasurement: primaryMeasurement,
-            decorationIndices: Array(decorationIndices)
-          )
-        )
-        for index in decorationIndices.reversed() {
-          work.append(.measure(node.children[index], decorationProposal, grade))
-        }
-      case .finishDecoration(
-        let node,
-        let originalProposal,
-        let effectiveProposal,
-        let primaryIndex,
-        let primaryMeasurement,
-        let decorationIndices
-      ):
-        finishDecorationMeasurement(
-          node,
-          originalProposal: originalProposal,
-          effectiveProposal: effectiveProposal,
-          primaryIndex: primaryIndex,
-          primaryMeasurement: primaryMeasurement,
-          decorationIndices: decorationIndices,
-          passContext: passContext,
-          results: &results
-        )
-      case .finishViewThatFitsChildren(
-        let node,
-        let originalProposal,
-        let effectiveProposal,
-        let axes,
-        let childCount
-      ):
-        let childMeasurements = popMeasurements(from: &results, count: childCount)
-        guard !node.children.isEmpty else {
-          results.append(
-            makeMeasuredNode(
-              for: node,
-              originalProposal: originalProposal,
-              effectiveProposal: effectiveProposal,
-              childMeasurements: childMeasurements,
-              selectedChildIndex: nil,
-              passContext: passContext
-            )
-          )
-          break
-        }
-
-        let fitProbe = proposalByRelaxingAxes(effectiveProposal, axes: axes)
-        localMetrics.branching.builtinChildMeasureRequests += 1
-        localMetrics.branching.builtinChildMeasureRequestsProbe += 1
-        work.append(
-          .finishViewThatFitsProbe(
-            node,
-            originalProposal: originalProposal,
-            effectiveProposal: effectiveProposal,
-            axes: axes,
-            childMeasurements: childMeasurements,
-            probeIndex: 0
-          )
-        )
-        work.append(.measure(node.children[0], fitProbe, .probe))
-      case .finishViewThatFitsProbe(
-        let node,
-        let originalProposal,
-        let effectiveProposal,
-        let axes,
-        let childMeasurements,
-        let probeIndex
-      ):
-        let idealMeasurement = popMeasurement(from: &results)
-        if fits(idealMeasurement.measuredSize, within: effectiveProposal, axes: axes)
-          || probeIndex == node.children.indices.last
-        {
-          results.append(
-            makeMeasuredNode(
-              for: node,
-              originalProposal: originalProposal,
-              effectiveProposal: effectiveProposal,
-              childMeasurements: childMeasurements,
-              selectedChildIndex: probeIndex,
-              issuedProposals: viewThatFitsIssuedProposalRecords(
-                children: node.children,
-                effectiveProposal: effectiveProposal,
-                axes: axes,
-                probedThrough: probeIndex
-              ),
-              passContext: passContext
-            )
-          )
-        } else {
-          let nextIndex = probeIndex + 1
-          let fitProbe = proposalByRelaxingAxes(effectiveProposal, axes: axes)
-          localMetrics.branching.builtinChildMeasureRequests += 1
-          localMetrics.branching.builtinChildMeasureRequestsProbe += 1
-          work.append(
-            .finishViewThatFitsProbe(
-              node,
-              originalProposal: originalProposal,
-              effectiveProposal: effectiveProposal,
-              axes: axes,
-              childMeasurements: childMeasurements,
-              probeIndex: nextIndex
-            )
-          )
-          work.append(.measure(node.children[nextIndex], fitProbe, .probe))
-        }
-      case .finishStackIdeal(
-        let node,
-        let originalProposal,
-        let effectiveProposal,
-        let children,
-        let axis,
-        let spacing,
-        let childCount,
-        let grade
-      ):
-        let idealMeasurements = popMeasurements(from: &results, count: childCount)
-        scheduleStackAfterIdealMeasurements(
-          node,
-          originalProposal: originalProposal,
-          effectiveProposal: effectiveProposal,
-          children: children,
-          axis: axis,
-          spacing: spacing,
-          idealMeasurements: idealMeasurements,
-          grade: grade,
+      case .finishNode:
+        finishNodeWorkItem(item, passContext: passContext, results: &results)
+      default:
+        finishMeasurementWorkItem(
+          item,
           passContext: passContext,
           localMetrics: &localMetrics,
           work: &work,
           results: &results
-        )
-      case .stackAllocateStep(
-        let node,
-        let originalProposal,
-        let effectiveProposal,
-        let children,
-        let axis,
-        let state
-      ):
-        let measurement = popMeasurement(from: &results)
-        let childIndex = state.plan.order[state.position]
-        state.measurements[childIndex] = measurement
-        // Spacers never absorb their offer themselves — their committed
-        // size is the allocated value (forced at completion), so charge
-        // that; everyone else charges the actual measured response.
-        let consumed =
-          isStackSpacer(children[childIndex], axis: axis)
-          ? state.allocatedMainSizes[childIndex]
-          : mainDimension(of: measurement.measuredSize, for: axis)
-        // A negative padding can make a child's response negative.
-        state.remainingMain = max(
-          0, SaturatingConversion.subtracting(state.remainingMain, consumed))
-        state.position += 1
-        continueStackAllocation(
-          node,
-          originalProposal: originalProposal,
-          effectiveProposal: effectiveProposal,
-          children: children,
-          axis: axis,
-          state: state,
-          passContext: passContext,
-          localMetrics: &localMetrics,
-          work: &work,
-          results: &results
-        )
-      case .finishStackAllocationBatch(
-        let node,
-        let originalProposal,
-        let effectiveProposal,
-        let children,
-        let axis,
-        let state,
-        let batchPositions
-      ):
-        // Batch consumption was charged at scheduling time (unbounded
-        // children size exactly to their offer); only merge results.
-        let batchMeasurements = popMeasurements(from: &results, count: batchPositions.count)
-        for (offset, position) in batchPositions.enumerated() {
-          state.measurements[state.plan.order[position]] = batchMeasurements[offset]
-        }
-        continueStackAllocation(
-          node,
-          originalProposal: originalProposal,
-          effectiveProposal: effectiveProposal,
-          children: children,
-          axis: axis,
-          state: state,
-          passContext: passContext,
-          localMetrics: &localMetrics,
-          work: &work,
-          results: &results
-        )
-      case .finishStackReconciliation(
-        let node,
-        let originalProposal,
-        let effectiveProposal,
-        let children,
-        let axis,
-        var measurements,
-        let replacementIndices
-      ):
-        let replacements = popMeasurements(from: &results, count: replacementIndices.count)
-        let issuedProposals = stackReconciliationIssuedProposalRecords(
-          children: children,
-          axis: axis,
-          effectiveProposal: effectiveProposal,
-          preReconciliationMeasurements: measurements,
-          replacementIndices: replacementIndices,
-          replacements: replacements
-        )
-        for (index, measurement) in zip(replacementIndices, replacements) {
-          var reconciled = measurement
-          if isStackSpacer(children[index], axis: axis) {
-            reconciled.measuredSize = settingMainDimension(
-              of: reconciled.measuredSize, for: axis,
-              to: mainDimension(of: measurements[index].measuredSize, for: axis))
-          }
-          measurements[index] = reconciled
-        }
-        results.append(
-          makeMeasuredNode(
-            for: node,
-            originalProposal: originalProposal,
-            effectiveProposal: effectiveProposal,
-            childMeasurements: measurements,
-            selectedChildIndex: nil,
-            issuedProposals: issuedProposals,
-            passContext: passContext
-          )
-        )
-      case .finishCompositionalLazyStack(let context, let indices, let elements, let childCount):
-        let measurements = popMeasurements(from: &results, count: childCount)
-        finishCompositionalLazyStack(
-          context: context, indices: indices, elements: elements,
-          measurements: measurements, passContext: passContext, localMetrics: &localMetrics,
-          work: &work, results: &results)
-      case .finishLazyStackIdealEstimate(
-        let node,
-        let originalProposal,
-        let effectiveProposal,
-        let axis,
-        let spacing,
-        let count,
-        let childCount
-      ):
-        let probes = popMeasurements(from: &results, count: childCount)
-        let main = SaturatingConversion.adding(
-          SaturatingConversion.sum(probes.map { mainDimension(of: $0.measuredSize, for: axis) }),
-          SaturatingConversion.multiplying(max(0, childCount - 1), spacing))
-        let cross = probes.reduce(0) { max($0, crossDimension(of: $1.measuredSize, for: axis)) }
-        let probeMeasurement = MeasuredNode(
-          identity: node.identity, proposal: originalProposal,
-          measuredSize: axis == .vertical
-            ? CellSize(width: cross, height: main)
-            : CellSize(width: main, height: cross), childMeasurements: [])
-        results.append(
-          finishLazyStackIdealEstimate(
-            node,
-            originalProposal: originalProposal,
-            effectiveProposal: effectiveProposal,
-            axis: axis,
-            spacing: spacing,
-            count: count,
-            probeMeasurement: probeMeasurement
-          )
         )
       }
     }
@@ -389,6 +71,378 @@ extension LayoutEngine {
       $0.branching.merge(localMetrics.branching)
     }
     return results[0]
+  }
+
+  /// The `.finishNode` item: the leaf and built-in container finish that
+  /// ends every chain. Its own frame keeps the tip's peak at this frame plus
+  /// `makeMeasuredNode` rather than every finish case's bindings.
+  private func finishNodeWorkItem(
+    _ item: MeasurementWorkItem,
+    passContext: LayoutPassContext?,
+    results: inout [MeasuredNode]
+  ) {
+    guard
+      case .finishNode(let node, let originalProposal, let effectiveProposal, let childCount) =
+        item
+    else {
+      preconditionFailure("finishNodeWorkItem takes a .finishNode item")
+    }
+    let childMeasurements = popMeasurements(from: &results, count: childCount)
+    results.append(
+      makeMeasuredNode(
+        for: node,
+        originalProposal: originalProposal,
+        effectiveProposal: effectiveProposal,
+        childMeasurements: childMeasurements,
+        selectedChildIndex: nil,
+        passContext: passContext
+      )
+    )
+  }
+
+  /// Runs one remaining finish item of the measurement work stack: the cases
+  /// that combine already-measured children or stage more work, none of
+  /// which re-enters the engine on the native stack. Separate from
+  /// `measureIterative` so their statically allocated bindings are not live
+  /// across a custom-layout re-entry (see the dispatch there).
+  private func finishMeasurementWorkItem(
+    _ item: MeasurementWorkItem,
+    passContext: LayoutPassContext?,
+    localMetrics: inout LayoutWorkMetrics,
+    work: inout [MeasurementWorkItem],
+    results: inout [MeasuredNode]
+  ) {
+    switch item {
+    case .measure, .measureFresh, .finishNode:
+      preconditionFailure("dispatched by measureIterative")
+    case .finishSafeAreaInsetAdornment(
+      let node,
+      let originalProposal,
+      let effectiveProposal,
+      let edge,
+      let spacing,
+      let safeArea,
+      let grade
+    ):
+      finishSafeAreaInsetAdornmentMeasurement(
+        node,
+        originalProposal: originalProposal,
+        effectiveProposal: effectiveProposal,
+        edge: edge,
+        spacing: spacing,
+        safeArea: safeArea,
+        grade: grade,
+        localMetrics: &localMetrics,
+        work: &work,
+        results: &results
+      )
+    case .finishSafeAreaInset(
+      let node,
+      let originalProposal,
+      let effectiveProposal,
+      let insetMeasurement
+    ):
+      let baseMeasurement = popMeasurement(from: &results)
+      results.append(
+        makeMeasuredNode(
+          for: node,
+          originalProposal: originalProposal,
+          effectiveProposal: effectiveProposal,
+          childMeasurements: [baseMeasurement, insetMeasurement],
+          selectedChildIndex: nil,
+          passContext: passContext
+        )
+      )
+    case .finishDecorationPrimary(
+      let node,
+      let originalProposal,
+      let effectiveProposal,
+      let primaryIndex,
+      let grade
+    ):
+      let primaryMeasurement = popMeasurement(from: &results)
+      let decorationProposal = ProposedSize(
+        width: .finite(primaryMeasurement.measuredSize.width),
+        height: .finite(primaryMeasurement.measuredSize.height)
+      )
+      let decorationIndices = node.children.indices.filter { $0 != primaryIndex }
+      localMetrics.branching.builtinChildMeasureRequests += decorationIndices.count
+      if grade == .probe {
+        localMetrics.branching.builtinChildMeasureRequestsProbe += decorationIndices.count
+      }
+      work.append(
+        .finishDecoration(
+          node,
+          originalProposal: originalProposal,
+          effectiveProposal: effectiveProposal,
+          primaryIndex: primaryIndex,
+          primaryMeasurement: primaryMeasurement,
+          decorationIndices: Array(decorationIndices)
+        )
+      )
+      for index in decorationIndices.reversed() {
+        work.append(.measure(node.children[index], decorationProposal, grade))
+      }
+    case .finishDecoration(
+      let node,
+      let originalProposal,
+      let effectiveProposal,
+      let primaryIndex,
+      let primaryMeasurement,
+      let decorationIndices
+    ):
+      finishDecorationMeasurement(
+        node,
+        originalProposal: originalProposal,
+        effectiveProposal: effectiveProposal,
+        primaryIndex: primaryIndex,
+        primaryMeasurement: primaryMeasurement,
+        decorationIndices: decorationIndices,
+        passContext: passContext,
+        results: &results
+      )
+    case .finishViewThatFitsChildren(
+      let node,
+      let originalProposal,
+      let effectiveProposal,
+      let axes,
+      let childCount
+    ):
+      let childMeasurements = popMeasurements(from: &results, count: childCount)
+      guard !node.children.isEmpty else {
+        results.append(
+          makeMeasuredNode(
+            for: node,
+            originalProposal: originalProposal,
+            effectiveProposal: effectiveProposal,
+            childMeasurements: childMeasurements,
+            selectedChildIndex: nil,
+            passContext: passContext
+          )
+        )
+        break
+      }
+
+      let fitProbe = proposalByRelaxingAxes(effectiveProposal, axes: axes)
+      localMetrics.branching.builtinChildMeasureRequests += 1
+      localMetrics.branching.builtinChildMeasureRequestsProbe += 1
+      work.append(
+        .finishViewThatFitsProbe(
+          node,
+          originalProposal: originalProposal,
+          effectiveProposal: effectiveProposal,
+          axes: axes,
+          childMeasurements: childMeasurements,
+          probeIndex: 0
+        )
+      )
+      work.append(.measure(node.children[0], fitProbe, .probe))
+    case .finishViewThatFitsProbe(
+      let node,
+      let originalProposal,
+      let effectiveProposal,
+      let axes,
+      let childMeasurements,
+      let probeIndex
+    ):
+      let idealMeasurement = popMeasurement(from: &results)
+      if fits(idealMeasurement.measuredSize, within: effectiveProposal, axes: axes)
+        || probeIndex == node.children.indices.last
+      {
+        results.append(
+          makeMeasuredNode(
+            for: node,
+            originalProposal: originalProposal,
+            effectiveProposal: effectiveProposal,
+            childMeasurements: childMeasurements,
+            selectedChildIndex: probeIndex,
+            issuedProposals: viewThatFitsIssuedProposalRecords(
+              children: node.children,
+              effectiveProposal: effectiveProposal,
+              axes: axes,
+              probedThrough: probeIndex
+            ),
+            passContext: passContext
+          )
+        )
+      } else {
+        let nextIndex = probeIndex + 1
+        let fitProbe = proposalByRelaxingAxes(effectiveProposal, axes: axes)
+        localMetrics.branching.builtinChildMeasureRequests += 1
+        localMetrics.branching.builtinChildMeasureRequestsProbe += 1
+        work.append(
+          .finishViewThatFitsProbe(
+            node,
+            originalProposal: originalProposal,
+            effectiveProposal: effectiveProposal,
+            axes: axes,
+            childMeasurements: childMeasurements,
+            probeIndex: nextIndex
+          )
+        )
+        work.append(.measure(node.children[nextIndex], fitProbe, .probe))
+      }
+    case .finishStackIdeal(
+      let node,
+      let originalProposal,
+      let effectiveProposal,
+      let children,
+      let axis,
+      let spacing,
+      let childCount,
+      let grade
+    ):
+      let idealMeasurements = popMeasurements(from: &results, count: childCount)
+      scheduleStackAfterIdealMeasurements(
+        node,
+        originalProposal: originalProposal,
+        effectiveProposal: effectiveProposal,
+        children: children,
+        axis: axis,
+        spacing: spacing,
+        idealMeasurements: idealMeasurements,
+        grade: grade,
+        passContext: passContext,
+        localMetrics: &localMetrics,
+        work: &work,
+        results: &results
+      )
+    case .stackAllocateStep(
+      let node,
+      let originalProposal,
+      let effectiveProposal,
+      let children,
+      let axis,
+      let state
+    ):
+      let measurement = popMeasurement(from: &results)
+      let childIndex = state.plan.order[state.position]
+      state.measurements[childIndex] = measurement
+      // Spacers never absorb their offer themselves — their committed
+      // size is the allocated value (forced at completion), so charge
+      // that; everyone else charges the actual measured response.
+      let consumed =
+        isStackSpacer(children[childIndex], axis: axis)
+        ? state.allocatedMainSizes[childIndex]
+        : mainDimension(of: measurement.measuredSize, for: axis)
+      // A negative padding can make a child's response negative.
+      state.remainingMain = max(
+        0, SaturatingConversion.subtracting(state.remainingMain, consumed))
+      state.position += 1
+      continueStackAllocation(
+        node,
+        originalProposal: originalProposal,
+        effectiveProposal: effectiveProposal,
+        children: children,
+        axis: axis,
+        state: state,
+        passContext: passContext,
+        localMetrics: &localMetrics,
+        work: &work,
+        results: &results
+      )
+    case .finishStackAllocationBatch(
+      let node,
+      let originalProposal,
+      let effectiveProposal,
+      let children,
+      let axis,
+      let state,
+      let batchPositions
+    ):
+      // Batch consumption was charged at scheduling time (unbounded
+      // children size exactly to their offer); only merge results.
+      let batchMeasurements = popMeasurements(from: &results, count: batchPositions.count)
+      for (offset, position) in batchPositions.enumerated() {
+        state.measurements[state.plan.order[position]] = batchMeasurements[offset]
+      }
+      continueStackAllocation(
+        node,
+        originalProposal: originalProposal,
+        effectiveProposal: effectiveProposal,
+        children: children,
+        axis: axis,
+        state: state,
+        passContext: passContext,
+        localMetrics: &localMetrics,
+        work: &work,
+        results: &results
+      )
+    case .finishStackReconciliation(
+      let node,
+      let originalProposal,
+      let effectiveProposal,
+      let children,
+      let axis,
+      var measurements,
+      let replacementIndices
+    ):
+      let replacements = popMeasurements(from: &results, count: replacementIndices.count)
+      let issuedProposals = stackReconciliationIssuedProposalRecords(
+        children: children,
+        axis: axis,
+        effectiveProposal: effectiveProposal,
+        preReconciliationMeasurements: measurements,
+        replacementIndices: replacementIndices,
+        replacements: replacements
+      )
+      for (index, measurement) in zip(replacementIndices, replacements) {
+        var reconciled = measurement
+        if isStackSpacer(children[index], axis: axis) {
+          reconciled.measuredSize = settingMainDimension(
+            of: reconciled.measuredSize, for: axis,
+            to: mainDimension(of: measurements[index].measuredSize, for: axis))
+        }
+        measurements[index] = reconciled
+      }
+      results.append(
+        makeMeasuredNode(
+          for: node,
+          originalProposal: originalProposal,
+          effectiveProposal: effectiveProposal,
+          childMeasurements: measurements,
+          selectedChildIndex: nil,
+          issuedProposals: issuedProposals,
+          passContext: passContext
+        )
+      )
+    case .finishCompositionalLazyStack(let context, let indices, let elements, let childCount):
+      let measurements = popMeasurements(from: &results, count: childCount)
+      finishCompositionalLazyStack(
+        context: context, indices: indices, elements: elements,
+        measurements: measurements, passContext: passContext, localMetrics: &localMetrics,
+        work: &work, results: &results)
+    case .finishLazyStackIdealEstimate(
+      let node,
+      let originalProposal,
+      let effectiveProposal,
+      let axis,
+      let spacing,
+      let count,
+      let childCount
+    ):
+      let probes = popMeasurements(from: &results, count: childCount)
+      let main = SaturatingConversion.adding(
+        SaturatingConversion.sum(probes.map { mainDimension(of: $0.measuredSize, for: axis) }),
+        SaturatingConversion.multiplying(max(0, childCount - 1), spacing))
+      let cross = probes.reduce(0) { max($0, crossDimension(of: $1.measuredSize, for: axis)) }
+      let probeMeasurement = MeasuredNode(
+        identity: node.identity, proposal: originalProposal,
+        measuredSize: axis == .vertical
+          ? CellSize(width: cross, height: main)
+          : CellSize(width: main, height: cross), childMeasurements: [])
+      results.append(
+        finishLazyStackIdealEstimate(
+          node,
+          originalProposal: originalProposal,
+          effectiveProposal: effectiveProposal,
+          axis: axis,
+          spacing: spacing,
+          count: count,
+          probeMeasurement: probeMeasurement
+        )
+      )
+    }
   }
 
   private func scheduleMeasurement(
@@ -469,6 +523,47 @@ extension LayoutEngine {
     // multiply by nesting depth. The helper's temporaries are transient.
     recordScheduledContainerComputation(for: node, grade: grade, into: &localMetrics)
 
+    // The built-in arms only stage work items and are popped before the next
+    // item; the custom arm is live across the author callback's re-entry.
+    // Keeping them apart leaves only the custom arm's temporaries on the
+    // re-entry chain (STUI-1133; see `measureIterative`).
+    switch node.layoutBehavior {
+    case .custom:
+      scheduleCustomLayoutMeasurement(
+        of: node,
+        proposal: proposal,
+        effectiveProposal: effectiveProposal,
+        grade: grade,
+        passContext: passContext,
+        results: &results
+      )
+    default:
+      scheduleBuiltInMeasurement(
+        of: node,
+        proposal: proposal,
+        effectiveProposal: effectiveProposal,
+        grade: grade,
+        passContext: passContext,
+        localMetrics: &localMetrics,
+        work: &work,
+        results: &results
+      )
+    }
+  }
+
+  /// Stages a built-in layout's child measurements on the work stack. Never
+  /// re-enters the engine, so its frame — every arm's temporaries, allocated
+  /// statically at -Onone — is gone before the next work item runs.
+  private func scheduleBuiltInMeasurement(
+    of node: ResolvedNode,
+    proposal: ProposedSize,
+    effectiveProposal: ProposedSize,
+    grade: MeasurementGrade,
+    passContext: LayoutPassContext?,
+    localMetrics: inout LayoutWorkMetrics,
+    work: inout [MeasurementWorkItem],
+    results: inout [MeasuredNode]
+  ) {
     switch node.layoutBehavior {
     case .intrinsic, .overlay, .offset, .position:
       // Collections constrain their viewport, not the vertical extent of
@@ -721,60 +816,77 @@ extension LayoutEngine {
         localMetrics: &localMetrics,
         work: &work
       )
-    case .custom(let token):
-      guard let handle = token as? CustomLayoutHandle else {
-        preconditionFailure("LayoutBehavior.custom must carry a CustomLayoutHandle")
-      }
-      guard
-        passContext?.enterCustomLayoutCompatibilityBoundary(
-          identity: node.identity,
-          debugName: handle.debugName,
-          phase: .measurement
-        ) ?? true
-      else {
-        results.append(
-          MeasuredNode(
-            viewNodeID: node.viewNodeID,
-            identity: node.identity,
-            proposal: proposal,
-            measuredSize: .zero,
-            childMeasurements: [],
-            containerAllocationSnapshot: nil
-          )
-        )
-        return
-      }
-      defer {
-        passContext?.exitCustomLayoutCompatibilityBoundary()
-      }
-      // Author probes recorded during measureContainer land on this frame
-      // and drain into the container's issued-proposal snapshot (plan
-      // 2026-08-11-006 Stage 0). Popped before the boundary exit (defers
-      // run LIFO).
-      passContext?.pushIssuedProposalProbeFrame()
-      defer {
-        passContext?.popIssuedProposalProbeFrame()
-      }
-
-      // Sticky-downward grade across the native re-entry: the pre-measure's
-      // `engine.measure` calls inherit this item's grade through the engine
-      // value's default, so no ambient state crosses the worker offload.
-      let childMeasurements = handle.measureChildren(
-        engine: withDefaultMeasurementGrade(grade),
-        node: node,
-        proposal: effectiveProposal,
-        passContext: passContext
-      )
-      let measured = makeMeasuredNode(
-        for: node,
-        originalProposal: proposal,
-        effectiveProposal: effectiveProposal,
-        childMeasurements: childMeasurements,
-        selectedChildIndex: nil,
-        passContext: passContext
-      )
-      results.append(measured)
+    case .custom:
+      preconditionFailure("custom layouts are scheduled by scheduleCustomLayoutMeasurement")
     }
+  }
+
+  /// Measures a custom layout: the pre-measure round and the author's
+  /// `sizeThatFits` both re-enter the engine on the native stack, so this
+  /// frame is live for the whole nested chain and holds only what that
+  /// needs.
+  private func scheduleCustomLayoutMeasurement(
+    of node: ResolvedNode,
+    proposal: ProposedSize,
+    effectiveProposal: ProposedSize,
+    grade: MeasurementGrade,
+    passContext: LayoutPassContext?,
+    results: inout [MeasuredNode]
+  ) {
+    guard case .custom(let token) = node.layoutBehavior,
+      let handle = token as? CustomLayoutHandle
+    else {
+      preconditionFailure("LayoutBehavior.custom must carry a CustomLayoutHandle")
+    }
+    guard
+      passContext?.enterCustomLayoutCompatibilityBoundary(
+        identity: node.identity,
+        debugName: handle.debugName,
+        phase: .measurement
+      ) ?? true
+    else {
+      results.append(
+        MeasuredNode(
+          viewNodeID: node.viewNodeID,
+          identity: node.identity,
+          proposal: proposal,
+          measuredSize: .zero,
+          childMeasurements: [],
+          containerAllocationSnapshot: nil
+        )
+      )
+      return
+    }
+    defer {
+      passContext?.exitCustomLayoutCompatibilityBoundary()
+    }
+    // Author probes recorded during measureContainer land on this frame
+    // and drain into the container's issued-proposal snapshot (plan
+    // 2026-08-11-006 Stage 0). Popped before the boundary exit (defers
+    // run LIFO).
+    passContext?.pushIssuedProposalProbeFrame()
+    defer {
+      passContext?.popIssuedProposalProbeFrame()
+    }
+
+    // Sticky-downward grade across the native re-entry: the pre-measure's
+    // `engine.measure` calls inherit this item's grade through the engine
+    // value's default, so no ambient state crosses the worker offload.
+    let childMeasurements = handle.measureChildren(
+      engine: withDefaultMeasurementGrade(grade),
+      node: node,
+      proposal: effectiveProposal,
+      passContext: passContext
+    )
+    let measured = makeMeasuredNode(
+      for: node,
+      originalProposal: proposal,
+      effectiveProposal: effectiveProposal,
+      childMeasurements: childMeasurements,
+      selectedChildIndex: nil,
+      passContext: passContext
+    )
+    results.append(measured)
   }
 
   /// The `.finishSafeAreaInsetAdornment` case body, extracted so its inset
