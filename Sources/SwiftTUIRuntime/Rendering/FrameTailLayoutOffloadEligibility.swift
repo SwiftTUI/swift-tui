@@ -27,18 +27,28 @@ extension FrameTailRenderer {
   /// main actor, whose pass context carries the main-thread depth limit.
   ///
   /// Deliberately BELOW the pass context's truncation limit
-  /// (`LayoutPassContext.defaultCustomLayoutCompatibilityDepthLimit`, 4):
-  /// each re-entry costs a measured ~80 KiB debug frame plus interior
-  /// scheduling frames, with a ~54 KiB windowed-measurement frame at the
-  /// tip, so even three re-entries left no margin on the ~512 KiB worker
-  /// once node layouts grew — the 2026-08-11 SIGBUS overflow (mrkdwn's
-  /// 500x20 table under `swift test`, crash queue
-  /// `swift-tui.frame-tail-layout`, re-fired at a budget of three). Two
-  /// re-entries keeps the common offload shapes (scroll content, one
+  /// (`LayoutPassContext.defaultCustomLayoutCompatibilityDepthLimit`, 4).
+  /// Each re-entry keeps a chain of -Onone frames live — the measurement
+  /// driver, the scheduler, the node builder and the author callback or the
+  /// collection's row loop — and -Onone allocates every temporary
+  /// statically, so the cost per level is set by the largest live frames.
+  /// When that chain measured ~110 KiB per level with a ~57 KiB
+  /// windowed-measurement frame at the tip, three re-entries left no margin
+  /// on the ~512 KiB worker once node layouts grew — the 2026-08-11 SIGBUS
+  /// overflow (mrkdwn's 500x20 table under `swift test`, crash queue
+  /// `swift-tui.frame-tail-layout`, re-fired at a budget of three) — and
+  /// two re-entries overflowed under AddressSanitizer, which inflates every
+  /// frame by about a third (STUI-1133). That repair keeps the built-in
+  /// sizing and finish frames off the re-entry chain: a custom-layout level
+  /// now holds ~32 KiB, a hosted-collection level ~35 KiB (~49 KiB across a
+  /// table's framed second pass) and a leaf's finish peaks at ~37 KiB, so
+  /// the budget-two chain fits in half the worker stack
+  /// (`MeasurementReentryStackHeadroomTests` pins that on a sized thread).
+  /// Two re-entries keeps the common offload shapes (scroll content, one
   /// hosted collection under a scroll) on the worker; deeper trees run the
   /// main-actor tail, whose ~8 MiB stack carries the 24-level truncation
-  /// boundary. Shrinking the per-level debug frames is the recorded
-  /// follow-up that could raise this budget again.
+  /// boundary. Raising the budget again is possible on these numbers, but
+  /// needs the mrkdwn shape re-verified in the examples overlay first.
   static let workerEngineReentryNestingBudget = 2
 
   func canOffloadLayout(

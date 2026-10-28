@@ -1,6 +1,19 @@
 @_spi(Testing) import SwiftTUIPrimitives
 
 extension LayoutEngine {
+  /// Admits a node to hosted-collection windowing. A non-empty `List` or
+  /// `Table` container measures its realized rows out of line; every other
+  /// node is answered `nil` from this small frame.
+  ///
+  /// Every scheduled measurement asks this question, so the common answer —
+  /// not a collection — must cost no stack. The body's -Onone frame is
+  /// large (about 56 KiB, 66 KiB under AddressSanitizer: the realized rows,
+  /// both collection layouts and the allocation snapshot are static
+  /// temporaries), and it sits at the tip of every nested custom-layout
+  /// re-entry chain, where a plain leaf under two re-entries overflowed the
+  /// frame-tail worker's stack under AddressSanitizer (STUI-1133). Keeping
+  /// the admission here reserves that frame only for a collection that is
+  /// actually windowed.
   func windowedHostedCollectionMeasurement(
     for node: ResolvedNode,
     originalProposal: ProposedSize,
@@ -15,7 +28,126 @@ extension LayoutEngine {
     else {
       return nil
     }
+    return measureWindowedHostedCollection(
+      for: node,
+      collection: collection,
+      source: source,
+      originalProposal: originalProposal,
+      effectiveProposal: effectiveProposal,
+      passContext: passContext
+    )
+  }
 
+  /// The windowing measurement proper; see the admission above for why it is
+  /// a separate frame. `@inline(never)` keeps optimized builds from folding
+  /// it back into the admission.
+  @inline(never)
+  private func measureWindowedHostedCollection(
+    for node: ResolvedNode,
+    collection: HostedCollectionContainerMetadata,
+    source: any IndexedChildSource,
+    originalProposal: ProposedSize,
+    effectiveProposal: ProposedSize,
+    passContext: LayoutPassContext?
+  ) -> MeasuredNode? {
+    guard
+      let plan = hostedCollectionWindowPlan(
+        for: node,
+        collection: collection,
+        source: source,
+        effectiveProposal: effectiveProposal,
+        passContext: passContext
+      )
+    else {
+      return nil
+    }
+    // Measuring each realized row below re-enters the layout engine on the
+    // native call stack — the hosted-collection sibling of the custom-layout
+    // compatibility recursion. Nested collections therefore consume real
+    // stack per level, so the re-entry shares the same depth boundary: the
+    // resolve-time `maxEngineReentryNestingDepth` aggregate keeps deep trees
+    // off the small-stack worker, and this runtime gate bounds the recursion
+    // (with a `layout.customLayoutDepthLimitExceeded` runtime issue) instead
+    // of letting a pathological nest overflow the stack.
+    guard
+      passContext?.enterCustomLayoutCompatibilityBoundary(
+        identity: node.identity,
+        debugName: collection.kind == .table ? "Table" : "List",
+        phase: .measurement
+      ) ?? true
+    else {
+      return MeasuredNode(
+        viewNodeID: node.viewNodeID,
+        identity: node.identity,
+        proposal: originalProposal,
+        measuredSize: .zero,
+        childMeasurements: [],
+        containerAllocationSnapshot: nil
+      )
+    }
+    defer {
+      passContext?.exitCustomLayoutCompatibilityBoundary()
+    }
+
+    // This frame is live across every row's re-entry, so it holds only the
+    // realized band. The window was planned out of line above, and each
+    // kind's layout products are derived out of line below; one straight-line
+    // body reserved all of their temporaries here at once (STUI-1133).
+    var sourceIndices = plan.sourceIndices
+    var measuredWindow = plan.measuredWindow
+    var hiddenEdges = plan.retainedHiddenEdges
+    var children: [ResolvedNode] = []
+    var measurements: [MeasuredNode] = []
+    children.reserveCapacity(sourceIndices.count)
+    measurements.reserveCapacity(sourceIndices.count)
+    if collection.kind == .table {
+      // Discovery must see every row at its own width. An earlier
+      // measurement of this source in the same frame (a scroll view measures
+      // the viewport, then re-measures against its content height) applied
+      // its widths, and a row framed at them reports nothing wider
+      // (STUI-1230). The second pass re-applies the retained widths.
+      source.beginHostedTableColumnDiscovery()
+    }
+    for index in sourceIndices {
+      let child = source.child(at: index)
+      children.append(child)
+      measurements.append(
+        measure(child, proposal: plan.childProposal, passContext: passContext)
+      )
+    }
+    if collection.kind == .table {
+      // Out of line: this function sits on every re-entrant measurement
+      // level, so its own stack frame must not grow (custom-layout depth).
+      widenWindowForHiddenTableSeparators(
+        node: node, source: source, bounds: plan.bounds, hint: plan.hint,
+        rowStride: plan.rowStride, tallRowHeights: plan.retainedTallRowHeights,
+        childProposal: plan.childProposal, passContext: passContext,
+        sourceIndices: &sourceIndices, measuredWindow: &measuredWindow,
+        children: &children, measurements: &measurements, hiddenEdges: &hiddenEdges)
+      return hostedTableMeasurement(
+        for: node, source: source, plan: plan, sourceIndices: sourceIndices,
+        measuredWindow: measuredWindow, children: &children, measurements: &measurements,
+        hiddenEdges: hiddenEdges, originalProposal: originalProposal,
+        effectiveProposal: effectiveProposal, passContext: passContext)
+    }
+    return hostedListMeasurement(
+      for: node, plan: plan, sourceIndices: sourceIndices, measuredWindow: measuredWindow,
+      children: children, measurements: measurements, hiddenEdges: hiddenEdges,
+      originalProposal: originalProposal, effectiveProposal: effectiveProposal)
+  }
+
+  /// Which rows a hosted collection realizes this pass, and at what proposal.
+  /// Derived out of line from the measurement so its temporaries (payload
+  /// copies, the line model's display lines, the retained estimates) are not
+  /// live across the rows' re-entry.
+  @inline(never)
+  private func hostedCollectionWindowPlan(
+    for node: ResolvedNode,
+    collection: HostedCollectionContainerMetadata,
+    source: any IndexedChildSource,
+    effectiveProposal: ProposedSize,
+    passContext: LayoutPassContext?
+  ) -> HostedCollectionWindowPlan? {
     let fallbackSize: CellSize
     switch node.drawPayload {
     case .list(let payload):
@@ -125,39 +257,7 @@ extension LayoutEngine {
       )
       sourceIndices = Array(0..<source.count)
     }
-    // Measuring each realized row below re-enters the layout engine on the
-    // native call stack — the hosted-collection sibling of the custom-layout
-    // compatibility recursion. Nested collections therefore consume real
-    // stack per level, so the re-entry shares the same depth boundary: the
-    // resolve-time `maxEngineReentryNestingDepth` aggregate keeps deep trees
-    // off the small-stack worker, and this runtime gate bounds the recursion
-    // (with a `layout.customLayoutDepthLimitExceeded` runtime issue) instead
-    // of letting a pathological nest overflow the stack.
-    guard
-      passContext?.enterCustomLayoutCompatibilityBoundary(
-        identity: node.identity,
-        debugName: collection.kind == .table ? "Table" : "List",
-        phase: .measurement
-      ) ?? true
-    else {
-      return MeasuredNode(
-        viewNodeID: node.viewNodeID,
-        identity: node.identity,
-        proposal: originalProposal,
-        measuredSize: .zero,
-        childMeasurements: [],
-        containerAllocationSnapshot: nil
-      )
-    }
-    defer {
-      passContext?.exitCustomLayoutCompatibilityBoundary()
-    }
 
-    var hiddenEdges = retainedHiddenEdges
-    var children: [ResolvedNode] = []
-    var measurements: [MeasuredNode] = []
-    children.reserveCapacity(sourceIndices.count)
-    measurements.reserveCapacity(sourceIndices.count)
     let childWidth: Int
     if case .table(let payload) = node.drawPayload {
       childWidth = max(0, concreteSize.width - payload.style.contentInsets.horizontal)
@@ -175,145 +275,203 @@ extension LayoutEngine {
     case .finite: proposedChildWidth = .finite(childWidth)
     case .unspecified, .infinity: proposedChildWidth = effectiveProposal.width
     }
-    let childProposal = ProposedSize(
-      width: proposedChildWidth,
-      height: .unspecified
+    return HostedCollectionWindowPlan(
+      bounds: bounds,
+      retainedTallRowHeights: retainedTallRows,
+      retainedHiddenEdges: retainedHiddenEdges,
+      rowStride: rowStride,
+      hint: hint,
+      sourceIndices: sourceIndices,
+      measuredWindow: measuredWindow,
+      childProposal: ProposedSize(width: proposedChildWidth, height: .unspecified)
     )
-    if collection.kind == .table {
-      // Discovery must see every row at its own width. An earlier
-      // measurement of this source in the same frame (a scroll view measures
-      // the viewport, then re-measures against its content height) applied
-      // its widths, and a row framed at them reports nothing wider
-      // (STUI-1230). The second pass below re-applies the retained widths.
-      source.beginHostedTableColumnDiscovery()
-    }
-    for index in sourceIndices {
-      let child = source.child(at: index)
-      children.append(child)
-      measurements.append(
-        measure(child, proposal: childProposal, passContext: passContext)
-      )
-    }
-    if collection.kind == .table {
-      // Out of line: this function sits on every re-entrant measurement
-      // level, so its own stack frame must not grow (custom-layout depth).
-      widenWindowForHiddenTableSeparators(
-        node: node, source: source, bounds: bounds, hint: hint, rowStride: rowStride,
-        tallRowHeights: retainedTallRows, childProposal: childProposal,
-        passContext: passContext, sourceIndices: &sourceIndices,
-        measuredWindow: &measuredWindow, children: &children,
-        measurements: &measurements, hiddenEdges: &hiddenEdges)
-    }
+  }
 
-    let measuredSize: CellSize
-    var tableColumnWidths: [Int]?
-    var listLayout: ListVisibleLayout?
-    var tableLayout: TableVisibleLayout?
-    var tallRowHeights = retainedTallRows
-    switch node.drawPayload {
-    case .list(let payload):
-      // Derive the height-aware layout ONCE, from the real measured heights,
-      // and carry it forward. `bounds` here is origin-zero; placement
-      // translates.
-      mergeTallRowHeights(
-        from: measurements,
-        at: sourceIndices,
-        into: &tallRowHeights
-      )
-      measuredSize = measuredHostedListSize(
-        for: payload,
-        childMeasurements: measurements,
-        sourceIndices: sourceIndices,
-        retainedTallRowHeights: retainedTallRows,
-        proposal: effectiveProposal
-      )
-      listLayout = payload.style.visibleListLayout(
-        for: payload,
-        in: .init(origin: .zero, size: measuredSize),
-        rowHeights: tallRowHeights,
-        // Only set on the hint path, where `bounds` is the collection's own
-        // content height rather than a viewport. Without it the line model
-        // would build a display line per row of the whole dataset before
-        // anything windowed it — the interim O(dataset) cost S2 left behind.
-        rowWindow: measuredWindow
-      )
-    case .table(let payload):
-      var discovered = measureTableColumnWidths(
-        columns: payload.columns,
-        rows: payload.isViewportBacked ? [] : payload.rows
-      )
-      for rowMeasurement in measurements {
-        for (columnIndex, cellMeasurement) in rowMeasurement.childMeasurements.enumerated()
-        where discovered.indices.contains(columnIndex) {
-          discovered[columnIndex] = max(
-            discovered[columnIndex],
-            cellMeasurement.measuredSize.width
-          )
-        }
-      }
-      tableColumnWidths = source.retainedTableColumnWidths(
-        columns: payload.columns,
-        discovered: discovered
-      )
-      // The second pass is load-bearing, not redundant (register item D21).
-      // Discovery above reads each cell's MEASURED width, and a cell that has
-      // had `.frame(width:)` applied reports exactly that width — a frame
-      // reports `width ?? contentSize.width`, so it fully masks the child's
-      // ideal. Discovery therefore needs an UNFRAMED measurement while the
-      // layout product needs a FRAMED one, and one pass cannot be both.
-      //
-      // Applying the retained widths before the loop instead — the obvious
-      // single-pass rewrite — caps every column at whatever it first
-      // discovered and never lets it grow again; with no retained widths on
-      // the first frame that cap is the column TITLE width, so a 16-character
-      // cell renders as narrow as a 2-character one, permanently.
-      // `TableColumnWidthPassTests` pins both halves of that.
-      //
-      // The cost is one extra measure of the WINDOW — not a re-realization:
-      // `applyHostedTableColumnWidths` re-frames the realization cache's rows
-      // on demand, so `child(at:)` below hits it (D21-a).
-      if let tableColumnWidths {
-        source.applyHostedTableColumnWidths(tableColumnWidths)
-        children.removeAll(keepingCapacity: true)
-        measurements.removeAll(keepingCapacity: true)
-        for index in sourceIndices {
-          let child = source.child(at: index)
-          children.append(child)
-          measurements.append(
-            measure(child, proposal: childProposal, passContext: passContext)
-          )
-        }
-      }
-      // Derive the height-aware layout ONCE, from the real measured heights,
-      // and carry it forward. `bounds` here is origin-zero; placement
-      // translates.
-      mergeTallRowHeights(
-        from: measurements,
-        at: sourceIndices,
-        into: &tallRowHeights
-      )
-      let hiddenSeparators = hiddenTableSeparators(from: hiddenEdges, rowCount: source.count)
-      measuredSize = measuredHostedTableSize(
-        for: payload,
-        childMeasurements: measurements,
-        sourceIndices: sourceIndices,
-        retainedTallRowHeights: retainedTallRows,
-        hiddenSeparatorCount: hiddenSeparators.count,
-        proposal: effectiveProposal
-      )
-      tableLayout = DrawExtractor().visibleTableLayout(
-        for: payload,
-        in: .init(origin: .zero, size: measuredSize),
-        columnWidths: tableColumnWidths,
-        rowHeights: tallRowHeights,
-        hiddenSeparators: hiddenSeparators,
-        rowWindow: measuredWindow
-      )
-    default:
+  /// A hosted list's product from its realized rows. Out of line from the
+  /// row loop (see `measureWindowedHostedCollection`).
+  @inline(never)
+  private func hostedListMeasurement(
+    for node: ResolvedNode,
+    plan: HostedCollectionWindowPlan,
+    sourceIndices: [Int],
+    measuredWindow: Range<Int>?,
+    children: [ResolvedNode],
+    measurements: [MeasuredNode],
+    hiddenEdges: [Int: HiddenRowSeparatorEdges],
+    originalProposal: ProposedSize,
+    effectiveProposal: ProposedSize
+  ) -> MeasuredNode? {
+    guard case .list(let payload) = node.drawPayload else {
       return nil
     }
+    // Derive the height-aware layout ONCE, from the real measured heights,
+    // and carry it forward. `bounds` here is origin-zero; placement
+    // translates.
+    var tallRowHeights = plan.retainedTallRowHeights
+    mergeTallRowHeights(
+      from: measurements,
+      at: sourceIndices,
+      into: &tallRowHeights
+    )
+    let measuredSize = measuredHostedListSize(
+      for: payload,
+      childMeasurements: measurements,
+      sourceIndices: sourceIndices,
+      retainedTallRowHeights: plan.retainedTallRowHeights,
+      proposal: effectiveProposal
+    )
+    let listLayout = payload.style.visibleListLayout(
+      for: payload,
+      in: .init(origin: .zero, size: measuredSize),
+      rowHeights: tallRowHeights,
+      // Only set on the hint path, where `bounds` is the collection's own
+      // content height rather than a viewport. Without it the line model
+      // would build a display line per row of the whole dataset before
+      // anything windowed it — the interim O(dataset) cost S2 left behind.
+      rowWindow: measuredWindow
+    )
+    return hostedCollectionMeasuredNode(
+      for: node,
+      originalProposal: originalProposal,
+      measuredSize: measuredSize,
+      children: children,
+      measurements: measurements,
+      sourceIndices: sourceIndices,
+      measuredWindow: measuredWindow,
+      rowStride: plan.rowStride,
+      tableColumnWidths: nil,
+      listLayout: listLayout,
+      tableLayout: nil,
+      tallRowHeights: tallRowHeights,
+      hiddenEdges: hiddenEdges
+    )
+  }
 
-    return MeasuredNode(
+  /// A hosted table's product from its realized rows: column discovery, the
+  /// framed second pass (which re-enters the engine, so this frame is live
+  /// for it, holding only the table's temporaries) and the layout.
+  @inline(never)
+  private func hostedTableMeasurement(
+    for node: ResolvedNode,
+    source: any IndexedChildSource,
+    plan: HostedCollectionWindowPlan,
+    sourceIndices: [Int],
+    measuredWindow: Range<Int>?,
+    children: inout [ResolvedNode],
+    measurements: inout [MeasuredNode],
+    hiddenEdges: [Int: HiddenRowSeparatorEdges],
+    originalProposal: ProposedSize,
+    effectiveProposal: ProposedSize,
+    passContext: LayoutPassContext?
+  ) -> MeasuredNode? {
+    guard case .table(let payload) = node.drawPayload else {
+      return nil
+    }
+    var discovered = measureTableColumnWidths(
+      columns: payload.columns,
+      rows: payload.isViewportBacked ? [] : payload.rows
+    )
+    for rowMeasurement in measurements {
+      for (columnIndex, cellMeasurement) in rowMeasurement.childMeasurements.enumerated()
+      where discovered.indices.contains(columnIndex) {
+        discovered[columnIndex] = max(
+          discovered[columnIndex],
+          cellMeasurement.measuredSize.width
+        )
+      }
+    }
+    let tableColumnWidths: [Int]? = source.retainedTableColumnWidths(
+      columns: payload.columns,
+      discovered: discovered
+    )
+    // The second pass is load-bearing, not redundant (register item D21).
+    // Discovery above reads each cell's MEASURED width, and a cell that has
+    // had `.frame(width:)` applied reports exactly that width — a frame
+    // reports `width ?? contentSize.width`, so it fully masks the child's
+    // ideal. Discovery therefore needs an UNFRAMED measurement while the
+    // layout product needs a FRAMED one, and one pass cannot be both.
+    //
+    // Applying the retained widths before the loop instead — the obvious
+    // single-pass rewrite — caps every column at whatever it first
+    // discovered and never lets it grow again; with no retained widths on
+    // the first frame that cap is the column TITLE width, so a 16-character
+    // cell renders as narrow as a 2-character one, permanently.
+    // `TableColumnWidthPassTests` pins both halves of that.
+    //
+    // The cost is one extra measure of the WINDOW — not a re-realization:
+    // `applyHostedTableColumnWidths` re-frames the realization cache's rows
+    // on demand, so `child(at:)` below hits it (D21-a).
+    if let tableColumnWidths {
+      source.applyHostedTableColumnWidths(tableColumnWidths)
+      children.removeAll(keepingCapacity: true)
+      measurements.removeAll(keepingCapacity: true)
+      for index in sourceIndices {
+        let child = source.child(at: index)
+        children.append(child)
+        measurements.append(
+          measure(child, proposal: plan.childProposal, passContext: passContext)
+        )
+      }
+    }
+    // Derive the height-aware layout ONCE, from the real measured heights,
+    // and carry it forward. `bounds` here is origin-zero; placement
+    // translates.
+    var tallRowHeights = plan.retainedTallRowHeights
+    mergeTallRowHeights(
+      from: measurements,
+      at: sourceIndices,
+      into: &tallRowHeights
+    )
+    let hiddenSeparators = hiddenTableSeparators(from: hiddenEdges, rowCount: source.count)
+    let measuredSize = measuredHostedTableSize(
+      for: payload,
+      childMeasurements: measurements,
+      sourceIndices: sourceIndices,
+      retainedTallRowHeights: plan.retainedTallRowHeights,
+      hiddenSeparatorCount: hiddenSeparators.count,
+      proposal: effectiveProposal
+    )
+    let tableLayout = DrawExtractor().visibleTableLayout(
+      for: payload,
+      in: .init(origin: .zero, size: measuredSize),
+      columnWidths: tableColumnWidths,
+      rowHeights: tallRowHeights,
+      hiddenSeparators: hiddenSeparators,
+      rowWindow: measuredWindow
+    )
+    return hostedCollectionMeasuredNode(
+      for: node,
+      originalProposal: originalProposal,
+      measuredSize: measuredSize,
+      children: children,
+      measurements: measurements,
+      sourceIndices: sourceIndices,
+      measuredWindow: measuredWindow,
+      rowStride: plan.rowStride,
+      tableColumnWidths: tableColumnWidths,
+      listLayout: nil,
+      tableLayout: tableLayout,
+      tallRowHeights: tallRowHeights,
+      hiddenEdges: hiddenEdges
+    )
+  }
+
+  private func hostedCollectionMeasuredNode(
+    for node: ResolvedNode,
+    originalProposal: ProposedSize,
+    measuredSize: CellSize,
+    children: [ResolvedNode],
+    measurements: [MeasuredNode],
+    sourceIndices: [Int],
+    measuredWindow: Range<Int>?,
+    rowStride: Int,
+    tableColumnWidths: [Int]?,
+    listLayout: ListVisibleLayout?,
+    tableLayout: TableVisibleLayout?,
+    tallRowHeights: [Int: Int],
+    hiddenEdges: [Int: HiddenRowSeparatorEdges]
+  ) -> MeasuredNode {
+    MeasuredNode(
       viewNodeID: node.viewNodeID,
       identity: node.identity,
       proposal: originalProposal,
@@ -614,6 +772,19 @@ package func tallRowExtraCells(
         partial, max(0, SaturatingConversion.subtracting(entry.value, 1)))
       : partial
   }
+}
+
+/// The window `measureWindowedHostedCollection` realizes, planned out of
+/// line (see `hostedCollectionWindowPlan`).
+private struct HostedCollectionWindowPlan {
+  var bounds: CellRect
+  var retainedTallRowHeights: [Int: Int]
+  var retainedHiddenEdges: [Int: HiddenRowSeparatorEdges]
+  var rowStride: Int
+  var hint: MeasureViewportHint?
+  var sourceIndices: [Int]
+  var measuredWindow: Range<Int>?
+  var childProposal: ProposedSize
 }
 
 extension ProposedDimension {
