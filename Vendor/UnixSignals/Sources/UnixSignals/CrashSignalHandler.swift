@@ -50,7 +50,21 @@
   nonisolated(unsafe) private var crashRestoreTermios = false
 
   /// The termios to restore (only meaningful when crashRestoreTermios is true).
-  nonisolated(unsafe) private var crashSavedTermios = termios()
+  ///
+  /// Heap storage on purpose. Swift 6.4 lays out a *global* of an imported C
+  /// struct with interior padding — `termios` has four bytes between `c_cc`
+  /// and `c_ispeed` on Darwin, three on Linux — as a packed
+  /// storage type without that padding (68 bytes here), while every copy in
+  /// and out uses the struct's real size (72). An inline global was therefore
+  /// written four bytes past its end on install and read back with its
+  /// neighbour's bytes in `c_ospeed` on restore; AddressSanitizer reported
+  /// the write as a global-buffer-overflow (STUI-1382). An allocation is
+  /// sized by stride, which is right.
+  nonisolated(unsafe) private var crashSavedTermios: UnsafeMutablePointer<termios> = {
+    let storage = UnsafeMutablePointer<termios>.allocate(capacity: 1)
+    unsafe storage.initialize(to: termios())
+    return unsafe storage
+  }()
 
   /// The fd to restore termios on (may differ from the output fd).
   nonisolated(unsafe) private var crashTermiosFD: Int32 = -1
@@ -91,12 +105,10 @@
 
     // Attempt to restore termios.
     if unsafe crashRestoreTermios, unsafe crashTermiosFD >= 0 {
-      unsafe withUnsafePointer(to: &crashSavedTermios) { ptr in
-        // tcsetattr is not officially async-signal-safe per POSIX, but it is
-        // practically safe on Darwin and Linux. This is a crash path — the
-        // small theoretical risk is acceptable.
-        _ = unsafe tcsetattr(crashTermiosFD, TCSANOW, ptr)
-      }
+      // tcsetattr is not officially async-signal-safe per POSIX, but it is
+      // practically safe on Darwin and Linux. This is a crash path — the
+      // small theoretical risk is acceptable.
+      _ = unsafe tcsetattr(crashTermiosFD, TCSANOW, crashSavedTermios)
     }
 
     // Re-raise with the default handler so the process terminates normally
@@ -186,7 +198,7 @@
       if let savedTermios = reset.savedTermios,
         let termiosFD = reset.termiosFileDescriptor
       {
-        unsafe crashSavedTermios = savedTermios
+        unsafe crashSavedTermios.pointee = savedTermios
         unsafe crashTermiosFD = termiosFD
         unsafe crashRestoreTermios = true
       } else {

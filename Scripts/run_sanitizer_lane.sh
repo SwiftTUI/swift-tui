@@ -14,6 +14,14 @@ set -eu
 # The lane is serialized (--no-parallel): sanitizer reports from concurrent
 # tests interleave and lose their stacks. Reports are summarized at the end
 # by their first frame so a baseline can be compared run to run.
+#
+# Exit tests (`#expect(processExitsWith:)`) re-spawn the test host. On Darwin
+# a sanitizer runtime must be loaded at launch: SwiftPM preloads it for the
+# host, but the preload does not survive into the host's environment, so the
+# child loaded the runtime too late and aborted ("Interceptors are not
+# working"). Swift Testing turns `XCTestBundleInjectPath` into the child's
+# `DYLD_INSERT_LIBRARIES` (its XCTest app-hosting path), so the lane hands it
+# this sanitizer's runtime.
 
 repo_root=$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)
 cd "$repo_root"
@@ -61,6 +69,37 @@ export TSAN_OPTIONS="${TSAN_OPTIONS:-halt_on_error=0 second_deadlock_stack=1 his
 export ASAN_OPTIONS="${ASAN_OPTIONS:-detect_leaks=0 halt_on_error=0}"
 export UBSAN_OPTIONS="${UBSAN_OPTIONS:-print_stacktrace=1 halt_on_error=0}"
 export SWIFTTUI_SANITIZER_LANE="$sanitizer"
+
+# The sanitizer runtime next to the toolchain's clang resources, for the
+# exit-test child spawn (see the header).
+sanitizer_runtime_path() {
+  resources=$(swiftly run swift -print-target-info 2>/dev/null \
+    | sed -n 's/^ *"runtimeResourcePath": *"\(.*\)",*$/\1/p' | head -n 1)
+  [ -n "$resources" ] || return 0
+  case "$1" in
+  address) short=asan ;;
+  thread) short=tsan ;;
+  undefined) short=ubsan ;;
+  esac
+  for candidate in "${resources%/swift}"/clang/*/lib/darwin/libclang_rt.${short}_osx_dynamic.dylib; do
+    if [ -f "$candidate" ]; then
+      echo "$candidate"
+      return 0
+    fi
+  done
+}
+
+case "$(uname -s)" in
+Darwin)
+  runtime=$(sanitizer_runtime_path "$sanitizer")
+  if [ -n "$runtime" ]; then
+    export XCTestBundleInjectPath="$runtime"
+    echo "[sanitizer-lane] exit-test children preload: $runtime"
+  else
+    >&2 echo "[sanitizer-lane] warning: no $sanitizer runtime dylib found; exit-test children will abort"
+  fi
+  ;;
+esac
 
 set -- swiftly run swift test --build-system native --sanitize "$sanitizer" --scratch-path "$scratch" --no-parallel
 if [ -n "$jobs" ]; then set -- "$@" --jobs "$jobs"; fi
