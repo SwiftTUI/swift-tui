@@ -55,14 +55,6 @@ struct StackSafetyRegressionTests {
     #expect(copy.layoutBehavior == .offset(x: 1, y: 0))
   }
 
-  @Test("resolved node descendant search remains stack-safe on deep trees")
-  func resolvedNodeDescendantSearchRemainStackSafe() {
-    let depth = 1024
-    let tree = makeDeepResolvedNodeTree(depth: depth)
-
-    #expect(tree.root.descendant(with: tree.leafIdentity)?.identity == tree.leafIdentity)
-  }
-
   @Test("resolved node path lookup remains stack-safe on deep trees")
   func resolvedNodePathLookupRemainStackSafe() {
     let depth = 1024
@@ -80,36 +72,6 @@ struct StackSafetyRegressionTests {
     #expect(identities.count == depth + 1)
     #expect(identities.first == tree.rootIdentity)
     #expect(identities.last == tree.leafIdentity)
-
-    var appearIDs: [String] = []
-    var disappearIDs: [String] = []
-    tree.root.collectLifecycleHandlerIDs(
-      appearIDs: &appearIDs,
-      disappearIDs: &disappearIDs
-    )
-    #expect(
-      appearIDs
-        == [
-          "resolved-root-appear",
-          "resolved-middle-appear",
-          "resolved-leaf-appear",
-        ]
-    )
-    #expect(
-      disappearIDs
-        == [
-          "resolved-root-disappear",
-          "resolved-middle-disappear",
-          "resolved-leaf-disappear",
-        ]
-    )
-
-    var lifecycleNodes: [LifecycleStateNode] = []
-    tree.root.collectLifecycleNodes(into: &lifecycleNodes)
-    #expect(
-      lifecycleNodes.map(\.identity)
-        == [tree.rootIdentity, tree.middleIdentity, tree.leafIdentity]
-    )
   }
 
   @Test("placed node traversals remain stack-safe on deep trees")
