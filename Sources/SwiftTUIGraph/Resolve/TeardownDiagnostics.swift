@@ -1,18 +1,7 @@
-/// The durable relation fact that first made a stored node reachable from the
-/// committed root during the teardown-coherence census.
-package enum LifetimeReachabilityReason: Equatable, Hashable, Sendable {
-  case root
-  case committedValue(ViewNodeID)
-  case hostedDetached(ViewNodeID)
-  case navigationSurface(ViewNodeID)
-  case parent(ViewNodeID)
-}
-
 /// Test-facing snapshot of the authoritative lifetime relation closure.
 package struct LifetimeReachabilitySnapshot: Equatable, Sendable {
   package var storedNodeIDs: Set<ViewNodeID>
   package var reachableNodeIDs: Set<ViewNodeID>
-  package var keepReasonsByNodeID: [ViewNodeID: LifetimeReachabilityReason]
   package var staleAliasDetail: String?
 
   package var unreachableNodeIDs: Set<ViewNodeID> {

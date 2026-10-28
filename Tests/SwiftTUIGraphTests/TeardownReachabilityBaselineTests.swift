@@ -173,11 +173,6 @@ struct TeardownReachabilityBaselineTests {
     )
     #expect(previewReachability.storedNodeIDs == [rootNodeID, childNodeID])
     #expect(previewReachability.reachableNodeIDs == [rootNodeID, childNodeID])
-    #expect(previewReachability.keepReasonsByNodeID[rootNodeID] == .root)
-    #expect(
-      previewReachability.keepReasonsByNodeID[childNodeID]
-        == .parent(rootNodeID)
-    )
     #expect(previewReachability.unreachableNodeIDs.isEmpty)
     #expect(graph.debugTeardownCoherenceViolation() == nil)
     graph.restoreCheckpoint(checkpoint)
