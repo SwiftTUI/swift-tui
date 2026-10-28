@@ -2747,31 +2747,6 @@ package final class ViewGraph {
     removeSubtree(rootedAt: previousResolvedRoot)
   }
 
-  package func pruneDetachedIdentitySubtree(
-    rootedAt identity: Identity
-  ) {
-    let staleNodes = nodesByNodeID.values
-      .filter { node in
-        node.prepareForFrame(currentFrameID)
-        return (node.identity == identity || node.identity.isDescendant(of: identity))
-          && node.wasPresentAtFrameStart
-          && !node.visitedThisFrame(currentFrameID)
-      }
-      .sorted { lhs, rhs in
-        if lhs.identity.components.count == rhs.identity.components.count {
-          return lhs.identity < rhs.identity
-        }
-        return lhs.identity.components.count < rhs.identity.components.count
-      }
-
-    for node in staleNodes {
-      guard nodeIfExists(for: node.viewNodeID) != nil else {
-        continue
-      }
-      removeSubtree(rootedAt: node)
-    }
-  }
-
   package func recordReusedSubtree(
     _ subtree: ResolvedNode,
     invalidator: (any Invalidating)?,
