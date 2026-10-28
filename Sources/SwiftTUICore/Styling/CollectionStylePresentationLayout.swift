@@ -570,6 +570,27 @@ extension ListStylePresentation {
     itemSizes: [ChildAllocation]
   ) -> GeneratedListLines {
     var displayLines = materializedListLines(for: payload)
+    return windowMaterializedListLines(
+      &displayLines,
+      for: payload,
+      viewportLineCount: viewportLineCount,
+      rowHeights: rowHeights,
+      itemSizes: itemSizes
+    )
+  }
+
+  /// Materializing lines and windowing them each reserve a large -Onone
+  /// frame. Keep those frames sequential: nesting them exhausted the 256 KiB
+  /// headroom thread on Windows when a custom layout measured a hosted list.
+  /// The inout array preserves the materialization's unique storage.
+  @inline(never)
+  private func windowMaterializedListLines(
+    _ displayLines: inout [ListDisplayLine],
+    for payload: ListPayload,
+    viewportLineCount: Int,
+    rowHeights: [Int: Int]?,
+    itemSizes: [ChildAllocation]
+  ) -> GeneratedListLines {
     var cursor = 0
     var rowRanges: [Range<Int>] = []
     for index in displayLines.indices {
