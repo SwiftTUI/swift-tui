@@ -99,7 +99,9 @@ when tests or runtime code intentionally inspect phase IR.
 
 The run loop calls eliding variants for animation-deadline frames that cannot
 affect the drawn surface. These variants commit animation state without running
-the frame tail or presenting a frame.
+the frame tail or presenting a frame. When an elided frame republishes runtime
+handlers, it preserves the last published scroll routes and targets so commands
+continue to address the displayed viewports until a rendered frame replaces them.
 
 ## Runtime Stages
 

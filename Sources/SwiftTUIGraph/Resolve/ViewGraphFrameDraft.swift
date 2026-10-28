@@ -164,6 +164,20 @@ package final class ViewGraphFrameDraft {
     )
   }
 
+  /// No frame tail follows an elided commit to replace geometry pruned by
+  /// full or scoped registration publication. Its last published geometry
+  /// remains authoritative until a rendered frame commits a new snapshot.
+  package func commitElidedRuntimeRegistrations(
+    from viewGraph: ViewGraph
+  ) -> RuntimeRegistrationDiagnostics {
+    guard let registry = liveRegistrations.scrollPositionRegistry else {
+      return commitRuntimeRegistrations(from: viewGraph)
+    }
+    return registry.preservingGeometry {
+      commitRuntimeRegistrations(from: viewGraph)
+    }
+  }
+
   @discardableResult
   package func commitRuntimeRegistrations(
     from viewGraph: ViewGraph

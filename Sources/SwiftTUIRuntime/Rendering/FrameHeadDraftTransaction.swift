@@ -162,7 +162,7 @@ package final class FrameHeadTransaction {
     let diagnostics: RuntimeRegistrationDiagnostics
     if let recorder {
       diagnostics = recorder.measure(.commitRuntimeRegistrations) {
-        graphDraft.commitRuntimeRegistrations(from: viewGraph)
+        graphDraft.commitElidedRuntimeRegistrations(from: viewGraph)
       }
     } else {
       diagnostics = graphDraft.commitRuntimeRegistrations(from: viewGraph)

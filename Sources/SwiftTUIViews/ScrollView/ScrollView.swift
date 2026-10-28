@@ -125,11 +125,14 @@ public struct ScrollView<Content: View>: PrimitiveView, IterativeResolvableView 
               return false
             }
             let event = keyPress.key
-            if keyPress.key == .home, let scrollCommandRegistry {
-              return scrollCommandRegistry.scrollTo(
+            // Home can reset its own binding even before geometry is published.
+            if keyPress.key == .home, let scrollCommandRegistry,
+              scrollCommandRegistry.scrollTo(
                 x: axes.contains(.horizontal) && targetAxis != .vertical ? 0 : nil,
                 y: axes.contains(.vertical) && targetAxis != .horizontal ? 0 : nil,
                 scopeIdentity: context.identity)
+            {
+              return true
             }
             // End jumps to ONE far edge: the bottom whenever a vertical axis
             // is in play, trailing only for a horizontal-only view or its

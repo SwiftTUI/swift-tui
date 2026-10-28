@@ -7,6 +7,84 @@ import Testing
 @Suite
 struct LocalScrollPositionRegistryTests {
   @Test(
+    "a registered route with missing geometry never selects a nested route",
+    arguments: [false, true])
+  func missingGeometryDoesNotRedirectCommands(reRooted: Bool) {
+    let registry = LocalScrollPositionRegistry()
+    let reader = testIdentity("MissingGeometryReader")
+    let outer = reader.child(.named("Outer"))
+    let inner = reRooted ? testIdentity("ReRootedInner") : outer.child(.named("Inner"))
+    var outerOffset = ScrollOffset(y: 5)
+    var innerOffset = ScrollOffset(y: 3)
+    registry.register(
+      identity: outer, currentOffset: { outerOffset }, applyOffset: { outerOffset = $0 })
+    registry.register(
+      identity: inner, currentOffset: { innerOffset }, applyOffset: { innerOffset = $0 })
+    let route = ScrollRoute(
+      identity: inner, viewNodeID: nil,
+      viewportRect: CellRect(origin: .zero, size: CellSize(width: 10, height: 3)),
+      contentBounds: CellRect(origin: .zero, size: CellSize(width: 10, height: 20)),
+      structuralHostChain: reRooted ? [reader, outer] : [])
+    registry.updateGeometry(scrollRoutes: [route], scrollTargets: [])
+
+    #expect(registry.viewportRect(scopeIdentity: outer) == nil)
+    #expect(!registry.scrollTo(y: 0, scopeIdentity: outer))
+    #expect(!registry.scrollToEdge(.bottom, scopeIdentity: outer))
+    #expect(outerOffset == ScrollOffset(y: 5))
+    #expect(innerOffset == ScrollOffset(y: 3))
+    // An unregistered reader scope still locates its first nested route,
+    // including one hosted across an explicit identity boundary.
+    #expect(registry.scrollTo(y: 0, scopeIdentity: reader))
+    #expect(innerOffset == .zero)
+  }
+
+  @Test(
+    "elided publication preserves targets without replaying offset corrections",
+    arguments: [false, true])
+  func preservedGeometryRetainsTargets(fullPublication: Bool) {
+    let registry = LocalScrollPositionRegistry()
+    let identity = testIdentity("PreservedGeometry")
+    let target = identity.child(.named("Target"))
+    var offset = ScrollOffset(y: 4)
+    registry.register(
+      identity: identity, currentOffset: { offset }, applyOffset: { offset = $0 })
+    let route = ScrollRoute(
+      identity: identity,
+      viewportRect: CellRect(origin: .zero, size: CellSize(width: 10, height: 3)),
+      contentBounds: CellRect(origin: .zero, size: CellSize(width: 10, height: 20)),
+      contentOffset: CellPoint(x: 0, y: 4))
+    registry.sync(
+      focusedIdentity: nil, focusRegions: [],
+      scrollRoutes: [route],
+      scrollTargets: [
+        ScrollTarget(
+          identity: target, scrollIdentity: identity,
+          rect: CellRect(origin: CellPoint(x: 0, y: 8), size: CellSize(width: 5, height: 1)))
+      ])
+    var registrations = registry.snapshot()
+    // New input is deliberately outside the previous geometry's range.
+    // Restoring geometry must not commit the old frame's clamped offset.
+    offset = ScrollOffset(y: 25)
+    registrations[0].resolvedOffset = offset
+    registry.preservingGeometry {
+      if fullPublication {
+        registry.reset()
+      } else {
+        registry.removeSubtrees(rootedAt: [identity])
+      }
+      registry.restore(registrations)
+    }
+    #expect(offset == ScrollOffset(y: 25))
+    #expect(registry.viewportRect(scopeIdentity: identity) == route.viewportRect)
+    // Resolve the retained target from a newer, in-range input offset.
+    offset = ScrollOffset(y: 6)
+    #expect(
+      registry.scrollToTarget(
+        ScrollTargetQuery(identity: target), anchor: .top, scopeIdentity: identity))
+    #expect(offset == ScrollOffset(y: 12))
+  }
+
+  @Test(
     "nonmatching and unrelated-route commands do not suppress focus relocation",
     arguments: [false, true]
   )

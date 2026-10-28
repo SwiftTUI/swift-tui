@@ -210,6 +210,18 @@ package final class LocalScrollPositionRegistry: Equatable {
     latestScrollTargets = scrollTargets
   }
 
+  /// An elided frame republishes handlers without producing new geometry.
+  /// Keep the last published routes and targets through registration teardown;
+  /// replaying offset corrections from that old frame could overwrite newer input.
+  package func preservingGeometry<Result>(during update: () -> Result) -> Result {
+    let routes = latestScrollRoutes
+    let targets = latestScrollTargets
+    defer {
+      updateGeometry(scrollRoutes: routes, scrollTargets: targets)
+    }
+    return update()
+  }
+
   /// Preserve a focused collection row when changed row heights or viewport size hide it.
   /// A new scroll request takes precedence over this correction.
   package func revealCollectionFocusAfterResize(
@@ -1278,6 +1290,12 @@ package final class LocalScrollPositionRegistry: Equatable {
   private func firstRoute(
     matching scopeIdentity: Identity?
   ) -> ScrollRoute? {
+    // A registered scroll view addresses itself. Missing geometry must not
+    // redirect its keyboard or pointer commands to a nested route. Reader
+    // scopes have no registration and still search their descendants below.
+    if let scopeIdentity, registrations[scopeIdentity] != nil {
+      return latestScrollRoutes.first { $0.identity == scopeIdentity }
+    }
     if let direct = latestScrollRoutes.first(where: {
       routeMatchesScope($0.identity, scopeIdentity: scopeIdentity)
     }) {
