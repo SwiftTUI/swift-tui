@@ -72,6 +72,14 @@ extension LayoutEngine {
       }
     }
 
+    // An exhaustive hosted product can still depend on a vacuous viewport.
+    // Re-measure it so a newly finite hint can window and acquire its claim.
+    if let hosted = previousMeasured.containerAllocationSnapshot?.hostedCollection,
+      hosted.measuredWindow == nil, hosted.measureViewportHint != nil
+    {
+      return nil
+    }
+
     // Same rule for a hint-windowed hosted collection: the stored product is
     // valid only for the window it was measured for, and an offset-only change
     // in the enclosing scroll view does not change anything the equivalence

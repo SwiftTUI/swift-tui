@@ -450,6 +450,40 @@ struct CustomLayoutContainerContractTests {
     )
   }
 
+  @Test("viewport-dependent alignment evaluates the current measurement on both axes")
+  func alignmentMemoRespectsMeasurementBasis() throws {
+    let node = container("viewport-box", layout: BoundsAlignmentLayout())
+    guard case .custom(let token) = node.layoutBehavior,
+      let handle = token as? CustomLayoutHandle
+    else {
+      Issue.record("missing layout")
+      return
+    }
+    let pass = LayoutPassContext()
+    let engine = LayoutEngine()
+    for size in [4, 10, 6] {
+      let measured = MeasuredNode(
+        identity: node.identity, proposal: .unspecified,
+        measuredSize: .init(width: size, height: size),
+        containerAllocationSnapshot: .init(
+          childSizes: [],
+          hostedCollection: .init(
+            sourceIndices: [],
+            measureViewportHint: .init(
+              axes: [.vertical], contentOffset: .zero,
+              viewportSize: .init(width: size, height: size)))))
+      #expect(measured.consumesMeasureViewport)
+      #expect(
+        handle.explicitAlignment(
+          engine: engine, node: node, measured: measured,
+          horizontalGuide: .leading, passContext: pass)?.value == size)
+      #expect(
+        handle.explicitAlignment(
+          engine: engine, node: node, measured: measured,
+          verticalGuide: .top, passContext: pass)?.value == size)
+    }
+  }
+
   @Test("the alignment hook runs once per guide and proposal within a pass")
   func alignmentHookIsMemoizedPerPass() {
     let probe = HookProbe()
@@ -858,4 +892,24 @@ private struct PersistingAlignmentLayout: Layout {
       )
     }
   }
+}
+
+private struct BoundsAlignmentLayout: Layout {
+  func sizeThatFits(proposal: ProposedViewSize, subviews: LayoutSubviews, cache: inout ())
+    -> LayoutSize
+  {
+    .init(width: 4, height: 4)
+  }
+  func placeSubviews(
+    in bounds: LayoutRect, proposal: ProposedViewSize,
+    subviews: LayoutSubviews, cache: inout ()
+  ) {}
+  func explicitAlignment(
+    of guide: HorizontalAlignment, in bounds: LayoutRect,
+    proposal: ProposedViewSize, subviews: LayoutSubviews, cache: inout ()
+  ) -> Int? { bounds.size.width }
+  func explicitAlignment(
+    of guide: VerticalAlignment, in bounds: LayoutRect,
+    proposal: ProposedViewSize, subviews: LayoutSubviews, cache: inout ()
+  ) -> Int? { bounds.size.height }
 }

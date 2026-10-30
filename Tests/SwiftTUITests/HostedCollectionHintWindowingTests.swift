@@ -12,6 +12,49 @@ import Testing
 @MainActor
 @Suite(.serialized)
 struct HostedCollectionHintWindowingTests {
+  @Test(
+    "vacuous hosted hints cannot poison a later finite measurement",
+    arguments: [false, true], [false, true])
+  func vacuousHintDoesNotCacheExhaustiveRows(table: Bool, wrapped: Bool) throws {
+    @ViewBuilder func content() -> some View {
+      if table {
+        Table(0..<100, id: \.self, columns: [.init("Value", width: 8)]) { Text("row \($0)") }
+      } else {
+        List(0..<100, id: \.self) { Text("row \($0)") }
+      }
+    }
+    var node = Resolver().resolve(content(), in: .init(identity: testIdentity("VacuousHosted")))
+    if wrapped {
+      node = ResolvedNode(
+        identity: testIdentity("Wrapper"), kind: .view("Wrapper"),
+        children: [node], layoutBehavior: .frame(width: nil, height: nil, alignment: .topLeading))
+    }
+    let engine = LayoutEngine(cache: MeasurementCache())
+    let pass = LayoutPassContext(retainedLayout: nil)
+    let proposal = ProposedSize(width: .finite(12), height: .unspecified)
+    let first = pass.withMeasureViewportHint(
+      .init(
+        axes: [.vertical], contentOffset: .zero, viewportSize: .init(width: 12, height: 0))
+    ) {
+      engine.measure(node, proposal: proposal, passContext: pass)
+    }
+    #expect(first.consumesMeasureViewport)
+    let hint = MeasureViewportHint(
+      axes: [.vertical], contentOffset: .zero,
+      viewportSize: .init(width: 12, height: 5))
+    let second = pass.withMeasureViewportHint(hint) {
+      let result = engine.measure(node, proposal: proposal, passContext: pass)
+      #expect(pass.claimCurrentMeasureViewportHint(for: testIdentity("Other")) == nil)
+      return result
+    }
+    #expect(second.containsWindowedMeasurement)
+    let coldPass = LayoutPassContext(retainedLayout: nil)
+    let cold = coldPass.withMeasureViewportHint(hint) {
+      LayoutEngine().measure(node, proposal: proposal, passContext: coldPass)
+    }
+    #expect(second == cold)
+  }
+
   @Test("T-20: ScrollView { List } realizes only the hinted window")
   func scrollViewListIsWindowed() {
     IndexedChildRealizationProbe.reset()

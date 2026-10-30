@@ -20,7 +20,7 @@ import SwiftTUIRuntime
 /// cell buffer as ANSI-decorated text and returns. Output streams naturally
 /// to stdout and survives piping to `less`, `tee`, or files.
 ///
-/// Width defaults to the live terminal width (`TIOCGWINSZ`), then `$COLUMNS`,
+/// Width defaults to the live terminal viewport width, then `$COLUMNS`,
 /// then 80. The output keeps the content's natural extent, up to 65,536 cells
 /// on either axis and 1,048,576 cells in all; content beyond that bound is
 /// clipped. Color and glyph policy honors `SwiftTUIOptions` plus the standard
@@ -98,12 +98,16 @@ public enum RenderOnce {
 
   // MARK: - Width detection
 
-  /// Resolves the effective terminal width using TIOCGWINSZ, then `$COLUMNS`,
+  /// Resolves the effective terminal width using the platform console query, then `$COLUMNS`,
   /// then 80.
   public static func resolveTerminalWidth(
     environment: [String: String] = ProcessInfo.processInfo.environment
   ) -> Int {
-    if let width = ioctlTerminalWidth(), width > 0 {
+    resolveTerminalWidth(environment: environment, liveWidth: liveTerminalWidth())
+  }
+
+  internal static func resolveTerminalWidth(environment: [String: String], liveWidth: Int?) -> Int {
+    if let width = liveWidth, width > 0 {
       return width
     }
     if let columns = environment["COLUMNS"], let parsed = Int(columns), parsed > 0 {
@@ -125,16 +129,13 @@ public enum RenderOnce {
     #endif
   }
 
-  // MARK: - Private POSIX helpers
+  // MARK: - Platform helpers
 
-  private static func ioctlTerminalWidth() -> Int? {
-    #if canImport(Darwin) || canImport(Glibc) || canImport(Android)
-      var size = winsize()
-      let result = withUnsafeMutablePointer(to: &size) { pointer in
-        unsafe ioctl(STDOUT_FILENO, UInt(TIOCGWINSZ), pointer)
-      }
-      guard result == 0, size.ws_col > 0 else { return nil }
-      return Int(size.ws_col)
+  private static func liveTerminalWidth() -> Int? {
+    #if canImport(Darwin) || canImport(Glibc) || canImport(Android) || canImport(ucrt)
+      // Share the interactive host's platform controller, including Win32's
+      // visible srWindow viewport rather than its scrollback buffer.
+      return try? PlatformTerminalController.make().windowSize(of: STDOUT_FILENO).width
     #else
       return nil
     #endif

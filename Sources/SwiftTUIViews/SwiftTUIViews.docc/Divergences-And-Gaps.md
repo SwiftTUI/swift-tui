@@ -248,11 +248,15 @@ are omitted even when SwiftUI exposes a corresponding API.
   through the captured index and can corrupt a neighbor or trap. A read of a
   departed occurrence traps with a diagnostic, matching the optional-base
   unwrap precedent. State-backed `Array`, `ArraySlice`, and `ContiguousArray`
-  values with inline stored POD or String IDs share an occurrence index for each stored
-  value: construction and rebuilding are O(n), and subsequent row lookups
-  are expected O(1). Arbitrary getter/setter bindings, custom collections,
-  reference elements, other ID storage and computed ID paths use a current-data O(n) scan per
-  access because they can change without a tracked value store. Repeated
+  values keyed by a concrete stored-property `id:` path to POD or String IDs
+  share an occurrence index for each stored value: construction and rebuilding
+  are O(n), and subsequent row lookups are expected O(1). The generic
+  `Identifiable` convenience overload cannot certify that its protocol accessor
+  is stored, so it scans current data on each access. Its row currency validates
+  the ID sequence as well as the collection token, preserving write detection
+  without admitting an unsafe index cache. Arbitrary getter/setter bindings,
+  custom collections, reference elements, other ID storage and computed ID
+  paths use a current-data O(n) scan per access because they can change without a tracked value store. Repeated
   full-list reads of those sources can therefore be O(n²).
   Swift drops the contextual isolation from
   property-wrapper closure parameters, so SwiftUI's bare `{ $item in ... }`

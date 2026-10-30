@@ -36,6 +36,72 @@ struct CellPixelMetricsRefreshTests {
     func read(from _: Int32, maxBytes _: Int, timeoutMilliseconds _: Int) throws -> [UInt8] { [] }
   }
 
+  @Test("pixel mouse coordinates refresh after terminal font changes")
+  func mouseMetricsRefresh() throws {
+    let controller = MutableController()
+    let host = TerminalHost(
+      inputFileDescriptor: 0, outputFileDescriptor: 1, fallbackSize: .init(width: 80, height: 24),
+      controller: controller, environment: ["TERM": "xterm-256color"],
+      mouseInputResolution: .automatic(.assumeWhenCellMetricsKnown))
+    try host.enableRawMode()
+    defer { try? host.disableRawMode() }
+    let original = host.resolvedInputCapabilities
+    controller.pixelSize = .init(width: 16, height: 32)
+    let updated = host.resolvedInputCapabilities
+    #expect(updated != original)
+    #expect(
+      updated.mouseCoordinateMode
+        == .pixels(
+          metrics: .init(width: 16, height: 32, source: .reported), source: .terminalPixels))
+    var parser = TerminalInputParser(mouseCoordinateMode: original.mouseCoordinateMode)
+    #expect(parser.feed(Array("\u{001B}[<0;".utf8)).isEmpty)
+    parser.updateMouseCoordinateMode(updated.mouseCoordinateMode)
+    let event = try #require(parser.feed(Array("33;65M".utf8)).first)
+    guard case .mouse(let mouse) = event else {
+      Issue.record("expected mouse input")
+      return
+    }
+    #expect(mouse.location.cell == .init(x: 2, y: 2))
+    controller.pixelSize = nil
+    #expect(host.resolvedInputCapabilities == updated)
+  }
+
+  @Test("frame acquisition synchronizes refreshed mouse metrics into the input reader")
+  @MainActor
+  func frameRefreshesInputReader() throws {
+    let controller = MutableController()
+    let host = TerminalHost(
+      inputFileDescriptor: 0, outputFileDescriptor: 1,
+      fallbackSize: .init(width: 80, height: 24), controller: controller,
+      environment: ["TERM": "xterm-256color"],
+      mouseInputResolution: .automatic(.assumeWhenCellMetricsKnown))
+    try host.enableRawMode()
+    defer { try? host.disableRawMode() }
+    let reader = RefreshInputReader()
+    let root = testIdentity("RefreshMetrics")
+    let loop = RunLoop(
+      rootIdentity: root, presentationSurface: host, terminalInputReader: reader,
+      scheduler: FrameScheduler(), stateContainer: StateContainer(initialState: 0),
+      focusTracker: FocusTracker(), viewBuilder: { _, _ in Text("metrics") })
+    let frame = ScheduledFrame(
+      causes: [.input], invalidatedIdentities: [], signalNames: [],
+      externalReasons: [], triggeredDeadline: nil, nextDeadline: nil)
+    _ = loop.resolveContext(for: frame)
+    let initial = reader.capabilities.value
+    controller.pixelSize = .init(width: 12, height: 24)
+    _ = loop.resolveContext(for: frame)
+    #expect(reader.capabilities.value != initial)
+    #expect(reader.capabilities.value == host.resolvedInputCapabilities)
+  }
+
+  private final class RefreshInputReader: TerminalInputReading, TerminalInputCapabilityConfiguring {
+    let capabilities = LockedBox(ResolvedTerminalInputCapabilities())
+    func inputEvents() -> AsyncStream<InputEvent> { AsyncStream { $0.finish() } }
+    func updateInputCapabilities(_ value: ResolvedTerminalInputCapabilities) {
+      capabilities.value = value
+    }
+  }
+
   @Test("baselineGraphicsCapabilities reflects the latest ioctl read on each access")
   func baselineRefreshes() {
     let controller = MutableController()

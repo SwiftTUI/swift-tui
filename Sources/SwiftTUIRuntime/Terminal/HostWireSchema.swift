@@ -73,6 +73,73 @@ package enum HostWireSchema {
   /// property. `HostWireSchemaContractTests` asserts each list matches the
   /// type's `Mirror` children exactly, in both directions.
   package static let sourceFieldMappings: [String: [FieldMapping]] = [
+    "HostWireFrameModel": [
+      .init("geometryRevision", wire: .key("geometryRevision")),
+      .init("viewportRevision", wire: .key("viewportRevision")),
+      .init("sequence", wire: .key("sequence")),
+      .init("gridSize", wire: .decomposed("width/height")),
+      .init("preferredLayoutSize", wire: .decomposed("preferredGridWidth/preferredGridHeight")),
+      .init("focusedIdentity", wire: .derived("focusPresentation and per-node isFocused")),
+      .init("damage", wire: .key("damage")),
+      .init("focusPresentation", wire: .key("focusPresentation")),
+      .init("terminalStyle", wire: .key("terminalStyle")),
+      .init("surface", wire: .decomposed("rows/deltaRows/styles/links/linkTargets")),
+      .init("accessibilityNodes", wire: .key("accessibilityTree")),
+      .init("paragraphs", wire: .key("paragraphs")),
+      .init("accessibilityAnnouncements", wire: .key("accessibilityAnnouncements")),
+      .init("accessibilityActionResponse", wire: .key("accessibilityActionResponse")),
+      .init("accessibilityFocusRequest", wire: .key("accessibilityFocusRequest")),
+      .init("scrollRegions", wire: .key("scrollRegions")),
+      .init("imageAttachments", wire: .key("images")),
+    ],
+    "HostWireEncodingState": [
+      .init("epochID", wire: .key("epoch")),
+      .init("recordsEncoded", wire: .derived("gen/baselineGen")),
+      .init("geometryRevisionsEnabled", wire: .derived("gates geometryRevision")),
+      .init("sharedViewportEnabled", wire: .derived("gates viewportRevision")),
+      .init("deltaEnabled", wire: .derived("selects full or delta version/encoding")),
+      .init("styleAppendEnabled", wire: .derived("gates stylesBase and appended styles")),
+      .init("knownImageIDs", wire: .derived("gates images dataBase64")),
+      .init("persistentStyles", wire: .derived("styles and stylesBase")),
+      .init("hasBaseline", wire: .derived("selects full or delta record")),
+      .init("baselineSize", wire: .derived("selects full or delta record")),
+    ],
+    "AccessibilityFocusPresentation": [
+      .init("generation", wire: .key("generation")),
+      .init("target", wire: .key("target")),
+    ],
+    "AccessibilityActionResponse": [
+      .init("requestID", wire: .key("requestID")),
+      .init("target", wire: .key("target")),
+      .init("result", wire: .key("result")),
+    ],
+    "TerminalRenderStyle": [
+      .init(
+        "appearance", wire: .decomposed("terminalStyle.foregroundColor/backgroundColor/tintColor")),
+      .init("theme", wire: .notSerialized("Theme is resolved into raster styles before encoding")),
+      .init(
+        "reduceMotion", wire: .notSerialized("Host input preference, applied before rendering")),
+      .init("contrast", wire: .notSerialized("Host input preference, applied before rendering")),
+      .init(
+        "differentiateWithoutColor",
+        wire: .notSerialized("Host input preference, applied before rendering")),
+      .init(
+        "reduceTransparency",
+        wire: .notSerialized("Host input preference, applied before rendering")),
+      .init(
+        "colorProfile", wire: .notSerialized("Host input preference, applied before rendering")),
+    ],
+    "TerminalAppearance": [
+      .init("foregroundColor", wire: .key("foregroundColor")),
+      .init("backgroundColor", wire: .key("backgroundColor")),
+      .init("tintColor", wire: .key("tintColor")),
+      .init("palette", wire: .notSerialized("Palette is resolved into per-cell colors")),
+      .init("colorSchemeContrast", wire: .notSerialized("Contrast is resolved before encoding")),
+      .init(
+        "source",
+        wire: .notSerialized("Local appearance provenance is not a rendering input on the receiver")
+      ),
+    ],
     "HostFrameProjection": [
       .init(
         "hostGeometryStamp",

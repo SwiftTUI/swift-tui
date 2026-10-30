@@ -128,6 +128,13 @@ public struct Rect: Equatable, Hashable, Sendable {
   }
 
   public func intersection(_ other: Rect) -> Rect? {
+    // min/max can discard a NaN in their second argument. Validate both
+    // operands before combining edges so invalid geometry is symmetric.
+    guard !isEmpty, !other.isEmpty,
+      origin.x.isFinite, origin.y.isFinite, maxX.isFinite, maxY.isFinite,
+      other.origin.x.isFinite, other.origin.y.isFinite,
+      other.maxX.isFinite, other.maxY.isFinite
+    else { return nil }
     let minX = max(origin.x, other.origin.x)
     let minY = max(origin.y, other.origin.y)
     let maxX = min(self.maxX, other.maxX)

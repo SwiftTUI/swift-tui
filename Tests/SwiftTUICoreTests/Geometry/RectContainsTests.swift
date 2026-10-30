@@ -3,6 +3,22 @@ import Testing
 
 @Suite("CellRect containment")
 struct RectContainsTests {
+  @Test(
+    "continuous intersection rejects nonfinite geometry in either operand",
+    arguments: [Double.nan, .infinity, -.infinity], 0..<4)
+  func nonfiniteIntersection(value: Double, component: Int) {
+    let valid = Rect(origin: .init(x: 10, y: 10), size: .init(width: 5, height: 5))
+    var values = [0.0, 0, 100, 100]
+    values[component] = value
+    let invalid = Rect(
+      origin: .init(x: values[0], y: values[1]),
+      size: .init(width: values[2], height: values[3]))
+    #expect(valid.intersection(invalid) == nil)
+    #expect(invalid.intersection(valid) == nil)
+    #expect(valid.intersection(valid) == valid)
+    #expect(valid.intersection(.zero) == nil)
+  }
+
   @Test("CellRect contains integer cells with half-open bounds")
   func containsCellsHalfOpen() {
     let rect = CellRect(

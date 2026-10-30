@@ -12,6 +12,53 @@ struct ForEachBindingCurrencyTests {
     Record(id: 1, name: "Brian"), Record(id: 1, name: "Cora"),
   ]
 
+  @Test("Identifiable row bindings preserve currency without admitting a computed-ID index")
+  func identifiableRowCurrency() throws {
+    let state = State(wrappedValue: seed)
+    let capture = Capture<Record>()
+    _ = Resolver().resolve(
+      ForEach(state.projectedValue) { row in
+        let _ = capture.rows.append(row)
+        Text("row")
+      }, in: .init(identity: testIdentity("IdentifiableCurrency")))
+    let row = try #require(capture.rows.first)
+    let before = try #require(row.valueIdentity?())
+    #expect(before === state.projectedValue.valueIdentity?())
+    row.name.wrappedValue = "Edited"
+    let after = try #require(row.valueIdentity?())
+    #expect(after !== before)
+    #expect(row.valueIdentity?() === after)
+  }
+
+  @Test("computed-ID row currency changes when external IDs relocate the projection")
+  func computedIDCurrency() throws {
+    let box = IDBox(0)
+    let state = State(wrappedValue: [
+      ComputedRecord(box: box, name: "First"),
+      ComputedRecord(box: IDBox(1), name: "Second"),
+    ])
+    var sourceToken = StateValueIdentity()
+    let originalSourceToken = sourceToken
+    var binding = state.projectedValue
+    binding.valueIdentity = { sourceToken }
+    let rows = captureRows(binding, id: \.id)
+    let before = try #require(rows[1].valueIdentity?())
+    box.value = 1
+    let after = try #require(rows[1].valueIdentity?())
+    #expect(after !== before)
+    #expect(rows[1].wrappedValue.name == "First")
+    #expect(rows[1].valueIdentity?() === after)
+    box.value = 0
+    #expect(rows[1].valueIdentity?() !== before)
+    #expect(rows[1].valueIdentity?() !== after)
+    // A checkpoint can restore a source token without restoring external IDs.
+    sourceToken = StateValueIdentity()
+    _ = rows[1].valueIdentity?()
+    box.value = 1
+    sourceToken = originalSourceToken
+    #expect(rows[1].valueIdentity?() !== before)
+  }
+
   @Test("state-backed duplicate bindings relocate for every mutation shape", arguments: 0..<5)
   func stateMutations(change: Int) throws {
     let state = State(wrappedValue: seed)

@@ -15,6 +15,23 @@ struct HostWireSchemaContractTests {
   private static func fixtures() -> [(typeName: String, instance: Any)] {
     [
       (
+        "HostWireFrameModel",
+        HostWireFrameModel(
+          surface: RasterSurface(), sequence: nil,
+          semanticSnapshot: nil, focusedIdentity: nil, damage: nil, preferredLayoutSize: nil)
+      ),
+      ("HostWireEncodingState", HostWireEncodingState(deltaEnabled: true)),
+      (
+        "AccessibilityFocusPresentation",
+        AccessibilityFocusPresentation(generation: 1, target: "node")
+      ),
+      (
+        "AccessibilityActionResponse",
+        AccessibilityActionResponse(requestID: 1, target: "node", result: .accepted)
+      ),
+      ("TerminalRenderStyle", TerminalRenderStyle(appearance: .fallback)),
+      ("TerminalAppearance", TerminalAppearance.fallback),
+      (
         "HostFrameProjection",
         HostFrameProjection(
           SemanticHostFrame(
@@ -64,6 +81,65 @@ struct HostWireSchemaContractTests {
       ("PresentationDamage", PresentationDamage()),
       ("PresentationDamage.TextRow", PresentationDamage.TextRow(row: 0)),
     ]
+  }
+
+  @Test("every emitted frame key has a mapped backing field")
+  func emittedKeysRequireMappedSources() {
+    // Independent of sourceFieldMappings and fixtures: the encoder totality
+    // tests pin these record keys to bytes. A new key must name its source here,
+    // and that source must have a property-complete Mirror fixture above.
+    let sources: [String: (type: String, property: String)] = [
+      "version": ("HostWireEncodingState", "deltaEnabled"),
+      "encoding": ("HostWireEncodingState", "deltaEnabled"),
+      "epoch": ("HostWireEncodingState", "epochID"),
+      "gen": ("HostWireEncodingState", "recordsEncoded"),
+      "baselineGen": ("HostWireEncodingState", "recordsEncoded"),
+      "stylesBase": ("HostWireEncodingState", "styleAppendEnabled"),
+      "width": ("HostWireFrameModel", "gridSize"),
+      "height": ("HostWireFrameModel", "gridSize"),
+      "styles": ("HostWireFrameModel", "surface"),
+      "rows": ("HostWireFrameModel", "surface"),
+      "deltaRows": ("HostWireFrameModel", "surface"),
+      "images": ("HostWireFrameModel", "imageAttachments"),
+      "links": ("HostWireFrameModel", "surface"),
+      "linkTargets": ("HostWireFrameModel", "surface"),
+      "preferredGridWidth": ("HostWireFrameModel", "preferredLayoutSize"),
+      "preferredGridHeight": ("HostWireFrameModel", "preferredLayoutSize"),
+      "accessibilityTree": ("HostWireFrameModel", "accessibilityNodes"),
+      "geometryRevision": ("HostWireFrameModel", "geometryRevision"),
+      "viewportRevision": ("HostWireFrameModel", "viewportRevision"),
+      "sequence": ("HostWireFrameModel", "sequence"),
+      "damage": ("HostWireFrameModel", "damage"),
+      "accessibilityAnnouncements": ("HostWireFrameModel", "accessibilityAnnouncements"),
+      "accessibilityActionResponse": ("HostWireFrameModel", "accessibilityActionResponse"),
+      "accessibilityFocusRequest": ("HostWireFrameModel", "accessibilityFocusRequest"),
+      "scrollRegions": ("HostWireFrameModel", "scrollRegions"),
+      "paragraphs": ("HostWireFrameModel", "paragraphs"),
+      "focusPresentation": ("HostWireFrameModel", "focusPresentation"),
+      "terminalStyle": ("HostWireFrameModel", "terminalStyle"),
+    ]
+    let emittedKeys = HostWireSchema.WebWire.fullFrameKeys
+      .union(HostWireSchema.WebWire.fullFrameOptionalKeys)
+      .union(HostWireSchema.WebWire.deltaFrameKeys)
+      .union(HostWireSchema.WebWire.deltaFrameOptionalKeys)
+    #expect(Set(sources.keys) == emittedKeys)
+    for (key, source) in sources {
+      #expect(
+        HostWireSchema.sourceFieldMappings[source.type]?.contains {
+          $0.property == source.property
+        } == true, "\(key) has no mapped source \(source.type).\(source.property)")
+    }
+    // These nested records are emitted independently of the top-level model.
+    let nestedSources: [String: Set<String>] = [
+      "AccessibilityFocusPresentation": ["generation", "target"],
+      "AccessibilityActionResponse": ["requestID", "target", "result"],
+      "TerminalRenderStyle": ["appearance"],
+      "TerminalAppearance": HostWireSchema.WebWire.terminalStyleKeys,
+    ]
+    for (type, properties) in nestedSources {
+      let mapped = Set((HostWireSchema.sourceFieldMappings[type] ?? []).map(\.property))
+      #expect(properties.isSubset(of: mapped), "unmapped nested wire source \(type)")
+    }
   }
 
   @Test("every mapped type's stored properties match its manifest mapping exactly")

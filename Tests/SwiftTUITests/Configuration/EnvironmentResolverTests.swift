@@ -3,6 +3,26 @@ import Testing
 @testable import SwiftTUIRuntime
 
 struct EnvironmentResolverTests {
+  @Test(
+    "headless web sessions animate unless capture is explicitly requested",
+    arguments: [false, true], [false, true])
+  func webStableOutput(isTTY: Bool, ci: Bool) {
+    var env = ["SWIFTTUI_WEB": "1", "CI": ci ? "true" : "false"]
+    #expect(!RuntimeConfiguration.detect(environment: env, isStdoutTTY: isTTY).stableOutput)
+    env["SWIFTTUI_STABLE_OUTPUT"] = "1"
+    #expect(RuntimeConfiguration.detect(environment: env, isStdoutTTY: isTTY).stableOutput)
+    env["SWIFTTUI_STABLE_OUTPUT"] = "0"
+    env["SWIFTTUI_REDUCE_MOTION"] = "1"
+    let reduced = RuntimeConfiguration.detect(environment: env, isStdoutTTY: isTTY)
+    #expect(!reduced.stableOutput)
+    #expect(reduced.motion == .reduced)
+    env.removeValue(forKey: "SWIFTTUI_STABLE_OUTPUT")
+    env["SWIFTTUI_WEB"] = "0"
+    #expect(
+      RuntimeConfiguration.detect(environment: env, isStdoutTTY: isTTY).stableOutput
+        == (ci || !isTTY))
+  }
+
   @Test("web sessions override terminal JSON output")
   func webOverridesJSON() {
     let configuration = RuntimeConfiguration.detect(

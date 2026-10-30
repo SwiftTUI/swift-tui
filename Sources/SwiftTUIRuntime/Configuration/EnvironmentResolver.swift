@@ -52,9 +52,6 @@ extension RuntimeConfiguration {
     if let v = environment["SWIFTTUI_REDUCE_MOTION"], !v.isEmpty {
       motion = ["0", "false", "no", "off"].contains(v.lowercased()) ? .normal : .reduced
     }
-    if let v = environment["SWIFTTUI_STABLE_OUTPUT"], !v.isEmpty {
-      stableOutput = v != "0"
-    }
     var cursorFollowsFocus = false
     if let v = environment["SWIFTTUI_CURSOR_FOLLOWS_FOCUS"], !v.isEmpty, v != "0" {
       cursorFollowsFocus = true
@@ -88,6 +85,12 @@ extension RuntimeConfiguration {
       }
       return WebConfig(port: port, bind: bind, openBrowser: openBrowser, sceneID: sceneID)
     }()
+
+    // Hosted viewers are interactive even when the server has no terminal.
+    if web != nil { stableOutput = false }
+    if let v = environment["SWIFTTUI_STABLE_OUTPUT"], !v.isEmpty {
+      stableOutput = v != "0"
+    }
 
     let debug = (environment["SWIFTTUI_DEBUG"].map { !$0.isEmpty && $0 != "0" }) ?? false
 

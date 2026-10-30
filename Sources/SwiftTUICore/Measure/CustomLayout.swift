@@ -414,7 +414,8 @@ package final class CustomLayoutHandle: CustomLayoutToken {
   /// user code, run once and classified like an `alignmentGuide` closure
   /// (`ViewDimensions.evaluatingGuide(_:)`): it is half a cell past its value
   /// when the layout read a half-cell guide value, such as a subview's odd
-  /// centre. Memoized per identity, proposal, and guide on the pass context.
+  /// centre. Proposal-only products are memoized per identity, proposal, and guide;
+  /// viewport-dependent measurements must evaluate against their current basis.
   package func explicitAlignment(
     engine: LayoutEngine,
     node: ResolvedNode,
@@ -431,13 +432,17 @@ package final class CustomLayoutHandle: CustomLayoutToken {
       axis: .horizontal,
       guide: guide.key
     )
-    if let memo = passContext?.customLayoutAlignmentMemo(for: key) {
+    if !measured.consumesMeasureViewport,
+      let memo = passContext?.customLayoutAlignmentMemo(for: key)
+    {
       return memo
     }
     let answer = ViewDimensions.evaluatingOptionalGuide {
       explicitHorizontalAlignmentHandler(engine, node, measured, guide, passContext)
     }
-    passContext?.recordCustomLayoutAlignmentMemo(answer, for: key)
+    if !measured.consumesMeasureViewport {
+      passContext?.recordCustomLayoutAlignmentMemo(answer, for: key)
+    }
     return answer
   }
 
@@ -457,13 +462,17 @@ package final class CustomLayoutHandle: CustomLayoutToken {
       axis: .vertical,
       guide: guide.key
     )
-    if let memo = passContext?.customLayoutAlignmentMemo(for: key) {
+    if !measured.consumesMeasureViewport,
+      let memo = passContext?.customLayoutAlignmentMemo(for: key)
+    {
       return memo
     }
     let answer = ViewDimensions.evaluatingOptionalGuide {
       explicitVerticalAlignmentHandler(engine, node, measured, guide, passContext)
     }
-    passContext?.recordCustomLayoutAlignmentMemo(answer, for: key)
+    if !measured.consumesMeasureViewport {
+      passContext?.recordCustomLayoutAlignmentMemo(answer, for: key)
+    }
     return answer
   }
 }

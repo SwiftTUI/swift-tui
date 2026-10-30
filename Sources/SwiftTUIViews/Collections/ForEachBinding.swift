@@ -26,10 +26,12 @@ extension ForEach {
   /// a write whose occurrence is gone is dropped and reports a
   /// `forEach.staleElementBindingWrite` runtime issue. A missing read traps.
   ///
-  /// State-backed arrays with stored POD or String IDs share an index per stored value, so
-  /// reading all rows takes linear lookup work. Sources without value currency
-  /// (including arbitrary getter/setter bindings), custom collections and
-  /// computed IDs require a current-data scan for each access.
+  /// This generic Identifiable spelling uses a current-data scan for each row
+  /// access: its protocol accessor cannot certify a stored ID. For linear
+  /// lookup work on State-backed arrays with stored POD or String IDs, use
+  /// the explicit `id:` overload with a concrete stored-property key path.
+  /// Row bindings preserve collection value currency; computed-ID currency
+  /// additionally validates the current ID sequence before reusing a token.
   @MainActor
   public init<C>(
     _ data: Binding<C>,
@@ -46,6 +48,9 @@ extension ForEach {
 
   /// Creates repeated content from a binding to a mutable collection, keyed
   /// by the identity at `id`, handing each row a binding to its own element.
+  /// State-backed standard arrays with stored POD or String IDs share an index
+  /// per stored value. Arbitrary bindings, custom collections, and computed
+  /// IDs scan current data on each row access.
   @MainActor
   public init<C>(
     _ data: Binding<C>,
@@ -141,7 +146,7 @@ where C: MutableCollection & RandomAccessCollection {
   // binding's setter either way. The row's source derives from the
   // collection's, keyed the way the row relocates.
   projected.transaction = collection.transaction
-  projected.valueIdentity = lookup.valueIdentity
+  projected.valueIdentity = lookup.rowValueIdentity
   projected.bindingSourceID = collection.elementBindingSource(
     ForEachBindingRowKey(elementID: elementID, occurrence: occurrence))
   return projected
@@ -164,13 +169,47 @@ extension ContiguousArray: ForEachBindingValueCollection {}
 @MainActor
 private final class ForEachBindingLookup<C, ID: Hashable & Sendable>
 where C: MutableCollection & RandomAccessCollection {
-  let valueIdentity: (@MainActor @Sendable () -> StateValueIdentity?)?
+  private let valueIdentity: (@MainActor @Sendable () -> StateValueIdentity?)?
+  private let collectionBinding: Binding<C>
+  private let canCertifyRow: Bool
+  private var certifiedSourceIdentity: StateValueIdentity?
+  private var certifiedRowIdentity: StateValueIdentity?
+  private var certifiedIDs: [ID] = []
+
+  var rowValueIdentity: (@MainActor @Sendable () -> StateValueIdentity?)? {
+    if let valueIdentity { return valueIdentity }
+    guard canCertifyRow, collectionBinding.valueIdentity != nil else { return nil }
+    return { self.currentRowValueIdentity() }
+  }
+
+  private func currentRowValueIdentity() -> StateValueIdentity? {
+    guard let source = collectionBinding.valueIdentity?() else { return nil }
+    let ids = collectionBinding.wrappedValue.map { $0[keyPath: id] }
+    if certifiedSourceIdentity !== source {
+      certifiedSourceIdentity = source
+      // Source tokens may return after checkpoint restoration while computed
+      // IDs changed externally. Do not reuse an earlier row certificate.
+      certifiedRowIdentity = certifiedRowIdentity == nil ? source : StateValueIdentity()
+      certifiedIDs = ids
+    } else if certifiedIDs != ids {
+      // A computed ID can relocate a row without a collection store. Never
+      // certify that changed projection with the old collection token.
+      certifiedRowIdentity = StateValueIdentity()
+      certifiedIDs = ids
+    }
+    return certifiedRowIdentity
+  }
   private let id: KeyPath<C.Element, ID>
   private var indexedValueIdentity: StateValueIdentity?
   private var indicesByID: [ID: [C.Index]] = [:]
 
   init(collection: Binding<C>, snapshot: C, ids: [ID], id: KeyPath<C.Element, ID>) {
     self.id = id
+    collectionBinding = collection
+    canCertifyRow =
+      C.self is any ForEachBindingValueCollection.Type
+      && !(C.Element.self is AnyObject.Type)
+      && (_isPOD(ID.self) || ID.self == String.self)
     // Stored IDs may themselves contain mutable references, including through
     // a value wrapper. Admit reference-free storage and String's known value
     // semantics; arbitrary non-POD Hashable values need a current-data scan.

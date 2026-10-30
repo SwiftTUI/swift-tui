@@ -650,10 +650,29 @@ public final class RunLoop<State: Equatable & Sendable, Content: View>:
         directPumpState.sync(loopFrames: &renderedFrames)
       #endif
       if let exitReason = consumeProgrammaticTerminationRequest() {
+        // Off-turn tasks can request termination without invalidating the
+        // tree. Their external wake still owes a presentation, including any
+        // state written by the termination handler and its final callbacks.
+        lifecycleCoordinator.beginShutdown()
+        #if os(Android)
+          if renderMode == .sync {
+            try renderPendingFrames(
+              renderedFrames: &renderedFrames, eventPump: eventPump,
+              drainPolicy: FrameDrainPolicy(exitReason: exitReason))
+          } else {
+            _ = try await renderPendingFramesAsync(
+              renderedFrames: &renderedFrames, eventPump: eventPump,
+              drainPolicy: FrameDrainPolicy(exitReason: exitReason))
+          }
+        #else
+          _ = try await renderPendingFramesAsync(
+            renderedFrames: &renderedFrames, eventPump: eventPump,
+            drainPolicy: FrameDrainPolicy(exitReason: exitReason))
+        #endif
         return RunLoopResult(
           finalState: stateContainer.state,
           renderedFrames: renderedFrames,
-          exitReason: exitReason
+          exitReason: consumeProgrammaticTerminationRequest() ?? exitReason
         )
       }
       #if os(Android)

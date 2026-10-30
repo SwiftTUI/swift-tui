@@ -10,6 +10,7 @@ extension RunLoop {
     hostConfiguration: HostLayoutConfiguration? = nil
   ) -> ResolveContext {
     let hostConfiguration = hostConfiguration ?? presentationSurface.hostLayoutConfiguration()
+    synchronizeInputCapabilities()
     let causeSummary = scheduledFrame.causes
       .map(\.rawValue)
       .sorted()

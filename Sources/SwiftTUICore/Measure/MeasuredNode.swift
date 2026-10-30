@@ -106,8 +106,11 @@ package struct HostedCollectionAllocationSnapshot: Equatable, Sendable {
   /// A hint-derived product is valid only for its window, and the scroll
   /// layout's reuse signature is deliberately position-free, so the retained
   /// gate recomputes the window and denies reuse on mismatch. `nil` on the
-  /// finite path, where the proposal itself already gates reuse.
+  /// finite path or when a vacuous hint required exhaustive measurement.
   package var measuredWindow: Range<Int>?
+  /// The viewport consulted by measurement, including an exhaustive result
+  /// from a zero-length viewport. Such results are not proposal-only products.
+  package var measureViewportHint: MeasureViewportHint?
   /// Display lines per row used to derive `measuredWindow`.
   package var estimatedRowStride: Int?
   /// The height-aware visible layout, derived ONCE here from the measured row
@@ -133,6 +136,7 @@ package struct HostedCollectionAllocationSnapshot: Equatable, Sendable {
     sourceIndices: [Int],
     tableColumnWidths: [Int]? = nil,
     measuredWindow: Range<Int>? = nil,
+    measureViewportHint: MeasureViewportHint? = nil,
     estimatedRowStride: Int? = nil,
     listLayout: ListVisibleLayout? = nil,
     tableLayout: TableVisibleLayout? = nil,
@@ -142,6 +146,7 @@ package struct HostedCollectionAllocationSnapshot: Equatable, Sendable {
     self.sourceIndices = sourceIndices
     self.tableColumnWidths = tableColumnWidths
     self.measuredWindow = measuredWindow
+    self.measureViewportHint = measureViewportHint
     self.estimatedRowStride = estimatedRowStride
     self.listLayout = listLayout
     self.tableLayout = tableLayout
@@ -318,8 +323,8 @@ package struct MeasuredNode: Equatable, Sendable {
   /// entries, which would replay the old viewport's geometry and anchor correction.
   package private(set) var containsWindowedMeasurement = false
   /// Whether this subtree's measurement consumed a measure-viewport hint:
-  /// ``containsWindowedMeasurement``, or an exhaustive lazy stack that claimed
-  /// a hint it could not window (``LazyStackAllocationSnapshot/claimedHint``).
+  /// ``containsWindowedMeasurement``, or an exhaustive lazy stack or hosted
+  /// collection that consulted a hint it could not window.
   /// Such a product is valid only for its hint, so no proposal-keyed reuse may
   /// serve it: a serve would skip the claim (STUI-1269).
   package private(set) var consumesMeasureViewport = false
@@ -375,6 +380,7 @@ package struct MeasuredNode: Equatable, Sendable {
     consumesMeasureViewport =
       containsWindowedMeasurement
       || containerAllocationSnapshot?.lazyStack?.claimedHint != nil
+      || containerAllocationSnapshot?.hostedCollection?.measureViewportHint != nil
       || childMeasurements.contains { $0.consumesMeasureViewport }
   }
 

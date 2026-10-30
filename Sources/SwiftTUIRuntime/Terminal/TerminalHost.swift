@@ -93,7 +93,17 @@ public enum TerminalHostError: Error, Equatable, Sendable, CustomStringConvertib
       if active { try enableRawMode() }
     }
     var activeMouseCoordinateMode: MouseCoordinateMode {
-      rawModeSession.mouseCoordinateMode
+      // Keep the negotiated protocol fixed for the raw-mode session, but
+      // refresh automatically detected pixel divisors after font/zoom changes.
+      if rawModeSession.isEnabled, case .automatic = mouseInputResolution,
+        case .pixels(_, let source) = rawModeSession.mouseCoordinateMode,
+        let size = baselineGraphicsCapabilities().cellPixelSize
+      {
+        rawModeSession.mouseCoordinateMode = .pixels(
+          metrics: .init(width: max(1, size.width), height: max(1, size.height), source: .reported),
+          source: source)
+      }
+      return rawModeSession.mouseCoordinateMode
     }
     var capabilityProbe = TerminalHostCapabilityProbeState()
     private var presentationSession = TerminalPresentationSession()

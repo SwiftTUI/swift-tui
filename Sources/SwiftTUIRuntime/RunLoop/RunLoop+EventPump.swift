@@ -300,7 +300,11 @@ extension RunLoop {
     renderedFrames: inout Int
   ) throws -> RunLoopExitReason? {
     if let exitReason = consumeProgrammaticTerminationRequest() {
-      return exitReason
+      lifecycleCoordinator.beginShutdown()
+      try renderPendingFrames(
+        renderedFrames: &renderedFrames, eventPump: eventPump,
+        drainPolicy: FrameDrainPolicy(exitReason: exitReason))
+      return consumeProgrammaticTerminationRequest() ?? exitReason
     }
 
     _ = eventPump.pullInput()

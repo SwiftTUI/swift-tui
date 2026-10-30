@@ -6,6 +6,17 @@ import Testing
 
 @MainActor
 struct RenderOnceTests {
+  @Test("width resolution prefers the live viewport and falls back on query failure")
+  func terminalWidthPrecedence() {
+    #expect(RenderOnce.resolveTerminalWidth(environment: ["COLUMNS": "80"], liveWidth: 132) == 132)
+    #expect(RenderOnce.resolveTerminalWidth(environment: ["COLUMNS": "120"], liveWidth: nil) == 120)
+    #expect(RenderOnce.resolveTerminalWidth(environment: ["COLUMNS": "120"], liveWidth: 0) == 120)
+    for columns in ["", "0", "-1", "invalid"] {
+      #expect(
+        RenderOnce.resolveTerminalWidth(environment: ["COLUMNS": columns], liveWidth: nil) == 80)
+    }
+  }
+
   @Test("RenderOnce.render emits text for a plain view")
   func rendersPlainText() throws {
     let output = RenderOnce.render(
