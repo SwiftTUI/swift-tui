@@ -64,8 +64,8 @@ env:
   # compile lines or per-test lines; the CPU-aware grace below distinguishes
   # slow active work from a parked process.
   #
-  # These four fit the core job's 30-minute cap. Runtime jobs allow a separate
-  # cold build before execution; the policy job has a tighter cap and overrides them.
+  # The core and runtime jobs override the deadline for their cold-build budget;
+  # the policy job has a tighter cap and overrides these bounds.
   # Worst-case kill = 600 idle + 300 grace + 10 kill grace = 910 s. It was
   # 2410 s until 2026-08-29 — the grace was a COUNT of three forgiven windows,
   # each costing another whole idle bound — so the watchdog could not fire
@@ -182,7 +182,13 @@ jobs:
       # not its descendant; yama ptrace_scope=1 refuses that without the
       # capability, and the default container capability set omits it.
       options: --cap-add=SYS_PTRACE
-    timeout-minutes: 30
+    # A cold Swift 6.4 test build took 1205 s, followed by 177 s for public
+    # import consumers and the remaining suites. The 30-minute cap cancelled
+    # a progressing collection journey (STUI-1400); keep the per-step watchdog
+    # bounds unchanged and allow the full core lane to finish.
+    timeout-minutes: 45
+    env:
+      SWIFTTUI_TEST_STEP_WATCHDOG_DEADLINE_SECONDS: "2700"
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(github.event_name == 'workflow_dispatch' && inputs.run_arm64 && '{"include":[{"arch":"amd64","runner":"ubuntu-24.04"},{"arch":"arm64","runner":"ubuntu-24.04-arm"}]}' || '{"include":[{"arch":"amd64","runner":"ubuntu-24.04"}]}') }}
