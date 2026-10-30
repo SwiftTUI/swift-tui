@@ -11,6 +11,11 @@ struct TerminalCellTextRenderer {
     /// resets, or a post-reset cell with the same raw style would skip its
     /// re-emission.
     fileprivate var activeRawStyle: ResolvedTextStyle?
+    /// A single-entry cache of the presentation-boundary sanitizer. It is
+    /// independent of the active OSC 8 state: closing a run must still reopen
+    /// the link even when its sanitized destination can be reused.
+    fileprivate var lastRawHyperlink: String?
+    fileprivate var lastSanitizedHyperlink: String?
 
     init() {}
   }
@@ -89,10 +94,19 @@ struct TerminalCellTextRenderer {
     state: inout RenderState,
     into result: inout String
   ) {
-    let hyperlink = hyperlink.flatMap { destination -> String? in
-      let sanitized = sanitizedHyperlinkDestination(destination)
-      return sanitized.isEmpty ? nil : sanitized
+    if let destination = hyperlink {
+      // String equality is canonically equivalent, but OSC 8 URI encoding
+      // preserves the authored UTF-8 bytes (e.g. composed vs decomposed é).
+      if state.lastRawHyperlink?.utf8.elementsEqual(destination.utf8) != true {
+        let sanitized = sanitizedHyperlinkDestination(destination)
+        state.lastRawHyperlink = destination
+        state.lastSanitizedHyperlink = sanitized.isEmpty ? nil : sanitized
+      }
+    } else {
+      state.lastRawHyperlink = nil
+      state.lastSanitizedHyperlink = nil
     }
+    let hyperlink = state.lastSanitizedHyperlink
     // A run of same-styled cells is the common shape of a span; the raw
     // compare early-outs before `styleResolvedForTerminal` re-derives the
     // terminal style. Equal raw inputs resolve to equal terminal styles (the

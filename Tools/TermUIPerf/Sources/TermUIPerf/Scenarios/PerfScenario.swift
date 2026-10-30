@@ -182,6 +182,8 @@ public enum PerfScenarioRegistry {
       SyntheticMeshTextScenario(),
       SyntheticLineLimitPreviewScenario(),
       SyntheticRichSteadyRepaintScenario(),
+      TerminalTextRepaintScenario(linked: true),
+      TerminalTextRepaintScenario(linked: false),
       SheetOpenLatencyScenario(),
       GalleryTabSwitchScenario(),
       FileBrowserSelectionScenario(),

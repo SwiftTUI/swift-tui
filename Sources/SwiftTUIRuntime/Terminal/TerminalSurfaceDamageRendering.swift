@@ -41,7 +41,7 @@ struct TerminalSurfaceDamageRenderer: Sendable {
 
       var renderedSpan = ""
       renderedSpan.reserveCapacity(max(0, span.upperBound - span.lowerBound) * 3)
-      _ = textRenderer.appendRenderedCells(
+      let renderedWidth = textRenderer.appendRenderedCells(
         in: currentRow,
         from: span.lowerBound,
         to: span.upperBound,
@@ -55,11 +55,7 @@ struct TerminalSurfaceDamageRenderer: Sendable {
           row: row,
           column: span.lowerBound,
           renderedSpan: renderedSpan,
-          cellsChanged: cellsChanged(
-            in: currentRow,
-            from: span.lowerBound,
-            to: span.upperBound
-          )
+          cellsChanged: renderedWidth
         )
       )
       cursorColumn = span.upperBound
@@ -214,25 +210,5 @@ struct TerminalSurfaceDamageRenderer: Sendable {
     in row: [RasterCell]
   ) -> RasterCell {
     row.indices.contains(index) ? row[index] : .empty
-  }
-
-  func cellsChanged(
-    in row: [RasterCell],
-    from start: Int,
-    to end: Int
-  ) -> Int {
-    guard start < end else {
-      return 0
-    }
-
-    var total = 0
-    for index in start..<end {
-      let cell = cell(at: index, in: row)
-      guard !cell.isContinuation else {
-        continue
-      }
-      total += max(1, cell.spanWidth)
-    }
-    return total
   }
 }
