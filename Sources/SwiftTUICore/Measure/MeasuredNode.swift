@@ -108,9 +108,11 @@ package struct HostedCollectionAllocationSnapshot: Equatable, Sendable {
   /// gate recomputes the window and denies reuse on mismatch. `nil` on the
   /// finite path or when a vacuous hint required exhaustive measurement.
   package var measuredWindow: Range<Int>?
-  /// The viewport consulted by measurement, including an exhaustive result
-  /// from a zero-length viewport. Such results are not proposal-only products.
-  package var measureViewportHint: MeasureViewportHint?
+  /// Whether measurement consulted a viewport, including an exhaustive result
+  /// from a zero-length viewport. Keep only the dependency bit: exhaustive
+  /// products re-measure, and windowed products validate their stored window.
+  /// This fits beside the optional range without growing MeasuredNode.
+  package var consumesMeasureViewport: Bool
   /// Display lines per row used to derive `measuredWindow`.
   package var estimatedRowStride: Int?
   /// The height-aware visible layout, derived ONCE here from the measured row
@@ -136,7 +138,7 @@ package struct HostedCollectionAllocationSnapshot: Equatable, Sendable {
     sourceIndices: [Int],
     tableColumnWidths: [Int]? = nil,
     measuredWindow: Range<Int>? = nil,
-    measureViewportHint: MeasureViewportHint? = nil,
+    consumesMeasureViewport: Bool = false,
     estimatedRowStride: Int? = nil,
     listLayout: ListVisibleLayout? = nil,
     tableLayout: TableVisibleLayout? = nil,
@@ -146,7 +148,7 @@ package struct HostedCollectionAllocationSnapshot: Equatable, Sendable {
     self.sourceIndices = sourceIndices
     self.tableColumnWidths = tableColumnWidths
     self.measuredWindow = measuredWindow
-    self.measureViewportHint = measureViewportHint
+    self.consumesMeasureViewport = consumesMeasureViewport
     self.estimatedRowStride = estimatedRowStride
     self.listLayout = listLayout
     self.tableLayout = tableLayout
@@ -380,7 +382,7 @@ package struct MeasuredNode: Equatable, Sendable {
     consumesMeasureViewport =
       containsWindowedMeasurement
       || containerAllocationSnapshot?.lazyStack?.claimedHint != nil
-      || containerAllocationSnapshot?.hostedCollection?.measureViewportHint != nil
+      || containerAllocationSnapshot?.hostedCollection?.consumesMeasureViewport == true
       || childMeasurements.contains { $0.consumesMeasureViewport }
   }
 

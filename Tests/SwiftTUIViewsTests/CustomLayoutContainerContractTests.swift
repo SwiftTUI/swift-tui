@@ -469,9 +469,7 @@ struct CustomLayoutContainerContractTests {
           childSizes: [],
           hostedCollection: .init(
             sourceIndices: [],
-            measureViewportHint: .init(
-              axes: [.vertical], contentOffset: .zero,
-              viewportSize: .init(width: size, height: size)))))
+            consumesMeasureViewport: true)))
       #expect(measured.consumesMeasureViewport)
       #expect(
         handle.explicitAlignment(

@@ -75,7 +75,7 @@ extension LayoutEngine {
     // An exhaustive hosted product can still depend on a vacuous viewport.
     // Re-measure it so a newly finite hint can window and acquire its claim.
     if let hosted = previousMeasured.containerAllocationSnapshot?.hostedCollection,
-      hosted.measuredWindow == nil, hosted.measureViewportHint != nil
+      hosted.measuredWindow == nil, hosted.consumesMeasureViewport
     {
       return nil
     }
