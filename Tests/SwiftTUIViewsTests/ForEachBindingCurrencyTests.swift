@@ -37,10 +37,10 @@ struct ForEachBindingCurrencyTests {
       ComputedRecord(box: box, name: "First"),
       ComputedRecord(box: IDBox(1), name: "Second"),
     ])
-    var sourceToken = StateValueIdentity()
-    let originalSourceToken = sourceToken
+    let sourceToken = Mutex(StateValueIdentity())
+    let originalSourceToken = sourceToken.withLock { $0 }
     var binding = state.projectedValue
-    binding.valueIdentity = { sourceToken }
+    binding.valueIdentity = { sourceToken.withLock { $0 } }
     let rows = captureRows(binding, id: \.id)
     let before = try #require(rows[1].valueIdentity?())
     box.value = 1
@@ -52,10 +52,10 @@ struct ForEachBindingCurrencyTests {
     #expect(rows[1].valueIdentity?() !== before)
     #expect(rows[1].valueIdentity?() !== after)
     // A checkpoint can restore a source token without restoring external IDs.
-    sourceToken = StateValueIdentity()
+    sourceToken.withLock { $0 = StateValueIdentity() }
     _ = rows[1].valueIdentity?()
     box.value = 1
-    sourceToken = originalSourceToken
+    sourceToken.withLock { $0 = originalSourceToken }
     #expect(rows[1].valueIdentity?() !== before)
   }
 

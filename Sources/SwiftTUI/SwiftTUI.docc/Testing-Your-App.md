@@ -161,9 +161,10 @@ disables built-in animation so captured frames show its static form:
 SWIFTTUI_STABLE_OUTPUT=1 swift test
 ```
 
-You rarely need to set it: when the variable is unset, `CI=true` or a
-non-TTY stdout enables stable output automatically, and both hold on
-common CI systems. Tests that pass an explicit `environment:` dictionary
+For terminal sessions, when the variable is unset, `CI=true` or a non-TTY
+stdout enables stable output automatically; both hold on common CI systems.
+Web sessions animate by default, so set the variable explicitly for hosted
+capture. Tests that pass an explicit `environment:` dictionary
 to `RenderOnce` are immune to the ambient environment either way, which
 is the most reproducible arrangement. The full variable reference is the
 [Environment Variables](https://swifttui.sh/docs/documentation/swifttuiruntime/environment-variables)

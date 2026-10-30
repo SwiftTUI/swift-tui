@@ -126,11 +126,12 @@ exactly.
 Under reduced motion — the `--reduce-motion` flag,
 `SWIFTTUI_REDUCE_MOTION=1`, or the `--accessible` /
 `SWIFTTUI_ACCESSIBLE=1` alias — ``AnimatedImage`` renders only the first
-frame and starts no playback task. Stable-output capture (CI, a non-TTY
-stdout, or `SWIFTTUI_STABLE_OUTPUT=1`) pins the first frame the same way
-without reporting a reduced-motion preference to app code through
-`accessibilityReduceMotion`. Tests assert both: the first frame is the
-rendered attachment and the task registry stays empty.
+frame and starts no playback task. Stable-output capture (CI or a non-TTY
+stdout for terminal sessions, or explicit `SWIFTTUI_STABLE_OUTPUT=1` for any
+host) pins the first frame the same way without reporting a reduced-motion
+preference to app code through `accessibilityReduceMotion`. Web sessions
+animate by default. Tests assert both: the first frame is the rendered
+attachment and the task registry stays empty.
 
 ## Topics
 
