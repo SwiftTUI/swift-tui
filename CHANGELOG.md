@@ -8,6 +8,48 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
 
 ## [Unreleased]
 
+## [0.20.0] - 2026-10-30
+
+### Changed
+
+- Terminal repainting reuses sanitized hyperlink destinations and computes row
+  text widths in one pass, reducing repeated work while preserving output bytes
+  (STUI-1397, STUI-1398).
+
+### Fixed
+
+- Scroll views preserve committed geometry across frames that skip layout, so
+  later scrolling and hit testing use the correct viewport (STUI-1130).
+- Custom layouts and hosted collections use smaller nested measurement frames,
+  preventing frame-tail worker stack overflows, including on Windows
+  (STUI-1133).
+- Crash handling keeps saved terminal settings in correctly sized storage,
+  avoiding a Swift 6.4 imported-struct global buffer overflow (STUI-1382).
+- Incremental rendering repaints image attachment and presentation-layer changes
+  even when text cells are unchanged (STUI-1385).
+- Disabled Picker options ignore pointer clicks (STUI-1392).
+- Programmatic termination presents state changes and final callbacks before
+  returning, including requests made by tasks outside an input turn.
+- Hosted collection measurement and custom-layout alignment refresh when the
+  viewport changes instead of reusing values from the previous viewport.
+- Bound ForEach rows invalidate correctly when computed IDs change without a
+  collection write; documentation distinguishes stored-ID lookup from the
+  generic Identifiable overload.
+- Web-hosted applications remain interactive when the server has no terminal;
+  an explicit `SWIFTTUI_STABLE_OUTPUT` value still overrides the default.
+- Pixel mouse coordinates refresh automatically detected cell dimensions after
+  terminal font or zoom changes.
+- One-shot rendering uses the visible Windows console viewport width before
+  falling back to `COLUMNS`.
+- Rectangle intersection consistently rejects empty or non-finite operands.
+
+### Tests and documentation
+
+- Expand host-wire field coverage, preserve sanitizer runtime preloading in
+  exit-test children, and add regressions for the runtime and layout repairs.
+- Refresh the SwiftUI divergence register to describe current behavior and
+  remaining gaps.
+
 ## [0.19.5] - 2026-10-26
 
 ### Changed
@@ -2805,7 +2847,8 @@ precomposition work (still images), cache hardening, and glyph-aware backdrops.
 See the GitHub releases for the full per-tag history:
 <https://github.com/SwiftTUI/swift-tui/releases>.
 
-[Unreleased]: https://github.com/SwiftTUI/swift-tui/compare/0.19.5...HEAD
+[Unreleased]: https://github.com/SwiftTUI/swift-tui/compare/0.20.0...HEAD
+[0.20.0]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.20.0
 [0.19.5]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.19.5
 [0.19.4]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.19.4
 [0.19.3]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.19.3
