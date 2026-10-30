@@ -175,8 +175,14 @@ extension Rasterizer {
         return .init(row: row, columnRanges: changedRanges)
       }
 
+    var rowRanges = Dictionary(uniqueKeysWithValues: refinedRows.map { ($0.row, $0.columnRanges) })
+    RasterSurfaceDamageDiff.appendNonCellDiffs(
+      previous: previousSurface, current: currentSurface, to: &rowRanges)
+
     return PresentationDamage(
-      textRows: refinedRows,
+      textRows: rowRanges.keys.sorted().map {
+        .init(row: $0, columnRanges: rowRanges[$0] ?? [])
+      },
       graphicsInvalidation: damage.graphicsInvalidation,
       requiresFullTextRepaint: damage.requiresFullTextRepaint,
       requiresFullGraphicsReplay: damage.requiresFullGraphicsReplay

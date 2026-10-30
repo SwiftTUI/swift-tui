@@ -15,8 +15,7 @@ package enum RasterSurfaceDamageDiff {
 
     var rowRanges: [Int: [Range<Int>]] = [:]
     appendCellDiffs(previous: previous, current: current, to: &rowRanges)
-    appendImageDiffs(previous: previous, current: current, to: &rowRanges)
-    appendPresentationLayerTopologyDiffs(previous: previous, current: current, to: &rowRanges)
+    appendNonCellDiffs(previous: previous, current: current, to: &rowRanges)
 
     return PresentationDamage(
       textRows: rowRanges.keys.sorted().map { row in
@@ -26,6 +25,18 @@ package enum RasterSurfaceDamageDiff {
         )
       }
     )
+  }
+
+  /// Shared by full-surface diffing and incremental cell-damage refinement.
+  /// Attachment and compositing changes can affect rows with identical cells,
+  /// including retained rows outside the incremental repaint scope.
+  internal static func appendNonCellDiffs(
+    previous: RasterSurface,
+    current: RasterSurface,
+    to rowRanges: inout [Int: [Range<Int>]]
+  ) {
+    appendImageDiffs(previous: previous, current: current, to: &rowRanges)
+    appendPresentationLayerTopologyDiffs(previous: previous, current: current, to: &rowRanges)
   }
 
   private static func appendCellDiffs(

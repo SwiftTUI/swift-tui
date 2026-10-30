@@ -1009,6 +1009,47 @@ struct RasterizerTests {
     #expect(result.surface.imageAttachments.map(\.identity) == [topIdentity, bottomIdentity])
     #expect(result.surface.imageAttachments.first?.source == .path("top-frame-b.png"))
     #expect(result.surface.imageAttachments.last == previousBottom)
+    #expect(
+      result.presentationDamage
+        == RasterSurfaceDamageDiff.diff(
+          previous: previousSurface, current: result.surface))
+  }
+
+  @Test(
+    "incremental damage includes attachment and effect changes with identical cells",
+    arguments: ["source", "move", "insert", "remove", "effect", "unchanged"], [false, true])
+  func incrementalNonCellDamage(mutation: String, verify: Bool) throws {
+    let rasterizer = Rasterizer(
+      incrementalVerificationPolicy: verify ? .verifySoundDamage : .trustSoundDamage)
+    func tree(current: Bool) -> DrawNode {
+      let hidden = (mutation == "insert" && !current) || (mutation == "remove" && current)
+      let row = mutation == "move" && current ? 2 : 0
+      if mutation == "effect" {
+        var text = coreRasterTextNode(id: "effect", row: 0, text: "same", width: 4)
+        if current { text.drawEffects = .init([.blendMode(.normal)]) }
+        return coreRasterRoot(children: [text])
+      }
+      let image = coreRasterImageNode(
+        id: "image", row: row,
+        source: mutation == "source" && current ? "new.png" : "old.png")
+      return coreRasterRoot(children: hidden ? [] : [image])
+    }
+    let previous = rasterizer.rasterize(tree(current: false))
+    let current = tree(current: true)
+    let result = rasterizer.rasterizeCollectingVisibleIdentities(
+      current, minimumSize: .zero, previousSurface: previous,
+      damage: .init(dirtyRows: [0, 2]))
+    #expect(result.path == .incremental)
+    #expect(result.incrementalMismatch == nil)
+    #expect(result.surface.cells == previous.cells)
+    if mutation == "effect" {
+      #expect(result.surface.imageAttachments == previous.imageAttachments)
+    }
+    #expect(result.surface == rasterizer.rasterize(current))
+    let expected = try #require(
+      RasterSurfaceDamageDiff.diff(previous: previous, current: result.surface))
+    #expect(expected.dirtyRows.isEmpty == (mutation == "unchanged"))
+    #expect(result.presentationDamage == expected)
   }
 
   @Test("incremental raster reuse refines row damage to actual changed spans")
