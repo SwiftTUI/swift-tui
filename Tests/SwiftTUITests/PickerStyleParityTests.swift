@@ -90,6 +90,44 @@ struct PickerStyleParityTests {
     #expect(probe.selection == 1)
   }
 
+  @Test(
+    "disabled menu options leave selection and expansion unchanged",
+    arguments: [false, true], [false, true])
+  func disabledMenuOptionIsInert(consumer: Bool, batched: Bool) throws {
+    let probe = PickerParityProbe()
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("DisabledMenuOption"), size: .init(width: 42, height: 12)
+    ) {
+      Picker("Choice", selection: probe.binding) {
+        Text("Alpha").tag(0)
+        Text("Disabled").tag(1).disabled(true)
+        Text("Enabled").tag(2)
+      }
+      .pickerStyle(consumer ? AnyPickerStyle(ConsumerPickerStyle(menu: true)) : .menu)
+    }
+    defer { harness.shutdown() }
+    _ = try harness.focusText("Choice")
+    let point = try #require(harness.point(forText: "Disabled"))
+    #expect(
+      harness.runLoop.handle(
+        RuntimeEvent.input(InputEvent.mouse(.init(kind: .down(.primary), location: point)))) == nil)
+    if !batched { _ = try harness.render() }
+    #expect(
+      harness.runLoop.handle(
+        RuntimeEvent.input(InputEvent.mouse(.init(kind: .up(.primary), location: point)))) == nil)
+    _ = try harness.render()
+    #expect(probe.selection == 0)
+    #expect(probe.writes == 0)
+    #expect(harness.frame.contains("Disabled"), "disabled click must leave the menu open")
+    #expect(harness.frame.contains("Enabled"))
+    if harness.frame.contains("Enabled") {
+      _ = try harness.clickText("Enabled")
+      #expect(probe.selection == 2)
+      #expect(probe.writes == 1)
+      #expect(!harness.frame.contains("Disabled"), "enabled selection still collapses the menu")
+    }
+  }
+
   @Test("omitting a menu trigger preserves expansion through keyboard actions")
   func omittedMenuTriggerPreservesKeyboard() throws {
     let probe = PickerParityProbe()

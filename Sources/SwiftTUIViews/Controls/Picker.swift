@@ -195,7 +195,7 @@ extension Picker {
           return handled ? .claimed : .ignored
         }
 
-        for (index, option) in options.enumerated() where option.isEnabled {
+        for (index, option) in options.enumerated() {
           let routeID = runtimePrimaryRouteID(
             for: pickerOptionIdentity(
               for: context.identity,
@@ -205,6 +205,9 @@ extension Picker {
           intake.registerPointerHandler(routeID: routeID) { event in
             switch event.kind {
             case .down(.primary):
+              // Disabled rows still claim the click so release activation cannot
+              // walk up to the picker and toggle the menu.
+              guard option.isEnabled else { return .claimed }
               let before = binding.wrappedValue
               _ = setBoundSelection(binding, to: option.tag)
               if wantsTrigger, before != binding.wrappedValue {
