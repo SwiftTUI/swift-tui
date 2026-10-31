@@ -13,6 +13,8 @@
 /// content row count is fixed by default (smoke-test friendly) but can be
 /// overridden with `SWIFTTUI_PERF_TAB_SWITCH_CONTENT_ROWS` to sweep content
 /// size.
+/// Each switch records its own input-to-present latency; historical batch
+/// latency measurements are not comparable to these per-input samples.
 public struct GalleryTabSwitchScenario: PerfScenario {
   public let name: PerfScenarioName = .galleryTabSwitch
   public let defaultTerminalSize = PerfTerminalSize(columns: 100, rows: 36)
@@ -20,7 +22,7 @@ public struct GalleryTabSwitchScenario: PerfScenario {
     "click across tab-bar entries; swap a per-tab content pane while chrome stays stable"
   ]
   public let visualMarkers = ["tab 0 body"]
-  public let settlingDescription = "first frame that shows tab 0 body"
+  public let settlingDescription = "first frame showing each clicked tab's body"
 
   private static let defaultContentRows = 24
   /// Tabs visited in order, including revisits so reuse of an already-built tab
@@ -40,10 +42,11 @@ public struct GalleryTabSwitchScenario: PerfScenario {
       PerfGalleryTabSwitchView(contentRows: contentRows)
     } drive: { driver in
       _ = try await driver.waitForFrame(containing: "tab 0 body")
-      let dispatchTime = monotonicSeconds()
+      var events: [PerfEventRecord] = []
       var lastFrame = driver.terminalHost.presentedFrames.last?.frameNumber ?? 0
 
-      for target in sequence {
+      for (index, target) in sequence.enumerated() {
+        let dispatchTime = monotonicSeconds()
         let cell = try driver.cell(containing: "[T\(target)]")
         driver.sendClick(at: cell)
         let switched = try await driver.waitForFrame(
@@ -51,22 +54,17 @@ public struct GalleryTabSwitchScenario: PerfScenario {
           afterFrame: lastFrame
         )
         lastFrame = switched.frameNumber
+        events.append(
+          .init(
+            eventID: "gallery-tab-switch-\(index)", eventType: "tab_switch",
+            dispatchTimeSeconds: dispatchTime, expectedVisualMarker: "tab \(target) body",
+            firstMatchingFrame: switched.frameNumber,
+            firstMatchingTimeSeconds: switched.timestampSeconds,
+            finalSettledFrame: switched.frameNumber,
+            finalSettledTimeSeconds: switched.timestampSeconds))
       }
 
-      let settled = driver.terminalHost.presentedFrames.last
-      let finalTab = sequence.last ?? 0
-      return [
-        PerfEventRecord(
-          eventID: "gallery-tab-switch",
-          eventType: "tab_switch",
-          dispatchTimeSeconds: dispatchTime,
-          expectedVisualMarker: "tab \(finalTab) body",
-          firstMatchingFrame: lastFrame,
-          firstMatchingTimeSeconds: settled?.timestampSeconds ?? dispatchTime,
-          finalSettledFrame: settled?.frameNumber ?? lastFrame,
-          finalSettledTimeSeconds: settled?.timestampSeconds ?? dispatchTime
-        )
-      ]
+      return events
     }
   }
 

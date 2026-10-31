@@ -149,6 +149,24 @@ struct ScenarioSmokeTests {
 
       #expect(result.presentedFrameCount > 0)
       #expect(result.events.isEmpty == false)
+      switch scenario.name {
+      case .galleryTabSwitch, .memoEquatableBoundary,
+        .canvasPixelCursor, .canvasPixelStroke, .canvasPixelFrame:
+        // These workloads report per-input latency; a single batch event
+        // would silently turn their p95 into a whole-script duration.
+        #expect(result.events.count == 8)
+        #expect(Set(result.events.map(\.eventID)).count == 8)
+        var previousMatchingFrame = 0
+        for event in result.events {
+          let frame = try #require(event.firstMatchingFrame)
+          let presented = try #require(event.firstMatchingTimeSeconds)
+          #expect(frame > previousMatchingFrame)
+          #expect(presented >= event.dispatchTimeSeconds)
+          previousMatchingFrame = frame
+        }
+      default:
+        break
+      }
       #expect(fileExists("run.json", in: result.runDirectory))
       #expect(fileExists("frames.tsv", in: result.runDirectory))
       #expect(fileExists("events.tsv", in: result.runDirectory))

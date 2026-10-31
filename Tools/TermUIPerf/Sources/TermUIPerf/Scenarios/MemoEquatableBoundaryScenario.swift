@@ -24,12 +24,14 @@
 /// baseline (blocked → recompute, plus the comparator's wasted work) — the
 /// Stage-2 finding in miniature. Grid size is `SWIFTTUI_PERF_MEMO_GRID_ROWS`
 /// (default 18) × 8 columns.
+/// Each click records its own input-to-present latency; historical batch
+/// latency measurements are not comparable to these per-input samples.
 public struct MemoEquatableBoundaryScenario: PerfScenario {
   public let name: PerfScenarioName = .memoEquatableBoundary
   public let defaultTerminalSize = PerfTerminalSize(columns: 80, rows: 48)
   public let scriptedEvents = ["click inc; invalidate the root above a large Equatable grid"]
   public let visualMarkers = ["count 0"]
-  public let settlingDescription = "first frame that shows count 0"
+  public let settlingDescription = "first frame showing each incremented count"
 
   private static let defaultRowCount = 18
   private static let columnCount = 8
@@ -52,9 +54,10 @@ public struct MemoEquatableBoundaryScenario: PerfScenario {
       )
     } drive: { driver in
       _ = try await driver.waitForFrame(containing: "count 0")
-      let dispatchTime = monotonicSeconds()
+      var events: [PerfEventRecord] = []
       var lastFrame = driver.terminalHost.presentedFrames.last?.frameNumber ?? 0
       for click in 1...Self.clickCount {
+        let dispatchTime = monotonicSeconds()
         let cell = try driver.cell(containing: "inc")
         driver.sendClick(at: cell)
         let matching = try await driver.waitForFrame(
@@ -62,20 +65,16 @@ public struct MemoEquatableBoundaryScenario: PerfScenario {
           afterFrame: lastFrame
         )
         lastFrame = matching.frameNumber
+        events.append(
+          .init(
+            eventID: "memo-equatable-boundary-\(click)", eventType: "mouse_click",
+            dispatchTimeSeconds: dispatchTime, expectedVisualMarker: "count \(click)",
+            firstMatchingFrame: matching.frameNumber,
+            firstMatchingTimeSeconds: matching.timestampSeconds,
+            finalSettledFrame: matching.frameNumber,
+            finalSettledTimeSeconds: matching.timestampSeconds))
       }
-      let settled = driver.terminalHost.presentedFrames.last
-      return [
-        PerfEventRecord(
-          eventID: "memo-equatable-boundary",
-          eventType: "mouse_click",
-          dispatchTimeSeconds: dispatchTime,
-          expectedVisualMarker: "count \(Self.clickCount)",
-          firstMatchingFrame: lastFrame,
-          firstMatchingTimeSeconds: settled?.timestampSeconds ?? dispatchTime,
-          finalSettledFrame: settled?.frameNumber ?? lastFrame,
-          finalSettledTimeSeconds: settled?.timestampSeconds ?? dispatchTime
-        )
-      ]
+      return events
     }
   }
 
