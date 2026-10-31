@@ -131,8 +131,9 @@ reports issues instead of silently inferring intent.
 
 Reduced motion changes *rendering*, not just timing: `Spinner` goes static
 and `PhaseAnimator` holds its first phase. `CI=true` or a non-TTY stdout use
-the same stable built-in rendering without changing the app-visible
-accessibility preference. Semantic style roles (`.foreground`, `.tint`, `.warning`,
+the same stable built-in rendering in terminal sessions without changing the
+app-visible accessibility preference; web sessions animate by default.
+Semantic style roles (`.foreground`, `.tint`, `.warning`,
 and the `.primary`/`.secondary` aliases) resolve through a host-owned theme;
 there is deliberately no `ColorScheme`. And an `App` is also a CLI command,
 with `--accessible`, `--no-color`, `--ascii`, `--reduce-motion`, and
@@ -199,8 +200,9 @@ surprise. Each links back to its register section by name.
 - **A missing named coordinate space falls back to global** with a frame
   diagnostic rather than trapping.
 - **Reduced motion changes what renders; capture stability is a separate
-  policy.** `CI=true` and non-TTY stdout show the same static built-in forms,
-  while app reads of `accessibilityReduceMotion` remain unchanged.
+  policy.** `CI=true` and non-TTY stdout show the same static built-in forms
+  in terminal sessions; web sessions animate by default. App reads of
+  `accessibilityReduceMotion` remain unchanged.
 
 ## Not there yet
 
