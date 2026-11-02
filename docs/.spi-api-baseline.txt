@@ -36,7 +36,6 @@ SwiftTUIRuntime.BoundedStepFrameClock.init(maximumStep:)
 SwiftTUIRuntime.BoundedStepFrameClock.now()
 SwiftTUIRuntime.CommittedFrameSample
 SwiftTUIRuntime.DebugBundle
-SwiftTUIRuntime.DebugBundle.announcementLine()
 SwiftTUIRuntime.DebugBundle.bundleFilePath(named:)
 SwiftTUIRuntime.DebugBundle.prepareIfNeeded(configuration:)
 SwiftTUIRuntime.DebugBundle.preparedDirectory

@@ -9,6 +9,7 @@ Run the executable with `--reader`, or export `SWIFTTUI_READER=1` in your shell
 profile. `--no-reader` overrides the environment for one launch. F12 switches
 between the grid and reader while preserving application state. The browser
 companion may remain attached; `--companion off` leaves the reader available.
+Grid-mode launches do not print a reader availability notice.
 
 Type commands followed by Enter. `help` lists them; `quit`, Ctrl-C, or Ctrl-D at
 an empty prompt returns to the shell. Escape discards the current command and

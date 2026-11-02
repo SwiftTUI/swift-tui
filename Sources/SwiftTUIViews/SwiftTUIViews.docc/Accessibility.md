@@ -508,9 +508,9 @@ it. Check reading, action, error recovery, focus, dynamic feedback, color and
 motion on each supported host; naming the container is insufficient.
 
 Interactive terminal launches through `SwiftTUI` or `SwiftTUIWebHostCLI` offer a
-loopback Canvas browser companion before entering full screen. Open the printed
-URL to operate the same running scene, or use `--companion-url` from another
-terminal to retrieve it. The browser uses bundled assets and does not open
+loopback Canvas browser companion without printing a startup notice. Use
+`--companion-url` from another terminal to retrieve its URL, then open it to
+operate the same running scene. The browser uses bundled assets and does not open
 unsolicited. Use `--companion off` to disable it. Redirected/noninteractive
 launches do not start it by default. `--web` selects browser-only hosting.
 The terminal-only `SwiftTUICLI` product does not include WebHost.

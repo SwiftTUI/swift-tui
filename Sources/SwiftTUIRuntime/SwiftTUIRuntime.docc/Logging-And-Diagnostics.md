@@ -103,10 +103,9 @@ tail -F /tmp/myapp-debug/runtime-issues.log
 
 `SWIFTTUI_DEBUG_DIR` names the directory explicitly. With `SWIFTTUI_DEBUG=1`
 (or `--debug`) and no explicit directory, the runtime installs a default
-bundle under `$TMPDIR`, and the terminal runner prints
-`SwiftTUI debug bundle: <dir>` to stderr after teardown restores the primary
-screen — including for sessions that end by throwing, which is exactly when
-the bundle matters. Depending on what is armed, the bundle can contain
+bundle under `$TMPDIR` (or `/tmp`). The terminal runner does not print a bundle
+announcement; set `SWIFTTUI_DEBUG_DIR` to choose a known location. Depending on
+what is armed, the bundle can contain
 `frames.tsv`, `diagnostics.tsv`, `memo.log`, `reuse.log`, `inval.log`,
 `soundness.log`, `profile.tsv`/`profile.jsonl`, `runtime-issues.log`,
 `changes.log` and `changes.jsonl`. Files appear lazily when their streams emit;
@@ -345,8 +344,8 @@ debug bundle when retaining evidence.
 `SWIFTTUI_TRACE` arms the framework's internal diagnostic streams by name
 (`frames`, `memo`, `reuse`, `inval`, `soundness`, `publication`), writing
 each into the debug bundle. You rarely need it day to day; for a bug report,
-`SWIFTTUI_DEBUG=1` and attaching the announced bundle directory is usually
-enough. The full grammar lives in <doc:Environment-Variables>.
+`SWIFTTUI_DEBUG=1 SWIFTTUI_DEBUG_DIR=/tmp/myapp-debug` and attaching that
+directory is usually enough. The full grammar lives in <doc:Environment-Variables>.
 
 ## See Also
 

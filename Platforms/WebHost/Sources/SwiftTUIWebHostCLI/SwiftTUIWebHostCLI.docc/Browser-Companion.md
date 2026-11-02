@@ -5,8 +5,9 @@ Operate the same running terminal app from a browser.
 ## Launch and discovery
 
 On macOS, Linux, and Windows, an interactive `SwiftTUI` app launched with its default
-`App.main()` prints a loopback URL before entering full screen. Open it in a
-browser for Canvas presentation and semantic controls. It uses assets packaged
+`App.main()` starts a loopback companion without printing a startup notice.
+From another terminal, run `myapp --companion-url` to retrieve its URL. Open it
+in a browser for Canvas presentation and semantic controls. It uses assets packaged
 with the executable; Node, Bun, a CDN, and an app-specific web build are unnecessary.
 No browser opens automatically. The page's Scene selector reaches every app scene.
 Only the Canvas painter and semantic accessibility controls ship in this default
@@ -98,7 +99,8 @@ Swift WASM artifact is shared by both renderers.
 
 Run the app on the remote machine with `--companion-port 9134`. In another local
 terminal, forward that same port with `ssh -N -L 9134:127.0.0.1:9134 user@host`.
-Open the printed tokenized `http://127.0.0.1:9134/` URL in the local browser.
+Run `myapp --companion-url` on the remote machine to retrieve the tokenized
+`http://127.0.0.1:9134/` URL, then open it in the local browser.
 The app and terminal remain on the remote machine. If the local port is occupied,
 choose another port for both the app and forwarding. The server stays bound to
 127.0.0.1; `--bind` configures browser-only `--web`, not the companion.

@@ -22,7 +22,6 @@ package final class TerminalReaderSurface: HostGeometryPresentationSurface,
   private var queuedNotices: [String] = []
   private var response: AccessibilityActionResponse?
   private var lastFrame: SemanticHostFrame?
-  private var started = false
 
   package init(terminal: any PresentationSurfaceMetricsProvider, enabled: Bool) {
     self.terminal = terminal
@@ -54,12 +53,7 @@ package final class TerminalReaderSurface: HostGeometryPresentationSurface,
   }
 
   package func enableRawMode() throws {
-    if !started {
-      try output?.write(
-        "Terminal reader available: start with --reader or press F12 in the running app.\r\n")
-    }
     try output?.enableRawMode()
-    started = true
     if isReading { try emit("Sequential terminal reader. Type help then Enter for commands.") }
   }
   package func disableRawMode() throws {

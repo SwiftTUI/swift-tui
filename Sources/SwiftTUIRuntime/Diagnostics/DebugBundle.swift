@@ -24,8 +24,8 @@ import SwiftTUICore
 ///
 /// `SWIFTTUI_DEBUG_DIR` names the directory explicitly. With `--debug` /
 /// `SWIFTTUI_DEBUG=1` and no explicit directory, ``prepareIfNeeded(configuration:)``
-/// installs a session default under `$TMPDIR` (or `/tmp`) and the CLI runner
-/// prints the bundle path to stderr after the terminal is restored.
+/// installs a session default under `$TMPDIR` (or `/tmp`). Bundle creation
+/// does not print to the terminal; use `SWIFTTUI_DEBUG_DIR` to choose a known path.
 /// Unavailable on WASI (no path-based file sinks).
 @MainActor
 @_spi(Runners) public enum DebugBundle {
@@ -64,14 +64,6 @@ import SwiftTUICore
   /// bundle directory is active. Seam for runners (the CLI diagnostics TSV).
   @_spi(Runners) public static func bundleFilePath(named name: String) -> String? {
     DebugLogRouter.resolvedFilePath(override: nil, bundleFileName: name)
-  }
-
-  /// The one-line, post-teardown stderr announcement, or `nil` when this
-  /// session prepared no bundle.
-  @_spi(Runners) public static func announcementLine() -> String? {
-    preparedDirectory.map { directory in
-      "SwiftTUI debug bundle: \(directory)\n"
-    }
   }
 
   /// Test seam: clears the prepared-bundle latch. Pair with

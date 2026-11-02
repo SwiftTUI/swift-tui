@@ -188,8 +188,8 @@ share the standard boolean grammar.
 The debug bundle is the one-stop capture path: one directory that collects
 every armed diagnostic under a fixed name, plus a `manifest.txt` recording
 what was armed. `SWIFTTUI_DEBUG=1` (or `--debug`) with no explicit directory
-installs a default bundle under `$TMPDIR` and the terminal CLI runner prints
-`SwiftTUI debug bundle: <dir>` to stderr after the session ends.
+installs a default bundle under `$TMPDIR` (or `/tmp`) without printing an
+announcement. Set `SWIFTTUI_DEBUG_DIR` to choose a known location.
 
 ```bash
 SWIFTTUI_DEBUG=1 SWIFTTUI_DEBUG_DIR=/tmp/myapp-debug myapp

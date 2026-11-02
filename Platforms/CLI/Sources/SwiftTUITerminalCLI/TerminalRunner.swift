@@ -71,16 +71,9 @@ public enum TerminalRunner {
         throw AppLaunchError.noScenes
       }
 
-      // Announce the debug bundle after the session ends (and after teardown
-      // restored the primary screen), succeed or throw — a crashed session is
-      // exactly when the bundle matters. Screen-deferred runtime issues flush
-      // first for the same reason: they were withheld precisely because the
-      // session owned the screen this stderr write needs.
+      // Report deferred runtime issues after teardown restores the primary screen.
       defer {
         RuntimeIssueSink.flushDeferredStandardErrorIssues()
-        if let announcement = DebugBundle.announcementLine() {
-          FileHandle.standardError.write(Data(announcement.utf8))
-        }
       }
       try await launchApp(
         selections: selections,
@@ -145,15 +138,6 @@ public enum TerminalRunner {
       } catch {
         for runtime in sceneRuntimes { runtime.shutdown() }
         throw CompanionLaunchError(underlying: String(describing: error))
-      }
-      if let companion {
-        FileHandle.standardError.write(
-          Data(
-            ("Browser accessibility companion (same running app): \(companion.url)\n"
-              + "Open or reopen this URL in your browser. No browser opens automatically.\n"
-              + "From another terminal, run this executable with --companion-url to retrieve the URL.\n"
-              + "Use --companion off to disable, or --companion-port 0 for an available port.\n")
-              .utf8))
       }
     } else {
       companion = nil

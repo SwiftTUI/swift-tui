@@ -170,9 +170,10 @@ description.
 ## Beyond the terminal
 
 Interactive macOS/Linux/Windows launches offer a Canvas browser companion for the same
-running app; open the URL printed before full screen (`--companion off` disables
-it). The packaged accessibility surface includes only Canvas and its semantic
-controls; the experimental DOM renderer and its fonts are excluded. To serve
+running app. Run the executable with `--companion-url` from another terminal to
+retrieve its URL (`--companion off` disables it). The packaged accessibility
+surface includes only Canvas and its semantic controls; the experimental DOM
+renderer and its fonts are excluded. To serve
 DOM, build an app-owned browser bundle and select it in your custom launcher;
 see [Browser Companion](Platforms/WebHost/Sources/SwiftTUIWebHostCLI/SwiftTUIWebHostCLI.docc/Browser-Companion.md#opt-into-the-experimental-dom-renderer).
 The same `App` also runs browser-only — launch it with `--web` to serve it over localhost, or compile it with the

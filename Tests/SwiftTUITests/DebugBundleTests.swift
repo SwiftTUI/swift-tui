@@ -6,7 +6,7 @@ import Testing
 /// Units for the `--debug` / `SWIFTTUI_DEBUG_DIR` session bundle: one
 /// directory that collects every armed diagnostic under a fixed name plus a
 /// `manifest.txt`. These pin the arming rules (debug off ⇒ inert) and the
-/// manifest/announcement contract the CLI runner prints after teardown.
+/// manifest written into the bundle.
 @MainActor
 @Suite("Debug bundle", .serialized)
 struct DebugBundleTests {
@@ -23,10 +23,9 @@ struct DebugBundleTests {
     DebugBundle.prepareIfNeeded(configuration: .default)
 
     #expect(DebugBundle.preparedDirectory == nil)
-    #expect(DebugBundle.announcementLine() == nil)
   }
 
-  @Test("debug on installs a default bundle with a manifest and announcement")
+  @Test("debug on installs a default bundle with a manifest")
   func debugOnInstallsDefaultBundle() throws {
     resetProcessState()
     defer {
@@ -40,7 +39,6 @@ struct DebugBundleTests {
 
     let directory = try #require(DebugBundle.preparedDirectory)
     #expect(directory.contains("swifttui"))
-    #expect(DebugBundle.announcementLine() == "SwiftTUI debug bundle: \(directory)\n")
     #expect(DebugBundle.bundleFilePath(named: "frames.tsv") == directory + "/frames.tsv")
 
     let manifest = try String(contentsOfFile: directory + "/manifest.txt", encoding: .utf8)
