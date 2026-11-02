@@ -15,14 +15,6 @@ struct CollectionSupportTests {
         #expect(layoutText(for: cell, width: nil).size.width == 1)
       }
     }
-    let columns = [TableColumn("界", width: 1), TableColumn("End", width: 3)]
-    for header in [false, true] {
-      let row = formattedTableLine(
-        cells: [glyph, "xyz"], widths: [1, 3],
-        columns: columns, usesTitleAlignment: header)
-      #expect(row == "… | xyz")
-      #expect(layoutText(for: row, width: nil).size.width == 7)
-    }
   }
 
   @Test("picker selection helpers support exact and optional matches")
@@ -40,30 +32,6 @@ struct CollectionSupportTests {
     #expect(pickerSelectionMatches(nonOptionalTag, selection: Optional<Int>.some(3)))
     #expect(pickerSelectionValue(from: nonOptionalTag, as: Optional<Int>.self) == .some(3))
     #expect(!pickerSelectionMatches(nonOptionalTag, selection: Optional<Int>.none))
-  }
-
-  @Test("table formatting helpers honor width and alignment")
-  func tableFormattingHelpersHonorWidthAndAlignment() {
-    let columns = [
-      TableColumn("Name", width: 6, alignment: .leading),
-      TableColumn("Score", width: 5, alignment: .trailing, titleAlignment: .center),
-    ]
-
-    let row = formattedTableLine(
-      cells: ["Ada", "42"],
-      widths: [6, 5],
-      columns: columns
-    )
-    let header = formattedTableLine(
-      cells: ["Name", "Score"],
-      widths: [6, 5],
-      columns: columns,
-      usesTitleAlignment: true
-    )
-
-    #expect(row == "Ada    |    42")
-    #expect(header == "Name   | Score")
-    #expect(paddedTableCell("toolong", width: 4, alignment: .leading) == "too…")
   }
 
   @Test("collection text extraction flattens nested text nodes")
@@ -92,18 +60,6 @@ struct CollectionSupportTests {
     )
 
     #expect(resolvedNodeLabelText(from: node) == "Alpha Beta")
-    #expect(
-      tableRowCells(
-        from: ResolvedNode(
-          identity: testIdentity("Row"),
-          kind: .view("TableRow"),
-          children: [
-            .init(identity: testIdentity("Row", "0"), kind: .view("Text"), drawPayload: .text("A")),
-            .init(identity: testIdentity("Row", "1"), kind: .view("Text"), drawPayload: .text("B")),
-          ]
-        )
-      ) == ["A", "B"]
-    )
   }
 
   @Test("collection text extraction flattens rich text payloads to visible text")

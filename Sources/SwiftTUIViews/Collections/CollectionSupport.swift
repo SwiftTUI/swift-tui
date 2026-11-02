@@ -404,12 +404,6 @@ func listItemPayload(
   )
 }
 
-func tableRowCells(
-  from node: ResolvedNode
-) -> [String] {
-  tableRowCellPayloads(from: node).map(\.text)
-}
-
 func tableRowCellPayloads(
   from node: ResolvedNode
 ) -> [TableCellPayload] {
@@ -432,56 +426,6 @@ func tableRowCellPayloads(
   }
 }
 
-func resolvedTableColumnWidths(
-  columns: [TableColumn],
-  rows: [TableRowPayload]
-) -> [Int] {
-  measureTableColumnWidths(
-    columns: columns.map { column in
-      .init(
-        title: column.title,
-        width: column.width,
-        alignment: resolvedTableCellAlignment(from: column.alignment),
-        titleAlignment: resolvedTableCellAlignment(from: column.titleAlignment)
-      )
-    },
-    rows: rows
-  )
-}
-
-func formattedTableLine(
-  cells: [String],
-  widths: [Int],
-  columns: [TableColumn],
-  usesTitleAlignment: Bool = false
-) -> String {
-  renderTableLine(
-    cells: cells,
-    widths: widths,
-    columns: columns.map { column in
-      .init(
-        title: column.title,
-        width: column.width,
-        alignment: resolvedTableCellAlignment(from: column.alignment),
-        titleAlignment: resolvedTableCellAlignment(from: column.titleAlignment)
-      )
-    },
-    usesTitleAlignment: usesTitleAlignment
-  )
-}
-
-func paddedTableCell(
-  _ content: String,
-  width: Int,
-  alignment: TableColumnAlignment
-) -> String {
-  renderTableCell(
-    content,
-    width: width,
-    alignment: resolvedTableCellAlignment(from: alignment)
-  )
-}
-
 private func taggedListRowNodes(
   in node: ResolvedNode
 ) -> [ResolvedNode] {
@@ -493,18 +437,6 @@ private func taggedListRowNodes(
     tagged.append(contentsOf: taggedListRowNodes(in: child))
   }
   return tagged
-}
-
-private func resolvedTableCellAlignment(
-  from alignment: TableColumnAlignment
-) -> TableCellAlignment {
-  if alignment == .center {
-    return .center
-  }
-  if alignment == .trailing {
-    return .trailing
-  }
-  return .leading
 }
 
 /// Postorder transformation of resolved collection content without native recursion.
