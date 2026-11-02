@@ -1,3 +1,5 @@
+import Synchronization
+
 /// Fingerprint of a lazy container's element-identity sequence, compared by
 /// the resolve/measure/place equivalence gates to prove the container's data
 /// membership and order unchanged.
@@ -80,6 +82,8 @@ package protocol IndexedChildSource: Sendable {
   var measurementSignature: IndexedChildMeasurementSignature { get }
   var canRunOnWorker: Bool { get }
   var workerResolvedChildren: [ResolvedNode]? { get }
+  /// Shared derived widths survive transitions between live and worker sources.
+  var tableColumnWidthRetention: TableColumnWidthRetention? { get }
 
   func child(at index: Int) -> ResolvedNode
 
@@ -146,6 +150,7 @@ package protocol IndexedChildSource: Sendable {
 extension IndexedChildSource {
   package var canRunOnWorker: Bool { false }
   package var workerResolvedChildren: [ResolvedNode]? { nil }
+  package var tableColumnWidthRetention: TableColumnWidthRetention? { nil }
 
   package func childElements(at index: Int) -> [ResolvedNode] {
     [child(at: index)]
@@ -188,7 +193,8 @@ extension IndexedChildSource {
     columns: [TableColumnPayload],
     discovered: [Int]
   ) -> [Int] {
-    discovered
+    tableColumnWidthRetention?.merge(columns: columns, discovered: discovered)
+      ?? discovered.map { min(maximumTableColumnWidth, max(1, $0)) }
   }
 
   package func beginHostedTableColumnDiscovery() {}
@@ -293,6 +299,8 @@ package struct IndexedChildSourceSnapshot: IndexedChildSource {
   private let identities: [Identity]
   private let tags: [SelectionTag?]
   private let segments: [Identity]
+  package let tableColumnWidthRetention: TableColumnWidthRetention?
+  private let tableApplication = TableColumnWidthApplication()
 
   package init(
     identityRoot: Identity,
@@ -306,6 +314,7 @@ package struct IndexedChildSourceSnapshot: IndexedChildSource {
     identities = children.map(\.identity)
     tags = children.map { _ in nil }
     segments = children.map { _ in identityRoot }
+    tableColumnWidthRetention = TableColumnWidthRetention()
   }
 
   package init(
@@ -315,7 +324,8 @@ package struct IndexedChildSourceSnapshot: IndexedChildSource {
     elements: [[ResolvedNode]],
     identities: [Identity],
     tags: [SelectionTag?],
-    segments: [Identity]
+    segments: [Identity],
+    tableColumnWidthRetention: TableColumnWidthRetention? = nil
   ) {
     precondition(
       children.count == elements.count && elements.count == identities.count
@@ -327,6 +337,7 @@ package struct IndexedChildSourceSnapshot: IndexedChildSource {
     self.identities = identities
     self.tags = tags
     self.segments = segments
+    self.tableColumnWidthRetention = tableColumnWidthRetention ?? TableColumnWidthRetention()
   }
 
   package var count: Int {
@@ -342,13 +353,89 @@ package struct IndexedChildSourceSnapshot: IndexedChildSource {
   }
 
   package func child(at index: Int) -> ResolvedNode {
-    children[index]
+    tableApplication.state.withLock { state in
+      guard let widths = state.widths else { return children[index] }
+      if let cached = state.children[index] { return cached }
+      let child = applyingHostedTableColumnWidths(widths, to: children[index])
+      state.children[index] = child
+      return child
+    }
   }
 
-  package func childElements(at index: Int) -> [ResolvedNode] { elements[index] }
+  package func childElements(at index: Int) -> [ResolvedNode] {
+    tableApplication.state.withLock { state in
+      guard let widths = state.widths else { return elements[index] }
+      return elements[index].map { applyingHostedTableColumnWidths(widths, to: $0) }
+    }
+  }
+
+  package func beginHostedTableColumnDiscovery() {
+    tableApplication.state.withLock {
+      $0.widths = nil
+      $0.children.removeAll(keepingCapacity: true)
+    }
+  }
+
+  package func applyHostedTableColumnWidths(_ widths: [Int]) {
+    tableApplication.state.withLock {
+      $0.widths = widths
+      $0.children.removeAll(keepingCapacity: true)
+    }
+  }
   package func elementIdentity(at index: Int) -> Identity { identities[index] }
   package func elementSelectionTag(at index: Int) -> SelectionTag? { tags[index] }
   package func estimationSegment(at index: Int) -> Identity { segments[index] }
+}
+
+/// Source-retained, derived high-water values. Only this small value cache is
+/// shared with workers; authored rows and their main-actor resolve contexts are not.
+package final class TableColumnWidthRetention: Sendable {
+  private struct State {
+    var columns: [TableColumnPayload]?
+    var widths: [Int] = []
+  }
+  private let state = Mutex(State())
+
+  package init() {}
+
+  package func merge(columns: [TableColumnPayload], discovered: [Int]) -> [Int] {
+    state.withLock { state in
+      let bounded = discovered.map { min(maximumTableColumnWidth, max(1, $0)) }
+      if state.columns != columns || state.widths.count != bounded.count {
+        state.columns = columns
+        state.widths = bounded
+      } else {
+        state.widths = zip(state.widths, bounded).map(max)
+      }
+      return state.widths
+    }
+  }
+}
+
+private final class TableColumnWidthApplication: Sendable {
+  struct State {
+    var widths: [Int]?
+    var children: [Int: ResolvedNode] = [:]
+  }
+  let state = Mutex(State())
+}
+
+package func applyingHostedTableColumnWidths(
+  _ widths: [Int],
+  to source: ResolvedNode
+) -> ResolvedNode {
+  var node = source
+  node.children = node.children.enumerated().map { index, child in
+    var child = applyingHostedTableColumnWidths(widths, to: child)
+    if child.kind == .view("HostedTableCell"),
+      case .frame(_, let height, let alignment) = child.layoutBehavior,
+      widths.indices.contains(index)
+    {
+      child.layoutBehavior = .frame(width: widths[index], height: height, alignment: alignment)
+    }
+    return child
+  }
+  return node
 }
 
 extension ResolvedNode {

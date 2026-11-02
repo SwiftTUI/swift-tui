@@ -375,9 +375,9 @@ extension LayoutEngine {
     for rowMeasurement in measurements {
       for (columnIndex, cellMeasurement) in rowMeasurement.childMeasurements.enumerated()
       where discovered.indices.contains(columnIndex) {
-        discovered[columnIndex] = max(
-          discovered[columnIndex],
-          cellMeasurement.measuredSize.width
+        discovered[columnIndex] = min(
+          maximumTableColumnWidth,
+          max(discovered[columnIndex], cellMeasurement.measuredSize.width)
         )
       }
     }

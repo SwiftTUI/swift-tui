@@ -1,3 +1,7 @@
+/// The widest table column in cells, matching the raster surface extent.
+/// Table lines allocate padding at these widths, including automatic widths.
+package let maximumTableColumnWidth = 1 << 16
+
 /// Horizontal alignment used by low-level table payloads.
 public enum TableCellAlignment: String, Equatable, Sendable {
   case leading

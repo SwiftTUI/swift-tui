@@ -240,8 +240,7 @@ private final class ForEachSourceIdentityArtifacts<ID: Hashable & Sendable>:
   /// Element index by id, so locating a selected row is a hash lookup rather
   /// than a scan of the whole dataset.
   let indexByID: [ID: Int]
-  var tableColumns: [TableColumnPayload]?
-  var tableColumnWidths: [Int] = []
+  let tableColumnWidthRetention = TableColumnWidthRetention()
   /// The integer-range id-space witness these artifacts were verified over,
   /// when the minting (or a later element-wise-verified adopting) resolve
   /// proved one (R4-A). Non-nil means `ids == Array(range)` for the witness's
@@ -558,23 +557,9 @@ where Data: RandomAccessCollection, ID: Hashable & Sendable, Content: View {
     }
   }
 
-  nonisolated package func retainedTableColumnWidths(
-    columns: [TableColumnPayload],
-    discovered: [Int]
-  ) -> [Int] {
-    withCheckedMainActorAccess("IndexedChildSource.retainedTableColumnWidths") {
-      if identityArtifacts.tableColumns != columns
-        || identityArtifacts.tableColumnWidths.count != discovered.count
-      {
-        identityArtifacts.tableColumns = columns
-        identityArtifacts.tableColumnWidths = discovered
-      } else {
-        identityArtifacts.tableColumnWidths = zip(
-          identityArtifacts.tableColumnWidths,
-          discovered
-        ).map(max)
-      }
-      return identityArtifacts.tableColumnWidths
+  nonisolated package var tableColumnWidthRetention: TableColumnWidthRetention? {
+    withCheckedMainActorAccess("IndexedChildSource.tableColumnWidthRetention") {
+      identityArtifacts.tableColumnWidthRetention
     }
   }
 
@@ -695,11 +680,8 @@ package final class HostedCollectionIndexedChildSource: IndexedChildSource {
     base.elementIndex(forSelectionTag: tag)
   }
 
-  nonisolated package func retainedTableColumnWidths(
-    columns: [TableColumnPayload],
-    discovered: [Int]
-  ) -> [Int] {
-    base.retainedTableColumnWidths(columns: columns, discovered: discovered)
+  nonisolated package var tableColumnWidthRetention: TableColumnWidthRetention? {
+    base.tableColumnWidthRetention
   }
 
   nonisolated package func beginHostedTableColumnDiscovery() {
@@ -715,25 +697,6 @@ package final class HostedCollectionIndexedChildSource: IndexedChildSource {
       widenedCache.removeAll(keepingCapacity: true)
     }
   }
-}
-
-@MainActor
-private func applyingHostedTableColumnWidths(
-  _ widths: [Int],
-  to source: ResolvedNode
-) -> ResolvedNode {
-  var node = source
-  node.children = node.children.enumerated().map { index, child in
-    var child = applyingHostedTableColumnWidths(widths, to: child)
-    if child.kind == .view("HostedTableCell"),
-      case .frame(_, let height, let alignment) = child.layoutBehavior,
-      widths.indices.contains(index)
-    {
-      child.layoutBehavior = .frame(width: widths[index], height: height, alignment: alignment)
-    }
-    return child
-  }
-  return node
 }
 
 extension ForEach: IndexedChildSourceView {

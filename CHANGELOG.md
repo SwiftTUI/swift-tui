@@ -12,6 +12,11 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
 
 ### Fixed
 
+- Tables keep cells aligned with their columns on worker-rendered frames,
+  discover wider rows after scrolling, and retain their widest columns across
+  worker and main-actor frames (STUI-1401).
+- Automatic table columns obey the same 65,536-cell limit as fixed columns,
+  including hosted discovery, bounding padding for oversized content (STUI-1402).
 - Validation scrolling stays aligned after native focus reveals a field,
   including frames that reuse layout, so the complete field and its error
   remain visible in narrow hosted forms (STUI-1409).

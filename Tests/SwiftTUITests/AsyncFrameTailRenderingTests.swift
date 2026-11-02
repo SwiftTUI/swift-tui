@@ -23,6 +23,52 @@ extension VerticalAlignment {
 @MainActor
 @Suite(.serialized)
 struct AsyncFrameTailRenderingTests {
+  @Test("interactive worker table retains widths when selection scrolls the widest row away")
+  func workerTableRetainsWidthsAcrossFrames() async throws {
+    let identity = testIdentity("AsyncTableColumnWidths")
+    let terminal = AsyncFrameTailTerminalHost(size: .init(width: 48, height: 10))
+    let state = StateContainer(initialState: 0, invalidationIdentities: [identity])
+    let renderer = DefaultRenderer()
+    let loop = RunLoop(
+      rootIdentity: identity,
+      renderer: renderer,
+      presentationSurface: terminal,
+      terminalInputReader: InjectedTerminalInputReader(),
+      scheduler: FrameScheduler(),
+      stateContainer: state,
+      focusTracker: FocusTracker(invalidationIdentities: [identity]),
+      proposal: terminal.proposal,
+      viewBuilder: { selected, _ in
+        Table(
+          0..<40, id: \.self, selection: .constant(Optional(selected)),
+          columns: [.init("Value"), .init("Tail")]
+        ) { row in
+          Text(row == 30 ? "wide-value-0000000" : "x")
+          Text("t\(row)")
+        }
+      })
+    var rendered = 0
+    func frame(selecting index: Int) async throws -> String {
+      state.replace(with: index)
+      loop.scheduler.requestInvalidation(of: [identity])
+      try await loop.renderPendingFramesAsync(renderedFrames: &rendered)
+      return try #require(terminal.frames.last)
+    }
+    func tailOffset(_ frame: String) throws -> Int {
+      let header = try #require(frame.split(separator: "\n").first { $0.contains("Tail") })
+      let position = try #require(header.range(of: "Tail")?.lowerBound)
+      return header.distance(from: header.startIndex, to: position)
+    }
+    let initial = try await frame(selecting: 0)
+    let wide = try await frame(selecting: 30)
+    #expect(wide.contains("wide-value-0000000"))
+    #expect(try tailOffset(wide) > tailOffset(initial))
+    let narrow = try await frame(selecting: 0)
+    #expect(!narrow.contains("wide-value-0000000"))
+    #expect(try tailOffset(narrow) == tailOffset(wide))
+    #expect(try tailOffset(await frame(selecting: 30)) == tailOffset(wide))
+  }
+
   @Test("worker-snapshot element budget scales with the root bound, defaults unbounded")
   func workerSnapshotElementBudgetScalesWithRootBound() {
     // Proposal 2026-07-13-002 Stage 2.2b: past this budget the frame head

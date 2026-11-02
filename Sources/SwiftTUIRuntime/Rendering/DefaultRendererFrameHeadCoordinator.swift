@@ -818,6 +818,9 @@ package func indexedChildSourceWorkerSnapshot(
     return node
   }
 
+  // The canonical source may have widths applied by an earlier committed
+  // frame. Freeze its original rows so worker discovery can still widen them.
+  source.beginHostedTableColumnDiscovery()
   let elements = (0..<source.count).map { index in
     source.childElements(at: index).map(indexedChildSourceWorkerSnapshot(of:))
   }
@@ -828,7 +831,8 @@ package func indexedChildSourceWorkerSnapshot(
     elements: elements,
     identities: (0..<source.count).map { source.elementIdentity(at: $0) },
     tags: (0..<source.count).map { source.elementSelectionTag(at: $0) },
-    segments: (0..<source.count).map { source.estimationSegment(at: $0) }
+    segments: (0..<source.count).map { source.estimationSegment(at: $0) },
+    tableColumnWidthRetention: source.tableColumnWidthRetention
   )
   return node
 }
