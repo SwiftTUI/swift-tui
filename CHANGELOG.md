@@ -8,6 +8,24 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
 
 ## [Unreleased]
 
+## [0.20.1] - 2026-11-01
+
+### Fixed
+
+- Validation scrolling stays aligned after native focus reveals a field,
+  including frames that reuse layout, so the complete field and its error
+  remain visible in narrow hosted forms (STUI-1409).
+- Terminal sessions no longer print unsolicited browser-companion, reader,
+  or debug-bundle notices at startup or exit. Explicit reader output and
+  deferred runtime issue reporting remain available (STUI-1408).
+
+### Tests and documentation
+
+- Add fixed-viewport canvas editing benchmarks and measure gallery tab switches
+  and counter clicks individually for interaction-latency evidence.
+- Clarify that automatic stable output for CI or non-TTY stdout applies to
+  terminal sessions; web-hosted sessions animate by default.
+
 ## [0.20.0] - 2026-10-30
 
 ### Changed
@@ -2847,7 +2865,8 @@ precomposition work (still images), cache hardening, and glyph-aware backdrops.
 See the GitHub releases for the full per-tag history:
 <https://github.com/SwiftTUI/swift-tui/releases>.
 
-[Unreleased]: https://github.com/SwiftTUI/swift-tui/compare/0.20.0...HEAD
+[Unreleased]: https://github.com/SwiftTUI/swift-tui/compare/0.20.1...HEAD
+[0.20.1]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.20.1
 [0.20.0]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.20.0
 [0.19.5]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.19.5
 [0.19.4]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.19.4
