@@ -8,6 +8,98 @@ import Testing
 @MainActor
 @Suite(.serialized)
 struct HostedSceneSessionTests {
+  private struct ValidationScrollApp: App {
+    var body: some Scene {
+      WindowGroup(id: "validation") { ValidationScrollForm() }
+    }
+  }
+
+  private struct ValidationScrollForm: View {
+    @State private var name = ""
+    @State private var suite = ""
+    @State private var submitted = false
+    @FocusState private var focus: String?
+
+    var body: some View {
+      ScrollViewReader { proxy in
+        ScrollView {
+          VStack(alignment: .leading, spacing: 1) {
+            VStack(alignment: .leading, spacing: 0) {
+              Text("Name")
+              TextField("Agent name", text: $name).focused($focus, equals: "name")
+              if submitted && name.isEmpty { Text("Enter an agent name.") }
+            }.id("name")
+            Text("Details").frame(height: 6)
+            VStack(alignment: .leading, spacing: 0) {
+              Text("Test suite")
+              TextField("Test suite", text: $suite).focused($focus, equals: "suite")
+              if submitted && suite.isEmpty { Text("Enter a test suite.") }
+            }.id("suite")
+            Text("Start immediately").frame(height: 8)
+          }
+        }
+        .scrollIndicators(.hidden)
+        .onAppear { focus = "name" }
+        .onKeyPress(.character("s"), modifiers: .ctrl) { _ in
+          submitted = true
+          focus = name.isEmpty ? "name" : "suite"
+          return .handled
+        }
+        .onChange(of: focus) {
+          if let focus { proxy.scrollTo(focus, anchor: .top) }
+        }
+        .onChange(of: submitted) {
+          if let focus { proxy.scrollTo(focus, anchor: .top) }
+        }
+      }
+    }
+  }
+
+  @Test("validation scrolls the focused field and its error into a narrow hosted viewport")
+  func validationScrollAfterNativeFocusReveal() async throws {
+    let recorder = SemanticFrameRecorder()
+    let surface = HostedRasterSurface(
+      surfaceSize: CellSize(width: 32, height: 5), appearance: .fallback,
+      onFrame: { recorder.record($0) })
+    let session = try HostedSceneSession(
+      for: ValidationScrollApp(), sceneID: "validation", surface: surface)
+    let task = Task { try await session.start() }
+    defer { session.stop() }
+
+    func wait(_ label: String, until predicate: @escaping @MainActor () -> Bool) async throws {
+      try await withStageBudget(label, within: .init(stages: 1), on: ManualStageClock()) {
+        await recorder.updates.wait(until: predicate)
+      }
+    }
+    try await wait("initial field focus") {
+      guard let frame = recorder.frames.last else { return false }
+      return frame.snapshot.accessibilityNodes.contains {
+        $0.identity == frame.focused && $0.label == "Agent name"
+      }
+    }
+    session.send(.key(.init(.character("s"), modifiers: .ctrl)))
+    try await wait("first invalid field") {
+      recorder.latestSurface?.lines.contains { $0.contains("Enter an agent name.") } == true
+    }
+    session.sendInput(Array("Verifier".utf8))
+    try await wait("corrected first field") {
+      recorder.latestSurface?.lines.contains { $0.contains("Verifier") } == true
+    }
+    session.send(.key(.init(.character("s"), modifiers: .ctrl)))
+    try await wait("remaining invalid field focus") {
+      guard let frame = recorder.frames.last else { return false }
+      return frame.snapshot.accessibilityNodes.contains {
+        $0.identity == frame.focused && $0.label == "Test suite"
+      }
+    }
+    let text = recorder.latestSurface?.lines.joined(separator: "\n") ?? ""
+    #expect(text.contains("Test suite"), "\(text)")
+    #expect(text.contains("Enter a test suite."), "\(text)")
+    #expect(!text.contains("Enter an agent name."), "\(text)")
+    session.stop()
+    #expect(try await task.value == .inputEnded)
+  }
+
   private struct HostedApp: App {
     var body: some Scene {
       WindowGroup("Primary", id: WindowIdentifier("primary")) {

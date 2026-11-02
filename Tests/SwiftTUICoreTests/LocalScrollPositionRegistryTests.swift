@@ -7,6 +7,57 @@ import Testing
 @Suite
 struct LocalScrollPositionRegistryTests {
   @Test(
+    "a target command after focus reveal uses the offset that placed its rectangle",
+    arguments: ScrollTargetPublication.allCases)
+  private func targetCommandAfterFocusReveal(publication: ScrollTargetPublication) {
+    let registry = LocalScrollPositionRegistry()
+    let scroll = testIdentity("ValidationForm")
+    let field = scroll.child(.named("Field"))
+    let input = field.child(.named("Input"))
+    var offset = ScrollOffset.zero
+    registry.register(identity: scroll, currentOffset: { offset }, applyOffset: { offset = $0 })
+    let route = ScrollRoute(
+      identity: scroll,
+      viewportRect: CellRect(origin: .zero, size: CellSize(width: 32, height: 5)),
+      contentBounds: CellRect(origin: .zero, size: CellSize(width: 32, height: 20)))
+    let inputRect = CellRect(origin: CellPoint(x: 0, y: 12), size: CellSize(width: 20, height: 1))
+    #expect(
+      registry.sync(
+        focusedIdentity: input, focusRegions: [FocusRegion(identity: input, rect: inputRect)],
+        scrollRoutes: [route],
+        scrollTargets: [
+          ScrollTarget(
+            identity: field, scrollIdentity: scroll,
+            rect: CellRect(origin: CellPoint(x: 0, y: 10), size: CellSize(width: 20, height: 4))),
+          ScrollTarget(identity: input, scrollIdentity: scroll, rect: inputRect),
+        ]))
+    #expect(offset == ScrollOffset(y: 8))
+
+    if publication != .placed {
+      let registrations = registry.snapshot()
+      registry.preservingGeometry {
+        if publication == .elidedFull {
+          registry.reset()
+        } else {
+          registry.removeSubtrees(rootedAt: [scroll])
+        }
+        registry.restore(registrations)
+      }
+    }
+
+    // The validation callback reveals the entire field, including its error,
+    // after native focus has revealed only the input. No layout has run yet.
+    #expect(
+      registry.scrollToTarget(
+        ScrollTargetQuery(identity: field), anchor: .top, scopeIdentity: scroll))
+    #expect(offset == ScrollOffset(y: 10))
+    #expect(
+      !registry.scrollToTarget(
+        ScrollTargetQuery(identity: field), anchor: .top, scopeIdentity: scroll))
+    #expect(offset == ScrollOffset(y: 10))
+  }
+
+  @Test(
     "a registered route with missing geometry never selects a nested route",
     arguments: [false, true])
   func missingGeometryDoesNotRedirectCommands(reRooted: Bool) {
@@ -1104,6 +1155,10 @@ struct LocalScrollPositionRegistryTests {
     #expect(offset == .init(x: 1, y: 4))
     #expect(enriched[1].contentOffset == .zero)
   }
+}
+
+private enum ScrollTargetPublication: CaseIterable {
+  case placed, elidedFull, elidedSubtree
 }
 
 private enum ScrollNormalizationInput: CaseIterable {

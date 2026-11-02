@@ -120,6 +120,9 @@ placed ancestor; recovery never makes all offscreen rows focus targets. The scro
 registry retains synchronized offsets, binding source tokens and pending command
 intent so deliberate scroll input takes precedence over recovery for unchanged focus. Nested reveal
 follows the existing scroll-target containment links through enclosing viewports.
+Placed target rectangles retain the offset from their geometry publication, separately
+from the offset after focus synchronization. Subsequent target commands translate
+from that placement offset, including when an elided frame retains the geometry.
 
 `SwiftTUI/swift-tui` is one SwiftPM package. Browser TypeScript source,
 examples, and the public website can live in sibling organization repositories.

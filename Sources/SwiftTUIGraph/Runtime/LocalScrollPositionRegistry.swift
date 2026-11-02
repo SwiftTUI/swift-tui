@@ -81,6 +81,9 @@ package final class LocalScrollPositionRegistry: Equatable {
   private var registrations: [Identity: ScrollPositionRegistrationSnapshot] = [:]
   private var latestScrollRoutes: [ScrollRoute] = []
   private var latestScrollTargets: [ScrollTarget] = []
+  /// Offsets when the latest geometry was published, before sync applies focus
+  /// reveal or deferred commands. Those writes move the binding, not the rects.
+  private var latestPlacedOffsets: [Identity: ScrollOffset] = [:]
   private struct PendingLazyTarget {
     var query: ScrollTargetQuery
     var anchor: UnitPoint?
@@ -208,6 +211,10 @@ package final class LocalScrollPositionRegistry: Equatable {
   ) {
     latestScrollRoutes = scrollRoutes
     latestScrollTargets = scrollTargets
+    latestPlacedOffsets = Dictionary(
+      uniqueKeysWithValues: scrollRoutes.compactMap { route in
+        registrations[route.identity].map { (route.identity, $0.currentOffset()) }
+      })
   }
 
   /// An elided frame republishes handlers without producing new geometry.
@@ -216,8 +223,11 @@ package final class LocalScrollPositionRegistry: Equatable {
   package func preservingGeometry<Result>(during update: () -> Result) -> Result {
     let routes = latestScrollRoutes
     let targets = latestScrollTargets
+    let offsets = latestPlacedOffsets
     defer {
-      updateGeometry(scrollRoutes: routes, scrollTargets: targets)
+      latestScrollRoutes = routes
+      latestScrollTargets = targets
+      latestPlacedOffsets = offsets
     }
     return update()
   }
@@ -514,7 +524,7 @@ package final class LocalScrollPositionRegistry: Equatable {
         anchor: anchor,
         route: route,
         registration: registration,
-        placedAt: lastSyncedPositions[route.identity]?.offset
+        placedAt: latestPlacedOffsets[route.identity]
       )
       if target.isEstimated {
         pendingLazyTargets[route.identity] = .init(
@@ -1054,6 +1064,7 @@ package final class LocalScrollPositionRegistry: Equatable {
     registrations.removeAll(keepingCapacity: true)
     latestScrollRoutes.removeAll(keepingCapacity: true)
     latestScrollTargets.removeAll(keepingCapacity: true)
+    latestPlacedOffsets.removeAll(keepingCapacity: true)
     // `reset()` is the run loop's per-frame full registration republication, not
     // a teardown — the same scroll routes are re-registered immediately after.
     // `lastRevealAnchors` is focus-reveal interaction state that must SURVIVE
@@ -1077,6 +1088,9 @@ package final class LocalScrollPositionRegistry: Equatable {
     }
     latestScrollRoutes.removeAll {
       identityMatchesAnySubtreeRoot($0.identity, roots: roots)
+    }
+    latestPlacedOffsets = latestPlacedOffsets.filter {
+      !identityMatchesAnySubtreeRoot($0.key, roots: roots)
     }
     latestScrollTargets.removeAll {
       identityMatchesAnySubtreeRoot($0.identity, roots: roots)
