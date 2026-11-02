@@ -21,7 +21,7 @@ struct AnimationControllerSnapshotTests {
     )
 
     let snapshot = AnimatableSnapshot.extract(from: node)
-    #expect(snapshot.foregroundColor == Color.red)
+    #expect(snapshot[.foregroundShapeStyle]?.unwrap(as: Color.self) == Color.red)
   }
 
   @Test("falls back to environment snapshot when local drawMetadata has no foreground")
@@ -42,7 +42,7 @@ struct AnimationControllerSnapshotTests {
 
     let snapshot = AnimatableSnapshot.extract(from: node)
     #expect(
-      snapshot.foregroundColor == Color.blue,
+      snapshot[.foregroundShapeStyle]?.unwrap(as: Color.self) == Color.blue,
       "environment-carried foreground styles must be extracted so `.foregroundStyle(color)` on non-Text views animates"
     )
   }
@@ -59,7 +59,7 @@ struct AnimationControllerSnapshotTests {
     )
 
     let snapshot = AnimatableSnapshot.extract(from: node)
-    #expect(snapshot.borderColor == Color.green)
+    #expect(snapshot[.borderShapeStyle]?.unwrap(as: Color.self) == Color.green)
   }
 
   @Test("removal snapshots carry transient-removal edge role")
@@ -105,7 +105,7 @@ struct AnimationControllerSnapshotTests {
     )
 
     let snapshot = AnimatableSnapshot.extract(from: node)
-    #expect(snapshot.foregroundColor == Color.red)
+    #expect(snapshot[.foregroundShapeStyle]?.unwrap(as: Color.self) == Color.red)
   }
 }
 
@@ -1757,7 +1757,7 @@ struct AnimationControllerPropertyTests {
     // Extract sanity check.
     let extracted = AnimatableSnapshot.extract(from: frame1)
     #expect(
-      extracted.frameWidth == 100,
+      extracted[.frameWidth]?.unwrap(as: Int.self) == 100,
       "maxWidth takes priority over minWidth in the extracted frameWidth"
     )
 

@@ -174,33 +174,8 @@ package struct AnimatableSnapshot: Sendable {
     return snapshot
   }
 
-  /// Back-compat shim: a lot of pre-Phase-3 tests assert on
-  /// `snapshot.foregroundColor` directly.  Expose a computed accessor
-  /// that unwraps the ``.foregroundShapeStyle`` slot when it happens to
-  /// carry a plain `Color`, so the assertion set doesn't have to move
-  /// wholesale to the new subscript form.
-  package var foregroundColor: Color? {
-    self[.foregroundShapeStyle]?.unwrap(as: Color.self)
-  }
-
-  package var backgroundColor: Color? {
-    self[.backgroundShapeStyle]?.unwrap(as: Color.self)
-  }
-
-  package var borderColor: Color? {
-    self[.borderShapeStyle]?.unwrap(as: Color.self)
-  }
-
   package var opacity: Double? {
     self[.opacity]?.unwrap(as: Double.self)
-  }
-
-  package var frameWidth: Int? {
-    self[.frameWidth]?.unwrap(as: Int.self)
-  }
-
-  package var frameHeight: Int? {
-    self[.frameHeight]?.unwrap(as: Int.self)
   }
 
   /// The stroke style a node draws with, from whichever of the three places
