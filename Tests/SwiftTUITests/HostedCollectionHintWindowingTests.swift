@@ -103,6 +103,33 @@ struct HostedCollectionHintWindowingTests {
     #expect(cliffIssues.count == 1, "exactly one issue per identity per pass")
   }
 
+  @Test("a bounded stack can request an unbounded collection ideal")
+  func boundedStackStillReportsExhaustiveIdealProbe() {
+    IndexedChildRealizationProbe.reset()
+    let artifacts = DefaultRenderer().render(
+      VStack(spacing: 0) {
+        Text("Header")
+        List(0..<100, id: \.self) { Text("row \($0)") }
+          .frame(maxHeight: .infinity)
+        Text("Footer")
+      }
+      .frame(width: 20, height: 8),
+      context: .init(identity: testIdentity("BoundedStackList"), applyEnvironmentValues: false),
+      proposal: .init(width: 20, height: 8)
+    )
+
+    // The stack asks for each child's ideal height before allocating its
+    // finite space. This diagnostic reports real work during that probe,
+    // even though neither the authored frame nor the final viewport is unbounded.
+    #expect(IndexedChildRealizationProbe.realizedChildCount == 100)
+    #expect(artifacts.rasterSurface.size == .init(width: 20, height: 8))
+    #expect(artifacts.rasterSurface.lines.joined(separator: "\n").contains("Footer"))
+    #expect(
+      artifacts.diagnostics.runtime.issues.filter {
+        $0.code == "collection.unboundedRealization"
+      }.count == 1)
+  }
+
   @Test("T-22: the measured size still reports the full virtual content height")
   func measuredSizeReportsVirtualHeight() throws {
     // The enclosing ScrollView needs the true content extent to clamp

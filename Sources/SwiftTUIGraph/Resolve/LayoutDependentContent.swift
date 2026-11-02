@@ -170,8 +170,17 @@ extension ResolvedNode {
     var copy = self
     if copy.layoutRealizedContent != nil {
       let realized = realizations[copy.identity] ?? []
-      let keys = Self.preferenceKeys(of: copy.children).union(Self.preferenceKeys(of: realized))
-      copy.replaceChildren(realized, refoldingPreferenceKeys: keys)
+      var keys = Self.preferenceKeys(of: copy.children).union(Self.preferenceKeys(of: realized))
+      // An outer reader's result can contain an inner reader's previous
+      // children: the inner boundary realizes later in the same layout pass.
+      // Apply those nested results too, so lifecycle/entity reconciliation
+      // consumes the content that layout actually accepted.
+      let children = realized.map { child in
+        let applied = child.realizationApplication(realizations)
+        keys.formUnion(applied.refoldedKeys)
+        return applied.node
+      }
+      copy.replaceChildren(children, refoldingPreferenceKeys: keys)
       return (copy, keys)
     }
     guard copy.children.contains(where: { $0.containsLayoutRealizedContent }) else {

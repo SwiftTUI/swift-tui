@@ -160,6 +160,15 @@ every row and reports `collection.unboundedRealization` once. These callers
 request the true ideal size. An estimate can give the wrong size when row
 heights differ.
 
+A bounded `VStack` also probes its children's ideal heights before allocating
+the available space. A list inside it can therefore emit this warning even
+when the stack has an explicit finite height and the list's final viewport is
+bounded. The warning describes exhaustive measurement, not necessarily a
+missing application constraint. A finite height on the collection itself
+constrains that probe; a height only on an enclosing stack does not. Small
+fixtures can accept the exhaustive work, but do not establish windowing for
+larger data sets.
+
 A direct `OutlineGroup` in a List also provides an indexed source. It enumerates
 logical IDs and hierarchy without evaluating offscreen row views. Disclosure
 state belongs to the outline rather than its recycled rows.

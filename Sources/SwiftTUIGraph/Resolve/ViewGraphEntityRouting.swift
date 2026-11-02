@@ -345,15 +345,17 @@ extension ViewGraph {
       consumeTeardownWork(.entityRoutedRemoval, for: pendingNodeIDs)
       for viewNodeID in pendingNodeIDs {
         guard let node = nodeIfExists(for: viewNodeID),
-          node.committed.entityIdentity != nil,
-          // Use the frame-stamped `visitedThisFrame` signal, not the stored
-          // `wasVisitedThisFrame` bool: a genuinely-gone node is never
-          // re-prepared in the frame it disappears, so the stored bool stays
-          // stale-`true` from its last live frame and would wrongly skip the
-          // teardown — leaking the node (and, for duplicate-id siblings, the
-          // occurrence-`>0` lifetime) in `nodesByNodeID` forever (G13).
-          !node.visitedThisFrame(currentFrameID)
+          node.committed.entityIdentity != nil
         else {
+          continue
+        }
+        if node.visitedThisFrame(currentFrameID) {
+          // A superseded pass can visit an element before the accepted pass
+          // removes it. Visitation alone cannot keep that departed lifetime:
+          // once its removal debt is consumed, no later diff will see it.
+          // Let the shared reachability barrier distinguish a re-adopted
+          // entity from a visited but now unanchored row.
+          enqueueTeardownWork(.sparedVisitedDescent, for: viewNodeID)
           continue
         }
         // Keep the node only while it is still the entity's live home: the

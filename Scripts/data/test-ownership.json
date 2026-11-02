@@ -2158,6 +2158,10 @@
       "category": "runtime-integration",
       "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
     },
+    "Tests/SwiftTUITests/NestedLayoutRealizationTeardownTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises nested geometry and entity teardown through the composed run loop."
+    },
     "Tests/SwiftTUITests/NestedMatchedGeometryTests.swift": {
       "category": "runtime-integration",
       "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."

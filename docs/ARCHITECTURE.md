@@ -720,6 +720,11 @@ include `GeometryReader` and anchor-based preferences. SwiftTUI handles this
 with **layout-dependent content realization**. SwiftTUI realizes the affected
 subtree after it resolves the enclosing geometry. It does not guess and then
 correct the geometry.
+The canonical frame applies the current pass's realizations recursively,
+including readers nested inside another reader's recorded content. Preference
+folding and lifecycle/entity cleanup therefore see the same current inner
+content as layout, rather than a previous inner snapshot retained by the outer
+reader.
 
 Custom layouts are `Sendable` values with `Sendable` caches. `Layout` requires
 both, so the renderer can evaluate any custom layout on the frame-tail worker.

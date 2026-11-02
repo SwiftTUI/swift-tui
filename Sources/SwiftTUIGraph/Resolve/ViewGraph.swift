@@ -3352,6 +3352,9 @@ package final class ViewGraph {
   /// rather than a lifetime anchor, and the rest of the cascade goes on
   /// severing edges that name it without re-examining a node already in the
   /// walk's entered set.
+  /// Pending entity removals also use this verdict when a superseded pass
+  /// visited a row before the accepted pass removed it. Consuming that debt
+  /// merely because the row was visited would leave it beyond later diffs.
   private func pruneSparedVisitedDescentStrands(
     candidateRootID: ViewNodeID,
     activeEntities: Set<EntityIdentity>

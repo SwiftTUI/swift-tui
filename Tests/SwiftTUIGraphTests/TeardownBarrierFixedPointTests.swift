@@ -115,6 +115,35 @@ struct TeardownBarrierFixedPointTests {
     #expect(SoundnessProbeConfiguration.barrierNonConvergenceCount == alarmBefore + 1)
   }
 
+  @Test("visited entity removal follows the accepted tree", arguments: [false, true])
+  func visitedEntityRemovalFollowsAcceptedTree(retained: Bool) throws {
+    let (graph, root, orphan) = try graphWithOrphan(entity: EntityIdentity("departed"))
+
+    func commitChildren(_ children: [ResolvedNode]) {
+      let rootNode = graph.beginEvaluation(identity: root.identity, invalidator: nil)
+      _ = graph.finishEvaluation(
+        rootNode,
+        resolved: ResolvedNode(identity: root.identity, kind: .root, children: children),
+        accessedStateSlots: 0)
+    }
+
+    commitChildren([orphan.committed])
+    _ = graph.finalizeFrame(rootIdentity: root.identity)
+    graph.beginFrame()
+
+    // A first pass visits the old row, then a later pass drops it. The
+    // structural diff must retain its removal debt until the frame settles.
+    graph.recordReusedSubtree(orphan.committed, invalidator: nil)
+    commitChildren([])
+    if retained { commitChildren([orphan.committed]) }
+    let result = graph.debugSettleTeardownBarrier(
+      resolved: graph.snapshot(rootIdentity: root.identity))
+
+    #expect(result.didConverge)
+    #expect((graph.nodeForViewNodeID(orphan.viewNodeID) === orphan) == retained)
+    #expect(graph.debugTeardownCoherenceViolation() == nil)
+  }
+
   private func graphWithOrphan(
     entity: EntityIdentity? = nil
   ) throws -> (ViewGraph, ResolvedNode, ViewNode) {

@@ -203,6 +203,37 @@ struct ResolvedNodeOffloadSummaryTests {
 @MainActor
 @Suite
 struct ResolvedNodeRealizationPreferenceTests {
+  @Test("nested realizations replace stale inner content and re-fold its preferences")
+  func nestedRealizationsUseCurrentInnerContent() throws {
+    var stale = makeNode("stale")
+    stale.preferenceValues[RealizationContentKey.self] = ["stale"]
+    var inner = makeNode("inner", children: [stale])
+    inner.layoutRealizedContent = makeBoundary(for: inner.identity)
+    inner.preferenceValues[RealizationLocalKey.self] = ["inner"]
+    var outer = makeNode("outer", children: [inner])
+    outer.layoutRealizedContent = makeBoundary(for: outer.identity)
+    let root = makeNode("root", children: [outer])
+    var current = makeNode("current")
+    current.preferenceValues[RealizationContentKey.self] = ["current"]
+
+    // The outer boundary was resolved before the inner boundary's new
+    // content, so its recorded value still carries the old inner subtree.
+    let realized = root.applyingLayoutDependentRealizations([
+      outer.identity: [inner], inner.identity: [current],
+    ])
+    let realizedInner = try #require(realized.children.first?.children.first)
+    #expect(realizedInner.children.map(\.identity) == [current.identity])
+    #expect(realizedInner.preferenceValues[RealizationLocalKey.self] == ["inner"])
+    #expect(realized.preferenceValues[RealizationContentKey.self] == ["current"])
+
+    let emptied = realized.applyingLayoutDependentRealizations([
+      outer.identity: [inner], inner.identity: [],
+    ])
+    #expect(emptied.children.first?.children.first?.children.isEmpty == true)
+    #expect(!emptied.preferenceValues.contains(RealizationContentKey.self))
+    #expect(emptied.preferenceValues[RealizationLocalKey.self] == ["inner"])
+  }
+
   @Test("realization keeps node-local declarations and re-folds the realized keys")
   func realizationReFoldsOnlyTheRealizedKeys() throws {
     var boundary = makeNode("boundary")
