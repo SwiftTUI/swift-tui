@@ -46,18 +46,21 @@
     /// Produces a compact JSON object string — no Foundation required.
     func jsonString() -> String {
       var fields: [String] = []
-      fields.append("\"id\":\(jsonStringLiteral(id.rawValue))")
+      fields.append(
+        "\(jsonStringLiteral(CodingKeys.id.rawValue)):\(jsonStringLiteral(id.rawValue))")
       if let title {
-        fields.append("\"title\":\(jsonStringLiteral(title))")
+        fields.append("\(jsonStringLiteral(CodingKeys.title.rawValue)):\(jsonStringLiteral(title))")
       } else {
-        fields.append("\"title\":null")
+        fields.append("\(jsonStringLiteral(CodingKeys.title.rawValue)):null")
       }
       if let ptyPath {
-        fields.append("\"ptyPath\":\(jsonStringLiteral(ptyPath))")
+        fields.append(
+          "\(jsonStringLiteral(CodingKeys.ptyPath.rawValue)):\(jsonStringLiteral(ptyPath))")
       } else {
-        fields.append("\"ptyPath\":null")
+        fields.append("\(jsonStringLiteral(CodingKeys.ptyPath.rawValue)):null")
       }
-      fields.append("\"isAttached\":\(isAttached ? "true" : "false")")
+      fields.append(
+        "\(jsonStringLiteral(CodingKeys.isAttached.rawValue)):\(isAttached ? "true" : "false")")
       return "{\(fields.joined(separator: ","))}"
     }
 
@@ -76,10 +79,22 @@
 
   // MARK: - SocketRequest
 
-  enum SocketRequest: Equatable, Sendable {
+  package enum SocketRequest: Equatable, Sendable {
     case list
     case companion
     case attach(sceneID: WindowIdentifier)
+
+    package func encode() throws(SocketProtocolError) -> String {
+      switch self {
+      case .list: return "LIST\n"
+      case .companion: return "COMPANION\n"
+      case .attach(let id):
+        guard !id.rawValue.unicodeScalars.contains(where: SocketLineFraming.isControl) else {
+          throw .encodingFailed("Scene identifier contains a control character")
+        }
+        return "ATTACH \(id)\n"
+      }
+    }
 
     static func parse(_ raw: String) throws(SocketProtocolError) -> SocketRequest {
       let line = raw.hasSuffix("\n") ? String(raw.dropLast()) : raw
@@ -108,6 +123,22 @@
     case sceneList([SceneInfo])
     case attachOK(ptyPath: String)
     case error(String)
+
+    package static func parse(
+      _ raw: String, for request: SocketRequest,
+      decodeScenes: (String) throws -> [SceneInfo]
+    ) throws -> Self {
+      let line = raw.hasSuffix("\n") ? String(raw.dropLast()) : raw
+      if line.hasPrefix("ERR ") { return .error(String(line.dropFirst(4))) }
+      guard line.hasPrefix("OK "), !line.unicodeScalars.contains(where: SocketLineFraming.isControl)
+      else { throw SocketClientError.unexpectedResponse(raw) }
+      let payload = String(line.dropFirst(3))
+      switch request {
+      case .list: return .sceneList(try decodeScenes(payload))
+      case .companion: return .companionURL(payload)
+      case .attach: return .attachOK(ptyPath: payload)
+      }
+    }
 
     package func encode() throws(SocketProtocolError) -> String {
       switch self {
