@@ -90,11 +90,11 @@ package struct HostWireFrameModel {
       idPath = node.identity.path
       parentIDPath = node.parentIdentity?.path
       rect = node.rect
-      roleToken = node.role.description
+      roleToken = node.role.wireToken
       label = node.label
       hint = node.hint
       hidden = node.hidden
-      liveRegionToken = node.liveRegion?.description
+      liveRegionToken = node.liveRegion?.wireToken
       cursorAnchor = node.cursorAnchor
       isFocused = node.runtimeFocusIdentity == focusedIdentity
       isAccessibilityFocused = node.isAccessibilityFocused
@@ -125,7 +125,7 @@ package struct HostWireFrameModel {
       _ announcement: AccessibilityAnnouncement
     ) {
       message = announcement.message
-      politenessToken = announcement.politeness.description
+      politenessToken = announcement.politeness.wireToken
     }
   }
 

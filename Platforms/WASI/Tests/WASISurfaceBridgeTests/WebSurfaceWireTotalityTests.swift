@@ -12,6 +12,13 @@ import Testing
 /// missing on web) and a manifest entry the encoder never learned both fail.
 @Suite
 struct WebSurfaceWireTotalityTests {
+  @Test("Accessibility wire tokens preserve associated values and live-region vocabulary")
+  func accessibilityWireTokens() {
+    #expect(AccessibilityRole.heading(level: 2).wireToken == "heading(level: 2)")
+    #expect(AccessibilityRole.custom("x").wireToken == "custom(x)")
+    #expect(AccessibilityPoliteness.allCases.map(\.wireToken) == ["off", "polite", "assertive"])
+  }
+
   @Test("canonical geometry corpus is produced by the shared encoder")
   func geometryFixtureMatchesEncoderOutput() throws {
     let caps = HostWireCapabilities(

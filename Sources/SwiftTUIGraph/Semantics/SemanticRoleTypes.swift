@@ -75,7 +75,9 @@ public enum AccessibilityRole: Hashable, Sendable, CustomStringConvertible {
   case timer
   case toggle
 
-  public var description: String {
+  public var description: String { wireToken }
+
+  package var wireToken: String {
     switch self {
     case .alert:
       "alert"
@@ -167,7 +169,9 @@ public enum AccessibilityPoliteness:
   case polite
   case assertive
 
-  public var description: String {
+  public var description: String { wireToken }
+
+  package var wireToken: String {
     switch self {
     case .off:
       "off"

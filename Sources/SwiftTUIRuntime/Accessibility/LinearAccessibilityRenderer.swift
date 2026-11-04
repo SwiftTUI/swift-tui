@@ -66,7 +66,7 @@ package struct LinearAccessibilityRenderer: Equatable, Sendable {
       return nil
     }
 
-    let role = textSanitizer.sanitized(node.role.description) ?? "unknown"
+    let role = textSanitizer.sanitized(node.role.wireToken) ?? "unknown"
     var line =
       if let label {
         "\(role): \(label)"
@@ -136,13 +136,13 @@ package struct JSONFrameRenderer: Equatable, Sendable {
     object([
       ("id", string(node.identity.path)),
       ("parentId", optionalString(node.parentIdentity?.path)),
-      ("role", string(node.role.description)),
+      ("role", string(node.role.wireToken)),
       ("label", optionalString(node.label)),
       ("hint", optionalString(node.hint)),
       ("rect", rect(node.rect)),
       ("hidden", bool(node.hidden)),
       ("focused", bool(node.runtimeFocusIdentity == focusedIdentity)),
-      ("liveRegion", optionalString(node.liveRegion?.description)),
+      ("liveRegion", optionalString(node.liveRegion?.wireToken)),
       ("cursorAnchor", optionalPoint(node.cursorAnchor)),
     ])
   }
@@ -152,7 +152,7 @@ package struct JSONFrameRenderer: Equatable, Sendable {
   ) -> String {
     object([
       ("message", string(announcement.message)),
-      ("politeness", string(announcement.politeness.description)),
+      ("politeness", string(announcement.politeness.wireToken)),
     ])
   }
 
