@@ -44,7 +44,7 @@ struct ReuseDenialTraceTests {
   func disabledTraceIsInert() {
     let path = Self.temporaryPath()
     withTrace(enabled: false, filePath: path) {
-      ReuseDenialTrace.record("invalidation-conflict")
+      ReuseDenialTrace.record(.invalidationConflict)
       ReuseDenialTrace.recordInvalidatedIdentity("App/Root/Layout[0]")
       #expect(ReuseDenialTrace.reasonCounts.isEmpty)
       ReuseDenialTrace.dumpAndReset(frameID: 1)
@@ -57,8 +57,8 @@ struct ReuseDenialTraceTests {
     let path = Self.temporaryPath()
     defer { try? FileManager.default.removeItem(atPath: path) }
     try withTrace(enabled: true, filePath: path) {
-      ReuseDenialTrace.record("invalidation-conflict")
-      ReuseDenialTrace.record("invalidation-conflict")
+      ReuseDenialTrace.record(.invalidationConflict)
+      ReuseDenialTrace.record(.invalidationConflict)
       ReuseDenialTrace.recordInvalidatedIdentity("App/sheet/Layout[0]")
       ReuseDenialTrace.dumpAndReset(frameID: 7)
 
@@ -83,11 +83,11 @@ struct ReuseDenialTraceTests {
     let path = Self.temporaryPath()
     defer { try? FileManager.default.removeItem(atPath: path) }
     try withTrace(enabled: true, filePath: path) {
-      ReuseDenialTrace.record("suppressed")
+      ReuseDenialTrace.record(.suppressed)
       ReuseDenialTrace.dumpAndReset(frameID: 1)
       #expect(ReuseDenialTrace.reasonCounts.isEmpty)
 
-      ReuseDenialTrace.record("dirty")
+      ReuseDenialTrace.record(.dirty)
       ReuseDenialTrace.dumpAndReset(frameID: 2)
 
       let lines = try String(contentsOfFile: path, encoding: .utf8)

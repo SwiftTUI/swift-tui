@@ -1,5 +1,56 @@
 import SwiftTUIPrimitives
 
+package enum ReuseDenialReason: String, CaseIterable, Sendable {
+  case cacheCanReuseDenied = "cache-can-reuse-denied"
+  case cacheDirty = "cache-dirty"
+  case cacheEnvMismatch = "cache-env-mismatch"
+  case cacheEnvironmentMismatch = "cache-environment-mismatch"
+  case cacheForeignParentedChild = "cache-foreign-parented-child"
+  case cacheMiss = "cache-miss"
+  case cacheNoRetainedSupport = "cache-no-retained-support"
+  case cacheNodeDeparted = "cache-node-departed"
+  case cacheNotPresent = "cache-not-present"
+  case cacheStaleIslandDescendant = "cache-stale-island-descendant"
+  case cacheStaleSignature = "cache-stale-signature"
+  case cacheStaleSnapshot = "cache-stale-snapshot"
+  case cacheTransaction = "cache-transaction"
+  case cacheTransactionMismatch = "cache-transaction-mismatch"
+  case cacheVisited = "cache-visited"
+  case canReuseDenied = "can-reuse-denied"
+  case dirty = "dirty"
+  case dynamicPropertyChanged = "dynamic-property-changed"
+  case dynamicPropertyUncertified = "dynamic-property-uncertified"
+  case envMismatch = "env-mismatch"
+  case foreignParentedChild = "foreign-parented-child"
+  case invalidatedEmpty = "invalidated-empty"
+  case invalidationConflict = "invalidation-conflict"
+  case noNode = "no-node"
+  case noRetainedSupport = "no-retained-support"
+  case notPresent = "not-present"
+  case staleIslandDescendant = "stale-island-descendant"
+  case staleSnapshot = "stale-snapshot"
+  case suppressed = "suppressed"
+  case transaction = "transaction"
+  case visited = "visited"
+
+  /// Records a node-level denial reached through the resolved-node cache.
+  package var cached: Self {
+    switch self {
+    case .canReuseDenied: .cacheCanReuseDenied
+    case .dirty: .cacheDirty
+    case .envMismatch: .cacheEnvMismatch
+    case .foreignParentedChild: .cacheForeignParentedChild
+    case .noRetainedSupport: .cacheNoRetainedSupport
+    case .notPresent: .cacheNotPresent
+    case .staleIslandDescendant: .cacheStaleIslandDescendant
+    case .staleSnapshot: .cacheStaleSnapshot
+    case .transaction: .cacheTransaction
+    case .visited: .cacheVisited
+    default: self
+    }
+  }
+}
+
 /// Diagnostic-only trace of **why retained reuse was denied** per node, gated by
 /// `SWIFTTUI_REUSE_TRACE` (default off). Inert and zero-cost when disabled.
 ///
@@ -35,12 +86,12 @@ package enum ReuseDenialTrace {
     named: fileEnvironmentVariableName
   )
 
-  package private(set) static var reasonCounts: [String: Int] = [:]
+  package private(set) static var reasonCounts: [ReuseDenialReason: Int] = [:]
   package private(set) static var environmentKeyDiffCounts: [String: Int] = [:]
   package private(set) static var invalidatedIdentityPaths: Set<String> = []
   package private(set) static var suppressionScopeDescriptions: [String] = []
 
-  package static func record(_ reason: String) {
+  package static func record(_ reason: ReuseDenialReason) {
     guard isEnabled else { return }
     reasonCounts[reason, default: 0] += 1
   }
@@ -107,7 +158,8 @@ package enum ReuseDenialTrace {
   /// before the per-frame reset erases it. Lets a deterministic fixture pin a
   /// specific frame's counter (e.g. the palette dismissal frame's
   /// `invalidation-conflict`) without parsing the emitted trace text.
-  package static var onFrameSummary: ((_ frameID: UInt64, _ reasonCounts: [String: Int]) -> Void)?
+  package static var onFrameSummary:
+    ((_ frameID: UInt64, _ reasonCounts: [ReuseDenialReason: Int]) -> Void)?
 
   /// Records a description of one leg of the frame's retained-reuse
   /// suppression scope (focus or press moves), so a
@@ -155,7 +207,7 @@ package enum ReuseDenialTrace {
     }
     var line = "[REUSE-TRACE] frame=\(frameID) recompute-reasons:"
     for (reason, count) in reasonCounts.sorted(by: { $0.value > $1.value }) {
-      line += " \(reason)=\(count)"
+      line += " \(reason.rawValue)=\(count)"
     }
     if !environmentKeyDiffCounts.isEmpty {
       line += " | env-diffs:"

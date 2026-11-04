@@ -115,7 +115,7 @@ extension ViewGraph {
           debugBodyChanges.note(.dynamicProperty, owner: node.ownerLifetimeID)
         }
       #endif
-      ReuseDenialTrace.record("dynamic-property-changed")
+      ReuseDenialTrace.record(.dynamicPropertyChanged)
       return nil
     case .uncertified:
       #if DEBUG
@@ -123,7 +123,7 @@ extension ViewGraph {
           debugBodyChanges.note(.dynamicProperty, owner: node.ownerLifetimeID)
         }
       #endif
-      ReuseDenialTrace.record("dynamic-property-uncertified")
+      ReuseDenialTrace.record(.dynamicPropertyUncertified)
       return nil
     }
     // A boundary that once served over a tolerated environment change may have

@@ -1,7 +1,6 @@
 import SwiftTUIGraph
-import Testing
-
 @_spi(Testing) import SwiftTUITestSupport
+import Testing
 
 @testable import SwiftTUICore
 @_spi(Runners) @testable import SwiftTUIRuntime
@@ -197,7 +196,7 @@ private final class PaletteClosePinHarness {
     ReuseDenialTrace.reset()
     ReuseDenialTrace.isEnabled = true
     ReuseDenialTrace.onFrameSummary = { [weak self] frameID, reasonCounts in
-      self?.conflictCountsByFrame[frameID] = reasonCounts["invalidation-conflict"] ?? 0
+      self?.conflictCountsByFrame[frameID] = reasonCounts[.invalidationConflict] ?? 0
     }
 
     scheduler.requestInvalidation(of: [runLoop.rootIdentity])
@@ -262,7 +261,7 @@ private final class PaletteClosePinHarness {
     try await interaction()
     // The last frame's trace counters have not been dumped yet -- fold the
     // still-accumulating histogram in as that frame's summary.
-    let residualConflicts = ReuseDenialTrace.reasonCounts["invalidation-conflict"] ?? 0
+    let residualConflicts = ReuseDenialTrace.reasonCounts[.invalidationConflict] ?? 0
     var observation = PaletteCycleObservation()
     observation.maxResolvedNodesComputed =
       diagnosticsRecorder.resolvedNodesComputedPerFrame.max() ?? 0

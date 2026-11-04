@@ -937,11 +937,11 @@ package final class ViewGraph {
     // `reusableSnapshot` siblings; `record` self-guards on `isEnabled`.
     let key = ResolvedNodeReuseCacheKey(namespace: namespace, owner: owner)
     guard var entry = resolvedNodeReuseCache[key] else {
-      ReuseDenialTrace.record("cache-miss")
+      ReuseDenialTrace.record(.cacheMiss)
       return nil
     }
     guard entry.signature == signature else {
-      ReuseDenialTrace.record("cache-stale-signature")
+      ReuseDenialTrace.record(.cacheStaleSignature)
       return nil
     }
 
@@ -950,16 +950,16 @@ package final class ViewGraph {
       ?? nodeIfExists(for: entry.node.identity)
     guard let node = cachedNode else {
       resolvedNodeReuseCache.removeValue(forKey: key)
-      ReuseDenialTrace.record("cache-node-departed")
+      ReuseDenialTrace.record(.cacheNodeDeparted)
       return nil
     }
 
     guard entry.node.environmentSnapshot == environment else {
-      ReuseDenialTrace.record("cache-environment-mismatch")
+      ReuseDenialTrace.record(.cacheEnvironmentMismatch)
       return nil
     }
     guard entry.node.transactionSnapshot.isReuseEquivalent(to: transaction) else {
-      ReuseDenialTrace.record("cache-transaction-mismatch")
+      ReuseDenialTrace.record(.cacheTransactionMismatch)
       return nil
     }
 
@@ -982,8 +982,8 @@ package final class ViewGraph {
             frameID: currentFrameID,
             environment: environment,
             transaction: transaction
-          ) ?? "can-reuse-denied"
-        ReuseDenialTrace.record("cache-\(reason)")
+          ) ?? .canReuseDenied
+        ReuseDenialTrace.record(reason.cached)
       }
       return nil
     }
@@ -2904,17 +2904,17 @@ package final class ViewGraph {
       return
     }
     if suppressed {
-      ReuseDenialTrace.record("suppressed")
+      ReuseDenialTrace.record(.suppressed)
       ReuseDenialTrace.recordSuppressedIdentity(identity.path)
       return
     }
     guard let node = nodeIfExists(for: identity) else {
-      ReuseDenialTrace.record("no-node")
+      ReuseDenialTrace.record(.noNode)
       ReuseDenialTrace.recordNoNodeIdentity(identity.path)
       return
     }
     if invalidatedIdentities.isEmpty {
-      ReuseDenialTrace.record("invalidated-empty")
+      ReuseDenialTrace.record(.invalidatedEmpty)
       return
     }
     if let reason = node.canReuseDenialReason(
@@ -2928,7 +2928,7 @@ package final class ViewGraph {
     // canReuse would succeed, so the only remaining denial is an identity /
     // structural intersection with the invalidation set. Capture the invalidated
     // identities so the dirty ancestor blocking the background is visible.
-    ReuseDenialTrace.record("invalidation-conflict")
+    ReuseDenialTrace.record(.invalidationConflict)
     ReuseDenialTrace.recordConflictIdentity(identity.path)
     for invalidated in invalidatedIdentities {
       ReuseDenialTrace.recordInvalidatedIdentity(invalidated.path)

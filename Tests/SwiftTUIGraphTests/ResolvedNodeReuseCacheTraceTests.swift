@@ -41,7 +41,7 @@ struct ResolvedNodeReuseCacheTraceTests {
     graph.beginFrame()
     withTracingEnabled {
       #expect(query(graph, owner: testIdentity("Root", "Strip")) == nil)
-      #expect(ReuseDenialTrace.reasonCounts["cache-miss"] == 1)
+      #expect(ReuseDenialTrace.reasonCounts[.cacheMiss] == 1)
     }
   }
 
@@ -58,7 +58,7 @@ struct ResolvedNodeReuseCacheTraceTests {
     )
     withTracingEnabled {
       #expect(query(graph, owner: owner, signature: "new") == nil)
-      #expect(ReuseDenialTrace.reasonCounts["cache-stale-signature"] == 1)
+      #expect(ReuseDenialTrace.reasonCounts[.cacheStaleSignature] == 1)
     }
   }
 
@@ -76,10 +76,10 @@ struct ResolvedNodeReuseCacheTraceTests {
     )
     withTracingEnabled {
       #expect(query(graph, owner: owner) == nil)
-      #expect(ReuseDenialTrace.reasonCounts["cache-node-departed"] == 1)
+      #expect(ReuseDenialTrace.reasonCounts[.cacheNodeDeparted] == 1)
       // The stale entry is evicted, so the next query is a plain miss.
       #expect(query(graph, owner: owner) == nil)
-      #expect(ReuseDenialTrace.reasonCounts["cache-miss"] == 1)
+      #expect(ReuseDenialTrace.reasonCounts[.cacheMiss] == 1)
     }
   }
 

@@ -1060,7 +1060,7 @@ struct DynamicPropertyUpdatePassTests {
     )
     _ = graph.finalizeFrame(rootIdentity: identity)
 
-    #expect(ReuseDenialTrace.reasonCounts["dynamic-property-uncertified"] == nil)
+    #expect(ReuseDenialTrace.reasonCounts[.dynamicPropertyUncertified] == nil)
   }
 
   @Test("a forwarded DynamicProperty output updates under its captured owner")
@@ -1275,11 +1275,11 @@ struct DynamicPropertyUpdatePassTests {
 
     func denialCount(
       for result: DynamicPropertyUpdateResult,
-      reason: String
+      reason: ReuseDenialReason
     ) -> Int {
       ReuseDenialTrace.reset()
       let graph = ViewGraph()
-      let identity = testIdentity("DynamicPropertyReuseDenial", reason)
+      let identity = testIdentity("DynamicPropertyReuseDenial", reason.rawValue)
       let unrelated = testIdentity("DynamicPropertyReuseDenial", "unrelated")
       let log = PassEventLog()
 
@@ -1304,10 +1304,10 @@ struct DynamicPropertyUpdatePassTests {
     }
 
     #expect(
-      denialCount(for: .changed, reason: "dynamic-property-changed") == 1
+      denialCount(for: .changed, reason: .dynamicPropertyChanged) == 1
     )
     #expect(
-      denialCount(for: .uncertified, reason: "dynamic-property-uncertified") == 1
+      denialCount(for: .uncertified, reason: .dynamicPropertyUncertified) == 1
     )
   }
 }

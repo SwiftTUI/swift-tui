@@ -17,7 +17,7 @@ struct CommittedFreshnessTests {
     #expect(!freshness.canServeValueBlind)
     #expect(!freshness.canServeMemo)
     #expect(!freshness.hasFreshCommittedSnapshot)
-    #expect(freshness.valueBlindDenialReason == "stale-snapshot")
+    #expect(freshness.valueBlindDenialReason == .staleSnapshot)
   }
 
   @Test("commitApplied re-adjudicates all three stamps")
@@ -83,7 +83,7 @@ struct CommittedFreshnessTests {
 
     #expect(!freshness.canServeValueBlind)
     #expect(freshness.canServeMemo)
-    #expect(freshness.valueBlindDenialReason == "foreign-parented-child")
+    #expect(freshness.valueBlindDenialReason == .foreignParentedChild)
   }
 
   @Test("descendant change below the island seam clears freshness only")
@@ -96,7 +96,7 @@ struct CommittedFreshnessTests {
     #expect(!freshness.isCommittedSnapshotFresh)
     #expect(!freshness.hasStaleIslandDescendant)
     #expect(!freshness.hasFreshCommittedSnapshot)
-    #expect(freshness.valueBlindDenialReason == "stale-snapshot")
+    #expect(freshness.valueBlindDenialReason == .staleSnapshot)
   }
 
   @Test("descendant change across the island seam records the island verdict only")
@@ -113,7 +113,7 @@ struct CommittedFreshnessTests {
     #expect(freshness.hasFreshCommittedSnapshot)
     #expect(!freshness.canServeValueBlind)
     #expect(!freshness.canServeMemo)
-    #expect(freshness.valueBlindDenialReason == "stale-island-descendant")
+    #expect(freshness.valueBlindDenialReason == .staleIslandDescendant)
   }
 
   @Test("retained write-back admissibility ignores freshness itself")
@@ -131,7 +131,7 @@ struct CommittedFreshnessTests {
 
     freshness.markDescendantChanged(crossingIslandSeam: true)
     #expect(!freshness.admitsRetainedWriteBack)
-    #expect(freshness.retainedWriteBackDenialReason == "stale-island-descendant")
+    #expect(freshness.retainedWriteBackDenialReason == .staleIslandDescendant)
   }
 
   @Test("a foreign-parented listing denies a retained write-back")
@@ -139,7 +139,7 @@ struct CommittedFreshnessTests {
     var freshness = CommittedFreshness()
     freshness.markChildReseated()
     #expect(!freshness.admitsRetainedWriteBack)
-    #expect(freshness.retainedWriteBackDenialReason == "foreign-parented-child")
+    #expect(freshness.retainedWriteBackDenialReason == .foreignParentedChild)
 
     // Sticky until the node's own apply re-owns its children.
     freshness.commitApplied()
@@ -169,16 +169,16 @@ struct CommittedFreshnessTests {
     freshness.markChildReseated()
     freshness.markDescendantChanged(crossingIslandSeam: true)
     // Not fresh + island + foreign: staleness wins.
-    #expect(freshness.valueBlindDenialReason == "stale-snapshot")
+    #expect(freshness.valueBlindDenialReason == .staleSnapshot)
 
     freshness.snapshotRefreshed()
     // Fresh + island + foreign: island wins over foreign.
-    #expect(freshness.valueBlindDenialReason == "stale-island-descendant")
+    #expect(freshness.valueBlindDenialReason == .staleIslandDescendant)
 
     freshness.commitApplied()
     freshness.markChildReseated()
     // Fresh + foreign only.
-    #expect(freshness.valueBlindDenialReason == "foreign-parented-child")
+    #expect(freshness.valueBlindDenialReason == .foreignParentedChild)
 
     freshness.commitApplied()
     #expect(freshness.valueBlindDenialReason == nil)

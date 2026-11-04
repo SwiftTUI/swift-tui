@@ -1216,7 +1216,7 @@ package final class ViewNode {
           : reuseState.freshness.admitsRetainedWriteBack,
         """
         retained write-back onto a node whose freshness verdict flipped since \
-        the gate: \(reuseState.freshness.retainedWriteBackDenialReason ?? "-") \
+        the gate: \(reuseState.freshness.retainedWriteBackDenialReason?.rawValue ?? "-") \
         node=\(viewNodeID) identity=\(identity.path)
         """
       )
@@ -1229,7 +1229,7 @@ package final class ViewNode {
           : reuseState.freshness.retainedWriteBackDenialReason
       {
         SoundnessProbeConfiguration.recordStampCoherenceViolation(
-          "retained write-back with \(denial) node=\(viewNodeID) identity=\(identity.path)"
+          "retained write-back with \(denial.rawValue) node=\(viewNodeID) identity=\(identity.path)"
         )
       }
     #endif
@@ -1555,21 +1555,21 @@ package final class ViewNode {
     frameID: UInt64,
     environment: EnvironmentSnapshot,
     transaction: TransactionSnapshot
-  ) -> String? {
+  ) -> ReuseDenialReason? {
     prepareForFrame(frameID)
-    if !wasPresentAtFrameStart { return "not-present" }
-    if wasVisitedThisFrame { return "visited" }
-    if isDirty { return "dirty" }
+    if !wasPresentAtFrameStart { return .notPresent }
+    if wasVisitedThisFrame { return .visited }
+    if isDirty { return .dirty }
     if let freshnessDenial = reuseState.freshness.valueBlindDenialReason {
       return freshnessDenial
     }
-    if !committed.supportsRetainedReuse { return "no-retained-support" }
+    if !committed.supportsRetainedReuse { return .noRetainedSupport }
     if committed.environmentSnapshot != environment {
       recordEnvironmentSnapshotDiff(committed.environmentSnapshot, environment)
-      return "env-mismatch"
+      return .envMismatch
     }
     if !committed.transactionSnapshot.isReuseEquivalent(to: transaction) {
-      return "transaction"
+      return .transaction
     }
     return nil
   }

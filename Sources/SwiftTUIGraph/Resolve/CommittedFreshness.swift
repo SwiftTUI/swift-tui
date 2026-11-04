@@ -139,25 +139,25 @@ package struct CommittedFreshness: Equatable {
 
   /// Diagnostic mirror of ``admitsRetainedWriteBack``: the first denying
   /// verdict, or `nil` when a retained write-back is admissible.
-  package var retainedWriteBackDenialReason: String? {
-    if hasStaleIslandDescendant { return "stale-island-descendant" }
-    if hasForeignParentedChild { return "foreign-parented-child" }
+  package var retainedWriteBackDenialReason: ReuseDenialReason? {
+    if hasStaleIslandDescendant { return .staleIslandDescendant }
+    if hasForeignParentedChild { return .foreignParentedChild }
     return nil
   }
 
   /// Diagnostic mirror of ``admitsMemoWriteBack``.
-  package var memoWriteBackDenialReason: String? {
-    if hasStaleIslandDescendant { return "stale-island-descendant" }
+  package var memoWriteBackDenialReason: ReuseDenialReason? {
+    if hasStaleIslandDescendant { return .staleIslandDescendant }
     return nil
   }
 
   /// Diagnostic mirror of ``canServeValueBlind``: the first denying stamp as
   /// a `ReuseDenialTrace` label, or `nil` when freshness would serve.
   /// Label strings and check order are load-bearing for trace stability.
-  package var valueBlindDenialReason: String? {
-    if !isCommittedSnapshotFresh { return "stale-snapshot" }
-    if hasStaleIslandDescendant { return "stale-island-descendant" }
-    if hasForeignParentedChild { return "foreign-parented-child" }
+  package var valueBlindDenialReason: ReuseDenialReason? {
+    if !isCommittedSnapshotFresh { return .staleSnapshot }
+    if hasStaleIslandDescendant { return .staleIslandDescendant }
+    if hasForeignParentedChild { return .foreignParentedChild }
     return nil
   }
 }
