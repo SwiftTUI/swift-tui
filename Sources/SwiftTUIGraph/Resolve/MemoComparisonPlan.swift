@@ -383,12 +383,9 @@ extension MemoValueComparator {
     }
   }
 
-  /// Type-name probe shared with the diagnostic comparator's blocked class:
-  /// `AnyView`/`AnyScene` erase their payloads behind boxes value comparison
-  /// must not open. Name-based so Graph does not import SwiftTUIViews.
+  /// Type-erasing wrappers hide state behind a box that value comparison cannot open.
   package static func isErasingWrapper(_ type: Any.Type) -> Bool {
-    let name = String(describing: type)
-    return name == "AnyView" || name.hasPrefix("AnyView<") || name == "AnyScene"
+    type is any TypeErasingWrapperMarker.Type
   }
 
   private static func podBytesEqual(_ lhs: Any, _ rhs: Any) -> Bool {
@@ -423,3 +420,6 @@ extension MemoValueComparator {
     return _openExistential(lhs, do: open)
   }
 }
+
+/// Framework view and scene wrappers whose boxed payload defeats structural memo comparison.
+package protocol TypeErasingWrapperMarker {}

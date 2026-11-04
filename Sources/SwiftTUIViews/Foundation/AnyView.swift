@@ -144,3 +144,5 @@ private struct AnyViewStorage {
   let authoringContext: AuthoringContext?
   let resolve: @MainActor (ResolveContext) -> ResolveWork<ResolvedNode>
 }
+
+extension AnyView: TypeErasingWrapperMarker {}

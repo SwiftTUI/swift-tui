@@ -178,3 +178,5 @@ public enum SceneBuilder {
     AnyScene(component)
   }
 }
+
+extension AnyScene: TypeErasingWrapperMarker {}
