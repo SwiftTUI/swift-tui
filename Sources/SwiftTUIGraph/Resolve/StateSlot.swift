@@ -356,18 +356,18 @@ package struct AnyStateSlot {
       return false
     }
 
-    if typeName.contains("->")
+    if unsafe typeName.contains("->")
       // Builtin leaves are compiler/runtime handles, not reconstructible
       // values. Their empty mirrors describe an opaque token, not safety.
       || typeName.hasPrefix("Builtin.")
       || typeName.contains("Builtin.")
       || typeName.hasPrefix("Swift.Task<")
-      || typeName == "Swift.ObjectIdentifier"
-      || typeName == "Swift.UnsafeRawPointer"
-      || typeName == "Swift.UnsafeMutableRawPointer"
+      || valueType == ObjectIdentifier.self
+      || valueType == UnsafeRawPointer.self
+      || valueType == UnsafeMutableRawPointer.self
       || typeName.contains("UnsafePointer<")
       || typeName.contains("UnsafeMutablePointer<")
-      || typeName.contains("OpaquePointer")
+      || valueType == OpaquePointer.self
       || typeName.contains("Unmanaged<")
       // Continuations and the standard library's unowned executor/job values
       // are opaque runtime resumptions or scheduling handles. Their mirrors
@@ -377,9 +377,9 @@ package struct AnyStateSlot {
       // remain eligible after their children pass this audit.
       || typeName.contains("Continuation<")
       || typeName.contains(">.Continuation")
-      || typeName.hasPrefix("Swift.UnownedSerialExecutor")
-      || typeName.hasPrefix("Swift.UnownedTaskExecutor")
-      || typeName.hasPrefix("Swift.UnownedJob")
+      || valueType == UnownedSerialExecutor.self
+      || valueType == UnownedTaskExecutor.self
+      || valueType == UnownedJob.self
       || typeName.hasPrefix("Swift.ExecutorJob")
     {
       return false
