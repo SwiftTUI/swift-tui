@@ -130,7 +130,7 @@ import SwiftTUICore
       capabilityProbe.hasProbedKittyKeyboardSupport = true
       capabilityProbe.cachedKittyKeyboardSupport = false
 
-      guard environment["SWIFTTUI_KITTY_KEYBOARD"] != "0" else {
+      guard FeatureFlags.booleanValue(environment[.kittyKeyboard]) != false else {
         return false
       }
       guard !isInsideTerminalMultiplexer else {

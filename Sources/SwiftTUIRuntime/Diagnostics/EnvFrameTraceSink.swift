@@ -72,7 +72,7 @@ import Synchronization
     #if canImport(WASILibc)
       false
     #else
-      if let path = FeatureFlags.environmentValue(named: "SWIFTTUI_FRAME_TRACE"), !path.isEmpty {
+      if let path = FeatureFlags.environmentValue(.frameTrace), !path.isEmpty {
         return true
       }
       return DebugTraceSelection.current.isArmed("frames") || debug
@@ -83,7 +83,7 @@ import Synchronization
     #if canImport(WASILibc)
       return nil
     #else
-      if let path = FeatureFlags.environmentValue(named: "SWIFTTUI_FRAME_TRACE"), !path.isEmpty {
+      if let path = FeatureFlags.environmentValue(.frameTrace), !path.isEmpty {
         return EnvFrameTraceSink(path: path)
       }
       guard isArmed(debug: debug),

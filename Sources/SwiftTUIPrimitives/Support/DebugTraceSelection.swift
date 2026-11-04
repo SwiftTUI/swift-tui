@@ -29,7 +29,7 @@ package struct DebugTraceSelection: Sendable, Equatable {
     }
   }
 
-  package static let environmentVariableName = "SWIFTTUI_TRACE"
+  package static let environmentVariableName = SwiftTUIEnvironmentVariable.trace.rawValue
 
   package static let knownTraceNames: Set<String> = [
     "frames", "memo", "reuse", "inval", "soundness", "publication", "cutoff",

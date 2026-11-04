@@ -62,7 +62,7 @@ package struct ResolveWork<Value> {
     ResolveWorkDiagnostics.maximumDrains = max(
       ResolveWorkDiagnostics.maximumDrains, ResolveWorkDiagnostics.activeDrains)
     defer { ResolveWorkDiagnostics.activeDrains -= 1 }
-    if FeatureFlags.environmentValue(named: "SWIFTTUI_ASSERT_ITERATIVE_RESOLVE") == "1" {
+    if FeatureFlags.isEnabled(.assertIterativeResolve, default: false) {
       precondition(ResolveWorkDiagnostics.activeDrains == 1, "Nested synchronous resolve drain")
     }
     let driver = ResolveWorkDriver()

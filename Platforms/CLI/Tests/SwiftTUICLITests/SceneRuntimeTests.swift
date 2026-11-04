@@ -82,6 +82,10 @@
     func termuiDiagnosticsCustomPathControlsDiagnosticsOutput() {
       #expect(
         SceneRuntime.diagnosticsFilePath(
+          configuration: .default,
+          environment: ["SWIFTTUI_DIAGNOSTICS": " OFF "]) == nil)
+      #expect(
+        SceneRuntime.diagnosticsFilePath(
           configuration: .init(debug: true),
           environment: ["SWIFTTUI_DIAGNOSTICS": "/tmp/custom-swifttui.tsv"]
         ) == "/tmp/custom-swifttui.tsv")

@@ -1,3 +1,5 @@
+import SwiftTUIPrimitives
+
 #if os(Windows)
   import WinSDK
 #endif
@@ -42,20 +44,8 @@ package let stackLeanResolveProfile: Bool = {
 }()
 
 /// The operator's explicit `SWIFTTUI_STACK_LEAN_PROFILE` choice, if any.
-///
-/// Documented grammar exception (unlike the shared `FeatureFlags.isEnabled`
-/// boolean rule): only the exact values `0` / `1` are respected, so a typo
-/// can never flip a whole engine profile.
-package let stackLeanExplicitEnvironmentChoice: Bool? = {
-  switch FeatureFlags.environmentValue(named: "SWIFTTUI_STACK_LEAN_PROFILE") {
-  case "0":
-    false
-  case "1":
-    true
-  default:
-    nil
-  }
-}()
+package let stackLeanExplicitEnvironmentChoice = FeatureFlags.booleanValue(
+  FeatureFlags.environmentValue(.stackLeanProfile))
 
 /// The smallest main-thread stack reserve the full engine profile is safe
 /// under. POSIX main threads get 8 MiB; the engine's resolve descent is
@@ -108,9 +98,4 @@ package let stackLeanArmedByWindowsStackFloor: Bool = {
 /// flag. Ignored when the lean profile itself is off (the gate short-circuits
 /// on `!stackLeanResolveProfile`).
 @MainActor
-package let leanRetainedReuse: Bool = {
-  // Documented grammar exception: only the exact value `1` opts in — this
-  // widens the engine's reuse behavior under an already-tight stack budget,
-  // so nothing short of an explicit `1` may arm it.
-  FeatureFlags.environmentValue(named: "SWIFTTUI_LEAN_RETAINED_REUSE") == "1"
-}()
+package let leanRetainedReuse = FeatureFlags.isEnabled(.leanRetainedReuse, default: false)

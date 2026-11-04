@@ -30,7 +30,7 @@ package enum WASITransportMode: Equatable, Sendable {
 package func resolveWASITransportMode(
   environmentValue: (String) -> String?
 ) -> WASITransportMode {
-  switch environmentValue("SWIFTTUI_TRANSPORT")?.lowercased() {
+  switch environmentValue(SwiftTUIEnvironmentVariable.transport.rawValue)?.lowercased() {
   case "ansi", "terminal", "xterm", "ghostty-web":
     return .ansi
   default:
@@ -41,12 +41,8 @@ package func resolveWASITransportMode(
 package func wasiSurfaceDeltaEnabled(
   environmentValue: (String) -> String?
 ) -> Bool {
-  switch environmentValue("SWIFTTUI_SURFACE_DELTA")?.lowercased() {
-  case "1", "true", "yes", "on":
-    return true
-  default:
-    return false
-  }
+  FeatureFlags.booleanValue(environmentValue(SwiftTUIEnvironmentVariable.surfaceDelta.rawValue))
+    ?? false
 }
 
 /// Resolves the WASI browser host's ``HostWireCapabilities`` from the
@@ -63,32 +59,24 @@ package func wasiHostWireCapabilities(
 ) -> HostWireCapabilities {
   HostWireCapabilities(
     acceptsDeltaFrames: wasiSurfaceDeltaEnabled(environmentValue: environmentValue),
-    styleAppend: environmentValue("SWIFTTUI_SURFACE_STYLE_APPEND") == "1",
-    geometryRevisions: environmentValue("SWIFTTUI_GEOMETRY_REVISIONS") == "1"
+    styleAppend: FeatureFlags.booleanValue(
+      environmentValue(SwiftTUIEnvironmentVariable.surfaceStyleAppend.rawValue)) ?? false,
+    geometryRevisions: FeatureFlags.booleanValue(
+      environmentValue(SwiftTUIEnvironmentVariable.geometryRevisions.rawValue)) ?? false
   )
 }
 
 package func wasiFrameDiagnosticsEnabled(
   environmentValue: (String) -> String?
 ) -> Bool {
-  parseDiagnosticsFlag(environmentValue("SWIFTTUI_FRAME_DIAGNOSTICS"))
-    ?? parseDiagnosticsFlag(environmentValue("SWIFTTUI_DIAGNOSTICS"))
+  parseDiagnosticsFlag(environmentValue(SwiftTUIEnvironmentVariable.frameDiagnostics.rawValue))
+    ?? parseDiagnosticsFlag(environmentValue(SwiftTUIEnvironmentVariable.diagnostics.rawValue))
     ?? false
 }
 
-/// Documented grammar exception (unlike the shared `FeatureFlags.isEnabled`
-/// boolean rule): the browser bridge historically sets `off` / `false` /
-/// `none` to disable, so this parser keeps accepting that wider falsy set.
+/// A non-boolean diagnostics destination requests recording on the browser host too.
 private func parseDiagnosticsFlag(_ value: String?) -> Bool? {
-  guard let value else {
-    return nil
-  }
-  switch value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
-  case "", "0", "false", "off", "none":
-    return false
-  default:
-    return true
-  }
+  value.map { FeatureFlags.booleanValue($0) ?? true }
 }
 
 /// Orchestrates scene manifest output and WASI-hosted scene launch.
@@ -276,7 +264,7 @@ public enum WASIRunner {
     }
 
     private static func wasiRenderStyle() -> TerminalRenderStyle? {
-      guard let encoded = environmentValue(named: "SWIFTTUI_RENDER_STYLE"),
+      guard let encoded = environmentValue(named: SwiftTUIEnvironmentVariable.renderStyle.rawValue),
         !encoded.isEmpty
       else {
         return nil
@@ -286,7 +274,9 @@ public enum WASIRunner {
     }
 
     private static func wasiSceneSelector() -> WindowIdentifier? {
-      if let selector = environmentValue(named: "SWIFTTUI_SCENE"), !selector.isEmpty {
+      if let selector = environmentValue(named: SwiftTUIEnvironmentVariable.scene.rawValue),
+        !selector.isEmpty
+      {
         return WindowIdentifier(selector)
       }
 
@@ -297,13 +287,13 @@ public enum WASIRunner {
       let width = max(
         40,
         integerEnvironmentValue(named: "COLUMNS")
-          ?? integerEnvironmentValue(named: "SWIFTTUI_COLUMNS")
+          ?? integerEnvironmentValue(named: SwiftTUIEnvironmentVariable.columns.rawValue)
           ?? 120
       )
       let height = max(
         20,
         integerEnvironmentValue(named: "LINES")
-          ?? integerEnvironmentValue(named: "SWIFTTUI_ROWS")
+          ?? integerEnvironmentValue(named: SwiftTUIEnvironmentVariable.rows.rawValue)
           ?? 36
       )
 
@@ -313,7 +303,7 @@ public enum WASIRunner {
 }
 
 private func requestedManifestMode() -> Bool {
-  environmentValue(named: "SWIFTTUI_MODE") == "manifest"
+  environmentValue(named: SwiftTUIEnvironmentVariable.mode.rawValue) == "manifest"
 }
 
 private func integerEnvironmentValue(

@@ -85,6 +85,7 @@ struct WASIRunnerTests {
     #expect(wasiFrameDiagnosticsEnabled(environmentValue: { _ in "" }) == false)
     #expect(wasiFrameDiagnosticsEnabled(environmentValue: { _ in "0" }) == false)
     #expect(wasiFrameDiagnosticsEnabled(environmentValue: { _ in "false" }) == false)
+    #expect(wasiFrameDiagnosticsEnabled(environmentValue: { _ in " NO " }) == false)
     #expect(wasiFrameDiagnosticsEnabled(environmentValue: { _ in "off" }) == false)
     #expect(wasiFrameDiagnosticsEnabled(environmentValue: { _ in "none" }) == false)
     #expect(wasiFrameDiagnosticsEnabled(environmentValue: { _ in "1" }) == true)

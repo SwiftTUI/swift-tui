@@ -1,4 +1,4 @@
-import Foundation
+import SwiftTUIPrimitives
 
 /// The iteration count for a churn loop in a hot-path stress test.
 ///
@@ -19,14 +19,7 @@ import Foundation
   return stressFullLaneRequested ? full : hotPath
 }
 
-/// Whether `SWIFTTUI_STRESS_FULL=1` is set for this process.
-///
-/// Read through Foundation rather than `getenv`: the Windows CRT deprecates
-/// `getenv` (C4996) and this package builds warnings-as-errors, so a raw
-/// `getenv` here is a hard Windows build failure. The framework's own
-/// Foundation-free funnel (`FeatureFlags.environmentValue`) is `package`-scoped
-/// to `SWIFTTUI_*` feature gates; test support already reads its knobs through
-/// `ProcessInfo` (see `AsyncTestSupport.swift`), so this matches its neighbours.
+/// Whether this process requests the full stress-test iteration count.
 @_spi(Testing) public var stressFullLaneRequested: Bool {
-  ProcessInfo.processInfo.environment["SWIFTTUI_STRESS_FULL"] == "1"
+  FeatureFlags.isEnabled(.stressFull, default: false)
 }

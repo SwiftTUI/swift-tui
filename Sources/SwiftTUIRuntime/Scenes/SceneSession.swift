@@ -250,12 +250,12 @@ import SwiftTUIViews
   ) async throws -> RunLoopResult<SceneSessionState> {
     #if DEBUG && (os(macOS) || os(Linux))
       if resources.surfaceName == "terminal",
-        let spool = FeatureFlags.environmentValue(named: "SWIFTTUI_HOT_RELOAD_SPOOL"),
+        let spool = FeatureFlags.environmentValue(.hotReloadSpool),
         !spool.isEmpty
       {
         let loader = try HotReloadLoader(
           spoolPath: spool,
-          logicalModule: FeatureFlags.environmentValue(named: "SWIFTTUI_HOT_RELOAD_MODULE"))
+          logicalModule: FeatureFlags.environmentValue(.hotReloadModule))
         let session = HotReloadSession(
           content: HotReloadGeneration {
             configuration.makeScopedRootView()

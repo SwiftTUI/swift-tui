@@ -361,7 +361,7 @@ final class SceneRuntime {
     configuration: RuntimeConfiguration,
     environment: [String: String] = ProcessInfo.processInfo.environment
   ) -> String? {
-    if let string = environment["SWIFTTUI_DIAGNOSTICS"],
+    if let string = environment[.diagnostics],
       let path = diagnosticsFilePath(from: string)
     {
       return path
@@ -378,10 +378,10 @@ final class SceneRuntime {
 
   @MainActor
   private static func diagnosticsFilePath(from string: String) -> String? {
-    switch string.lowercased() {
-    case "", "0", "false", "no":
+    switch FeatureFlags.booleanValue(string) {
+    case false:
       return nil
-    case "1", "true", "yes":
+    case true:
       return bundleOrDefaultDiagnosticsFilePath()
     default:
       return string

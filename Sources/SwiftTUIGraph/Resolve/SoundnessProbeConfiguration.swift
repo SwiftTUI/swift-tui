@@ -1,3 +1,5 @@
+import SwiftTUIPrimitives
+
 /// A complete point-in-time mirror of the soundness probe's process-global
 /// counters.
 ///
@@ -326,7 +328,8 @@ package struct SoundnessCounterGrowth: Sendable, Equatable {
 @MainActor
 package enum SoundnessProbeConfiguration {
   package static let environmentVariableName = FeatureGate.soundnessProbe.environmentVariableName
-  package static let sampleEnvironmentVariableName = "SWIFTTUI_SOUNDNESS_PROBE_SAMPLE"
+  package static let sampleEnvironmentVariableName = SwiftTUIEnvironmentVariable
+    .soundnessProbeSample.rawValue
 
   /// Whether the probe is active at all. On in every configuration (F34);
   /// release runs the oracles on sampled frames only.
@@ -758,12 +761,13 @@ package enum SoundnessProbeConfiguration {
   /// recorded violation (to `SWIFTTUI_SOUNDNESS_PROBE_TRACE_FILE`, else
   /// stderr). Counters alone are invisible outside the test process; a CI
   /// soak lane needs the violations in its log.
-  package static let traceEnvironmentVariableName = "SWIFTTUI_SOUNDNESS_PROBE_TRACE"
-  package static let traceFileEnvironmentVariableName = "SWIFTTUI_SOUNDNESS_PROBE_TRACE_FILE"
+  package static let traceEnvironmentVariableName = SwiftTUIEnvironmentVariable.soundnessProbeTrace
+    .rawValue
+  package static let traceFileEnvironmentVariableName = SwiftTUIEnvironmentVariable
+    .soundnessProbeTraceFile.rawValue
   package static var isTraceEnabled: Bool =
-    FeatureFlags.environmentValue(named: traceEnvironmentVariableName).map {
-      $0 != "0" && !$0.isEmpty
-    } ?? DebugTraceSelection.current.isArmed("soundness")
+    FeatureFlags.booleanValue(FeatureFlags.environmentValue(named: traceEnvironmentVariableName))
+    ?? DebugTraceSelection.current.isArmed("soundness")
 
   private static func emitTrace(_ kind: String) {
     guard isTraceEnabled else {

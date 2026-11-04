@@ -124,7 +124,7 @@ package enum StateCaptureCensus {
     /// Hit-path events (`captureHit`, `captureRefreshedOwner`, `bindBound`)
     /// stay counter-only: they are hot and carry no deletion signal.
     private static let censusFilePath: String? =
-      FeatureFlags.environmentValue(named: "SWIFTTUI_STATE_CAPTURE_CENSUS_FILE")
+      FeatureFlags.environmentValue(.stateCaptureCensusFile)
 
     private static func emitCensusLine(for event: Event) {
       guard let censusFilePath else {

@@ -1,4 +1,5 @@
 import Foundation
+import SwiftTUIPrimitives
 
 // Deterministic pseudo-random generation with shrinking for adversarial
 // property tests (campaign two, lineage F5 and the child lineages).
@@ -299,7 +300,7 @@ extension Gen where Value == String {
   public static let fullIterations = 1_000
 
   public static var seed: UInt64 {
-    guard let raw = ProcessInfo.processInfo.environment["SWIFTTUI_PROPERTY_SEED"], !raw.isEmpty
+    guard let raw = ProcessInfo.processInfo.environment[.propertySeed], !raw.isEmpty
     else {
       return 0x5A17_7A11
     }
@@ -310,7 +311,7 @@ extension Gen where Value == String {
   }
 
   public static var iterations: Int {
-    if let raw = ProcessInfo.processInfo.environment["SWIFTTUI_PROPERTY_ITERATIONS"],
+    if let raw = ProcessInfo.processInfo.environment[.propertyIterations],
       let value = Int(raw), value > 0
     {
       return value

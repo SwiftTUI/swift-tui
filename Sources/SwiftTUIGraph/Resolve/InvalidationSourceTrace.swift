@@ -1,3 +1,5 @@
+import SwiftTUIPrimitives
+
 /// Diagnostic-only trace of **how each frame's invalidation set was assembled**,
 /// gated by `SWIFTTUI_INVAL_TRACE` (default off). Inert/zero-cost when disabled.
 ///
@@ -18,8 +20,9 @@
 /// `ViewGraph` instance (or task-locals, the animation-sink storages' shape).
 @MainActor
 package enum InvalidationSourceTrace {
-  package static let environmentVariableName = "SWIFTTUI_INVAL_TRACE"
-  package static let fileEnvironmentVariableName = "SWIFTTUI_INVAL_TRACE_FILE"
+  package static let environmentVariableName = SwiftTUIEnvironmentVariable.invalTrace.rawValue
+  package static let fileEnvironmentVariableName = SwiftTUIEnvironmentVariable.invalTraceFile
+    .rawValue
 
   package static var isEnabled: Bool = environmentDefault()
 
@@ -89,6 +92,6 @@ package enum InvalidationSourceTrace {
     else {
       return DebugTraceSelection.current.isArmed("inval")
     }
-    return !rawValue.isEmpty && rawValue != "0"
+    return FeatureFlags.booleanValue(rawValue) ?? false
   }
 }

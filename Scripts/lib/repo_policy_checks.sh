@@ -82,6 +82,9 @@ run_repo_policy_phase() {
     echo "  standalone source-policy checks still run below"
   fi
 
+  run_repo_policy_check "$mode" "$repo_root" "Check environment variable registry" \
+    "python3 Scripts/check_environment_variables.py" python3 Scripts/check_environment_variables.py
+
   run_repo_policy_check \
     "$mode" \
     "$repo_root" \

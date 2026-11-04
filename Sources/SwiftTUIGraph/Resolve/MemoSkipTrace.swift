@@ -1,3 +1,5 @@
+import SwiftTUIPrimitives
+
 /// Memoization soundness diagnostics. Answers the design's kill-gate question —
 /// *how many recomputed nodes per interaction frame would have been memoizable,
 /// and is skipping them sound* — without changing any behavior.
@@ -41,9 +43,11 @@
 /// `ViewGraph` instance (or task-locals, the animation-sink storages' shape).
 @MainActor
 package enum MemoSkipTrace {
-  package static let environmentVariableName = "SWIFTTUI_MEMO_TRACE"
-  package static let fileEnvironmentVariableName = "SWIFTTUI_MEMO_TRACE_FILE"
-  package static let sampleEnvironmentVariableName = "SWIFTTUI_MEMO_TRACE_SAMPLE"
+  package static let environmentVariableName = SwiftTUIEnvironmentVariable.memoTrace.rawValue
+  package static let fileEnvironmentVariableName = SwiftTUIEnvironmentVariable.memoTraceFile
+    .rawValue
+  package static let sampleEnvironmentVariableName = SwiftTUIEnvironmentVariable.memoTraceSample
+    .rawValue
 
   package static var isEnabled: Bool = environmentDefault()
   package static var sampleEveryNFrames: Int = sampleDefault()
@@ -138,7 +142,8 @@ package enum MemoSkipTrace {
     unsoundContentNoReads += 1
     // Name the node: a bare field name leaves the reader with nothing to
     // bisect, while the identity path and view type pin the authored site.
-    var detail = "memo shadow oracle: content field '\(contentField)' diverged on a no-reads would-skip node"
+    var detail =
+      "memo shadow oracle: content field '\(contentField)' diverged on a no-reads would-skip node"
     if let identity {
       detail += " at \(identity.path.isEmpty ? "$root" : identity.path)"
     }
@@ -238,7 +243,7 @@ package enum MemoSkipTrace {
       // `SWIFTTUI_MEMO_TRACE=0` opts out.
       return true
     }
-    return !rawValue.isEmpty && rawValue != "0"
+    return FeatureFlags.booleanValue(rawValue) ?? true
   }
 
   private static func sampleDefault() -> Int {
@@ -264,7 +269,7 @@ package enum MemoSkipTrace {
 
   private static func traceEmissionDefault() -> Bool {
     if let rawValue = environmentValue(named: environmentVariableName) {
-      return !rawValue.isEmpty && rawValue != "0"
+      return FeatureFlags.booleanValue(rawValue) ?? false
     }
     if environmentValue(named: fileEnvironmentVariableName) != nil {
       return true

@@ -35,7 +35,8 @@ import Synchronization
 /// recursive) the first time a stream resolves into it; on failure the
 /// stream falls back to stderr rather than dropping output.
 package enum DebugLogRouter {
-  package static let debugDirectoryEnvironmentVariableName = "SWIFTTUI_DEBUG_DIR"
+  package static let debugDirectoryEnvironmentVariableName = SwiftTUIEnvironmentVariable.debugDir
+    .rawValue
 
   /// `SWIFTTUI_DEBUG_DIR` as read from the process environment (latched,
   /// trailing slashes trimmed, empty treated as unset).

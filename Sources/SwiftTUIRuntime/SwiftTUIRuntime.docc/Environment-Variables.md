@@ -14,9 +14,10 @@ changes.
 
 ### Reading rules
 
-Unless a row says otherwise, boolean variables share one grammar: **unset**
-keeps the default, **empty or `0`** means off, and **any other value** means
-on. Integer and path variables state their shape in their row.
+Framework boolean variables accept `1`, `true`, `yes`, or `on` to enable and
+an empty value, `0`, `false`, `no`, `off`, or `none` to disable. Matching ignores
+case and surrounding whitespace. Missing or unrecognized values use the
+gate's default. Variables that also accept paths describe them below.
 
 Most gates read the environment **once** and latch the result, so set variables
 before the process launches. Command-line flags parsed by `SwiftTUICommand`
@@ -161,8 +162,8 @@ mains get 8 MiB).
 
 | Variable | Values | Effect |
 | --- | --- | --- |
-| `SWIFTTUI_STACK_LEAN_PROFILE` | exactly `0` or `1` | The stack-lean resolve profile: lean ambient slots instead of task-locals, reuse/memo/selective evaluation off; shares iterative descent with the full profile. Defaults on for WASI builds. On Windows it arms automatically when the measured main-thread stack reserve is below the 8 MiB full-engine floor (link with `-Xlinker /STACK:16777216` to run the full engine); an explicit value overrides that automatic choice, and a debug build that degrades emits a `windows.stack-floor-lean-profile` runtime issue. Otherwise off natively. Other values are ignored. |
-| `SWIFTTUI_LEAN_RETAINED_REUSE` | exactly `1` | Re-enables retained reuse under the lean profile (a reuse hit shortens the descent, so it can only shallow the stack). Ignored when the lean profile is off. |
+| `SWIFTTUI_STACK_LEAN_PROFILE` | boolean | The stack-lean resolve profile: lean ambient slots instead of task-locals, reuse/memo/selective evaluation off; shares iterative descent with the full profile. Defaults on for WASI builds. On Windows it arms automatically when the measured main-thread stack reserve is below the 8 MiB full-engine floor (link with `-Xlinker /STACK:16777216` to run the full engine); an explicit value overrides that automatic choice, and a debug build that degrades emits a `windows.stack-floor-lean-profile` runtime issue. Otherwise off natively. Other values are ignored. |
+| `SWIFTTUI_LEAN_RETAINED_REUSE` | boolean | Re-enables retained reuse under the lean profile (a reuse hit shortens the descent, so it can only shallow the stack). Ignored when the lean profile is off. |
 
 ### Soundness and verification gates
 
@@ -219,7 +220,7 @@ preferred spelling.
 | `SWIFTTUI_INVAL_TRACE_FILE` | file path | Appends invalidation-trace lines to a file instead of the bundle's `inval.log` or stderr. |
 | `SWIFTTUI_PUBLICATION_DIAGNOSTICS` | boolean | Enables runtime registration-publication diagnostics (checkpoint and portal bookkeeping counters). Also armable via `SWIFTTUI_TRACE=publication`. |
 | `SWIFTTUI_RETAINED_VALIDATION_COUNTERS` | boolean, default off | Records comparison, identity-validation, and metadata-restamping work during retained layout. Enable when profiling cache-validation cost; it adds diagnostic work and does not change reuse policy. |
-| `SWIFTTUI_DIAGNOSTICS` | boolean or file path | Terminal CLI runner: `1`/`true` writes the diagnostics TSV to the bundle's `diagnostics.tsv` (or `/tmp/termui-diagnostics.tsv` with no bundle); any other truthy value is used as the file path. `SWIFTTUI_DEBUG=1` (or `--debug`) implies the same resolution. |
+| `SWIFTTUI_DIAGNOSTICS` | boolean or file path | Enabling this flag in the terminal CLI writes the diagnostics TSV to the bundle's `diagnostics.tsv` (or `/tmp/termui-diagnostics.tsv` with no bundle); a non-boolean value specifies a custom file path. `SWIFTTUI_DEBUG=1` (or `--debug`) implies the same resolution. |
 
 ### Browser (WASI) host
 
@@ -230,8 +231,8 @@ listed for completeness and for driving the wasm binary directly.
 | --- | --- | --- |
 | `SWIFTTUI_TRANSPORT` | `ansi`, `terminal`, `xterm`, `ghostty-web`; default surface | Selects the ANSI terminal transport instead of the structured surface transport. |
 | `SWIFTTUI_SURFACE_DELTA` | `1`/`true`/`yes`/`on` | Declares that the host accepts delta frames on the surface transport (the browser bridge's capability opt-in). |
-| `SWIFTTUI_SURFACE_STYLE_APPEND` | exactly `1` | Declares that a delta carries its appended styles plus a `stylesBase` offset instead of the whole accumulated style table (the browser bridge's capability opt-in). |
-| `SWIFTTUI_GEOMETRY_REVISIONS` | exactly `1` | Declares that the host accepts captured geometry revisions on the surface transport (the browser bridge's capability opt-in). |
+| `SWIFTTUI_SURFACE_STYLE_APPEND` | boolean | Declares that a delta carries its appended styles plus a `stylesBase` offset instead of the whole accumulated style table (the browser bridge's capability opt-in). |
+| `SWIFTTUI_GEOMETRY_REVISIONS` | boolean | Declares that the host accepts captured geometry revisions on the surface transport (the browser bridge's capability opt-in). |
 | `SWIFTTUI_FRAME_DIAGNOSTICS` | boolean | Enables wire frame diagnostics. Falls back to `SWIFTTUI_DIAGNOSTICS`; `off`/`false`/`none`/`0`/empty disable. |
 | `SWIFTTUI_MODE` | `manifest` | Prints the app's scene manifest as JSON and exits without launching a scene. |
 | `SWIFTTUI_SCENE` | scene selector | Selects the scene to launch. Falls back to the first command-line argument. |

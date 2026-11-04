@@ -1,3 +1,5 @@
+import SwiftTUIPrimitives
+
 /// Diagnostic-only trace of **why retained reuse was denied** per node, gated by
 /// `SWIFTTUI_REUSE_TRACE` (default off). Inert and zero-cost when disabled.
 ///
@@ -14,7 +16,7 @@
 /// `ViewGraph` instance (or task-locals, the animation-sink storages' shape).
 @MainActor
 package enum ReuseDenialTrace {
-  package static let environmentVariableName = "SWIFTTUI_REUSE_TRACE"
+  package static let environmentVariableName = SwiftTUIEnvironmentVariable.reuseTrace.rawValue
 
   /// Optional file sink. When `SWIFTTUI_REUSE_TRACE_FILE` names a writable path,
   /// each `[REUSE-TRACE]` line is appended there instead of stderr. The trace is
@@ -22,7 +24,8 @@ package enum ReuseDenialTrace {
   /// (this is why it was previously misread as silent on the release perf path).
   /// A file sink makes the diagnostic a durable, run-correlated artifact.
   /// `nil` keeps the historical stderr behavior. Settable for tests.
-  package static let fileEnvironmentVariableName = "SWIFTTUI_REUSE_TRACE_FILE"
+  package static let fileEnvironmentVariableName = SwiftTUIEnvironmentVariable.reuseTraceFile
+    .rawValue
 
   package static var isEnabled: Bool = environmentDefault()
 
@@ -104,8 +107,7 @@ package enum ReuseDenialTrace {
   /// before the per-frame reset erases it. Lets a deterministic fixture pin a
   /// specific frame's counter (e.g. the palette dismissal frame's
   /// `invalidation-conflict`) without parsing the emitted trace text.
-  package static var onFrameSummary:
-    ((_ frameID: UInt64, _ reasonCounts: [String: Int]) -> Void)?
+  package static var onFrameSummary: ((_ frameID: UInt64, _ reasonCounts: [String: Int]) -> Void)?
 
   /// Records a description of one leg of the frame's retained-reuse
   /// suppression scope (focus or press moves), so a
@@ -200,7 +202,7 @@ package enum ReuseDenialTrace {
     guard let rawValue = environmentValue(named: environmentVariableName) else {
       return DebugTraceSelection.current.isArmed("reuse")
     }
-    return !rawValue.isEmpty && rawValue != "0"
+    return FeatureFlags.booleanValue(rawValue) ?? false
   }
 
   private static func environmentValue(named name: String) -> String? {

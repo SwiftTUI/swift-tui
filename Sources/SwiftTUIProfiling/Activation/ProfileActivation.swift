@@ -42,7 +42,9 @@ public final class ProfileActivation {
     guard !activated else {
       return
     }
-    let resolved = explicit ?? EnvProfileParser.parse(Self.environmentValue("SWIFTTUI_PROFILE"))
+    let resolved =
+      explicit
+      ?? EnvProfileParser.parse(Self.environmentValue(SwiftTUIEnvironmentVariable.profile.rawValue))
     guard let config = resolved, !config.signals.isEmpty else {
       return
     }

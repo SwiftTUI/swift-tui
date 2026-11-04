@@ -1,3 +1,5 @@
+import SwiftTUIPrimitives
+
 package struct RuntimeRegistrationPublicationDiagnostics: Equatable, Sendable {
   package var publicationMode: String
   package var dirtyPlanResult: String
@@ -89,7 +91,8 @@ package struct RuntimeRegistrationPublicationDiagnostics: Equatable, Sendable {
 
 @MainActor
 package enum RuntimeRegistrationPublicationDiagnosticsConfiguration {
-  package static let environmentVariableName = "SWIFTTUI_PUBLICATION_DIAGNOSTICS"
+  package static let environmentVariableName = SwiftTUIEnvironmentVariable.publicationDiagnostics
+    .rawValue
   package static var isEnabled: Bool = environmentDefault()
 
   private static func environmentDefault() -> Bool {

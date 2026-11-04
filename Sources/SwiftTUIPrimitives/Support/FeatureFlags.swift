@@ -32,42 +32,44 @@ package enum FeatureGate: CaseIterable, Sendable {
   case retainedValidationCounters
   case mergePressurePacing
 
-  package var environmentVariableName: String {
+  package var environmentVariableName: String { environmentVariable.rawValue }
+
+  package var environmentVariable: SwiftTUIEnvironmentVariable {
     switch self {
     case .soundnessProbe:
-      "SWIFTTUI_SOUNDNESS_PROBE"
+      .soundnessProbe
     case .overlayIncrementalDamage:
-      "SWIFTTUI_OVERLAY_INCREMENTAL_DAMAGE"
+      .overlayIncrementalDamage
     case .rasterVerifyIncremental:
-      "SWIFTTUI_RASTER_VERIFY_INCREMENTAL"
+      .rasterVerifyIncremental
     case .rasterTrustSoundDamage:
-      "SWIFTTUI_RASTER_TRUST_SOUND_DAMAGE"
+      .rasterTrustSoundDamage
     case .presentedProgressGuard:
-      "SWIFTTUI_PRESENTED_PROGRESS_GUARD"
+      .presentedProgressGuard
     case .collectionProbes:
-      "SWIFTTUI_COLLECTION_PROBES"
+      .collectionProbes
     case .collectionResolveReuse:
-      "SWIFTTUI_COLLECTION_RESOLVE_REUSE"
+      .collectionResolveReuse
     case .lazyStackIdealEstimate:
-      "SWIFTTUI_LAZY_IDEAL_ESTIMATE"
+      .lazyIdealEstimate
     case .scrollRegionEmission:
-      "SWIFTTUI_SCROLL_REGION"
+      .scrollRegion
     case .scrollBlit:
-      "SWIFTTUI_SCROLL_BLIT"
+      .scrollBlit
     case .measureSizeStabilityCutoff:
-      "SWIFTTUI_MEASURE_CUTOFF"
+      .measureCutoff
     case .persistentCustomLayoutCache:
-      "SWIFTTUI_PERSISTENT_LAYOUT_CACHE"
+      .persistentLayoutCache
     case .focusMoveInvalidationNarrowing:
-      "SWIFTTUI_FOCUS_MOVE_NARROWING"
+      .focusMoveNarrowing
     case .stateCaptureBinding:
-      "SWIFTTUI_STATE_CAPTURE_BINDING"
+      .stateCaptureBinding
     case .animationVelocity:
-      "SWIFTTUI_ANIMATION_VELOCITY"
+      .animationVelocity
     case .retainedValidationCounters:
-      "SWIFTTUI_RETAINED_VALIDATION_COUNTERS"
+      .retainedValidationCounters
     case .mergePressurePacing:
-      "SWIFTTUI_MERGE_PRESSURE_PACING"
+      .mergePressurePacing
     }
   }
 
@@ -218,7 +220,7 @@ package enum FeatureGate: CaseIterable, Sendable {
   }
 
   package func initialIsEnabled() -> Bool {
-    FeatureFlags.isEnabled(named: environmentVariableName, default: defaultIsEnabled)
+    FeatureFlags.isEnabled(environmentVariable, default: defaultIsEnabled)
   }
 }
 
@@ -258,15 +260,28 @@ package enum FeatureFlags {
     }
   }
 
-  /// Parses a boolean-ish feature flag: absent → `defaultValue`; `"0"` or empty
-  /// → `false`; anything else → `true`.
-  package static func isEnabled(
-    named name: String,
-    default defaultValue: Bool
-  ) -> Bool {
-    guard let rawValue = environmentValue(named: name) else {
-      return defaultValue
+  package static func environmentValue(_ key: SwiftTUIEnvironmentVariable) -> String? {
+    environmentValue(named: key.rawValue)
+  }
+
+  /// Parses a switch, ignoring case and surrounding whitespace. Missing and
+  /// unrecognized values leave the choice to the caller (e.g. a diagnostics path).
+  package static func booleanValue(_ raw: String?) -> Bool? {
+    guard let raw else { return nil }
+    switch raw.trimmedUnicodeWhitespace().lowercased() {
+    case "1", "true", "yes", "on": return true
+    case "", "0", "false", "no", "off", "none": return false
+    default: return nil
     }
-    return !rawValue.isEmpty && rawValue != "0"
+  }
+
+  package static func isEnabled(_ key: SwiftTUIEnvironmentVariable, default defaultValue: Bool)
+    -> Bool
+  {
+    booleanValue(environmentValue(key)) ?? defaultValue
+  }
+
+  package static func isEnabled(named name: String, default defaultValue: Bool) -> Bool {
+    booleanValue(environmentValue(named: name)) ?? defaultValue
   }
 }

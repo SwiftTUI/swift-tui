@@ -1,7 +1,9 @@
 import Foundation
+import SwiftTUIPrimitives
 
 package enum AsyncTestTimeouts {
-  package static let scaleEnvironmentVariable = "SWIFTTUI_TEST_TIMEOUT_SCALE"
+  package static let scaleEnvironmentVariable = SwiftTUIEnvironmentVariable.testTimeoutScale
+    .rawValue
 
   package static var timeoutScale: Double {
     guard

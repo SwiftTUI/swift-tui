@@ -1,3 +1,5 @@
+import SwiftTUIPrimitives
+
 #if canImport(Darwin)
   import Darwin
 #elseif canImport(Glibc)
@@ -19,7 +21,7 @@ public enum RuntimeRenderMode: String, Sendable {
   case asyncNoCancel = "async-no-cancel"
   case asyncNoDrop = "async-no-drop"
 
-  public static let environmentVariableName = "SWIFTTUI_RENDER_MODE"
+  public static let environmentVariableName = SwiftTUIEnvironmentVariable.renderMode.rawValue
   public static let defaultMode: Self = .async
 
   public static func parse(_ rawValue: String?) -> Self {

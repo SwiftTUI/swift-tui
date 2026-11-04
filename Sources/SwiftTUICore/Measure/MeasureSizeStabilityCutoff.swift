@@ -1,3 +1,5 @@
+import SwiftTUIPrimitives
+
 /// The size-stability measure cutoff's certificate pre-pass (plan
 /// 2026-08-11-002, Stage 1 — dark).
 ///
@@ -76,7 +78,7 @@ package enum MeasureCutoffTrace {
         + "record-overflow=\(metrics.deniedRecordOverflow) "
         + "window-mismatch=\(metrics.deniedWindowMismatch))\n",
       toFileAt: DebugLogRouter.resolvedFilePath(
-        override: FeatureFlags.environmentValue(named: "SWIFTTUI_MEASURE_CUTOFF_TRACE_FILE"),
+        override: FeatureFlags.environmentValue(.measureCutoffTraceFile),
         bundleFileName: "measure-cutoff.log"
       )
     )

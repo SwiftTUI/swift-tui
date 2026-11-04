@@ -1,3 +1,5 @@
+import SwiftTUIPrimitives
+
 // The reader-scoped environment toleration: what the reuse door consults in
 // place of whole-snapshot environment equality.
 //
@@ -310,7 +312,7 @@ package enum EnvironmentTolerationCensus {
     // `FeatureFlags.environmentValue` is the Foundation-free `getenv` funnel;
     // this layer must not import Foundation.
     package static var isEnabled: Bool =
-      FeatureFlags.environmentValue(named: "SWIFTTUI_ENV_TOLERATION_CENSUS") != nil
+      FeatureFlags.isEnabled(.envTolerationCensus, default: false)
     package static var tolerated = 0
     package static var readerDenials = 0
     package static var writerDenials = 0

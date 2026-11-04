@@ -1,3 +1,5 @@
+import SwiftTUIPrimitives
+
 // Opt-in metadata only; never records terminal contents or input text.
 #if !os(Windows)
   import Dispatch
@@ -8,7 +10,7 @@
     private let file: Mutex<FileHandle>
 
     init?() {
-      guard let directory = ProcessInfo.processInfo.environment["SWIFTTUI_PTY_DIAGNOSTICS"] else {
+      guard let directory = FeatureFlags.environmentValue(.ptyDiagnostics) else {
         return nil
       }
       let path = URL(fileURLWithPath: directory)
