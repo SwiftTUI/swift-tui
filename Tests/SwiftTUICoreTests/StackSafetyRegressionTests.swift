@@ -379,13 +379,13 @@ struct StackSafetyRegressionTests {
 
     #expect(
       passContext.runtimeIssues.contains {
-        $0.code == "layout.customLayoutDepthLimitExceeded"
+        $0.typedCode == .Layout.customLayoutDepthLimitExceeded
           && $0.message.contains("measurement")
       }
     )
     #expect(
       passContext.runtimeIssues.contains {
-        $0.code == "layout.customLayoutDepthLimitExceeded"
+        $0.typedCode == .Layout.customLayoutDepthLimitExceeded
           && $0.message.contains("placement")
       }
     )
@@ -406,7 +406,7 @@ struct StackSafetyRegressionTests {
     #expect(measured.identity == resolved.identity)
     #expect(
       passContext.runtimeIssues.contains {
-        $0.code == "layout.customLayoutDepthLimitExceeded"
+        $0.typedCode == .Layout.customLayoutDepthLimitExceeded
           && $0.message.contains("measurement")
           && $0.source == "List"
       }

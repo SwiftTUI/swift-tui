@@ -34,7 +34,7 @@ struct KeyCommandModifierlessDiagnosticTests {
     }
 
     let issue = graph.frameRuntimeIssues.first { issue in
-      issue.code == "keyCommand.modifierlessIgnored"
+      issue.typedCode == .KeyCommand.modifierlessIgnored
     }
     #expect(issue != nil, "issues: \(graph.frameRuntimeIssues)")
     #expect(issue?.severity == .warning)
@@ -50,7 +50,7 @@ struct KeyCommandModifierlessDiagnosticTests {
 
     #expect(
       !graph.frameRuntimeIssues.contains { issue in
-        issue.code == "keyCommand.modifierlessIgnored"
+        issue.typedCode == .KeyCommand.modifierlessIgnored
       },
       "issues: \(graph.frameRuntimeIssues)"
     )
@@ -65,7 +65,7 @@ struct KeyCommandModifierlessDiagnosticTests {
 
     #expect(
       !graph.frameRuntimeIssues.contains { issue in
-        issue.code == "keyCommand.modifierlessIgnored"
+        issue.typedCode == .KeyCommand.modifierlessIgnored
       },
       "issues: \(graph.frameRuntimeIssues)"
     )

@@ -282,7 +282,7 @@ import Testing
     #expect(activations == 1)
     #expect(loop.rejectedHostGeometryPointerCount == 3)
     #expect(loop.cancelledHostGeometryGestureCount == 1)
-    #expect(loop.reportedRuntimeIssues.contains { $0.code == "host.geometry.stalePointer" })
+    #expect(loop.reportedRuntimeIssues.contains { $0.typedCode == .Host.geometryStalepointer })
   }
 
   @Test func accessibilityAcknowledgementDoesNotOutliveItsHostSession() throws {

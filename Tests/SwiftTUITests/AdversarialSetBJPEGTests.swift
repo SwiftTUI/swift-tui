@@ -24,7 +24,7 @@ struct AdversarialSetBJPEGTests {
     DefaultRenderer().render(
       Image(data: bytes), context: .init(identity: testIdentity("SetBJPEG", name)),
       proposal: .init(width: 8, height: 4)
-    ).diagnostics.runtime.issues.first { $0.code == "image.unresolvedSource" }
+    ).diagnostics.runtime.issues.first { $0.typedCode == .Image.unresolvedSource }
   }
 
   // A 3:2 horizontal sampling ratio is not divisible; the decoder says such

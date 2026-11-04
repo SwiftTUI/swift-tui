@@ -6,7 +6,7 @@ extension RunLoop {
       reportRuntimeIssue(
         RuntimeIssue(
           severity: .error,
-          code: "lifecycle.userExitUnsupported",
+          code: .Lifecycle.userExitUnsupported,
           message: "Exit keys cannot end an app on this host. The session is still running."
         )
       )

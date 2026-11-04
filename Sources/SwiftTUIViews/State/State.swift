@@ -746,7 +746,7 @@ public struct State<Value> {
           {
             ImperativeRuntimeIssueQueue.record(
               RuntimeIssue(
-                severity: .warning, code: "state.duplicateSlotClaim",
+                severity: .warning, code: .State.duplicateSlotClaim,
                 message:
                   "A write from @State<\(Value.self)> cannot replace the incompatible slot \(slotIdentifier) storing \(slot.storedTypeDescription). Conform the enclosing helper to DynamicProperty.",
                 source: "@State"))
@@ -832,7 +832,7 @@ private func reportImperativeSeedFallback(
   ImperativeRuntimeIssueQueue.record(
     RuntimeIssue(
       severity: .warning,
-      code: "state.imperativeSeedFallback",
+      code: .State.imperativeSeedFallback,
       message: message,
       source: "@State"
     )

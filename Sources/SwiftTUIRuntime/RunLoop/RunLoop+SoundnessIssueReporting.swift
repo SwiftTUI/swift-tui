@@ -191,7 +191,7 @@ extension RunLoop {
     issues.append(
       RuntimeIssue(
         severity: .warning,
-        code: "soundness.\(kind.issueName)",
+        code: .soundness(kind),
         message:
           "\(newViolations) sampled soundness violation(s): "
           + (snapshot.lastViolationDetailByKind[kind] ?? "no detail recorded"),

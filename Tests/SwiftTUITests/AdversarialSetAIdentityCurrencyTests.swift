@@ -302,7 +302,7 @@ struct AdversarialSetAIdentityCurrencyTests {
     #expect(collection.wrappedValue.map(\.name) == ["A", "C"])
     #expect(
       ImperativeRuntimeIssueQueue.pending.contains {
-        $0.code == "forEach.staleElementBindingWrite"
+        $0.typedCode == .ForEach.staleElementBindingWrite
       })
     // Drain the dispatch warning through a real frame; never read the retired row binding.
     try h.renderAfterExternalMutation()

@@ -38,7 +38,7 @@ struct BoundedReconciliationTests {
     )
     let rendered = artifacts.rasterSurface.lines.joined(separator: "\n")
     let limitIssues = artifacts.diagnostics.runtime.issues.filter {
-      $0.code == "latePreference.reconciliationLimitExceeded"
+      $0.typedCode == .LatePreference.reconciliationLimitExceeded
     }
 
     #expect(limitIssues.isEmpty)
@@ -71,7 +71,7 @@ struct BoundedReconciliationTests {
       proposal: .init(width: 30, height: 4)
     )
     let limitIssues = artifacts.diagnostics.runtime.issues.filter {
-      $0.code == "latePreference.reconciliationLimitExceeded"
+      $0.typedCode == .LatePreference.reconciliationLimitExceeded
     }
     let resolvedBodyText = textPayloads(in: artifacts.resolvedTree).filter {
       $0.hasPrefix("body-height-")

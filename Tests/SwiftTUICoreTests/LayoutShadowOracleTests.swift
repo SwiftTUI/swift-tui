@@ -668,7 +668,7 @@ struct LayoutShadowOracleTests {
     let freshMeasured = freshEngine.measure(tree, proposal: proposal, passContext: freshContext)
     #expect(
       freshContext.runtimeIssues.contains { issue in
-        issue.code == "layout.customLayoutDepthLimitExceeded"
+        issue.typedCode == .Layout.customLayoutDepthLimitExceeded
       }
     )
     #expect(freshMeasured.measuredSize != productionMeasured.measuredSize)

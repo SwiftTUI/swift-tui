@@ -74,7 +74,9 @@ struct PipelineContractTests {
       #expect(passes > 1)
       #expect(result?.layout.layoutWork == expected)
       #expect(
-        result?.runtimeIssues.contains { $0.code == "latePreference.reconciliationLimitExceeded" }
+        result?.runtimeIssues.contains {
+          $0.typedCode == .LatePreference.reconciliationLimitExceeded
+        }
           == exceedsBudget)
     }
   }

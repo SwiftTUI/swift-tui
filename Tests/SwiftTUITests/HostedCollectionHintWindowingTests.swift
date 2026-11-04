@@ -98,7 +98,7 @@ struct HostedCollectionHintWindowingTests {
     // realization stays complete — the cliff is reported, not estimated away.
     #expect(IndexedChildRealizationProbe.realizedChildCount == 200)
     let cliffIssues = artifacts.diagnostics.runtime.issues.filter {
-      $0.code == "collection.unboundedRealization"
+      $0.typedCode == .Collection.unboundedRealization
     }
     #expect(cliffIssues.count == 1, "exactly one issue per identity per pass")
   }
@@ -126,7 +126,7 @@ struct HostedCollectionHintWindowingTests {
     #expect(artifacts.rasterSurface.lines.joined(separator: "\n").contains("Footer"))
     #expect(
       artifacts.diagnostics.runtime.issues.filter {
-        $0.code == "collection.unboundedRealization"
+        $0.typedCode == .Collection.unboundedRealization
       }.count == 1)
   }
 

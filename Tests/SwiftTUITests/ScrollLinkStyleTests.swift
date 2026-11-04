@@ -89,7 +89,9 @@ struct ScrollLinkStyleTests {
       }.scrollViewStyle(ConsumerScrollViewStyle(verticalGlyph: glyph, horizontalGlyph: "=")),
       context: .init(identity: testIdentity("InvalidGlyphs")), proposal: .init(width: 10, height: 4)
     )
-    let issues = frame.diagnostics.runtime.issues.filter { $0.code == "style.invalidPresentation" }
+    let issues = frame.diagnostics.runtime.issues.filter {
+      $0.typedCode == .Style.invalidPresentation
+    }
     #expect(issues.count == 1)
     // The report rides the shared misuse channel and names the offender.
     #expect(issues.first?.source == "ScrollViewStyle")
@@ -128,7 +130,7 @@ struct ScrollLinkStyleTests {
         indicatorStyle: .color(.red), opacity: .nan, reservesIndicatorSpace: false),
       configuration: configuration, styleLabel: "invalid", identity: testIdentity("InvalidFields"))
     let issues = ImperativeRuntimeIssueQueue.drain()
-    #expect(issues.filter { $0.code == "style.invalidPresentation" }.count == 1)
+    #expect(issues.filter { $0.typedCode == .Style.invalidPresentation }.count == 1)
     #expect(issues.first?.message.contains("presentation: invalid") == true)
     #expect(presentation.contentInsets == .zero)
     #expect(presentation.opacity == 1)
@@ -411,7 +413,7 @@ struct ScrollLinkStyleTests {
     let run = try #require(allLinkRuns(in: invalid.resolvedTree).first)
     #expect(run.style.opacity == 1)
     let issues = invalid.diagnostics.runtime.issues.filter {
-      $0.code == "style.invalidPresentation"
+      $0.typedCode == .Style.invalidPresentation
     }
     #expect(issues.count == 1)
     #expect(issues.first?.source == "LinkStyle")
@@ -422,7 +424,8 @@ struct ScrollLinkStyleTests {
       context: context)
     #expect(try #require(allLinkRuns(in: valid.resolvedTree).first).style.opacity == 0.5)
     #expect(
-      valid.diagnostics.runtime.issues.filter { $0.code == "style.invalidPresentation" }.isEmpty)
+      valid.diagnostics.runtime.issues.filter { $0.typedCode == .Style.invalidPresentation }.isEmpty
+    )
   }
 
   @Test("invalid custom opacity keeps disabled dimming and independent custom paint")
@@ -443,7 +446,7 @@ struct ScrollLinkStyleTests {
       #expect(custom.style.opacity < 1)
       #expect(custom.style.foregroundStyle == .color(.green))
       let issues = artifacts.diagnostics.runtime.issues.filter {
-        $0.code == "style.invalidPresentation"
+        $0.typedCode == .Style.invalidPresentation
       }
       #expect(issues.count == 1)
       #expect(issues.first?.message.contains("automatic values") == true)

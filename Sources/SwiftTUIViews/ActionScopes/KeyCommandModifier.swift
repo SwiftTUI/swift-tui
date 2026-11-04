@@ -72,7 +72,7 @@ public struct KeyCommandRegistrationModifier: IterativePrimitiveViewModifier, Se
         context.viewGraph?.recordFrameRuntimeIssue(
           RuntimeIssue(
             severity: .warning,
-            code: "keyCommand.modifierlessIgnored",
+            code: .KeyCommand.modifierlessIgnored,
             message:
               "The key command \"\(description)\" binds \(binding.key) with no "
               + "modifiers; modifier-less keys are reserved for typing and "
@@ -94,7 +94,7 @@ public struct KeyCommandRegistrationModifier: IterativePrimitiveViewModifier, Se
         // deliver it. Legacy terminal bytes cannot express these combinations.
         context.viewGraph?.recordFrameRuntimeIssue(
           RuntimeIssue(
-            severity: .warning, code: "keyCommand.requiresEnhancedKeyboard",
+            severity: .warning, code: .KeyCommand.requiresEnhancedKeyboard,
             message: "The key command \"\(description)\" requires explicit letter modifiers "
               + "that legacy terminal input cannot deliver. Use the resulting character without "
               + "Shift, or a lowercase character with Control, for a portable binding.",

@@ -939,7 +939,7 @@ struct AsyncFrameTailRenderingTests {
     let issue = artifacts.diagnostics.runtime.issues.first
 
     #expect(artifacts.diagnostics.runtime.issues.count == 1)
-    #expect(issue?.code == "toolbar.unhostedItems")
+    #expect(issue?.typedCode == .Toolbar.unhostedItems)
     #expect(issue?.severity == .warning)
   }
 
@@ -951,7 +951,7 @@ struct AsyncFrameTailRenderingTests {
       proposal: .init(width: 24, height: 4)
     )
     let issues = artifacts.diagnostics.runtime.issues.filter {
-      $0.code == "layout.customLayoutDepthLimitExceeded"
+      $0.typedCode == .Layout.customLayoutDepthLimitExceeded
     }
 
     #expect(!issues.isEmpty)
@@ -973,7 +973,7 @@ struct AsyncFrameTailRenderingTests {
 
     #expect(
       artifacts.diagnostics.runtime.issues.filter {
-        $0.code == "layout.customLayoutDepthLimitExceeded"
+        $0.typedCode == .Layout.customLayoutDepthLimitExceeded
       }.isEmpty
     )
     // Nesting beyond the worker budget disqualifies offload: the layout pass
@@ -1001,7 +1001,7 @@ struct AsyncFrameTailRenderingTests {
 
     #expect(
       artifacts.diagnostics.runtime.issues.filter {
-        $0.code == "layout.customLayoutDepthLimitExceeded"
+        $0.typedCode == .Layout.customLayoutDepthLimitExceeded
       }.isEmpty
     )
     #expect(workerTimings.layoutCompute == .zero)

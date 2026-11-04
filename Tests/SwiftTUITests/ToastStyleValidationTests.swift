@@ -57,7 +57,7 @@ struct ToastStyleValidationTests {
   }
 
   private func styleIssues(in artifacts: RenderSnapshot) -> [RuntimeIssue] {
-    artifacts.diagnostics.runtime.issues.filter { $0.code == "style.invalidPresentation" }
+    artifacts.diagnostics.runtime.issues.filter { $0.typedCode == .Style.invalidPresentation }
   }
 
   @Test("inverted width bounds render the info presentation and report one issue")

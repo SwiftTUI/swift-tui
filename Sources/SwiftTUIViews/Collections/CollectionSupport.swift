@@ -269,7 +269,7 @@ func eagerCollectionRuntimeIssue(
   }
   return RuntimeIssue(
     severity: .warning,
-    code: "collection.eagerLargeCollection",
+    code: .Collection.eagerLargeCollection,
     message:
       "\(source) resolved \(rowCount) rows eagerly. Builder-authored content takes the "
       + "unwindowed path; the data-source initializer realizes only the visible band.",

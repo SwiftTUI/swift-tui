@@ -200,7 +200,7 @@ struct AdversarialSetBImageTests {
     #expect(parseFileURL(real.absoluteString + "%FF") == nil)
     #expect(parseFileURL("FILE://LOCALHOST/tmp/example.png") == "/tmp/example.png")
     let rawNUL = render(Image(path: real.path + "\0suffix"), "raw-nul", width: 4, height: 2)
-    #expect(rawNUL.diagnostics.runtime.issues.contains { $0.code == "image.unresolvedSource" })
+    #expect(rawNUL.diagnostics.runtime.issues.contains { $0.typedCode == .Image.unresolvedSource })
     let genuine = render(Image(fileURLString: real.absoluteString), "genuine", width: 4, height: 2)
     #expect(genuine.rasterSurface.imageAttachments.first?.bounds.size.width == 1)
   }
@@ -256,7 +256,7 @@ struct AdversarialSetBImageTests {
     ] {
       let snapshot = render(Image(data: bytes), name, width: 4, height: 2)
       let issues = snapshot.diagnostics.runtime.issues.filter {
-        $0.code == "image.unresolvedSource"
+        $0.typedCode == .Image.unresolvedSource
       }
       #expect(issues.count == 1, "\(name): \(snapshot.diagnostics.runtime.issues.map(\.code))")
       #expect(
@@ -264,7 +264,8 @@ struct AdversarialSetBImageTests {
         "\(name): \(snapshot.measuredTree.measuredSize)")
     }
     let good = render(Image(data: png), "intact", width: 4, height: 2)
-    #expect(good.diagnostics.runtime.issues.filter { $0.code == "image.unresolvedSource" }.isEmpty)
+    #expect(
+      good.diagnostics.runtime.issues.filter { $0.typedCode == .Image.unresolvedSource }.isEmpty)
     #expect(
       good.measuredTree.measuredSize == CellSize(width: 1, height: 1),
       "\(good.measuredTree.measuredSize)")

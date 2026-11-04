@@ -885,7 +885,7 @@ private func expectRenderTimeMutationWarnsWithoutTrapping() async {
         proposal: .init(width: 40, height: 8)
       )
       let warnings = artifacts.diagnostics.runtime.issues.filter {
-        $0.code == "presentation.mutationDuringViewUpdate"
+        $0.typedCode == .Presentation.mutationDuringViewUpdate
       }
       #expect(warnings.count == 1)
       #expect(warnings.first?.severity == .warning)

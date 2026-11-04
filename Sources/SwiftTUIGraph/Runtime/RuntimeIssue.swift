@@ -12,7 +12,13 @@ public enum RuntimeIssueSeverity: String, Sendable, Hashable {
 /// Each runtime issue for a frame is also part of the diagnostics for that frame.
 public struct RuntimeIssue: Sendable, Hashable, CustomStringConvertible {
   public var severity: RuntimeIssueSeverity
-  public var code: String
+  public var typedCode: Code
+
+  /// The historical wire spelling of this issue, including host-defined codes.
+  public var code: String {
+    get { typedCode.wireValue }
+    set { typedCode = Code(wireValue: newValue) }
+  }
   public var message: String
   public var identity: Identity?
   public var source: String?
@@ -24,8 +30,20 @@ public struct RuntimeIssue: Sendable, Hashable, CustomStringConvertible {
     identity: Identity? = nil,
     source: String? = nil
   ) {
+    self.init(
+      severity: severity, code: Code(wireValue: code), message: message,
+      identity: identity, source: source)
+  }
+
+  public init(
+    severity: RuntimeIssueSeverity,
+    code: Code,
+    message: String,
+    identity: Identity? = nil,
+    source: String? = nil
+  ) {
     self.severity = severity
-    self.code = code
+    self.typedCode = code
     self.message = message
     self.identity = identity
     self.source = source

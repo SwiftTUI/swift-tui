@@ -543,7 +543,7 @@ package final class LayoutPassContext: Sendable {
       guard state.customLayoutCompatibilityDepth < state.customLayoutCompatibilityDepthLimit else {
         let issue = RuntimeIssue(
           severity: .error,
-          code: "layout.customLayoutDepthLimitExceeded",
+          code: .Layout.customLayoutDepthLimitExceeded,
           message:
             "Layout engine re-entry (\(phase.rawValue)) exceeded the compatibility depth "
             + "limit of \(state.customLayoutCompatibilityDepthLimit).",
@@ -576,7 +576,7 @@ package final class LayoutPassContext: Sendable {
     state.withLock { state in
       let issue = RuntimeIssue(
         severity: .warning,
-        code: "layout.placementChildMismatch",
+        code: .Layout.placementChildMismatch,
         message:
           "placement for \(behavior) saw \(childCount) resolved children but "
           + "\(measurementCount) measurements; the surplus is not placed",
@@ -606,7 +606,7 @@ package final class LayoutPassContext: Sendable {
     state.withLock { state in
       let issue = RuntimeIssue(
         severity: .warning,
-        code: "collection.unboundedRealization",
+        code: .Collection.unboundedRealization,
         message:
           "\(source) realized all \(count) rows: the height proposal is unbounded and no "
           + "enclosing scroll view declared a measure viewport to window against.",

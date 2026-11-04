@@ -742,7 +742,7 @@ struct DormantTabStateTests {
     )
 
     let issues = resolved.preferenceValues[RuntimeIssuePreferenceKey.self]
-      .filter { $0.code == "tab.duplicateTag" }
+      .filter { $0.typedCode == .Tab.duplicateTag }
     #expect(issues.count == 1)
     #expect(issues[0].message.contains("occurrence 1"))
   }
@@ -955,7 +955,7 @@ struct DormantTabStateTests {
 
     let archive = graph.captureDormantStateArchive(rootedAt: root)
     let issues = graph.frameRuntimeIssues.filter {
-      $0.code == "tab.dormantStateUnsupportedValue"
+      $0.typedCode == .Tab.dormantStateUnsupportedValue
     }
     #expect(issues.isEmpty, "unexpected rejections: \(issues.map(\.message))")
     #expect(archive.persistentSlotCount == 4)
@@ -996,7 +996,7 @@ struct DormantTabStateTests {
     let archive = graph.captureDormantStateArchive(rootedAt: root)
     #expect(archive.persistentSlotCount == 0)
     let issues = graph.frameRuntimeIssues.filter {
-      $0.code == "tab.dormantStateUnsupportedValue"
+      $0.typedCode == .Tab.dormantStateUnsupportedValue
     }
     #expect(issues.count == 2, "issues: \(issues.map(\.message))")
   }
@@ -1024,7 +1024,7 @@ struct DormantTabStateTests {
     )
     #expect(surfaceText(departed).contains("Other"))
     let unsupported = departed.diagnostics.runtime.issues.filter {
-      $0.code == "tab.dormantStateUnsupportedValue"
+      $0.typedCode == .Tab.dormantStateUnsupportedValue
     }
     #expect(unsupported.isEmpty, "unexpected: \(unsupported.map(\.message))")
 
@@ -1054,7 +1054,7 @@ struct DormantTabStateTests {
     _ = sourceGraph.captureDormantStateArchive(rootedAt: root)
     _ = sourceGraph.captureDormantStateArchive(rootedAt: root)
     let classIssues = sourceGraph.frameRuntimeIssues.filter {
-      $0.code == "tab.dormantStateUnsupportedValue"
+      $0.typedCode == .Tab.dormantStateUnsupportedValue
     }
     #expect(classIssues.count == 1)
     #expect(classIssues.first?.message.contains("hoist") == true)
@@ -1095,7 +1095,7 @@ struct DormantTabStateTests {
     let archive = graph.captureDormantStateArchive(rootedAt: root)
     #expect(archive.persistentSlotCount == 0)
     let issues = graph.frameRuntimeIssues.filter {
-      $0.code == "tab.dormantStateUnsupportedValue"
+      $0.typedCode == .Tab.dormantStateUnsupportedValue
     }
     #expect(issues.count == 2)
     #expect(
@@ -1157,7 +1157,7 @@ struct DormantTabStateTests {
     )
 
     let issues = graph.frameRuntimeIssues.filter {
-      $0.code == "tab.dormantStateUnsupportedValue"
+      $0.typedCode == .Tab.dormantStateUnsupportedValue
     }
     #expect(issues.count == 2)
     #expect(issues.contains { $0.message.contains("Swift.ObjectIdentifier") })

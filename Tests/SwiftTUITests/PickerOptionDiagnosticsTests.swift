@@ -49,7 +49,7 @@ struct PickerOptionDiagnosticsTests {
     )
 
     let issues = artifacts.diagnostics.runtime.issues.filter {
-      $0.code == "picker.unrepresentableOptionContent"
+      $0.typedCode == .Picker.unrepresentableOptionContent
     }
     #expect(issues.count == 2)
     #expect(Set(issues.compactMap(\.identity)).count == 2)
@@ -79,7 +79,7 @@ struct PickerOptionDiagnosticsTests {
 
     #expect(
       !artifacts.diagnostics.runtime.issues.contains {
-        $0.code == "picker.unrepresentableOptionContent"
+        $0.typedCode == .Picker.unrepresentableOptionContent
       }
     )
   }
@@ -104,7 +104,7 @@ struct PickerOptionDiagnosticsTests {
       proposal: .init(width: 30, height: 8))
     #expect(
       !artifacts.diagnostics.runtime.issues.contains {
-        $0.code == "picker.unrepresentableOptionContent"
+        $0.typedCode == .Picker.unrepresentableOptionContent
       })
     #expect(artifacts.rasterSurface.lines.joined().contains("Option 3"))
     #expect(keys.dispatch(identity: identity, keyPress: KeyPress(.arrowDown)))

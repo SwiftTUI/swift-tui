@@ -40,7 +40,9 @@ struct MenuCompositionStyleTests {
     let artifacts = renderMenu(
       .init(RepeatedMenuContentStyle()),
       enabled: true, focused: false, expanded: true)
-    let issues = artifacts.diagnostics.runtime.issues.filter { $0.code == "style.duplicateContent" }
+    let issues = artifacts.diagnostics.runtime.issues.filter {
+      $0.typedCode == .Style.duplicateContent
+    }
     #expect(issues.count == 1)
     #expect(issues.first?.source == "MenuStyle")
     #expect(artifacts.rasterSurface.lines.filter { $0.contains("First command") }.count == 1)
@@ -55,7 +57,7 @@ struct MenuCompositionStyleTests {
         context: .init(identity: testIdentity("RepeatedContent")),
         proposal: .init(width: 40, height: 8))
       let issues = artifacts.diagnostics.runtime.issues.filter {
-        $0.code == "style.duplicateContent"
+        $0.typedCode == .Style.duplicateContent
       }
       #expect(issues.count == (alternatives ? 0 : 1))
       if !alternatives {

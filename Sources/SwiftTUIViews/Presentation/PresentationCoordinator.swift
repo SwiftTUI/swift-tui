@@ -35,7 +35,8 @@ package enum ViewUpdateGuard {
 /// from an action, a task, or a binding instead.
 @MainActor
 package enum PresentationMutationGuard {
-  package static let mutationDuringViewUpdateCode = "presentation.mutationDuringViewUpdate"
+  package static let mutationDuringViewUpdateCode = RuntimeIssue.Code.Presentation
+    .mutationDuringViewUpdate.rawValue
 
   /// Test observer, called with the coordinator's message after each refusal
   /// is reported.

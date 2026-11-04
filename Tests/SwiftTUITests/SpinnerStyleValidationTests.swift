@@ -32,7 +32,7 @@ struct SpinnerStyleValidationTests {
     label: String
   ) -> [RuntimeIssue] {
     artifacts.diagnostics.runtime.issues.filter {
-      $0.code == "style.invalidPresentation" && $0.message.contains(label)
+      $0.typedCode == .Style.invalidPresentation && $0.message.contains(label)
     }
   }
 

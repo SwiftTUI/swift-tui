@@ -431,7 +431,7 @@ private func rootRuntimeIssues(
     unhostedToolbarItems.compactMap(\.sourceIdentity).first ?? resolved.identity
   let unhostedIssue = RuntimeIssue(
     severity: .warning,
-    code: "toolbar.unhostedItems",
+    code: .Toolbar.unhostedItems,
     message:
       "\(unhostedToolbarItems.count) toolbar item(s) reached the scene root without an enclosing `.toolbar()` on an `ActionScope`; the item(s) were not rendered.\(titleSummary)",
     identity: sourceIdentity,
@@ -449,7 +449,7 @@ private func latePreferenceReconciliationLimitIssue(
 ) -> RuntimeIssue {
   RuntimeIssue(
     severity: .warning,
-    code: "latePreference.reconciliationLimitExceeded",
+    code: .LatePreference.reconciliationLimitExceeded,
     message:
       "Late preference reconciliation did not converge within the \(relayoutPassBudget)-pass tree-derived budget; the frame was committed after one final relayout of the latest reconciled tree.",
     identity: rootIdentity,

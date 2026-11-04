@@ -127,7 +127,7 @@ where C: MutableCollection & RandomAccessCollection {
         ImperativeRuntimeIssueQueue.record(
           RuntimeIssue(
             severity: .warning,
-            code: "forEach.staleElementBindingWrite",
+            code: .ForEach.staleElementBindingWrite,
             message:
               "A ForEach element binding for id \(elementID) was written after "
               + "its element left the collection; the write was dropped. "

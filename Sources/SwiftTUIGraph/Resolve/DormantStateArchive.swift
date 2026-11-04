@@ -144,7 +144,7 @@ extension ViewGraph {
           recordFrameRuntimeIssue(
             RuntimeIssue(
               severity: .warning,
-              code: "tab.dormantStateUnsupportedValue",
+              code: .Tab.dormantStateUnsupportedValue,
               message:
                 "TabView cannot archive persistent state slot \(identifier.ordinal) containing "
                 + "\(slot.storedTypeDescription); it will restart from its authored value. "

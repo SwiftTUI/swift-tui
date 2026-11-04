@@ -212,7 +212,7 @@ struct DynamicPropertySlotIdentityTests {
     #expect(first == 7)
     #expect(second == 7, "the legacy undiscovered composition no longer shared its slot")
     #expect(
-      graph.frameRuntimeIssues.contains { $0.code == "state.duplicateSlotClaim" },
+      graph.frameRuntimeIssues.contains { $0.typedCode == .State.duplicateSlotClaim },
       "two distinct boxes claimed one slot silently; issues: \(graph.frameRuntimeIssues)"
     )
   }

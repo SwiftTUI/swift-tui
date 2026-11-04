@@ -447,7 +447,7 @@ struct AdversarialSetBGestureTests {
     #expect(probe.changes == [0, 2, 0, 0])
     #expect(loop.rejectedHostGeometryPointerCount == 3)
     #expect(loop.cancelledHostGeometryGestureCount == 1)
-    let stale = loop.reportedRuntimeIssues.filter { $0.code == "host.geometry.stalePointer" }
+    let stale = loop.reportedRuntimeIssues.filter { $0.typedCode == .Host.geometryStalepointer }
     #expect(!stale.isEmpty)
   }
 }

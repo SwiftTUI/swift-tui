@@ -2974,7 +2974,7 @@ struct PlacementMismatchDiagnosticsTests {
     )
     #expect(requests.count == min(2, measurementCount))
     #expect(
-      pass.runtimeIssues.filter { $0.code == "layout.placementChildMismatch" }.count
+      pass.runtimeIssues.filter { $0.typedCode == .Layout.placementChildMismatch }.count
         == (measurementCount == 2 ? 0 : 1))
   }
 
@@ -3007,7 +3007,7 @@ struct PlacementMismatchDiagnosticsTests {
     #expect(requests.isEmpty)
     #expect(
       passContext.runtimeIssues.contains { issue in
-        issue.code == "layout.placementChildMismatch"
+        issue.typedCode == .Layout.placementChildMismatch
       },
       "the divergence was swallowed silently; issues: \(passContext.runtimeIssues)"
     )
@@ -3071,7 +3071,7 @@ struct PlacementMismatchDiagnosticsTests {
     #expect(requests.count == 1, "the truncated placement itself is unchanged")
     #expect(
       passContext.runtimeIssues.contains { issue in
-        issue.code == "layout.placementChildMismatch"
+        issue.typedCode == .Layout.placementChildMismatch
       }
     )
   }

@@ -50,7 +50,7 @@ struct PanelTests {
 
     let issues = resolved.duplicateEntityIdentityRuntimeIssues()
     #expect(issues.count == 1)
-    #expect(issues[0].code == "identity.duplicateEntity")
+    #expect(issues[0].typedCode == .Identity.duplicateEntity)
     #expect(issues[0].identity == testIdentity("Root", "VStack[1]", "ID[\"dup\"]"))
   }
 
@@ -78,7 +78,7 @@ struct PanelTests {
 
     let issues = resolved.duplicateEntityIdentityRuntimeIssues()
     #expect(issues.count == 1)
-    #expect(issues[0].code == "identity.duplicateEntity")
+    #expect(issues[0].typedCode == .Identity.duplicateEntity)
   }
 
   @Test("Panel with explicit id exposes that id via ActionScope.ID")

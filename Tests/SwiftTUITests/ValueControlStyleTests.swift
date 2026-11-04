@@ -276,7 +276,7 @@ struct ValueControlStyleTests {
         Stepper("Count", value: .constant(5), in: 0...10)
           .stepperStyle(ConsumerStepperStyle(duplicates: true))
       })
-    let issues = frame.diagnostics.runtime.issues.filter { $0.code == "style.duplicateRoute" }
+    let issues = frame.diagnostics.runtime.issues.filter { $0.typedCode == .Style.duplicateRoute }
     #expect(issues.count == 3)
     for issue in issues {
       #expect(

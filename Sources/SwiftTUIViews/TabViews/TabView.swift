@@ -479,7 +479,7 @@ extension TabView {
         }
         return RuntimeIssue(
           severity: .warning,
-          code: "tab.duplicateTag",
+          code: .Tab.duplicateTag,
           message:
             "TabView declared duplicate selection tag \(option.tag.identityComponent) "
             + "at occurrence \(option.tagOccurrence); dormant state is isolated by occurrence, "
@@ -645,7 +645,7 @@ extension TabView {
       guard let tag = entry.tag else {
         excludedIssues.append(
           RuntimeIssue(
-            severity: .warning, code: "tab.missingStructuralTag",
+            severity: .warning, code: .Tab.missingStructuralTag,
             message:
               "TabView excluded child \(index): its selection tag is not structurally visible. "
               + "Declare Tab directly in the builder, or attach .tag to the child wrapper.",

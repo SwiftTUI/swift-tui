@@ -41,7 +41,7 @@ struct StyleRouteContractTests {
     #expect(strip == "Home (Home) Settings (Settings) Logs (Logs)")
 
     let issues = artifacts.diagnostics.runtime.issues.filter {
-      $0.code == "style.duplicateRoute"
+      $0.typedCode == .Style.duplicateRoute
     }
     #expect(issues.count == 3, "one issue per item whose route was installed twice")
     let issue = try #require(issues.first)
@@ -146,7 +146,9 @@ struct StyleRouteContractTests {
       context: .init(identity: testIdentity("Root")),
       proposal: .init(width: 48, height: 4)
     )
-    let issues = artifacts.diagnostics.runtime.issues.filter { $0.code == "style.duplicateRoute" }
+    let issues = artifacts.diagnostics.runtime.issues.filter {
+      $0.typedCode == .Style.duplicateRoute
+    }
     #expect(issues.count == 3, "one issue per item")
     for index in 0..<3 {
       #expect(

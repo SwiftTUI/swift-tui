@@ -530,7 +530,7 @@ private func resolveValuePath(
           runtimeIssues.append(
             RuntimeIssue(
               severity: .warning,
-              code: "navigation.missingValueDestination",
+              code: .Navigation.missingValueDestination,
               message:
                 "No navigation destination is registered for path value type \(pathBinding.valueTypeName); the path stopped at index \(index).",
               identity: context.identity,
@@ -664,7 +664,7 @@ private func resolveActiveDestinationChain(
           runtimeIssues.append(
             RuntimeIssue(
               severity: .warning,
-              code: "navigation.multipleActiveDestinations",
+              code: .Navigation.multipleActiveDestinations,
               message:
                 "\(activeInstances.count) binding-driven navigation destinations were active in the same surface; the last declaration won and every earlier binding was reset.",
               identity: context.identity,
@@ -708,7 +708,7 @@ private func resolveActiveDestinationChain(
       visibleNode.preferenceValues[NavigationDestinationDeclarationPreferenceKey.self] = .init()
       visibleNode.preferenceValues[NavigationValueDestinationPreferenceKey.self] = .init()
       if hasOverflow,
-        !runtimeIssues.contains(where: { $0.code == "navigation.depthLimitExceeded" })
+        !runtimeIssues.contains(where: { $0.typedCode == .Navigation.depthLimitExceeded })
       {
         runtimeIssues.append(navigationDepthLimitIssue(identity: context.identity))
       }
@@ -729,7 +729,7 @@ private func resolveActiveDestinationChain(
 private func navigationDepthLimitIssue(identity: Identity) -> RuntimeIssue {
   RuntimeIssue(
     severity: .warning,
-    code: "navigation.depthLimitExceeded",
+    code: .Navigation.depthLimitExceeded,
     message:
       "Navigation exceeded the \(navigationDestinationDepthLimit)-destination safety limit; deeper destinations were not resolved.",
     identity: identity,

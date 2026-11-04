@@ -75,7 +75,7 @@ extension RunLoop {
       // One stable issue per scene keeps high-rate stale motion diagnostics bounded.
       reportRuntimeIssue(
         .init(
-          severity: .warning, code: "host.geometry.stalePointer",
+          severity: .warning, code: .Host.geometryStalepointer,
           message: "Pointer input from an obsolete host geometry was rejected.",
           source: "HostGeometry"
         ))

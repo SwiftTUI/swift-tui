@@ -196,7 +196,9 @@ struct PickerStyleParityTests {
       ),
       proposal: .init(width: 60, height: 12)
     )
-    let issues = artifacts.diagnostics.runtime.issues.filter { $0.code == "style.duplicateRoute" }
+    let issues = artifacts.diagnostics.runtime.issues.filter {
+      $0.typedCode == .Style.duplicateRoute
+    }
     #expect(issues.count == 4)
     #expect(
       issues.allSatisfy { $0.source == "PickerStyle" && $0.message.contains("ConsumerPickerStyle") }

@@ -380,7 +380,7 @@ extension Picker {
           label = extractedLabel
           let issue = RuntimeIssue(
             severity: .warning,
-            code: "picker.unrepresentableOptionContent",
+            code: .Picker.unrepresentableOptionContent,
             message:
               "Picker option content cannot be represented by the text-only option metadata "
               + "model (discarded: \(reasons.joined(separator: ", "))). "

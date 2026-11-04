@@ -91,7 +91,7 @@ struct TypedNavigationPathTests {
 
     #expect(
       artifacts.diagnostics.runtime.issues.contains {
-        $0.code == "navigation.missingValueDestination"
+        $0.typedCode == .Navigation.missingValueDestination
       }
     )
   }
@@ -117,7 +117,7 @@ struct TypedNavigationPathTests {
     #expect(model.second)
     #expect(
       artifacts.diagnostics.runtime.issues.contains {
-        $0.code == "navigation.multipleActiveDestinations"
+        $0.typedCode == .Navigation.multipleActiveDestinations
       }
     )
   }
@@ -134,7 +134,7 @@ struct TypedNavigationPathTests {
 
     #expect(
       artifacts.diagnostics.runtime.issues.contains {
-        $0.code == "navigation.depthLimitExceeded"
+        $0.typedCode == .Navigation.depthLimitExceeded
       }
     )
   }

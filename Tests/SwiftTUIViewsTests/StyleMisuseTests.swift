@@ -35,7 +35,7 @@ struct StyleMisuseTests {
     #expect(resolved == "fallback")
     let issue = try #require(reported.first)
     #expect(reported.count == 1)
-    #expect(issue.code == "style.invalidPresentation")
+    #expect(issue.typedCode == .Style.invalidPresentation)
     #expect(issue.severity == .warning)
     #expect(issue.source == "SpinnerStyle")
     // The message names the offender, every problem, and the fix, so a
@@ -57,7 +57,7 @@ struct StyleMisuseTests {
       identity: identity
     )
     #expect(issue.code == StyleMisuse.missingRequiredRouteCode)
-    #expect(issue.code == "style.missingRequiredRoute")
+    #expect(issue.typedCode == .Style.missingRequiredRoute)
     #expect(issue.severity == .warning)
     #expect(issue.source == "MenuStyle")
     #expect(issue.identity == identity)

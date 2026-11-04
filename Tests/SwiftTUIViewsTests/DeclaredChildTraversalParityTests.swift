@@ -95,7 +95,7 @@ struct DeclaredChildDivergenceReportingTests {
     )
 
     #expect(issue.severity == .warning)
-    #expect(issue.code == "structure.declaredChildTraversalMismatch")
+    #expect(issue.typedCode == .Structure.declaredChildTraversalMismatch)
     #expect(issue.message.contains("3"))
     #expect(issue.message.contains("2"))
   }

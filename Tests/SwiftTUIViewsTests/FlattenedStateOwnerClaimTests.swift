@@ -66,7 +66,7 @@ struct FlattenedStateOwnerClaimTests {
   private func drainSeedFallbackIssues() -> [RuntimeIssue] {
     var owned: [RuntimeIssue] = []
     for issue in ImperativeRuntimeIssueQueue.drain()
-    where issue.code == "state.imperativeSeedFallback" {
+    where issue.typedCode == .State.imperativeSeedFallback {
       if issue.message.contains(#fileID) {
         owned.append(issue)
       } else {

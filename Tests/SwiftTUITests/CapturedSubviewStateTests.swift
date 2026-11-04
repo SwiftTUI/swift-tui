@@ -27,7 +27,7 @@ struct CapturedSubviewStateTests {
     let dormant = frame(tab: 1, hidden: true)
     #expect(
       !dormant.diagnostics.runtime.issues.contains {
-        $0.code == "tab.dormantStateUnsupportedValue"
+        $0.typedCode == .Tab.dormantStateUnsupportedValue
       })
     _ = frame(tab: 0, hidden: true)
     #expect(frame(tab: 0, hidden: false).rasterSurface.lines.joined().contains("Item 1:42"))

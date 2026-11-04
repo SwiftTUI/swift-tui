@@ -21,7 +21,7 @@ package enum WindowsStackFloorDiagnostic {
       guard stackLeanArmedByWindowsStackFloor else { return nil }
       return RuntimeIssue(
         severity: .warning,
-        code: "windows.stack-floor-lean-profile",
+        code: .Windows.stackFloorLeanProfile,
         message: message(
           reserveBytes: windowsMainThreadStackReserve(),
           floorBytes: fullEngineStackReserveFloor

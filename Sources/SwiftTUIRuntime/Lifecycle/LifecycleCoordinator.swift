@@ -423,6 +423,14 @@ package final class LifecycleCoordinator {
     case appear
     case disappear
     case change
+
+    var issueCode: RuntimeIssue.Code {
+      switch self {
+      case .appear: .Lifecycle.appearHandlerSkipped
+      case .disappear: .Lifecycle.disappearHandlerSkipped
+      case .change: .Lifecycle.changeHandlerSkipped
+      }
+    }
   }
 
   private func recordHandlerSkip(
@@ -441,7 +449,7 @@ package final class LifecycleCoordinator {
     }
     let issue = RuntimeIssue(
       severity: .warning,
-      code: "lifecycle.\(kind.rawValue)HandlerSkipped",
+      code: kind.issueCode,
       message:
         "committed \(kind.rawValue) handler '\(handlerID)' never fired: "
         + "no registered handler at commit",
@@ -470,7 +478,7 @@ package final class LifecycleCoordinator {
     }
     let issue = RuntimeIssue(
       severity: .warning,
-      code: "lifecycle.taskStartSkipped",
+      code: .Lifecycle.taskStartSkipped,
       message:
         "committed task '\(descriptor.id)' never started: "
         + "no \(missing.joined(separator: " or ")) at commit",

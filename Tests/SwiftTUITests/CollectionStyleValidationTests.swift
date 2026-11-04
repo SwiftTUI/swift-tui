@@ -16,7 +16,9 @@ struct CollectionStyleValidationTests {
     _ actual: RenderSnapshot, _ baseline: RenderSnapshot, family: String, resolves: Int = 1
   ) {
     #expect(actual.rasterSurface.lines == baseline.rasterSurface.lines)
-    let issues = actual.diagnostics.runtime.issues.filter { $0.code == "style.invalidPresentation" }
+    let issues = actual.diagnostics.runtime.issues.filter {
+      $0.typedCode == .Style.invalidPresentation
+    }
     #expect(issues.count == resolves)
     #expect(issues.first?.source == family)
     #expect(issues.first?.message.contains("invalid-test") == true)
@@ -86,7 +88,8 @@ struct CollectionStyleValidationTests {
     valid.borderGlyphs.top = " "
     valid.borderGlyphs.bottom = "e\u{301}"
     let custom = render(view.tableStyle(FixedTable(value: valid)))
-    #expect(!custom.diagnostics.runtime.issues.contains { $0.code == "style.invalidPresentation" })
+    #expect(
+      !custom.diagnostics.runtime.issues.contains { $0.typedCode == .Style.invalidPresentation })
     #expect(custom.rasterSurface.lines != baseline.rasterSurface.lines)
   }
 
@@ -117,7 +120,8 @@ struct CollectionStyleValidationTests {
     let valid = OutlineStylePresentation(
       continuingIndenter: "界 ", emptyIndenter: "", branchConnector: "-- ", leafConnector: ">")
     let custom = render(view.outlineStyle(FixedOutline(value: valid)))
-    #expect(!custom.diagnostics.runtime.issues.contains { $0.code == "style.invalidPresentation" })
+    #expect(
+      !custom.diagnostics.runtime.issues.contains { $0.typedCode == .Style.invalidPresentation })
     #expect(custom.rasterSurface.lines.joined().contains(">Row 2"))
   }
 }

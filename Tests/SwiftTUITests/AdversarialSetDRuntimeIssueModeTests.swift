@@ -9,7 +9,7 @@ import Testing
 // runtime issues routed through elided, aborted, batched and presented
 // frames. Brief 08.
 
-private let staleCode = "forEach.staleElementBindingWrite"
+private let staleCode = RuntimeIssue.Code.ForEach.staleElementBindingWrite.rawValue
 
 private struct SetDCountItem: Identifiable, Sendable {
   var id: Int
@@ -292,7 +292,7 @@ struct AdversarialSetDRuntimeIssueModeTests {
       try h.render()
     }
     let distinct = h.runLoop.reportedRuntimeIssues.filter {
-      $0.code == "collection.unboundedRealization"
+      $0.typedCode == .Collection.unboundedRealization
     }
     #expect(distinct.count == 1, "\(distinct.map(\.message)); sink \(issues.issues.map(\.code))")
   }
@@ -309,7 +309,7 @@ struct AdversarialSetDRuntimeIssueModeTests {
     }
     defer { h.shutdown() }
     #expect(
-      h.runLoop.reportedRuntimeIssues.contains { $0.code == "collection.missingSelectionTag" },
+      h.runLoop.reportedRuntimeIssues.contains { $0.typedCode == .Collection.missingSelectionTag },
       "\(h.runLoop.reportedRuntimeIssues.map(\.code))")
     try h.clickText("bravo")
     #expect(box.value == nil)

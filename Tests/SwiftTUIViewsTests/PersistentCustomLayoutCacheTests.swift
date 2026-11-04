@@ -153,7 +153,7 @@ struct PersistentCustomLayoutCacheTests {
     // pass-coupled state the check exists to catch. Record-only.
     #expect(
       secondContext.runtimeIssues.contains { issue in
-        issue.code == "layout.persistedCacheDivergence"
+        issue.typedCode == .Layout.persistedCacheDivergence
       }
     )
   }
@@ -190,7 +190,7 @@ struct PersistentCustomLayoutCacheTests {
 
     #expect(
       secondContext.runtimeIssues.contains { issue in
-        issue.code == "layout.persistedCacheDivergence"
+        issue.typedCode == .Layout.persistedCacheDivergence
       }
     )
   }

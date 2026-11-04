@@ -212,7 +212,7 @@ package final class WebSocketInputReader: ScopedInputReading, Sendable {
             || (capabilities.geometryRevisions && capabilities.sharedViewport)
         else {
           let issue = RuntimeIssue(
-            severity: .error, code: "companion-client-outdated",
+            severity: .error, code: .Companion.clientOutdated,
             message:
               "This shared terminal session requires its matching browser assets. Reload the companion URL with the browser cache cleared."
           )

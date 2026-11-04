@@ -710,7 +710,8 @@ struct RunLoopDrainFairnessTests {
     var reportedIssues: [RuntimeIssue] = []
     harness.runLoop.runtimeIssueSink = RuntimeIssueSink { issue in
       reportedIssues.append(issue)
-      guard issue.code == "lifecycle.appearHandlerSkipped", issue.identity == faultIdentity else {
+      guard issue.typedCode == .Lifecycle.appearHandlerSkipped, issue.identity == faultIdentity
+      else {
         return
       }
       state.mutate {
@@ -737,7 +738,7 @@ struct RunLoopDrainFairnessTests {
 
     #expect(didInjectFault)
     #expect(reportedIssues.count == 1)
-    #expect(reportedIssues.first?.code == "lifecycle.appearHandlerSkipped")
+    #expect(reportedIssues.first?.typedCode == .Lifecycle.appearHandlerSkipped)
     #expect(reportedIssues.first?.identity == faultIdentity)
     #expect(reportedIssues.first?.severity == .warning)
     #expect(reportedIssues.first?.source == "LifecycleCoordinator")

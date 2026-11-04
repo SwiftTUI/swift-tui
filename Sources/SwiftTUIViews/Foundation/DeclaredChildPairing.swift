@@ -131,7 +131,7 @@ extension DeclaredChildTraversalDivergence {
   ) -> RuntimeIssue {
     RuntimeIssue(
       severity: .warning,
-      code: "structure.declaredChildTraversalMismatch",
+      code: .Structure.declaredChildTraversalMismatch,
       message:
         "\(container) enumerated \(enumeratedCount) declared children but the "
         + "payload traversal produced \(payloadCount); children past the first "

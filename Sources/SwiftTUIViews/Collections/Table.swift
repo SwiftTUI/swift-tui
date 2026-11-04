@@ -805,7 +805,7 @@ extension Table {
         if tag == nil {
           issue = RuntimeIssue(
             severity: .warning,
-            code: "collection.missingSelectionTag",
+            code: .Collection.missingSelectionTag,
             message:
               "Selectable Table row has no selection tag; the row remains visible but is not selectable.",
             identity: node.identity,
@@ -814,7 +814,7 @@ extension Table {
         } else if compatibleTag == nil {
           issue = RuntimeIssue(
             severity: .warning,
-            code: "collection.incompatibleSelectionTag",
+            code: .Collection.incompatibleSelectionTag,
             message:
               "Selectable Table row has a tag incompatible with the selection value type; the row remains visible but is not selectable.",
             identity: node.identity,

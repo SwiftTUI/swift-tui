@@ -120,7 +120,7 @@ struct ToolbarTests {
     )
     let issue = artifacts.diagnostics.runtime.issues.first
     #expect(artifacts.diagnostics.runtime.issues.count == 1)
-    #expect(issue?.code == "toolbar.unhostedItems")
+    #expect(issue?.typedCode == .Toolbar.unhostedItems)
     #expect(issue?.severity == .warning)
     #expect(issue?.identity != nil)
   }
@@ -168,7 +168,7 @@ struct ToolbarTests {
     let issue = artifacts.diagnostics.runtime.issues.first
 
     #expect(artifacts.diagnostics.runtime.issues.count == 1)
-    #expect(issue?.code == "toolbar.unhostedItems")
+    #expect(issue?.typedCode == .Toolbar.unhostedItems)
     #expect(issue?.severity == .warning)
     #expect(issue?.identity != nil)
   }
@@ -512,7 +512,7 @@ struct ToolbarTests {
     // Filter to the toolbar issue: the soundness probe's counters are
     // process-global, so concurrently-running suites' sampled violations can
     // legitimately reach this run loop's sink too (F34 routing).
-    let toolbarIssues = receivedIssues.value.filter { $0.code == "toolbar.unhostedItems" }
+    let toolbarIssues = receivedIssues.value.filter { $0.typedCode == .Toolbar.unhostedItems }
 
     #expect(result.exitReason == .inputEnded)
     #expect(toolbarIssues.count == 1)

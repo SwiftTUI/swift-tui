@@ -131,7 +131,9 @@ struct ForEachBindingCurrencyTests {
     third.wrappedValue = Record(id: 1, name: "Ghost")
     #expect(binding.wrappedValue.map(\.name) == ["Other", "Ada", "Edited"])
     #expect(
-      ImperativeRuntimeIssueQueue.drain().contains { $0.code == "forEach.staleElementBindingWrite" }
+      ImperativeRuntimeIssueQueue.drain().contains {
+        $0.typedCode == .ForEach.staleElementBindingWrite
+      }
     )
   }
 

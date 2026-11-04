@@ -311,7 +311,7 @@ final class LayoutWorkerProxy<L: Layout>: WorkerCustomLayoutProxy,
           passContext?.recordRuntimeIssue(
             RuntimeIssue(
               severity: .error,
-              code: "layout.persistedCacheDivergence",
+              code: .Layout.persistedCacheDivergence,
               message:
                 "a persisted Layout.Cache produced \(size.width)x\(size.height) where a "
                 + "fresh makeCache pass produced \(freshSize.width)x\(freshSize.height); "
@@ -462,7 +462,7 @@ final class LayoutWorkerProxy<L: Layout>: WorkerCustomLayoutProxy,
             passContext?.recordRuntimeIssue(
               RuntimeIssue(
                 severity: .error,
-                code: "layout.persistedCacheDivergence",
+                code: .Layout.persistedCacheDivergence,
                 message:
                   "a persisted Layout.Cache answered an explicit alignment guide "
                   + "differently from a fresh makeCache pass; the author cache carries "
@@ -870,7 +870,7 @@ final class LayoutWorkerProxy<L: Layout>: WorkerCustomLayoutProxy,
           passContext?.recordRuntimeIssue(
             RuntimeIssue(
               severity: .error,
-              code: "layout.persistedCacheDivergence",
+              code: .Layout.persistedCacheDivergence,
               message:
                 "a persisted Layout.Cache placed a subview differently from a fresh "
                 + "makeCache pass; the author cache carries pass-coupled state",

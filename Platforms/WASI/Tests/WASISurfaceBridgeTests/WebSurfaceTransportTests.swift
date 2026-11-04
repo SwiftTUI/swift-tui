@@ -751,7 +751,7 @@
     func encoderEmitsRuntimeIssueRecords() throws {
       let issue = RuntimeIssue(
         severity: .warning,
-        code: "toolbar.unhostedItems",
+        code: .Toolbar.unhostedItems,
         message: "Toolbar item was not rendered",
         identity: Identity(components: ["root", "body"]),
         source: ".toolbarItem(...)"

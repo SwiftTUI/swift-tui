@@ -123,7 +123,7 @@ package enum LayoutShadowOracle {
     // 2026-08-11 mrkdwn examples-gate class), so the frame is excluded
     // whole and counted.
     let shadowHitDepthBudget = scratchContext.runtimeIssues.contains { issue in
-      issue.code == "layout.customLayoutDepthLimitExceeded"
+      issue.typedCode == .Layout.customLayoutDepthLimitExceeded
     }
     let summary: LayoutShadowComparisonSummary
     if shadowHitDepthBudget {

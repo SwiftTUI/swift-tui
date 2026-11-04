@@ -250,7 +250,7 @@ extension LayoutEngine {
           passContext?.recordRuntimeIssue(
             .init(
               severity: .warning,
-              code: "layout.insetBorderOccludesContent",
+              code: .Layout.insetBorderOccludesContent,
               message: "The inset border leaves no interior cells for its content. "
                 + "Add padding or use placement: .outset to keep the content visible.",
               identity: resolved.identity, source: "border"))

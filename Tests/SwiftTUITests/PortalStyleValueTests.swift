@@ -63,13 +63,15 @@ extension PortalStyleValueTests {
     #expect(!oversized.validationProblems.isEmpty)
     #expect(!AnchoredSurfaceStylePresentation(minimumWidth: Int.max).validationProblems.isEmpty)
     // Larger than any terminal is still a representable count, not misuse.
-    #expect(AnchoredSurfaceStylePresentation(contentInsets: .init(all: 200)).validationProblems.isEmpty)
+    #expect(
+      AnchoredSurfaceStylePresentation(contentInsets: .init(all: 200)).validationProblems.isEmpty)
     let frame = DefaultRenderer().render(
       Text("Base").popover(isPresented: .constant(true)) { Text("Body") }
         .popoverStyle(OversizedInsetPopoverStyle()),
       context: .init(identity: testIdentity("Root")), proposal: .init(width: 40, height: 16))
     #expect(
-      frame.diagnostics.runtime.issues.filter { $0.code == "style.invalidPresentation" }.count == 1)
+      frame.diagnostics.runtime.issues.filter { $0.typedCode == .Style.invalidPresentation }.count
+        == 1)
     #expect(frame.rasterSurface.lines.joined().contains("Body"))
   }
 }
@@ -83,7 +85,8 @@ extension PortalStyleValueTests {
     let baseline = presentedSheet(UnrepresentableScrollHeightSheetStyle(invalid: false))
     let frame = presentedSheet(UnrepresentableScrollHeightSheetStyle(invalid: true))
     #expect(
-      frame.diagnostics.runtime.issues.filter { $0.code == "style.invalidPresentation" }.count == 1)
+      frame.diagnostics.runtime.issues.filter { $0.typedCode == .Style.invalidPresentation }.count
+        == 1)
     #expect(frame.rasterSurface == baseline.rasterSurface)
     #expect(frame.rasterSurface.lines.joined().contains("Body"))
   }
@@ -95,7 +98,8 @@ extension PortalStyleValueTests {
     let baseline = presentedAlert(UnrepresentableWidthPromptStyle(invalid: false))
     let frame = presentedAlert(UnrepresentableWidthPromptStyle(invalid: true))
     #expect(
-      frame.diagnostics.runtime.issues.filter { $0.code == "style.invalidPresentation" }.count == 1)
+      frame.diagnostics.runtime.issues.filter { $0.typedCode == .Style.invalidPresentation }.count
+        == 1)
     #expect(frame.rasterSurface == baseline.rasterSurface)
     #expect(frame.rasterSurface.lines.joined().contains("Title"))
   }

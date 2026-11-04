@@ -630,7 +630,7 @@ package final class ViewNode {
     ownerGraph?.recordFrameRuntimeIssue(
       RuntimeIssue(
         severity: .warning,
-        code: "state.duplicateSlotClaim",
+        code: .State.duplicateSlotClaim,
         message:
           "Two wrapper instances (\(existing.wrapperDescription) and "
           + "\(wrapperDescription)) claimed one state slot \(identifier) on "

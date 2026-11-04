@@ -100,7 +100,7 @@ public struct Image: PrimitiveView, ResolvableView {
         value: [
           RuntimeIssue(
             severity: .warning,
-            code: "image.unresolvedSource",
+            code: .Image.unresolvedSource,
             message:
               "Image source \(sourceDescription) did not resolve to a decodable asset; the image measures zero."
               + (failureDescription.map { " Decode failed: " + $0 } ?? ""),

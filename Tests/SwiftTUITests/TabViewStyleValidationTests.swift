@@ -88,7 +88,7 @@ struct TabViewStyleValidationTests {
   }
 
   private func styleIssues(in artifacts: RenderSnapshot) -> [RuntimeIssue] {
-    artifacts.diagnostics.runtime.issues.filter { $0.code == "style.invalidPresentation" }
+    artifacts.diagnostics.runtime.issues.filter { $0.typedCode == .Style.invalidPresentation }
   }
 
   @Test("an out-of-range visible index renders the automatic strip and reports one issue")

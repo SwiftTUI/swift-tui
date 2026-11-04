@@ -45,7 +45,7 @@ struct PortalStyleRuntimeTests {
     let equal = baseline.rasterSurface == invalid.rasterSurface
     #expect(equal)
     let issues = invalid.diagnostics.runtime.issues.filter {
-      $0.code == "style.invalidPresentation"
+      $0.typedCode == .Style.invalidPresentation
     }
     #expect(issues.count == 1)
     #expect(issues.first?.message.contains("invalid-fixture") == true)
@@ -60,10 +60,12 @@ struct PortalStyleRuntimeTests {
     // that never renders can fall back or warn.
     let closed = portalStyleFrame(family: family, invalid: true, presented: false)
     #expect(
-      closed.diagnostics.runtime.issues.filter { $0.code == "style.invalidPresentation" }.isEmpty)
+      closed.diagnostics.runtime.issues.filter { $0.typedCode == .Style.invalidPresentation }
+        .isEmpty)
     let open = portalStyleFrame(family: family, invalid: true, presented: true)
     #expect(
-      open.diagnostics.runtime.issues.filter { $0.code == "style.invalidPresentation" }.count == 1)
+      open.diagnostics.runtime.issues.filter { $0.typedCode == .Style.invalidPresentation }.count
+        == 1)
   }
 
   @Test(

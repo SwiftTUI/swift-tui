@@ -21,7 +21,7 @@ struct BorderModifierLayoutTests {
       context: .init(identity: testIdentity("WideHorizontalBorder")))
     #expect(
       artifacts.diagnostics.runtime.issues.contains {
-        $0.code == "layout.insetBorderOccludesContent"
+        $0.typedCode == .Layout.insetBorderOccludesContent
       } == !hasInterior)
     if topOnly && hasInterior {
       #expect(artifacts.rasterSurface.lines.joined().contains("visible"))
@@ -55,7 +55,7 @@ struct BorderModifierLayoutTests {
     #expect(!artifacts.rasterSurface.lines.joined().contains("hi"))
     #expect(
       artifacts.diagnostics.runtime.issues.contains {
-        $0.code == "layout.insetBorderOccludesContent"
+        $0.typedCode == .Layout.insetBorderOccludesContent
       })
   }
 
@@ -71,7 +71,7 @@ struct BorderModifierLayoutTests {
     #expect(artifacts.rasterSurface.lines.joined().contains("hi"))
     #expect(
       !artifacts.diagnostics.runtime.issues.contains {
-        $0.code == "layout.insetBorderOccludesContent"
+        $0.typedCode == .Layout.insetBorderOccludesContent
       })
   }
 
@@ -81,7 +81,7 @@ struct BorderModifierLayoutTests {
     #expect(artifacts.rasterSurface.lines.joined().contains("hi"))
     #expect(
       !artifacts.diagnostics.runtime.issues.contains {
-        $0.code == "layout.insetBorderOccludesContent"
+        $0.typedCode == .Layout.insetBorderOccludesContent
       })
   }
 

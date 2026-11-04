@@ -173,7 +173,9 @@ struct AdversarialSetCCaptureTests {
     retired.binding.wrappedValue = 77
     #expect(retired.binding.wrappedValue == 77)
     #expect(
-      !ImperativeRuntimeIssueQueue.drain().contains { $0.code == "state.imperativeSeedFallback" })
+      !ImperativeRuntimeIssueQueue.drain().contains {
+        $0.typedCode == .State.imperativeSeedFallback
+      })
     log.visible = true
     _ = try h.renderAfterExternalMutation()
     let successor = try #require(log.entries.last)
@@ -242,7 +244,9 @@ struct AdversarialSetCCaptureTests {
     _ = ImperativeRuntimeIssueQueue.drain()
     leaf.preset(7)
     #expect(
-      !ImperativeRuntimeIssueQueue.drain().contains { $0.code == "state.imperativeSeedFallback" })
+      !ImperativeRuntimeIssueQueue.drain().contains {
+        $0.typedCode == .State.imperativeSeedFallback
+      })
     let h = try StressRuntimeHarness(
       rootIdentity: testIdentity("setC006-premount"),
       size: .init(width: 30, height: 4)

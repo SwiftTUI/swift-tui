@@ -34,7 +34,7 @@ struct StateSlotClaimWindowTests {
       )
     }
     func duplicateClaims(_ snapshot: RenderSnapshot) -> [RuntimeIssue] {
-      snapshot.diagnostics.runtime.issues.filter { $0.code == "state.duplicateSlotClaim" }
+      snapshot.diagnostics.runtime.issues.filter { $0.typedCode == .State.duplicateSlotClaim }
     }
 
     let first = render(tick: 1)

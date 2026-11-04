@@ -299,7 +299,7 @@ struct AdversarialSetBLayoutTests {
     #expect(horizontalLines.count == 2, "horizontal \(horizontalLines)")
     #expect(horizontalLines.last == "│ hi", "horizontal \(horizontalLines)")
     let occluded = topAndLeading.diagnostics.runtime.issues.contains {
-      $0.code == "layout.insetBorderOccludesContent"
+      $0.typedCode == .Layout.insetBorderOccludesContent
     }
     #expect(!occluded)
 

@@ -259,7 +259,7 @@ struct HostedSceneSessionTests {
 
     #expect(issues.count == 1)
     #expect(issues.first?.severity == .error)
-    #expect(issues.first?.code == "lifecycle.userExitUnsupported")
+    #expect(issues.first?.typedCode == .Lifecycle.userExitUnsupported)
     if editsText {
       #expect(recorder.latestSurface?.lines.contains(where: { $0.contains("hello") }) == true)
       #expect(recorder.latestSurface?.lines.contains(where: { $0.contains("qhello") }) == false)

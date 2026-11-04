@@ -59,7 +59,7 @@ struct LifecycleCoordinatorSkipTests {
     #expect(coordinator.taskStartSkipCount == 1)
     #expect(coordinator.activeTaskCount == 0)
     #expect(issues.count == 1)
-    #expect(issues.first?.code == "lifecycle.taskStartSkipped")
+    #expect(issues.first?.typedCode == .Lifecycle.taskStartSkipped)
     #expect(issues.first?.severity == .warning)
     #expect(issues.first?.identity == testIdentity("Root", "missing"))
     #expect(issues.first?.message.contains("task registration") == true)
@@ -324,7 +324,7 @@ struct LifecycleCoordinatorSkipTests {
 
     #expect(coordinator.appearHandlerSkipCount == 1)
     #expect(issues.count == 1)
-    #expect(issues.first?.code == "lifecycle.appearHandlerSkipped")
+    #expect(issues.first?.typedCode == .Lifecycle.appearHandlerSkipped)
     #expect(issues.first?.severity == .warning)
     #expect(issues.first?.identity == testIdentity("Root", "appearing"))
   }
@@ -352,7 +352,7 @@ struct LifecycleCoordinatorSkipTests {
 
     #expect(coordinator.disappearHandlerSkipCount == 1)
     #expect(issues.count == 1)
-    #expect(issues.first?.code == "lifecycle.disappearHandlerSkipped")
+    #expect(issues.first?.typedCode == .Lifecycle.disappearHandlerSkipped)
   }
 
   @Test("an .onChange handler missing from the current registry is counted and reported")
@@ -378,7 +378,7 @@ struct LifecycleCoordinatorSkipTests {
 
     #expect(coordinator.changeHandlerSkipCount == 1)
     #expect(issues.count == 1)
-    #expect(issues.first?.code == "lifecycle.changeHandlerSkipped")
+    #expect(issues.first?.typedCode == .Lifecycle.changeHandlerSkipped)
   }
 
   @Test(

@@ -98,7 +98,7 @@ private func withRetiredWriteAccounting(_ body: () throws -> Void) throws {
   _ = ImperativeRuntimeIssueQueue.drain()
   try body()
   let issues = ImperativeRuntimeIssueQueue.drain().filter {
-    $0.code == "state.imperativeSeedFallback"
+    $0.typedCode == .State.imperativeSeedFallback
   }
   #expect(issues.allSatisfy { $0.message.contains("discarded") }, "\(issues.map(\.message))")
 }
@@ -117,7 +117,7 @@ private func withRetiredWriteAccountingAsync(_ body: () async throws -> Void) as
   _ = ImperativeRuntimeIssueQueue.drain()
   try await body()
   let issues = ImperativeRuntimeIssueQueue.drain().filter {
-    $0.code == "state.imperativeSeedFallback"
+    $0.typedCode == .State.imperativeSeedFallback
   }
   #expect(issues.allSatisfy { $0.message.contains("discarded") }, "\(issues.map(\.message))")
 }

@@ -121,7 +121,8 @@ struct PaletteStyleRuntimeTests {
       context: .init(identity: testIdentity("PaletteRouteMisuse")),
       proposal: .init(width: 64, height: 24))
     #expect(
-      fixture.diagnostics.runtime.issues.filter { $0.code == "style.duplicateRoute" }.count == 1)
+      fixture.diagnostics.runtime.issues.filter { $0.typedCode == .Style.duplicateRoute }.count == 1
+    )
     let probe = PaletteJourneyProbe()
     let harness = try StressRuntimeHarness(
       rootIdentity: testIdentity("DuplicatePaletteRoutes"), size: .init(width: 64, height: 24)

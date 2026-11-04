@@ -51,7 +51,7 @@ struct SpinnerStyleRuntimeTests {
   }
 
   private func styleIssues(in artifacts: RenderSnapshot) -> [RuntimeIssue] {
-    artifacts.diagnostics.runtime.issues.filter { $0.code == "style.invalidPresentation" }
+    artifacts.diagnostics.runtime.issues.filter { $0.typedCode == .Style.invalidPresentation }
   }
 
   private func surface(of artifacts: RenderSnapshot) -> String {

@@ -22,17 +22,17 @@ enum StyleMisuse {
   /// The one issue code every invalid-presentation emission uses. The family
   /// and the offending style are named in the message, not the code, so
   /// issue-code filtering stays stable as families are added.
-  static let invalidPresentationCode = "style.invalidPresentation"
+  static let invalidPresentationCode = RuntimeIssue.Code.Style.invalidPresentation.rawValue
 
   /// The issue code for a route wrapper installed more than once in one
   /// style-body resolve (see `StyleRouteView`).
-  static let duplicateRouteCode = "style.duplicateRoute"
+  static let duplicateRouteCode = RuntimeIssue.Code.Style.duplicateRoute.rawValue
 
   static func duplicateContentIssue(
     family: String, styleLabel: String, identity: Identity
   ) -> RuntimeIssue {
     RuntimeIssue(
-      severity: .warning, code: "style.duplicateContent",
+      severity: .warning, code: .Style.duplicateContent,
       message:
         "\(family) \(styleLabel) placed retained content more than once in one body resolve. "
         + "The first placement owns the content; later placements are omitted. "
@@ -43,7 +43,7 @@ enum StyleMisuse {
   /// The issue code for a style body that omitted a wrapper the primitive
   /// needs while the control is in a state that requires it (a presented
   /// menu without its portal or inline content).
-  static let missingRequiredRouteCode = "style.missingRequiredRoute"
+  static let missingRequiredRouteCode = RuntimeIssue.Code.Style.missingRequiredRoute.rawValue
 
   /// Returns `presentation` unchanged when `problems` is empty; otherwise
   /// reports one issue describing every problem and returns `fallback()` —

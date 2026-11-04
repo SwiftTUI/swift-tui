@@ -68,7 +68,8 @@ struct AdversarialSetBDataFlowTests {
       do {
         #expect(value == 0, "the authored seed is read, got \(value)")
         #expect(
-          issues.contains { $0.code == "state.imperativeSeedFallback" }, "\(issues.map(\.code))")
+          issues.contains { $0.typedCode == .State.imperativeSeedFallback }, "\(issues.map(\.code))"
+        )
         #expect(SoundnessProbeConfiguration.stateSeedFallbackViolationCount == seedBefore + 1)
       }
     }

@@ -39,7 +39,8 @@ struct MenuStyleFallbackTests {
       #expect(issues.count == 1)
       #expect(issues.first?.message.contains("OmittingMenuStyle") == true)
       #expect(
-        frame.diagnostics.runtime.issues.filter { $0.code != "style.missingRequiredRoute" }.isEmpty)
+        frame.diagnostics.runtime.issues.filter { $0.typedCode != .Style.missingRequiredRoute }
+          .isEmpty)
       #expect(menuStateChildCounts(frame.resolvedTree) == [1])
       #expect(subtreeRootCount(frame.resolvedTree, under: body) == 1)
       #expect(routeCount(frame.resolvedTree, identity: trigger) == 1)
@@ -74,7 +75,7 @@ struct MenuStyleFallbackTests {
 }
 
 private func missingRouteIssues(in frame: RenderSnapshot) -> [RuntimeIssue] {
-  frame.diagnostics.runtime.issues.filter { $0.code == "style.missingRequiredRoute" }
+  frame.diagnostics.runtime.issues.filter { $0.typedCode == .Style.missingRequiredRoute }
 }
 
 /// The number of disjoint subtrees rooted at or beneath `identity`. A composed

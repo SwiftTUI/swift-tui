@@ -145,7 +145,7 @@ struct MenuStyleRuntimeTests {
       Menu("Commands") { Text("Presented child") }
         .menuStyle(DuplicateMenuStyle()).id(id),
       context: .init(identity: testIdentity("Root")), proposal: .init(width: 40, height: 12))
-    let issues = frame.diagnostics.runtime.issues.filter { $0.code == "style.duplicateRoute" }
+    let issues = frame.diagnostics.runtime.issues.filter { $0.typedCode == .Style.duplicateRoute }
     #expect(issues.count == 2)
     #expect(issues.contains { $0.message.contains("trigger") })
     #expect(issues.contains { $0.message.contains("portal") })
@@ -166,7 +166,9 @@ struct MenuStyleRuntimeTests {
     #expect(actions.dispatch(identity: id))
     let frame = renderer.render(view, context: context, proposal: .init(width: 40, height: 12))
     #expect(frame.rasterSurface.lines.joined().contains("Presented child"))
-    let issues = frame.diagnostics.runtime.issues.filter { $0.code == "style.missingRequiredRoute" }
+    let issues = frame.diagnostics.runtime.issues.filter {
+      $0.typedCode == .Style.missingRequiredRoute
+    }
     #expect(issues.count == 1)
     #expect(issues.first?.source == "MenuStyle")
     #expect(issues.first?.message.contains("MissingMenuContentStyle") == true)
@@ -219,11 +221,13 @@ struct MenuStyleRuntimeTests {
       identity: testIdentity("Root"), localActionRegistry: actions,
       applyEnvironmentValues: true)
     let closed = renderer.render(view, context: context, proposal: .init(width: 40, height: 12))
-    #expect(closed.diagnostics.runtime.issues.contains { $0.code == "style.invalidPresentation" })
+    #expect(
+      closed.diagnostics.runtime.issues.contains { $0.typedCode == .Style.invalidPresentation })
     #expect(actions.dispatch(identity: id))
     let opened = renderer.render(view, context: context, proposal: .init(width: 40, height: 12))
     #expect(opened.rasterSurface.lines.joined().contains("Presented child"))
-    #expect(opened.diagnostics.runtime.issues.contains { $0.code == "style.invalidPresentation" })
+    #expect(
+      opened.diagnostics.runtime.issues.contains { $0.typedCode == .Style.invalidPresentation })
   }
 
   @Test("fixture trigger and portal wrappers are inert")

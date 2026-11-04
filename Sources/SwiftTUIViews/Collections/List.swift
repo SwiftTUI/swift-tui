@@ -795,7 +795,7 @@ extension List {
     } else if row.tagCount == 0 {
       issue = RuntimeIssue(
         severity: .warning,
-        code: "collection.missingSelectionTag",
+        code: .Collection.missingSelectionTag,
         message:
           "Selectable List row has no selection tag; the row remains visible but is not selectable.",
         identity: node.identity,
@@ -804,7 +804,7 @@ extension List {
     } else if row.tagCount > 1 {
       issue = RuntimeIssue(
         severity: .error,
-        code: "collection.ambiguousSelectionTag",
+        code: .Collection.ambiguousSelectionTag,
         message:
           "Selectable List row has \(row.tagCount) selection tags; the row remains visible but is not selectable.",
         identity: node.identity,
@@ -813,7 +813,7 @@ extension List {
     } else if compatibleTag == nil {
       issue = RuntimeIssue(
         severity: .warning,
-        code: "collection.incompatibleSelectionTag",
+        code: .Collection.incompatibleSelectionTag,
         message:
           "Selectable List row has a tag incompatible with the selection value type; the row remains visible but is not selectable.",
         identity: node.identity,

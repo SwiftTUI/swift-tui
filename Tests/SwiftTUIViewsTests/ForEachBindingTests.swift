@@ -220,7 +220,7 @@ struct ForEachBindingTests {
     #expect(store.collectionWrites == 0)
     #expect(
       ImperativeRuntimeIssueQueue.pending.contains {
-        $0.code == "forEach.staleElementBindingWrite"
+        $0.typedCode == .ForEach.staleElementBindingWrite
       }
     )
     _ = ImperativeRuntimeIssueQueue.drain()

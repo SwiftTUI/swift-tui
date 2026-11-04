@@ -367,7 +367,7 @@ extension LayoutEngine {
     // truncation), and certifying it would serve a product a fresh
     // production pass could not compute. Deny instead of certifying.
     if scratchContext.runtimeIssues.contains(where: { issue in
-      issue.code == "layout.customLayoutDepthLimitExceeded"
+      issue.typedCode == .Layout.customLayoutDepthLimitExceeded
     }) {
       certifiedProduct?.flattenForRelease()
       result.metrics.deniedAbortedByCap += 1

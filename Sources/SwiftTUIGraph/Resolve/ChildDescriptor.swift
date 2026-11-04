@@ -106,7 +106,7 @@ extension ResolvedNode {
           issues.append(
             RuntimeIssue(
               severity: .warning,
-              code: "identity.duplicateEntity",
+              code: .Identity.duplicateEntity,
               message:
                 "Duplicate entity id \(entityIdentity.debugDescription) resolved at occurrence \(entityIdentity.occurrence) for \(node.kind) in structural slot \(sourcePath.description); lifetime matching is deterministic but duplicate ids are undefined user input.",
               identity: node.identity,
