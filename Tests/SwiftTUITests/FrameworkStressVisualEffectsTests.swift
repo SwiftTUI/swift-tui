@@ -905,7 +905,7 @@ extension FrameworkStressVisualEffectsTests {
     func node(for generation: Int) -> ResolvedNode {
       ResolvedNode(
         identity: identity,
-        kind: .view("Rectangle"),
+        kind: .view(.init("Rectangle")),
         drawPayload: .shape(
           ShapePayload(
             geometry: .rectangle,
@@ -982,7 +982,7 @@ extension FrameworkStressVisualEffectsTests {
     func node(for generation: Int) -> ResolvedNode {
       ResolvedNode(
         identity: identity,
-        kind: .view("Ellipse"),
+        kind: .view(.init("Ellipse")),
         drawPayload: .shape(
           ShapePayload(
             geometry: .ellipse,

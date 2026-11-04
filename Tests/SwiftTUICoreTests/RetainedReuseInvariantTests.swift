@@ -352,7 +352,7 @@ struct RetainedReuseInvariantTests {
   @Test("retained text placement refreshes authored animation intent without growing the node")
   func textAnimationProjectionRefreshes() {
     var text = ResolvedNode(
-      identity: testIdentity("text-intent"), kind: .view("Text"),
+      identity: testIdentity("text-intent"), kind: .view(.text),
       drawPayload: .text("7"))
     text.drawMetadata.contentTransition = .init(kind: .numericText)
     text.transactionSnapshot.animationRequest = .disabled
@@ -384,7 +384,7 @@ private func makeMetadata(
 ) -> PlacedNodeResolvedMetadata {
   PlacedNodeResolvedMetadata(
     identity: identity,
-    kind: .view("Projection-\(token)"),
+    kind: .view(.init("Projection-\(token)")),
     environmentSnapshot: .init(
       debugSignature: "env-\(token)",
       values: ["token": token]

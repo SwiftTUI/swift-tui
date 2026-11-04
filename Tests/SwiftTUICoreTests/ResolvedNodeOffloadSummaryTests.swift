@@ -149,7 +149,7 @@ struct ResolvedNodeOffloadSummaryTests {
   func lazyStackSourcesDoNotCountTowardReentryDepth() {
     var stack = ResolvedNode(
       identity: Identity(components: ["lazy"]),
-      kind: .view("lazy"),
+      kind: .view(.init("lazy")),
       layoutBehavior: .lazyStack(
         axis: .vertical,
         spacing: nil,
@@ -287,7 +287,7 @@ private func makeNode(
 ) -> ResolvedNode {
   ResolvedNode(
     identity: Identity(components: [name]),
-    kind: .view(name),
+    kind: .view(.init(name)),
     children: children
   )
 }
@@ -298,7 +298,7 @@ private func makeCustomNode(
 ) -> ResolvedNode {
   ResolvedNode(
     identity: Identity(components: [name]),
-    kind: .view(name),
+    kind: .view(.init(name)),
     children: children,
     layoutBehavior: .custom(CustomLayoutHandle(OffloadSummaryCustomLayoutProxy()))
   )
@@ -310,7 +310,7 @@ private func makeWorkerCapableCustomNode(
 ) -> ResolvedNode {
   ResolvedNode(
     identity: Identity(components: [name]),
-    kind: .view(name),
+    kind: .view(.init(name)),
     children: children,
     layoutBehavior: .custom(
       CustomLayoutHandle(
@@ -377,6 +377,6 @@ private struct MainActorOnlyChildSource: IndexedChildSource {
   }
 
   func child(at index: Int) -> ResolvedNode {
-    ResolvedNode(identity: identityRoot, kind: .view("main-actor-only-child"))
+    ResolvedNode(identity: identityRoot, kind: .view(.init("main-actor-only-child")))
   }
 }

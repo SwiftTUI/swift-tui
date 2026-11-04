@@ -201,7 +201,7 @@ private let reenteringCustomLayoutProxy = ReenteringCustomLayoutProxy()
 private func makeReenteringCustomLayoutNode(_ name: String, child: ResolvedNode) -> ResolvedNode {
   ResolvedNode(
     identity: testIdentity(name),
-    kind: .view("ReenteringCustomLayout"),
+    kind: .view(.init("ReenteringCustomLayout")),
     children: [child],
     layoutBehavior: .custom(CustomLayoutHandle(reenteringCustomLayoutProxy))
   )
@@ -219,7 +219,7 @@ private func makeReenteringCustomLayoutChain(depth: Int) -> ResolvedNode {
 private func makeLayoutLeaf(_ name: String, size: CellSize) -> ResolvedNode {
   ResolvedNode(
     identity: testIdentity(name),
-    kind: .view("Leaf"),
+    kind: .view(.init("Leaf")),
     intrinsicSize: size
   )
 }
@@ -230,7 +230,7 @@ private func makeLayoutLeaf(_ name: String, size: CellSize) -> ResolvedNode {
 private func makeHostedListNode(_ name: String, rowContent: ResolvedNode) -> ResolvedNode {
   var node = ResolvedNode(
     identity: testIdentity(name),
-    kind: .view("List"),
+    kind: .view(.list),
     drawPayload: .list(
       ListPayload(
         items: [ListItemPayload(kind: .row, text: "row")],

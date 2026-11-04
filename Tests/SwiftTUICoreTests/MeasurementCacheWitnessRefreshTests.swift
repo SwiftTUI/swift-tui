@@ -118,7 +118,7 @@ struct MeasurementCacheWitnessRefreshTests {
     ResolvedNode(
       viewNodeID: .init(rawValue: 1),
       identity: testIdentity("Root"),
-      kind: .view("Witness"),
+      kind: .view(.init("Witness")),
       typeDiscriminator: type,
       intrinsicSize: .init(width: 4, height: 1)
     )
@@ -130,7 +130,7 @@ struct MeasurementCacheWitnessRefreshTests {
       ResolvedNode(
         viewNodeID: .init(rawValue: 2),
         identity: testIdentity("Root", "Child"),
-        kind: .view("WitnessChild"),
+        kind: .view(.init("WitnessChild")),
         typeDiscriminator: ObjectIdentifier(Int.self),
         intrinsicSize: .init(width: 4, height: 1)
       )

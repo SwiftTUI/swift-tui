@@ -41,11 +41,11 @@ struct CustomLayoutContainerContractTests {
       .settingVerticalAlignmentGuide(.top, debugName: "top", computeValue: { _ in 3 })
     if wrapped {
       child = ResolvedNode(
-        identity: testIdentity("padding"), kind: .view("Padding"),
+        identity: testIdentity("padding"), kind: .view(.padding),
         children: [child], layoutBehavior: .padding(.init(top: 1, leading: 1)))
     }
     let root = ResolvedNode(
-      identity: testIdentity("anchor-layout"), kind: .view("Custom"),
+      identity: testIdentity("anchor-layout"), kind: .view(.init("Custom")),
       children: [child], layoutBehavior: AnyLayout(AnchoredLayout()).resolvedBehavior)
     let engine = LayoutEngine()
     let context = LayoutPassContext()
@@ -60,23 +60,23 @@ struct CustomLayoutContainerContractTests {
       for reversed in [false, true] {
         for wrapped in [false, true] {
           let capped = ResolvedNode(
-            identity: testIdentity("cap"), kind: .view("Frame"),
+            identity: testIdentity("cap"), kind: .view(.frame),
             children: [leaf("content", width: 1, height: 1)],
             layoutBehavior: .flexibleFrame(
               minWidth: nil, idealWidth: nil, maxWidth: axis == .horizontal ? 50 : nil,
               minHeight: nil, idealHeight: nil, maxHeight: axis == .vertical ? 50 : nil,
               alignment: .topLeading))
           let custom = ResolvedNode(
-            identity: testIdentity("custom"), kind: .view("Custom"), children: [capped],
+            identity: testIdentity("custom"), kind: .view(.init("Custom")), children: [capped],
             layoutBehavior: AnyLayout(ProposalForwardingContractLayout()).resolvedBehavior)
           let child =
             wrapped
             ? ResolvedNode(
-              identity: testIdentity("wrapper"), kind: .view("Padding"), children: [custom],
+              identity: testIdentity("wrapper"), kind: .view(.padding), children: [custom],
               layoutBehavior: .padding(.init()))
             : custom
           let spacer = ResolvedNode(
-            identity: testIdentity("spacer"), kind: .view("Spacer"),
+            identity: testIdentity("spacer"), kind: .view(.spacer),
             intrinsicSize: .zero)
           let root = stack(
             "parent", axis: axis, spacing: 0,
@@ -232,7 +232,7 @@ struct CustomLayoutContainerContractTests {
         leaf("column-text", width: 4, height: 1),
         ResolvedNode(
           identity: testIdentity("outer"),
-          kind: .view("Outer"),
+          kind: .view(.init("Outer")),
           children: [
             container("inner", layout: SpacingContractLayout(vertical: 2))
           ],
@@ -399,7 +399,7 @@ struct CustomLayoutContainerContractTests {
     ]
     for behavior in wrappers {
       let wrapper = ResolvedNode(
-        identity: testIdentity("wrapper"), kind: .view("Wrapper"),
+        identity: testIdentity("wrapper"), kind: .view(.init("Wrapper")),
         children: [box], layoutBehavior: behavior
       )
       let outer = frame("outer", width: 10, alignment: .topLeading, child: wrapper)
@@ -432,14 +432,14 @@ struct CustomLayoutContainerContractTests {
     let engine = LayoutEngine()
     let box = ResolvedNode(
       identity: testIdentity("box"),
-      kind: .view("Box"),
+      kind: .view(.init("Box")),
       children: [leaf("box-a", width: 4, height: 1)],
       layoutBehavior: AnyLayout(AnyLayout(AlignmentContractLayout(leading: 3))).resolvedBehavior
     )
     #expect(engine.dimensions(of: box)[.leading] == 3)
     let spaced = ResolvedNode(
       identity: testIdentity("spaced"),
-      kind: .view("Spaced"),
+      kind: .view(.init("Spaced")),
       children: [leaf("spaced-a", width: 4, height: 1)],
       layoutBehavior: AnyLayout(AnyLayout(SpacingContractLayout(horizontal: 3, vertical: 2)))
         .resolvedBehavior
@@ -533,7 +533,7 @@ struct CustomLayoutContainerContractTests {
     let probe = HookProbe()
     let engine = LayoutEngine()
     let overlay = ResolvedNode(
-      identity: testIdentity("overlay"), kind: .view("ZStack"),
+      identity: testIdentity("overlay"), kind: .view(.zStack),
       children: [container("box", layout: ProbedContractLayout(probe: probe))],
       layoutBehavior: .overlay(alignment: .topLeading)
     )
@@ -577,7 +577,7 @@ struct CustomLayoutContainerContractTests {
   private func leaf(_ name: String, width: Int, height: Int) -> ResolvedNode {
     ResolvedNode(
       identity: testIdentity(name),
-      kind: .view("Test"),
+      kind: .view(.init("Test")),
       intrinsicSize: .init(width: width, height: height)
     )
   }
@@ -589,7 +589,7 @@ struct CustomLayoutContainerContractTests {
   ) -> ResolvedNode {
     ResolvedNode(
       identity: testIdentity(name),
-      kind: .view("ContractFixture"),
+      kind: .view(.init("ContractFixture")),
       children: [leaf("\(name)-a", width: childWidth, height: 1)],
       layoutBehavior: AnyLayout(layout).resolvedBehavior
     )
@@ -605,7 +605,7 @@ struct CustomLayoutContainerContractTests {
   ) -> ResolvedNode {
     ResolvedNode(
       identity: testIdentity(name),
-      kind: .view(axis == .vertical ? "VStack" : "HStack"),
+      kind: .view(axis == .vertical ? .vStack : .hStack),
       children: children,
       layoutBehavior: .stack(
         axis: axis,
@@ -624,7 +624,7 @@ struct CustomLayoutContainerContractTests {
   ) -> ResolvedNode {
     ResolvedNode(
       identity: testIdentity(name),
-      kind: .view("Frame"),
+      kind: .view(.frame),
       children: [child],
       layoutBehavior: .frame(width: width, height: nil, alignment: alignment)
     )

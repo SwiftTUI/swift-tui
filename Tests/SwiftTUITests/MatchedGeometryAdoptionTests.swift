@@ -89,18 +89,18 @@ struct MatchedGeometryAdoptionTests {
   ) -> ResolvedNode {
     var children: [ResolvedNode] = []
     if let source {
-      var node = ResolvedNode(identity: source, kind: .view("Leaf"))
+      var node = ResolvedNode(identity: source, kind: .view(.init("Leaf")))
       node.matchedGeometry = MatchedGeometryConfig(key: key)
       children.append(node)
     }
     if let nonSource {
       var node = ResolvedNode(
-        viewNodeID: nonSourceNodeID, identity: nonSource, kind: .view("Leaf"),
+        viewNodeID: nonSourceNodeID, identity: nonSource, kind: .view(.init("Leaf")),
         children: [], layoutBehavior: .intrinsic, drawMetadata: DrawMetadata())
       node.matchedGeometry = config
       children.append(node)
     }
-    return ResolvedNode(identity: root, kind: .view("Root"), children: children)
+    return ResolvedNode(identity: root, kind: .view(.init("Root")), children: children)
   }
 
   private static func placedPair(
@@ -401,14 +401,14 @@ struct MatchedGeometryAdoptionTests {
     let thirdBounds = CellRect(origin: CellPoint(x: 40, y: 10), size: CellSize(width: 6, height: 1))
 
     // Frame 2: the pair leaves and a third instance takes the key, animated.
-    var thirdNode = ResolvedNode(identity: third, kind: .view("Leaf"))
+    var thirdNode = ResolvedNode(identity: third, kind: .view(.init("Leaf")))
     thirdNode.matchedGeometry = MatchedGeometryConfig(key: Self.key)
     var transaction = TransactionSnapshot()
     transaction.animationRequest = .animate(pair.animation.animationBox)
     pair.controller.beginTransitionCollection()
     pair.controller.finishTransitionCollection()
     pair.controller.processResolvedTree(
-      ResolvedNode(identity: pair.root, kind: .view("Root"), children: [thirdNode]),
+      ResolvedNode(identity: pair.root, kind: .view(.init("Root")), children: [thirdNode]),
       transaction: transaction,
       timestamp: pair.start
     )
@@ -515,22 +515,22 @@ struct MatchedGeometryAdoptionTests {
     let departingBounds = CellRect(origin: CellPoint(x: 50, y: 0), size: heroSize)
 
     func resolved(heroInOuter: Bool) -> ResolvedNode {
-      var outerSourceNode = ResolvedNode(identity: outerSource, kind: .view("Leaf"))
+      var outerSourceNode = ResolvedNode(identity: outerSource, kind: .view(.init("Leaf")))
       outerSourceNode.matchedGeometry = MatchedGeometryConfig(key: outerKey)
-      var hero = ResolvedNode(identity: destination, kind: .view("Leaf"))
+      var hero = ResolvedNode(identity: destination, kind: .view(.init("Leaf")))
       hero.matchedGeometry = MatchedGeometryConfig(key: Self.key)
       var outerNode = ResolvedNode(
-        identity: outer, kind: .view("Frame"), children: heroInOuter ? [hero] : [])
+        identity: outer, kind: .view(.frame), children: heroInOuter ? [hero] : [])
       outerNode.matchedGeometry = MatchedGeometryConfig(key: outerKey, isSource: false)
       var children = [outerSourceNode, outerNode]
       if !heroInOuter {
         var departingNode = ResolvedNode(
-          viewNodeID: departingNodeID, identity: departing, kind: .view("Leaf"),
+          viewNodeID: departingNodeID, identity: departing, kind: .view(.init("Leaf")),
           children: [], layoutBehavior: .intrinsic, drawMetadata: DrawMetadata())
         departingNode.matchedGeometry = MatchedGeometryConfig(key: Self.key)
         children.append(departingNode)
       }
-      return ResolvedNode(identity: root, kind: .view("Root"), children: children)
+      return ResolvedNode(identity: root, kind: .view(.init("Root")), children: children)
     }
     func placed(heroInOuter: Bool) -> PlacedNode {
       var children = [
@@ -762,12 +762,12 @@ extension MatchedGeometryAdoptionTests {
     #expect(lastBounds.origin.x == 22)
 
     let third = testIdentity("T251", "Third")
-    var thirdNode = ResolvedNode(identity: third, kind: .view("Leaf"))
+    var thirdNode = ResolvedNode(identity: third, kind: .view(.init("Leaf")))
     thirdNode.matchedGeometry = MatchedGeometryConfig(key: Self.key)
     pair.controller.beginTransitionCollection()
     pair.controller.finishTransitionCollection()
     pair.controller.processResolvedTree(
-      ResolvedNode(identity: pair.root, kind: .view("Root"), children: [thirdNode]),
+      ResolvedNode(identity: pair.root, kind: .view(.init("Root")), children: [thirdNode]),
       transaction: transaction, timestamp: departure)
     let thirdBounds = CellRect(origin: .init(x: 40, y: 2), size: Self.sourceBounds.size)
     let placed = PlacedNode(

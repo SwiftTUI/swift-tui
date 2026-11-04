@@ -142,7 +142,7 @@ enum AnimationTransitionOverlay {
       var wrapped = ResolvedNode(
         identity: wrapperIdentity,
         structuralEdgeRole: .transientRemovalOverlay,
-        kind: .view("TransitionOffset"),
+        kind: .view(.transitionOffset),
         children: [node],
         environmentSnapshot: node.environmentSnapshot,
         transactionSnapshot: node.transactionSnapshot,

@@ -334,7 +334,7 @@ private func collectViewKindNames(
   into kinds: inout [String]
 ) {
   if case .view(let name) = node.kind {
-    kinds.append(name)
+    kinds.append(name.name)
   }
 
   for child in node.children {

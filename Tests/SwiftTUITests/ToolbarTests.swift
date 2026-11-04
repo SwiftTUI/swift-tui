@@ -872,7 +872,7 @@ private func findNode(
 
 @MainActor
 private func isKind(_ kind: NodeKind, named name: String) -> Bool {
-  if case .view(let n) = kind, n == name { return true }
+  if case .view(let n) = kind, n.name == name { return true }
   return false
 }
 

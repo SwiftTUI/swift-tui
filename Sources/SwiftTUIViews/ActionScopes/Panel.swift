@@ -70,7 +70,7 @@ public struct Panel<ID: Hashable & Sendable, Content: View>: PrimitiveView, Acti
       return [
         ResolvedNode(
           identity: context.identity,
-          kind: .view("Panel"),
+          kind: .view(.panel),
           children: [childNode],
           environmentSnapshot: context.environment,
           transactionSnapshot: context.transaction,

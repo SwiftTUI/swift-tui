@@ -866,7 +866,7 @@ private func firstResolvedNode(
   kind: String,
   in root: ResolvedNode
 ) -> ResolvedNode? {
-  if root.kind == .view(kind) {
+  if root.kind == .view(.init(kind)) {
     return root
   }
   for child in root.children {

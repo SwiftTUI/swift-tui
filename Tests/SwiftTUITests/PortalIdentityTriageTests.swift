@@ -54,7 +54,7 @@ struct PortalIdentityTriageTests {
     var identities: [Identity] = []
     for payloads in [[first], [first, second], [first]] {
       let artifacts = renderer.render(
-        PortalAttachmentGroupView(kindName: "Payloads", payloads: payloads),
+        PortalAttachmentGroupView(kindName: .init("Payloads"), payloads: payloads),
         context: context, proposal: .init(width: 30, height: 6))
       identities.append(
         try #require(artifacts.resolvedTree.descendant(withText: "Survivor")?.identity))

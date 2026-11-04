@@ -20,7 +20,7 @@ struct CommittedHandlerResolutionOracleTests {
           identity: rootIdentity,
           kind: .root,
           children: [
-            ResolvedNode(identity: childIdentity, kind: .view("Child"))
+            ResolvedNode(identity: childIdentity, kind: .view(.init("Child")))
           ]
         )
       )
@@ -529,11 +529,11 @@ struct CommittedHandlerResolutionOracleTests {
       children: [
         ResolvedNode(
           identity: testIdentity("Root", "Branch"),
-          kind: .view("Branch"),
+          kind: .view(.init("Branch")),
           children: [
             ResolvedNode(
               identity: testIdentity("Root", "Branch", "Leaf"),
-              kind: .view("Leaf"),
+              kind: .view(.init("Leaf")),
               lifecycleMetadata: lifecycleMetadata,
               handlerInventory: inventory
             )

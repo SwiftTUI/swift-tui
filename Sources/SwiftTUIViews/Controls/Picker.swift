@@ -286,7 +286,7 @@ extension Picker {
 
         var node = ResolvedNode(
           identity: context.identity,
-          kind: .view("Picker"),
+          kind: .view(.picker),
           children: [child],
           environmentSnapshot: context.environment,
           transactionSnapshot: context.transaction,
@@ -424,7 +424,7 @@ extension Picker {
     let label = resolvedNodeLabelText(from: node)
     var reasons: [String] = []
 
-    if case .view("Text") = node.kind {
+    if case .view(.text) = node.kind {
       // Expected primitive shape.
     } else {
       reasons.append("non-Text structure")

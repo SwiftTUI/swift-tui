@@ -26,7 +26,7 @@ struct PresentationTriggerSplitTests {
         artifacts.resolvedTree.descendant(withText: "Base probe")?.identity
       )
       let triggerIdentity = try #require(
-        artifacts.resolvedTree.firstNode(ofKind: .view("__presentationTrigger"))?.identity
+        artifacts.resolvedTree.firstNode(ofKind: .view(.presentationTrigger))?.identity
       )
 
       // The crux invariant: trigger and background are siblings, so toggling the
@@ -84,7 +84,7 @@ struct PresentationTriggerSplitTests {
         proposal: triggerProposal
       )
       let triggerIdentity = try #require(
-        closed.resolvedTree.firstNode(ofKind: .view("__presentationTrigger"))?.identity
+        closed.resolvedTree.firstNode(ofKind: .view(.presentationTrigger))?.identity
       )
 
       // Frame 2 (open) with ONLY the trigger invalidated — exactly the set
@@ -150,7 +150,7 @@ struct PresentationTriggerSplitTests {
         artifacts.resolvedTree.descendant(withText: "Base probe")?.identity
       )
       let triggerIdentity = try #require(
-        artifacts.resolvedTree.firstNode(ofKind: .view("__presentationTrigger"))?.identity
+        artifacts.resolvedTree.firstNode(ofKind: .view(.presentationTrigger))?.identity
       )
 
       #expect(triggerIdentity != backgroundIdentity)
@@ -172,7 +172,7 @@ struct PresentationTriggerSplitTests {
         proposal: triggerProposal
       )
       let triggerIdentity = try #require(
-        closed.resolvedTree.firstNode(ofKind: .view("__presentationTrigger"))?.identity
+        closed.resolvedTree.firstNode(ofKind: .view(.presentationTrigger))?.identity
       )
 
       let opened = renderer.render(
@@ -201,7 +201,7 @@ struct PresentationTriggerSplitTests {
       )
 
       #expect(
-        artifacts.resolvedTree.firstNode(ofKind: .view("__presentationTrigger")) != nil
+        artifacts.resolvedTree.firstNode(ofKind: .view(.presentationTrigger)) != nil
       )
       #expect(artifacts.resolvedTree.descendant(withText: "Item alpha") != nil)
 

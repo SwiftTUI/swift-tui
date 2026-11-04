@@ -25,7 +25,7 @@ struct ForEachIterationParityTests {
     var eagerIndex = 0
     content.appendDeclaredChildren(
       in: context,
-      kindName: "ParityChild",
+      kindName: .init("ParityChild"),
       nextIndex: &eagerIndex,
       into: &eager
     )
@@ -34,7 +34,7 @@ struct ForEachIterationParityTests {
     var enumerationIndex = 0
     content.enumerateDeclaredChildren(
       in: context,
-      kindName: "ParityChild",
+      kindName: .init("ParityChild"),
       nextIndex: &enumerationIndex
     ) { _, _, resolveOne in
       enumerated.append(resolveOne())
@@ -276,7 +276,7 @@ struct ForEachIterationParityTests {
       in: ResolveContext(
         identity: testIdentity("ForEachParity", "PortalSequence")
       ),
-      kindName: "VStack",
+      kindName: .vStack,
       nextIndex: &nextIndex,
       into: &resolved
     )

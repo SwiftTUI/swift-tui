@@ -87,11 +87,11 @@ struct AdversarialSetAMeasurementTests {
   private func tree() -> ResolvedNode {
     let wrapper = ResolvedNode(
       viewNodeID: .init(rawValue: 2), identity: testIdentity("SetA", "wrapper"),
-      kind: .view("Padding"),
+      kind: .view(.padding),
       children: [leaf(3, width: 3, height: 2)],
       layoutBehavior: .padding(.init(top: 1, leading: 1, bottom: 0, trailing: 2)))
     return ResolvedNode(
-      viewNodeID: .init(rawValue: 1), identity: testIdentity("SetA"), kind: .view("Stack"),
+      viewNodeID: .init(rawValue: 1), identity: testIdentity("SetA"), kind: .view(.init("Stack")),
       children: [wrapper, leaf(4, width: 5, height: 1)],
       layoutBehavior: .stack(
         axis: .vertical, spacing: 1,
@@ -101,7 +101,7 @@ struct AdversarialSetAMeasurementTests {
   private func leaf(_ id: UInt64, width: Int, height: Int) -> ResolvedNode {
     .init(
       viewNodeID: .init(rawValue: id), identity: testIdentity("SetA", "leaf-\(id)"),
-      kind: .view("Leaf"), intrinsicSize: .init(width: width, height: height))
+      kind: .view(.init("Leaf")), intrinsicSize: .init(width: width, height: height))
   }
 
   private func compare(_ versions: [ResolvedNode]) {

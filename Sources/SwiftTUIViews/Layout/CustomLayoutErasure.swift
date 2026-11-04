@@ -25,6 +25,7 @@ import Synchronization
 // one closed dependency graph; no file outside this pair references them.
 
 protocol AnyLayoutBox: Sendable {
+  var concreteType: ObjectIdentifier { get }
   var debugName: String { get }
   var builtinLayoutBehavior: LayoutBehavior? { get }
   var measurementReuseSignature: String? { get }
@@ -75,6 +76,8 @@ protocol AnyLayoutBox: Sendable {
 
 struct ConcreteAnyLayoutBox<L: Layout>: AnyLayoutBox {
   var layout: L
+
+  var concreteType: ObjectIdentifier { ObjectIdentifier(L.self) }
 
   var debugName: String {
     String(describing: L.self)
@@ -930,7 +933,7 @@ struct LayoutContainer<Content: View>: PrimitiveView, IterativeResolvableView {
       resolveDeclaredChildrenWork(
         content,
         in: childContext,
-        kindName: "Layout"
+        kindName: .layout
       )
     }
 
@@ -938,7 +941,8 @@ struct LayoutContainer<Content: View>: PrimitiveView, IterativeResolvableView {
       return [
         ResolvedNode(
           identity: context.identity,
-          kind: .view(layout.debugName),
+          kind: .view(.init(layout.debugName, custom: true)),
+          typeDiscriminator: layout.concreteType,
           children: resolvedChildren,
           environmentSnapshot: context.environment,
           transactionSnapshot: context.transaction,

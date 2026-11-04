@@ -108,7 +108,7 @@ struct DeclaredChildDivergenceReportingTests {
     let paired = pairedLazyDeclaredChildren(
       from: threeChildren(),
       in: context,
-      kindName: "Tab",
+      kindName: .tab,
       debugName: "Body"
     )
     #expect(paired.divergence == nil)
@@ -205,7 +205,7 @@ private func expectTraversalAgreement<V: View>(
   let paired = pairedLazyDeclaredChildren(
     from: view,
     in: context,
-    kindName: "Tab",
+    kindName: .tab,
     debugName: "Body"
   )
 

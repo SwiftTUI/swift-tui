@@ -14,7 +14,7 @@ struct TextFigureResolutionTests {
     )
     let resolved = try #require(wrapper.anyViewPayloadContent)
 
-    #expect(resolved.kind == .view("TextFigure"))
+    #expect(resolved.kind == .view(.textFigure))
     #expect(resolved.children.isEmpty)
 
     guard case .textFigure(let payload) = resolved.drawPayload else {
@@ -39,9 +39,9 @@ struct TextFigureResolutionTests {
 
 extension ResolvedNode {
   fileprivate var anyViewPayloadContent: ResolvedNode? {
-    guard kind == .view("AnyView"),
+    guard kind == .view(.anyView),
       children.count == 1,
-      children[0].kind == .view("AnyViewPayload"),
+      children[0].kind == .view(.anyViewPayload),
       children[0].children.count == 1
     else {
       return nil

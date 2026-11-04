@@ -22,13 +22,13 @@ public struct TupleView<each Content: View>: PrimitiveView, IterativeResolvableV
     resolveDeclaredChildrenWork(
       self,
       in: context,
-      kindName: "Group"
+      kindName: .group
     )
   }
 
   package func appendDeclaredChildren(
     in context: ResolveContext,
-    kindName: String,
+    kindName: ViewKind,
     nextIndex: inout Int,
     into resolved: inout [ResolvedNode]
   ) {
@@ -41,7 +41,7 @@ public struct TupleView<each Content: View>: PrimitiveView, IterativeResolvableV
 
   package func appendDeclaredStructure(
     in context: ResolveContext,
-    kindName: String,
+    kindName: ViewKind,
     nextIndex: inout Int,
     into resolved: inout DeclaredChildAccumulator
   ) {
@@ -58,7 +58,7 @@ public struct TupleView<each Content: View>: PrimitiveView, IterativeResolvableV
 
   package func appendScopedDeclaredChildren(
     in context: DeclaredPayloadTraversalContext,
-    kindName: String,
+    kindName: ViewKind,
     nextIndex: inout Int,
     into children: inout [ScopedContentPayload]
   ) {
@@ -75,7 +75,7 @@ public struct TupleView<each Content: View>: PrimitiveView, IterativeResolvableV
 
   package func appendPortalDeclaredChildren(
     in context: DeclaredPayloadTraversalContext,
-    kindName: String,
+    kindName: ViewKind,
     nextIndex: inout Int,
     into children: inout [PortalAttachmentContentPayload]
   ) {
@@ -92,7 +92,7 @@ public struct TupleView<each Content: View>: PrimitiveView, IterativeResolvableV
 
   package func enumerateDeclaredChildren(
     in context: ResolveContext,
-    kindName: String,
+    kindName: ViewKind,
     nextIndex: inout Int,
     visitor: (
       _ child: Any,

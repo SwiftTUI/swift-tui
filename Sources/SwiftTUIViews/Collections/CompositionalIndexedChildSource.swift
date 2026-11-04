@@ -3,11 +3,11 @@
 @MainActor
 package protocol DeclaredChildStructure {
   func appendDeclaredStructureWork(
-    in context: ResolveContext, kindName: String, state: DeclaredStructureWorkState
+    in context: ResolveContext, kindName: ViewKind, state: DeclaredStructureWorkState
   ) -> ResolveWork<Void>
   func appendDeclaredStructure(
     in context: ResolveContext,
-    kindName: String,
+    kindName: ViewKind,
     nextIndex: inout Int,
     into result: inout DeclaredChildAccumulator
   )
@@ -33,7 +33,7 @@ package struct DeclaredChildAccumulator {
 package func appendDeclaredContent<V: View>(
   _ view: V,
   in context: ResolveContext,
-  kindName: String,
+  kindName: ViewKind,
   nextIndex: inout Int,
   into result: inout DeclaredChildAccumulator
 ) {
@@ -44,7 +44,7 @@ package func appendDeclaredContent<V: View>(
     return
   }
   if result.indexed, let provider = view as? any IndexedChildSourceView {
-    let childContext = context.indexedChild(kind: .init(rawValue: kindName), index: nextIndex)
+    let childContext = context.indexedChild(kind: .init(rawValue: kindName.name), index: nextIndex)
     if let source = provider.indexedChildSource(in: childContext) {
       nextIndex += 1
       result.sources.append(source)
@@ -72,7 +72,7 @@ package func appendDeclaredContent<V: View>(
 
 @MainActor
 package func makeCompositionalIndexedChildSource<V: View>(
-  from view: V, in context: ResolveContext, kindName: String
+  from view: V, in context: ResolveContext, kindName: ViewKind
 ) -> any IndexedChildSource {
   var result = DeclaredChildAccumulator(indexed: true)
   var nextIndex = 0
@@ -161,7 +161,7 @@ package final class DeclaredStructureWorkState {
 
 @MainActor
 package func appendDeclaredContentWork<V: View>(
-  _ view: V, in context: ResolveContext, kindName: String, state: DeclaredStructureWorkState
+  _ view: V, in context: ResolveContext, kindName: ViewKind, state: DeclaredStructureWorkState
 ) -> ResolveWork<Void> {
   .deferred {
     if let structure = view as? any DeclaredChildStructure {
@@ -169,7 +169,7 @@ package func appendDeclaredContentWork<V: View>(
     }
     if state.result.indexed, let provider = view as? any IndexedChildSourceView {
       let childContext = context.indexedChild(
-        kind: .init(rawValue: kindName), index: state.nextIndex)
+        kind: .init(rawValue: kindName.name), index: state.nextIndex)
       if let source = provider.indexedChildSource(in: childContext) {
         state.nextIndex += 1
         state.result.sources.append(source)
@@ -197,7 +197,7 @@ package func appendDeclaredContentWork<V: View>(
 
 @MainActor
 package func makeCompositionalIndexedChildSourceWork<V: View>(
-  from view: V, in context: ResolveContext, kindName: String
+  from view: V, in context: ResolveContext, kindName: ViewKind
 ) -> ResolveWork<any IndexedChildSource> {
   let state = DeclaredStructureWorkState(indexed: true)
   return appendDeclaredContentWork(view, in: context, kindName: kindName, state: state).map { _ in
@@ -207,12 +207,13 @@ package func makeCompositionalIndexedChildSourceWork<V: View>(
 
 extension Group {
   package func appendDeclaredStructureWork(
-    in context: ResolveContext, kindName: String, state: DeclaredStructureWorkState
+    in context: ResolveContext, kindName: ViewKind, state: DeclaredStructureWorkState
   ) -> ResolveWork<Void> {
-    let childContext = context.indexedChild(kind: .init(rawValue: kindName), index: state.nextIndex)
+    let childContext = context.indexedChild(
+      kind: .init(rawValue: kindName.name), index: state.nextIndex)
     state.nextIndex += 1
     let children = DeclaredStructureWorkState(indexed: state.result.indexed)
-    return appendDeclaredContentWork(content, in: childContext, kindName: "Group", state: children)
+    return appendDeclaredContentWork(content, in: childContext, kindName: .group, state: children)
       .map { _ in
         children.result.normalizeOccurrences()
         state.result.append(children.result)
@@ -222,7 +223,7 @@ extension Group {
 
 extension TupleView {
   package func appendDeclaredStructureWork(
-    in context: ResolveContext, kindName: String, state: DeclaredStructureWorkState
+    in context: ResolveContext, kindName: ViewKind, state: DeclaredStructureWorkState
   ) -> ResolveWork<Void> {
     var work: [ResolveWork<Void>] = []
     for child in repeat each value {
@@ -234,9 +235,10 @@ extension TupleView {
 
 extension VariadicView {
   package func appendDeclaredStructureWork(
-    in context: ResolveContext, kindName: String, state: DeclaredStructureWorkState
+    in context: ResolveContext, kindName: ViewKind, state: DeclaredStructureWorkState
   ) -> ResolveWork<Void> {
-    let childContext = context.indexedChild(kind: .init(rawValue: kindName), index: state.nextIndex)
+    let childContext = context.indexedChild(
+      kind: .init(rawValue: kindName.name), index: state.nextIndex)
     state.nextIndex += 1
     let children = DeclaredStructureWorkState(indexed: state.result.indexed)
     return resolveSequentially(content) { child in
@@ -247,9 +249,9 @@ extension VariadicView {
 
 extension ConditionalContent {
   package func appendDeclaredStructureWork(
-    in context: ResolveContext, kindName: String, state: DeclaredStructureWorkState
+    in context: ResolveContext, kindName: ViewKind, state: DeclaredStructureWorkState
   ) -> ResolveWork<Void> {
-    let slot = context.indexedChild(kind: .init(rawValue: kindName), index: state.nextIndex)
+    let slot = context.indexedChild(kind: .init(rawValue: kindName.name), index: state.nextIndex)
     state.nextIndex += 1
     let children = DeclaredStructureWorkState(indexed: state.result.indexed)
     let work: ResolveWork<Void>

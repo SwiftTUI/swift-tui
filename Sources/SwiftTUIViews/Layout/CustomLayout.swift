@@ -605,6 +605,8 @@ public struct AnyLayout: Layout {
 
   // Widened from `fileprivate` to file-internal so `LayoutContainer` (in
   // `CustomLayoutErasure.swift`) can read the layout's debug name.
+  var concreteType: ObjectIdentifier { box.concreteType }
+
   var debugName: String {
     box.debugName
   }

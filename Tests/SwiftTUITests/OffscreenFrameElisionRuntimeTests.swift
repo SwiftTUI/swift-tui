@@ -454,7 +454,7 @@ struct OffscreenFrameElisionRuntimeTests {
     frame1Metadata.baseStyle.explicitOpacity = 1.0
     let frame1 = ResolvedNode(
       identity: leafIdentity,
-      kind: .view("Leaf"),
+      kind: .view(.init("Leaf")),
       drawMetadata: frame1Metadata
     )
     let t0 = MonotonicInstant.now()
@@ -464,7 +464,7 @@ struct OffscreenFrameElisionRuntimeTests {
     frame2Metadata.baseStyle.explicitOpacity = 0.0
     var frame2 = ResolvedNode(
       identity: leafIdentity,
-      kind: .view("Leaf"),
+      kind: .view(.init("Leaf")),
       drawMetadata: frame2Metadata
     )
     var animatingTransaction = TransactionSnapshot()
@@ -1840,7 +1840,7 @@ private func resolvedLeaf(identity: Identity, opacity: Double) -> ResolvedNode {
   metadata.baseStyle.explicitOpacity = opacity
   return ResolvedNode(
     identity: identity,
-    kind: .view("Leaf"),
+    kind: .view(.init("Leaf")),
     drawMetadata: metadata
   )
 }

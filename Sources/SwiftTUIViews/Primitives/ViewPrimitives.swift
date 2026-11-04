@@ -135,7 +135,7 @@ public struct Text: PrimitiveView, ResolvableView {
     }
     let node = ResolvedNode(
       identity: context.identity,
-      kind: .view("Text"),
+      kind: .view(.text),
       typeDiscriminator: ObjectIdentifier(Text.self),
       environmentSnapshot: context.environment,
       transactionSnapshot: context.transaction,
@@ -327,7 +327,7 @@ public struct Spacer: PrimitiveView, ResolvableView {
     resolvedDrawMetadata.leafStackAxis = context.environmentValues.stackAxis
     return [
       resolveLeafNode(
-        kindName: "Spacer",
+        kindName: .spacer,
         intrinsicSize: intrinsicSize,
         drawMetadata: resolvedDrawMetadata,
         in: context
@@ -349,7 +349,7 @@ public struct Divider: PrimitiveView, ResolvableView {
     resolvedDrawMetadata.leafStackAxis = context.environmentValues.stackAxis
     return [
       resolveLeafNode(
-        kindName: "Divider",
+        kindName: .divider,
         intrinsicSize: .init(width: 1, height: 1),
         drawMetadata: resolvedDrawMetadata,
         drawPayload: .rule(strokeStyle),
@@ -361,7 +361,7 @@ public struct Divider: PrimitiveView, ResolvableView {
 
 @MainActor
 func resolveLeafNode(
-  kindName: String,
+  kindName: ViewKind,
   intrinsicSize: CellSize? = nil,
   layoutBehavior: LayoutBehavior = .intrinsic,
   layoutMetadata: LayoutMetadata = .init(),

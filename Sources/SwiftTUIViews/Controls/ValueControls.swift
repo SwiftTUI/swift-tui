@@ -91,7 +91,7 @@ extension Toggle {
 
       return ResolvedNode(
         identity: context.identity,
-        kind: .view("Toggle"),
+        kind: .view(.toggle),
         children: [child],
         environmentSnapshot: context.environment,
         transactionSnapshot: context.transaction,
@@ -233,7 +233,7 @@ extension TextField {
 
       return ResolvedNode(
         identity: context.identity,
-        kind: .view("TextField"),
+        kind: .view(.textField),
         children: [child],
         environmentSnapshot: context.environment,
         transactionSnapshot: context.transaction,
@@ -386,7 +386,7 @@ extension DisclosureGroup {
       metadata.explicitInteractionRect = CellRect(origin: .zero, size: .zero)
       return ResolvedNode(
         identity: context.identity,
-        kind: .view("DisclosureGroup"),
+        kind: .view(.disclosureGroup),
         children: [child],
         environmentSnapshot: context.environment,
         transactionSnapshot: context.transaction,

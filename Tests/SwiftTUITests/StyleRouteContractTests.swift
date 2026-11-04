@@ -532,12 +532,12 @@ private struct RoutelessConsumerTabViewStyle: TabViewStyle {
 
 extension ResolvedNode {
   fileprivate func pointerRouteCount(for identity: Identity) -> Int {
-    let own = (kind == .view("PointerRoute") && self.identity == identity) ? 1 : 0
+    let own = (kind == .view(.pointerRoute) && self.identity == identity) ? 1 : 0
     return children.reduce(own) { $0 + $1.pointerRouteCount(for: identity) }
   }
 
   fileprivate func totalPointerRouteCount() -> Int {
-    let own = kind == .view("PointerRoute") ? 1 : 0
+    let own = kind == .view(.pointerRoute) ? 1 : 0
     return children.reduce(own) { $0 + $1.totalPointerRouteCount() }
   }
 

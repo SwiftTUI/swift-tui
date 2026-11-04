@@ -18,8 +18,8 @@ struct ViewCompositionSurfaceTests {
     #expect(resolved.children.count == 2)
     #expect(resolved.children[0].identity == testIdentity("Root", "Group[0]"))
     #expect(resolved.children[1].identity == testIdentity("Root", "Group[1]"))
-    #expect(resolved.children[0].kind == .view("Text"))
-    #expect(resolved.children[1].kind == .view("Divider"))
+    #expect(resolved.children[0].kind == .view(.text))
+    #expect(resolved.children[1].kind == .view(.divider))
   }
 
   @Test("public metadata modifiers merge into resolved nodes without disturbing explicit identity")

@@ -460,7 +460,7 @@ private func backgroundShape<V: View>(_ harness: StressRuntimeHarness<V>) throws
   )
   func kindName(_ node: ResolvedNode) -> String {
     if case .view(let name) = node.kind {
-      return name
+      return name.name
     }
     return "\(node.kind)"
   }
@@ -472,7 +472,7 @@ private func backgroundShape<V: View>(_ harness: StressRuntimeHarness<V>) throws
     return "\(kindName(node))[\(node.children.map(describe).joined(separator: ", "))]"
   }
   func findBackgroundContent(_ node: ResolvedNode) -> ResolvedNode? {
-    if node.kind == .view("Background"), let content = node.children.first {
+    if node.kind == .view(.background), let content = node.children.first {
       return content
     }
     for child in node.children {

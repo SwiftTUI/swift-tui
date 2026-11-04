@@ -4376,14 +4376,14 @@ private func makeAsyncRecursiveCustomLayoutNode(
 ) -> ResolvedNode {
   var node = ResolvedNode(
     identity: identity.child(.named("leaf")),
-    kind: .view("Leaf"),
+    kind: .view(.init("Leaf")),
     intrinsicSize: .init(width: 1, height: 1)
   )
 
   for index in stride(from: depth - 1, through: 0, by: -1) {
     node = ResolvedNode(
       identity: index == 0 ? identity : identity.child(.init(rawValue: "recursive-\(index)")),
-      kind: .view("AsyncRecursiveCustomLayout"),
+      kind: .view(.init("AsyncRecursiveCustomLayout")),
       children: [node],
       layoutBehavior: .custom(CustomLayoutHandle(asyncRecursiveCustomLayoutProxy))
     )
@@ -4672,12 +4672,12 @@ private struct AsyncFrameTailWorkerCustomLayout<Content: View>: PrimitiveView,
       workerProxy: asyncFrameTailWorkerCustomLayoutSnapshot(recorder: recorder)
     )
     return resolveDeclaredChildrenWork(
-      content, in: context, kindName: "AsyncFrameTailWorkerCustomLayout"
+      content, in: context, kindName: .init("AsyncFrameTailWorkerCustomLayout")
     ).map { children in
       return [
         ResolvedNode(
           identity: context.identity,
-          kind: .view("AsyncFrameTailWorkerCustomLayout"),
+          kind: .view(.init("AsyncFrameTailWorkerCustomLayout")),
           children: children,
           environmentSnapshot: context.environment,
           transactionSnapshot: context.transaction,

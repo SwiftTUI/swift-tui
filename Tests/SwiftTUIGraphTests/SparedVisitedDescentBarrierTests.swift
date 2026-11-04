@@ -30,19 +30,19 @@ struct SparedVisitedDescentBarrierTests {
     let resolvedIsland =
       graph.finishEvaluation(
         islandNode,
-        resolved: ResolvedNode(identity: islandIdentity, kind: .view("Island")),
+        resolved: ResolvedNode(identity: islandIdentity, kind: .view(.init("Island"))),
         accessedStateSlots: 0
-      ) ?? ResolvedNode(identity: islandIdentity, kind: .view("Island"))
+      ) ?? ResolvedNode(identity: islandIdentity, kind: .view(.init("Island")))
     let resolvedWrapper =
       graph.finishEvaluation(
         wrapperNode,
         resolved: ResolvedNode(
           identity: wrapperIdentity,
-          kind: .view("Wrapper"),
+          kind: .view(.init("Wrapper")),
           children: [resolvedIsland]
         ),
         accessedStateSlots: 0
-      ) ?? ResolvedNode(identity: wrapperIdentity, kind: .view("Wrapper"))
+      ) ?? ResolvedNode(identity: wrapperIdentity, kind: .view(.init("Wrapper")))
     graph.finishEvaluation(
       rootNode,
       resolved: ResolvedNode(identity: rootIdentity, kind: .root, children: [resolvedWrapper]),
@@ -62,7 +62,7 @@ struct SparedVisitedDescentBarrierTests {
     let islandNode = graph.beginEvaluation(identity: islandIdentity, invalidator: nil)
     _ = graph.finishEvaluation(
       islandNode,
-      resolved: ResolvedNode(identity: islandIdentity, kind: .view("Island")),
+      resolved: ResolvedNode(identity: islandIdentity, kind: .view(.init("Island"))),
       accessedStateSlots: 0
     )
     // … and the committed pass drops the wrapper. The structural child diff
@@ -114,9 +114,9 @@ struct SparedVisitedDescentBarrierTests {
     let resolvedIsland =
       graph.finishEvaluation(
         islandNode,
-        resolved: ResolvedNode(identity: islandIdentity, kind: .view("Island")),
+        resolved: ResolvedNode(identity: islandIdentity, kind: .view(.init("Island"))),
         accessedStateSlots: 0
-      ) ?? ResolvedNode(identity: islandIdentity, kind: .view("Island"))
+      ) ?? ResolvedNode(identity: islandIdentity, kind: .view(.init("Island")))
     let adopterIdentity = testIdentity("Root", "Adopter")
     let adopterNode = graph.beginEvaluation(identity: adopterIdentity, invalidator: nil)
     let resolvedAdopter =
@@ -124,11 +124,11 @@ struct SparedVisitedDescentBarrierTests {
         adopterNode,
         resolved: ResolvedNode(
           identity: adopterIdentity,
-          kind: .view("Adopter"),
+          kind: .view(.init("Adopter")),
           children: [resolvedIsland]
         ),
         accessedStateSlots: 0
-      ) ?? ResolvedNode(identity: adopterIdentity, kind: .view("Adopter"))
+      ) ?? ResolvedNode(identity: adopterIdentity, kind: .view(.init("Adopter")))
     let rootNode = graph.beginEvaluation(identity: rootIdentity, invalidator: nil)
     _ = graph.finishEvaluation(
       rootNode,

@@ -21,13 +21,13 @@ public struct HStack<Content: View>: PrimitiveView, IterativeResolvableView {
     return resolveDeclaredChildrenWork(
       content,
       in: stackContext,
-      kindName: "HStack"
+      kindName: .hStack
     )
     .map { resolvedChildren in
       return [
         ResolvedNode(
           identity: context.identity,
-          kind: .view("HStack"),
+          kind: .view(.hStack),
           children: resolvedChildren,
           environmentSnapshot: context.environment,
           transactionSnapshot: context.transaction,

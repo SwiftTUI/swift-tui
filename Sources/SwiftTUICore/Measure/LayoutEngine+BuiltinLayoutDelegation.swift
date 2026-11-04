@@ -71,7 +71,7 @@ extension LayoutEngine {
 
     return ResolvedNode(
       identity: Identity(components: ["SwiftTUIBuiltinLayoutDelegation"]),
-      kind: .view("BuiltinLayoutDelegation"),
+      kind: .view(.builtinLayoutDelegation),
       children: children,
       layoutBehavior: behavior
     )

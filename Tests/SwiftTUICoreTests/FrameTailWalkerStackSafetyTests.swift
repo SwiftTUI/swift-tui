@@ -74,7 +74,7 @@ struct FrameTailWalkerStackSafetyTests {
   ) -> ResolvedNode {
     var node = ResolvedNode(
       identity: testIdentity("deep", leafLabel),
-      kind: .view("Leaf")
+      kind: .view(.init("Leaf"))
     )
     for index in stride(from: depth - 1, through: 0, by: -1) {
       var semanticMetadata = SemanticMetadata()
@@ -83,7 +83,7 @@ struct FrameTailWalkerStackSafetyTests {
       }
       node = ResolvedNode(
         identity: testIdentity("deep", "\(index)"),
-        kind: .view("Container"),
+        kind: .view(.init("Container")),
         children: [node],
         semanticMetadata: semanticMetadata
       )
@@ -111,14 +111,14 @@ struct FrameTailWalkerStackSafetyTests {
   private func deepPlacedChain(depth: Int) -> PlacedNode {
     var node = PlacedNode(
       identity: testIdentity("deep", "leaf"),
-      kind: .view("Leaf"),
+      kind: .view(.init("Leaf")),
       bounds: .init(origin: .zero, size: .init(width: 1, height: 1)),
       drawPayload: .text("A")
     )
     for index in stride(from: depth - 1, through: 0, by: -1) {
       node = PlacedNode(
         identity: testIdentity("deep", "\(index)"),
-        kind: .view("Container"),
+        kind: .view(.init("Container")),
         bounds: .init(origin: .zero, size: .init(width: 1, height: 1)),
         children: [node]
       )

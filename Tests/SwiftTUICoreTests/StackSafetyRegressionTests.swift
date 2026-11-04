@@ -472,7 +472,7 @@ private func makeRecursiveCustomLayoutChain(depth: Int) -> ResolvedNode {
   for index in stride(from: depth - 1, through: 0, by: -1) {
     node = ResolvedNode(
       identity: testIdentity("recursive-custom", "\(index)"),
-      kind: .view("RecursiveCustomLayout"),
+      kind: .view(.init("RecursiveCustomLayout")),
       children: [node],
       layoutBehavior: .custom(CustomLayoutHandle(recursiveCustomLayoutProxy))
     )
@@ -544,7 +544,7 @@ private final class RecursiveCustomLayoutProxy: LayoutPassContextCustomLayoutPro
 private func makeWorkerSafeCustomLayoutNode(children: [ResolvedNode]) -> ResolvedNode {
   ResolvedNode(
     identity: testIdentity("worker-custom-root"),
-    kind: .view("WorkerSafeCustomLayout"),
+    kind: .view(.init("WorkerSafeCustomLayout")),
     children: children,
     layoutBehavior: .custom(
       CustomLayoutHandle(
@@ -626,7 +626,7 @@ private func makeDeepResolvedNodeTree(depth: Int) -> DeepResolvedTree {
   )
   var node = ResolvedNode(
     identity: leafIdentity,
-    kind: .view("Button"),
+    kind: .view(.button),
     semanticMetadata: leafSemanticMetadata,
     lifecycleMetadata: leafLifecycleMetadata
   )
@@ -650,7 +650,7 @@ private func makeDeepResolvedNodeTree(depth: Int) -> DeepResolvedTree {
 
     node = ResolvedNode(
       identity: identity,
-      kind: .view("Container"),
+      kind: .view(.init("Container")),
       children: [node],
       lifecycleMetadata: lifecycleMetadata
     )
@@ -686,7 +686,7 @@ private func makeDeepPlacedNodeTree(depth: Int) -> DeepPlacedTree {
   )
   var node = PlacedNode(
     identity: leafIdentity,
-    kind: .view("Button"),
+    kind: .view(.button),
     bounds: .init(origin: .zero, size: .init(width: 1, height: 1)),
     semanticMetadata: leafSemanticMetadata,
     lifecycleMetadata: leafLifecycleMetadata,
@@ -712,7 +712,7 @@ private func makeDeepPlacedNodeTree(depth: Int) -> DeepPlacedTree {
 
     node = PlacedNode(
       identity: identity,
-      kind: .view("Container"),
+      kind: .view(.init("Container")),
       bounds: .init(origin: .zero, size: .init(width: 1, height: 1)),
       children: [node],
       lifecycleMetadata: lifecycleMetadata
@@ -770,7 +770,7 @@ private func makeLayoutLeaf(
 ) -> ResolvedNode {
   ResolvedNode(
     identity: testIdentity(name),
-    kind: .view("Leaf"),
+    kind: .view(.init("Leaf")),
     intrinsicSize: size
   )
 }
@@ -784,7 +784,7 @@ private func makeHostedListNode(
 ) -> ResolvedNode {
   var node = ResolvedNode(
     identity: testIdentity(name),
-    kind: .view("List"),
+    kind: .view(.list),
     drawPayload: .list(
       ListPayload(
         items: [ListItemPayload(kind: .row, text: "row")],
@@ -819,7 +819,7 @@ private func makeDeepLayoutWrapperChain(depth: Int) -> ResolvedNode {
   for index in stride(from: depth - 1, through: 0, by: -1) {
     node = ResolvedNode(
       identity: testIdentity("wrapper", "\(index)"),
-      kind: .view("Wrapper"),
+      kind: .view(.init("Wrapper")),
       children: [node],
       layoutBehavior: wrapperBehavior(for: index)
     )
@@ -870,7 +870,7 @@ private func makeDeepStackLayoutChain(depth: Int) -> ResolvedNode {
     let sibling = makeLayoutLeaf("stack-sibling-\(index)", size: .init(width: 1, height: 1))
     node = ResolvedNode(
       identity: testIdentity("stack", "\(index)"),
-      kind: .view(index.isMultiple(of: 2) ? "VStack" : "HStack"),
+      kind: .view(index.isMultiple(of: 2) ? .vStack : .hStack),
       children: [node, sibling],
       layoutBehavior: .stack(
         axis: index.isMultiple(of: 2) ? .vertical : .horizontal,
@@ -893,21 +893,21 @@ private func makeDeepBranchingLayoutTree(depth: Int) -> ResolvedNode {
     case 0:
       node = ResolvedNode(
         identity: testIdentity("branch-overlay", "\(index)"),
-        kind: .view("Overlay"),
+        kind: .view(.overlay),
         children: [node, adornment],
         layoutBehavior: .overlay(alignment: .center)
       )
     case 1:
       node = ResolvedNode(
         identity: testIdentity("branch-decoration", "\(index)"),
-        kind: .view("Decoration"),
+        kind: .view(.init("Decoration")),
         children: [adornment, node],
         layoutBehavior: .decoration(primaryIndex: 1, alignment: .center)
       )
     case 2:
       node = ResolvedNode(
         identity: testIdentity("branch-inset", "\(index)"),
-        kind: .view("SafeAreaInset"),
+        kind: .view(.safeAreaInset),
         children: [node, adornment],
         layoutBehavior: .safeAreaInset(
           edge: .top,
@@ -919,7 +919,7 @@ private func makeDeepBranchingLayoutTree(depth: Int) -> ResolvedNode {
     default:
       node = ResolvedNode(
         identity: testIdentity("branch-view-that-fits", "\(index)"),
-        kind: .view("ViewThatFits"),
+        kind: .view(.viewThatFits),
         children: [node, adornment],
         layoutBehavior: .viewThatFits([.horizontal, .vertical])
       )
@@ -944,7 +944,7 @@ private func makeLayoutRealizedNode(children: [ResolvedNode]) -> ResolvedNode {
   )
   return ResolvedNode(
     identity: identity,
-    kind: .view("LayoutRealized"),
+    kind: .view(.init("LayoutRealized")),
     layoutRealizedContent: boundary
   )
 }
@@ -973,7 +973,7 @@ private func makeIndexedLazyStackLayoutTree(
 ) -> ResolvedNode {
   ResolvedNode(
     identity: testIdentity(name),
-    kind: .view(axis == .horizontal ? "LazyHStack" : "LazyVStack"),
+    kind: .view(axis == .horizontal ? .lazyHStack : .lazyVStack),
     layoutBehavior: .lazyStack(
       axis: axis,
       spacing: 0,

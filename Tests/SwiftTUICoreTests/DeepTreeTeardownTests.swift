@@ -197,11 +197,11 @@ private func drainDrawChainOnWorkerStack() async {
 // MARK: - File-scope fixtures
 
 private func teardownResolvedChain(depth: Int) -> ResolvedNode {
-  var node = ResolvedNode(identity: testIdentity("teardown", "leaf"), kind: .view("Leaf"))
+  var node = ResolvedNode(identity: testIdentity("teardown", "leaf"), kind: .view(.init("Leaf")))
   for index in stride(from: depth - 1, through: 0, by: -1) {
     node = ResolvedNode(
       identity: testIdentity("teardown", "\(index)"),
-      kind: .view("Container"),
+      kind: .view(.init("Container")),
       children: [node]
     )
   }
@@ -228,14 +228,14 @@ private func teardownMeasuredChain(depth: Int) -> MeasuredNode {
 private func teardownPlacedChain(depth: Int) -> PlacedNode {
   var node = PlacedNode(
     identity: testIdentity("teardown", "leaf"),
-    kind: .view("Leaf"),
+    kind: .view(.init("Leaf")),
     bounds: .init(origin: .zero, size: .init(width: 1, height: 1)),
     drawPayload: .text("A")
   )
   for index in stride(from: depth - 1, through: 0, by: -1) {
     node = PlacedNode(
       identity: testIdentity("teardown", "\(index)"),
-      kind: .view("Container"),
+      kind: .view(.init("Container")),
       bounds: .init(origin: .zero, size: .init(width: 1, height: 1)),
       children: [node]
     )

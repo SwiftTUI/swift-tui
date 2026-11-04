@@ -150,7 +150,7 @@ struct TransactionContinuityTests {
     var base = TransactionSnapshot()
     base.isContinuous = true
     controller.processResolvedTree(
-      ResolvedNode(identity: testIdentity("ContinuityGate"), kind: .view("Probe")),
+      ResolvedNode(identity: testIdentity("ContinuityGate"), kind: .view(.init("Probe"))),
       transaction: .init(),
       timestamp: .now()
     )

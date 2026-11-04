@@ -140,11 +140,11 @@ struct AnimationEpicLifecycleTests {
         transaction.animationRequest = .animate(animation.animationBox)
         transaction.animationBatchID = batch
         return ResolvedNode(
-          identity: testIdentity("partial", label), kind: .view("Leaf"),
+          identity: testIdentity("partial", label), kind: .view(.init("Leaf")),
           transactionSnapshot: transaction, drawMetadata: metadata)
       }
       return ResolvedNode(
-        identity: testIdentity("partial"), kind: .view("Root"),
+        identity: testIdentity("partial"), kind: .view(.init("Root")),
         children: [leaf("early", animation: early)]
           + (includesLate ? [leaf("late", animation: late)] : []))
     }

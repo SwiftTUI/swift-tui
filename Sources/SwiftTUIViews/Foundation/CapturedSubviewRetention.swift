@@ -40,7 +40,7 @@ package struct CapturedSubviewRetention: Sendable {
       if let ownerNode, let graph = context.viewGraph {
         let locator = graph.dormantStateArchiveLocator(
           rootedAt: ResolvedNode(
-            identity: identity, kind: .view("CapturedSubviewSequence"), children: children))
+            identity: identity, kind: .view(.capturedSubviewSequence), children: children))
         withTransientDormantStateSlot {
           ownerNode.setStateSlotSilently(
             ordinal: StateSlotOrdinals.capturedSubviewLocator, value: locator)

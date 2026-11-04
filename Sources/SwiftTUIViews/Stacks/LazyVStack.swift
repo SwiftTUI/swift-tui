@@ -19,13 +19,13 @@ public struct LazyVStack<Content: View>: PrimitiveView, IterativeResolvableView 
   package func makeResolveWork(in context: ResolveContext) -> ResolveWork<[ResolvedNode]> {
     let stackContext = context.settingEnvironment(\.stackAxis, to: .vertical)
     return makeCompositionalIndexedChildSourceWork(
-      from: content, in: stackContext, kindName: "LazyVStack"
+      from: content, in: stackContext, kindName: .lazyVStack
     ).map { source in
       context.recordResolvedComputation()
       return [
         ResolvedNode(
           identity: context.identity,
-          kind: .view("LazyVStack"),
+          kind: .view(.lazyVStack),
           environmentSnapshot: context.environment,
           transactionSnapshot: context.transaction,
           layoutBehavior: .lazyStack(

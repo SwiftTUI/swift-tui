@@ -795,7 +795,7 @@ struct DefaultRendererFrameHeadCoordinator {
 
     return ResolvedNode(
       identity: resolved.identity.child(.named("ContainerSafeArea")),
-      kind: .view("ContainerSafeArea"),
+      kind: .view(.containerSafeArea),
       children: [resolved],
       environmentSnapshot: context.environment,
       transactionSnapshot: context.transaction,

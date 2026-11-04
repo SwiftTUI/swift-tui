@@ -101,7 +101,7 @@ package func retainingAuthoredAccessibilitySlot<Slot: View>(
   return resolveViewWork(slot, in: context.child(component: .named(slotName))).map { source in
     ResolvedNode(
       identity: context.identity.child(.named(presentationName)),
-      kind: .view("AuthoredAccessibilitySlot"),
+      kind: .view(.authoredAccessibilitySlot),
       children: [styled, markingVirtualAccessibility(source, labelOnly: !isValue)],
       environmentSnapshot: context.environment, transactionSnapshot: context.transaction,
       layoutBehavior: .decoration(primaryIndex: 0, alignment: .topLeading))

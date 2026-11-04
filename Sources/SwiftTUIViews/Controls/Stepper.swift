@@ -219,7 +219,7 @@ extension Stepper {
       metadata.explicitInteractionRect = CellRect(origin: .zero, size: .zero)
       return ResolvedNode(
         identity: context.identity,
-        kind: .view("Stepper"),
+        kind: .view(.stepper),
         children: [child],
         environmentSnapshot: context.environment,
         transactionSnapshot: context.transaction,

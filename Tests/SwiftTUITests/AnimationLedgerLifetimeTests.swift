@@ -16,10 +16,10 @@ struct AnimationLedgerLifetimeTests {
 
   private func resolved(present: Bool) -> ResolvedNode {
     ResolvedNode(
-      identity: root, kind: .view("Root"),
+      identity: root, kind: .view(.init("Root")),
       children: present
         ? [
-          ResolvedNode(viewNodeID: nodeID, identity: leaf, kind: .view("Leaf"))
+          ResolvedNode(viewNodeID: nodeID, identity: leaf, kind: .view(.init("Leaf")))
         ] : [])
   }
 
@@ -110,7 +110,7 @@ struct AnimationLedgerLifetimeTests {
     let secondNodeID = ViewNodeID(rawValue: 95_503)
     var both = resolved(present: true)
     both.children.append(
-      ResolvedNode(viewNodeID: secondNodeID, identity: second, kind: .view("Leaf")))
+      ResolvedNode(viewNodeID: secondNodeID, identity: second, kind: .view(.init("Leaf"))))
     var bothPlaced = placed(present: true)
     bothPlaced.children.append(PlacedNode(identity: second, bounds: bounds))
     controller.beginTransitionCollection()

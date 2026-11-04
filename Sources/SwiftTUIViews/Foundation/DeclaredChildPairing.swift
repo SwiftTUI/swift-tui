@@ -79,7 +79,7 @@ package struct PairedDeclaredChildren {
 package func pairedLazyDeclaredChildren<V: View>(
   from view: V,
   in context: ResolveContext,
-  kindName: String,
+  kindName: ViewKind,
   debugName: String,
   origin: LazySubviewPayloadOrigin = .tabBody,
   lifecyclePolicy: LazySubviewLifecyclePolicy = .activeOnly

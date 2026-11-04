@@ -266,7 +266,7 @@ public struct PreferenceOverlayValueModifier<Key: PreferenceKey, Overlay: View>:
         return [
           ResolvedNode(
             identity: context.identity,
-            kind: .view("Overlay"),
+            kind: .view(.overlay),
             children: [baseNode, overlayNode],
             environmentSnapshot: context.environment,
             transactionSnapshot: context.transaction,
@@ -318,7 +318,7 @@ public struct PreferenceBackgroundValueModifier<Key: PreferenceKey, Background: 
         return [
           ResolvedNode(
             identity: context.identity,
-            kind: .view("Background"),
+            kind: .view(.background),
             children: [backgroundNode, baseNode],
             environmentSnapshot: context.environment,
             transactionSnapshot: context.transaction,

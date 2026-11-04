@@ -26,7 +26,7 @@ struct ScaleTransitionTests {
     controller.beginTransitionCollection()
     controller.finishTransitionCollection()
     controller.processResolvedTree(
-      ResolvedNode(identity: Self.rootIdentity, kind: .view("Root")),
+      ResolvedNode(identity: Self.rootIdentity, kind: .view(.init("Root"))),
       transaction: .init(), timestamp: start)
     controller.beginTransitionCollection()
     controller.registerTransition(
@@ -37,10 +37,10 @@ struct ScaleTransitionTests {
     transaction.animationRequest = .animate(animation.animationBox)
     controller.processResolvedTree(
       ResolvedNode(
-        identity: Self.rootIdentity, kind: .view("Root"),
+        identity: Self.rootIdentity, kind: .view(.init("Root")),
         children: [
           ResolvedNode(
-            viewNodeID: Self.leafNodeID, identity: Self.leafIdentity, kind: .view("Leaf"))
+            viewNodeID: Self.leafNodeID, identity: Self.leafIdentity, kind: .view(.init("Leaf")))
         ]), transaction: transaction, timestamp: start)
     let tree = Self.placedTree(includingLeaf: true)
     let sampled = controller.placedAnimationOverlaySnapshot(for: tree, at: start)
@@ -126,7 +126,7 @@ struct ScaleTransitionTests {
     controller.beginTransitionCollection()
     controller.finishTransitionCollection()
     controller.processResolvedTree(
-      ResolvedNode(identity: Self.rootIdentity, kind: .view("Root")),
+      ResolvedNode(identity: Self.rootIdentity, kind: .view(.init("Root"))),
       transaction: .init(),
       timestamp: start
     )
@@ -143,12 +143,12 @@ struct ScaleTransitionTests {
     controller.processResolvedTree(
       ResolvedNode(
         identity: Self.rootIdentity,
-        kind: .view("Root"),
+        kind: .view(.init("Root")),
         children: [
           ResolvedNode(
             viewNodeID: Self.leafNodeID,
             identity: Self.leafIdentity,
-            kind: .view("Leaf")
+            kind: .view(.init("Leaf"))
           )
         ]
       ),
@@ -209,7 +209,7 @@ struct ScaleTransitionTests {
     let animation = Animation.linear(duration: .seconds(1))
     controller.register(animation)
     let start = MonotonicInstant(offset: .seconds(550))
-    let empty = ResolvedNode(identity: Self.rootIdentity, kind: .view("Root"))
+    let empty = ResolvedNode(identity: Self.rootIdentity, kind: .view(.init("Root")))
     controller.beginTransitionCollection()
     controller.finishTransitionCollection()
     controller.processResolvedTree(empty, transaction: .init(), timestamp: start)
@@ -223,10 +223,10 @@ struct ScaleTransitionTests {
     transaction.animationRequest = .animate(animation.animationBox)
     controller.processResolvedTree(
       ResolvedNode(
-        identity: Self.rootIdentity, kind: .view("Root"),
+        identity: Self.rootIdentity, kind: .view(.init("Root")),
         children: [
           ResolvedNode(
-            viewNodeID: Self.leafNodeID, identity: Self.leafIdentity, kind: .view("Leaf"))
+            viewNodeID: Self.leafNodeID, identity: Self.leafIdentity, kind: .view(.init("Leaf")))
         ]),
       transaction: transaction, timestamp: start)
     controller.capturePlacedTree(Self.placedTree(includingLeaf: true))
@@ -269,12 +269,12 @@ struct ScaleTransitionTests {
     controller.processResolvedTree(
       ResolvedNode(
         identity: Self.rootIdentity,
-        kind: .view("Root"),
+        kind: .view(.init("Root")),
         children: [
           ResolvedNode(
             viewNodeID: Self.leafNodeID,
             identity: Self.leafIdentity,
-            kind: .view("Leaf")
+            kind: .view(.init("Leaf"))
           )
         ]
       ),
@@ -290,7 +290,7 @@ struct ScaleTransitionTests {
     controller.processResolvedTree(
       ResolvedNode(
         identity: Self.rootIdentity,
-        kind: .view("Root"),
+        kind: .view(.init("Root")),
         children: [Self.siblingPlacedAsResolved]
       ),
       transaction: transaction,
@@ -364,7 +364,7 @@ struct ScaleTransitionTests {
   }
 
   private static var siblingPlacedAsResolved: ResolvedNode {
-    ResolvedNode(identity: siblingIdentity, kind: .view("Sibling"))
+    ResolvedNode(identity: siblingIdentity, kind: .view(.init("Sibling")))
   }
 
   private static func placedTree(includingLeaf: Bool) -> PlacedNode {

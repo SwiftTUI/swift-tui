@@ -108,7 +108,7 @@ private func groupRowShape<V: View>(_ harness: StressRuntimeHarness<V>) throws -
       )
       return
     }
-    if node.kind == .view("ExplicitIdentityHost") {
+    if node.kind == .view(.explicitIdentityHost) {
       lines.append("ExplicitIdentityHost@\(node.identity.path)")
     }
     for child in node.children {

@@ -275,7 +275,7 @@ struct SoundnessProbeConfigurationTests {
         identity: testIdentity("Root"),
         kind: .root,
         children: [
-          ResolvedNode(identity: testIdentity("Root", "Leaf"), kind: .view("Leaf"))
+          ResolvedNode(identity: testIdentity("Root", "Leaf"), kind: .view(.init("Leaf")))
         ]
       )
     )

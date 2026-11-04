@@ -133,7 +133,7 @@ struct CommittedHandlerInventoryTests {
       ) { _ in false }
     }
     departing.apply(
-      resolved: ResolvedNode(identity: departing.identity, kind: .view("Departing")),
+      resolved: ResolvedNode(identity: departing.identity, kind: .view(.init("Departing"))),
       children: []
     )
     absorber.adoptRuntimeRegistrations(from: departing)
@@ -182,7 +182,7 @@ struct CommittedHandlerInventoryTests {
         identity: root,
         kind: .root,
         children: [
-          ResolvedNode(identity: child, kind: .view("Child"))
+          ResolvedNode(identity: child, kind: .view(.init("Child")))
         ]
       )
     )
@@ -234,14 +234,14 @@ struct CommittedHandlerInventoryTests {
     var chain = ResolvedNode(
       viewNodeID: ViewNodeID(rawValue: 1),
       identity: testIdentity("Deep", "0"),
-      kind: .view("Depth"),
+      kind: .view(.init("Depth")),
       handlerInventory: inventory
     )
     for index in 1..<depth {
       chain = ResolvedNode(
         viewNodeID: ViewNodeID(rawValue: UInt64(index + 1)),
         identity: testIdentity("Deep", "\(index)"),
-        kind: .view("Depth"),
+        kind: .view(.init("Depth")),
         children: [chain],
         handlerInventory: inventory
       )
@@ -273,7 +273,7 @@ struct CommittedHandlerInventoryTests {
         ResolvedNode(
           viewNodeID: leafID,
           identity: testIdentity("Exact", "Leaf"),
-          kind: .view("Leaf"),
+          kind: .view(.init("Leaf")),
           handlerInventory: inventory
         )
       ]

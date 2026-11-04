@@ -252,7 +252,7 @@ struct ChildDescriptorTests {
   func resolvedNodeInitPropagatesDiscriminator() {
     var resolved = ResolvedNode(
       identity: testIdentity("Root"),
-      kind: .view("TestViewA"),
+      kind: .view(.init("TestViewA")),
       typeDiscriminator: ObjectIdentifier(TestViewA.self)
     )
     resolved.attachingEntityIdentity(

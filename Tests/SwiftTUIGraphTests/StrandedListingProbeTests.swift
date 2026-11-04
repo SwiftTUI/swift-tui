@@ -33,7 +33,7 @@ struct StrandedListingProbeTests {
     let childResolved = try #require(
       graph.finishEvaluation(
         child,
-        resolved: ResolvedNode(identity: childIdentity, kind: .view("Child")),
+        resolved: ResolvedNode(identity: childIdentity, kind: .view(.init("Child"))),
         accessedStateSlots: 0
       )
     )
@@ -42,7 +42,7 @@ struct StrandedListingProbeTests {
         claimant,
         resolved: ResolvedNode(
           identity: claimantIdentity,
-          kind: .view("Claimant"),
+          kind: .view(.init("Claimant")),
           children: [childResolved]
         ),
         accessedStateSlots: 0
@@ -52,7 +52,7 @@ struct StrandedListingProbeTests {
     let thiefResolved = try #require(
       graph.finishEvaluation(
         thief,
-        resolved: ResolvedNode(identity: thiefIdentity, kind: .view("Thief")),
+        resolved: ResolvedNode(identity: thiefIdentity, kind: .view(.init("Thief"))),
         accessedStateSlots: 0
       )
     )
@@ -120,7 +120,7 @@ struct StrandedListingProbeTests {
 
     thief.apply(
       resolved: ResolvedNode(
-        identity: thief.identity, kind: .view("Thief"), children: [child.committed]),
+        identity: thief.identity, kind: .view(.init("Thief")), children: [child.committed]),
       children: [child])
     #expect(child.parent === thief)
     #expect(!claimant.claimsOwnershipOfListedChildren)

@@ -31,7 +31,7 @@ package func scopedAnyView<V: View>(
 package func appendDeclaredChildNodes<V: View>(
   _ view: V,
   in context: ResolveContext,
-  kindName: String,
+  kindName: ViewKind,
   nextIndex: inout Int,
   into resolved: inout [ResolvedNode]
 ) {
@@ -47,7 +47,7 @@ package func appendDeclaredChildNodes<V: View>(
   }
 
   let childContext = context.indexedChild(
-    kind: .init(rawValue: kindName),
+    kind: .init(rawValue: kindName.name),
     index: nextIndex
   )
   nextIndex += 1
@@ -80,7 +80,7 @@ package func appendDeclaredChildNodes<V: View>(
 package func resolveDeclaredChildren<V: View>(
   _ view: V,
   in context: ResolveContext,
-  kindName: String
+  kindName: ViewKind
 ) -> [ResolvedNode] {
   var resolved: [ResolvedNode] = []
   var nextIndex = 0
@@ -128,7 +128,7 @@ package func assignEntityIdentityOccurrences(to resolved: inout [ResolvedNode]) 
 package func enumerateDeclaredChildViews<V: View>(
   _ view: V,
   in context: ResolveContext,
-  kindName: String,
+  kindName: ViewKind,
   nextIndex: inout Int,
   visitor: (
     _ child: Any,
@@ -148,7 +148,7 @@ package func enumerateDeclaredChildViews<V: View>(
   }
 
   let childContext = context.indexedChild(
-    kind: .init(rawValue: kindName),
+    kind: .init(rawValue: kindName.name),
     index: nextIndex
   )
   nextIndex += 1
@@ -171,7 +171,7 @@ package func appendScopedDeclaredBuilderChildren<V: View>(
   appendScopedDeclaredBuilderChildren(
     from: view,
     in: .root,
-    kindName: "Group",
+    kindName: .group,
     nextIndex: &nextIndex,
     into: &children
   )
@@ -181,7 +181,7 @@ package func appendScopedDeclaredBuilderChildren<V: View>(
 package func appendScopedDeclaredBuilderChildren<V: View>(
   from view: V,
   in context: DeclaredPayloadTraversalContext,
-  kindName: String,
+  kindName: ViewKind,
   nextIndex: inout Int,
   into children: inout [ScopedContentPayload]
 ) {
@@ -296,7 +296,7 @@ package func normalizeResolvedElements(
   case 0:
     return ResolvedNode(
       identity: context.identity,
-      kind: .view("EmptyView"),
+      kind: .view(.emptyView),
       typeDiscriminator: ObjectIdentifier(SynthesizedEmptyViewMarker.self),
       environmentSnapshot: context.environment,
       transactionSnapshot: context.transaction,
@@ -311,7 +311,7 @@ package func normalizeResolvedElements(
     assignEntityIdentityOccurrences(to: &groupedChildren)
     return ResolvedNode(
       identity: context.identity,
-      kind: .view("Group"),
+      kind: .view(.group),
       typeDiscriminator: ObjectIdentifier(SynthesizedGroupWrapperMarker.self),
       children: groupedChildren,
       environmentSnapshot: context.environment,

@@ -77,7 +77,7 @@ public struct Menu<Label: View, Content: View>: PrimitiveView, IterativeResolvab
       return [
         ResolvedNode(
           identity: context.identity,
-          kind: .view("Menu"),
+          kind: .view(.menu),
           children: [child],
           environmentSnapshot: context.environment,
           transactionSnapshot: context.transaction,
@@ -101,7 +101,7 @@ extension Menu {
         in: context.replacingIdentity(with: controlIdentity), ownerNode: ViewNodeContext.current
       ).map { body in
         var node = ResolvedNode(
-          identity: context.identity, kind: .view("MenuState"), children: [body],
+          identity: context.identity, kind: .view(.menuState), children: [body],
           environmentSnapshot: context.environment, transactionSnapshot: context.transaction)
         if let owner {
           node.preferenceValues[CapturedSubviewOwnersPreferenceKey.self].insert(owner)

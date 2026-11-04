@@ -86,7 +86,7 @@ extension LayoutEngine {
   }
 
   package func isSpacer(_ child: ResolvedNode) -> Bool {
-    child.kind == .view("Spacer")
+    child.kind == .view(.spacer)
   }
 
   /// Along-axis Spacers report an intrinsic size even when offered surplus.

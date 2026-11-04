@@ -51,7 +51,7 @@ struct ViewGraphCheckpointTotalityTests {
       metadata.baseStyle.foregroundStyle = .color(color)
       return ResolvedNode(
         identity: identity,
-        kind: .view("Leaf"),
+        kind: .view(.init("Leaf")),
         drawMetadata: metadata
       )
     }
@@ -281,7 +281,7 @@ struct ViewGraphCheckpointTotalityTests {
         children: [
           ResolvedNode(
             identity: childIdentity,
-            kind: .view("Child"),
+            kind: .view(.init("Child")),
             lifecycleMetadata: .init(
               appearHandlerIDs: ["child-appear"],
               disappearHandlerIDs: ["child-disappear"]
@@ -303,11 +303,11 @@ struct ViewGraphCheckpointTotalityTests {
         children: [
           ResolvedNode(
             identity: childIdentity,
-            kind: .view("ChildUpdated")
+            kind: .view(.init("ChildUpdated"))
           ),
           ResolvedNode(
             identity: insertedIdentity,
-            kind: .view("Inserted"),
+            kind: .view(.init("Inserted")),
             lifecycleMetadata: .init(
               appearHandlerIDs: ["inserted-appear"],
               tasks: [.init(id: "inserted-task", priority: .medium)]

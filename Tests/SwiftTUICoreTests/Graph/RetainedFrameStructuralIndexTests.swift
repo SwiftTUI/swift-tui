@@ -9,7 +9,7 @@ struct RetainedFrameStructuralIndexTests {
   func structuralIndexRecordsRealParent() throws {
     let child = ResolvedNode(
       identity: testIdentity("Root", "Slot[0]", "ID[42]"),
-      kind: .view("Text")
+      kind: .view(.text)
     )
     let root = ResolvedNode(
       identity: testIdentity("Root"),
@@ -31,8 +31,8 @@ struct RetainedFrameStructuralIndexTests {
       identity: testIdentity("Root"),
       kind: .root,
       children: [
-        ResolvedNode(identity: duplicate, kind: .view("Row")),
-        ResolvedNode(identity: duplicate, kind: .view("Row")),
+        ResolvedNode(identity: duplicate, kind: .view(.init("Row"))),
+        ResolvedNode(identity: duplicate, kind: .view(.init("Row"))),
       ]
     )
 
@@ -51,8 +51,8 @@ struct RetainedFrameStructuralIndexTests {
       identity: testIdentity("Root"),
       kind: .root,
       children: [
-        ResolvedNode(identity: testIdentity("Root", "A"), kind: .view("Row")),
-        ResolvedNode(identity: testIdentity("Root", "B"), kind: .view("Row")),
+        ResolvedNode(identity: testIdentity("Root", "A"), kind: .view(.init("Row"))),
+        ResolvedNode(identity: testIdentity("Root", "B"), kind: .view(.init("Row"))),
       ]
     )
 
@@ -65,11 +65,11 @@ struct RetainedFrameStructuralIndexTests {
   func retainedInvalidationUsesStructuralAdjacencyForPresentIdentities() {
     let sibling = ResolvedNode(
       identity: testIdentity("Root", "A"),
-      kind: .view("Sibling")
+      kind: .view(.init("Sibling"))
     )
     let pathDescendantButStructuralSibling = ResolvedNode(
       identity: testIdentity("Root", "A", "B"),
-      kind: .view("Text")
+      kind: .view(.text)
     )
     let root = ResolvedNode(
       identity: testIdentity("Root"),
@@ -90,7 +90,7 @@ struct RetainedFrameStructuralIndexTests {
   func retainedInvalidationFallsBackForSyntheticIdentities() {
     let child = ResolvedNode(
       identity: testIdentity("Root", "Slot[0]", "ID[42]"),
-      kind: .view("Text")
+      kind: .view(.text)
     )
     let root = ResolvedNode(
       identity: testIdentity("Root"),
@@ -111,15 +111,15 @@ struct RetainedFrameStructuralIndexTests {
       identity: testIdentity("Root"),
       kind: .root,
       children: [
-        ResolvedNode(identity: testIdentity("Root", "A"), kind: .view("Text"))
+        ResolvedNode(identity: testIdentity("Root", "A"), kind: .view(.text))
       ]
     )
     let updated = ResolvedNode(
       identity: testIdentity("Root"),
       kind: .root,
       children: [
-        ResolvedNode(identity: testIdentity("Root", "A"), kind: .view("Text")),
-        ResolvedNode(identity: testIdentity("Root", "B"), kind: .view("Text")),
+        ResolvedNode(identity: testIdentity("Root", "A"), kind: .view(.text)),
+        ResolvedNode(identity: testIdentity("Root", "B"), kind: .view(.text)),
       ]
     )
     let previous = RetainedFrameIndex(frame: frame(resolvedTree: initial))
@@ -145,17 +145,17 @@ struct RetainedFrameStructuralIndexTests {
       children: [
         ResolvedNode(
           identity: testIdentity("Root", "List"),
-          kind: .view("List"),
+          kind: .view(.list),
           children: [
-            ResolvedNode(identity: duplicate, kind: .view("Row")),
-            ResolvedNode(identity: duplicate, kind: .view("Row")),
+            ResolvedNode(identity: duplicate, kind: .view(.init("Row"))),
+            ResolvedNode(identity: duplicate, kind: .view(.init("Row"))),
             ResolvedNode(
               identity: testIdentity("Root", "List", "Row[2]"),
-              kind: .view("Row"),
+              kind: .view(.init("Row")),
               children: [
                 ResolvedNode(
                   identity: testIdentity("Root", "List", "Row[2]", "Label"),
-                  kind: .view("Text")
+                  kind: .view(.text)
                 )
               ]
             ),
@@ -163,11 +163,11 @@ struct RetainedFrameStructuralIndexTests {
         ),
         ResolvedNode(
           identity: testIdentity("Root", "Sidebar"),
-          kind: .view("VStack"),
+          kind: .view(.vStack),
           children: [
             ResolvedNode(
               identity: testIdentity("Root", "Sidebar", "Item"),
-              kind: .view("Text")
+              kind: .view(.text)
             )
           ]
         ),
@@ -218,15 +218,15 @@ struct RetainedFrameStructuralIndexTests {
       identity: testIdentity("Root"),
       kind: .root,
       children: [
-        ResolvedNode(identity: testIdentity("Root", "A"), kind: .view("Text"))
+        ResolvedNode(identity: testIdentity("Root", "A"), kind: .view(.text))
       ]
     )
     let updated = ResolvedNode(
       identity: testIdentity("Root"),
       kind: .root,
       children: [
-        ResolvedNode(identity: testIdentity("Root", "A"), kind: .view("Text")),
-        ResolvedNode(identity: testIdentity("Root", "B"), kind: .view("Text")),
+        ResolvedNode(identity: testIdentity("Root", "A"), kind: .view(.text)),
+        ResolvedNode(identity: testIdentity("Root", "B"), kind: .view(.text)),
       ]
     )
 

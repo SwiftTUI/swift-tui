@@ -18,7 +18,7 @@ struct LayoutShadowOracleTests {
     var nested = nestedCustomTree("cutoff-depth", customDepth: 2)
     nested.identity = testIdentity("Root", "Dirty")
     let tree = ResolvedNode(
-      identity: testIdentity("Root"), kind: .view("Offset"), children: [nested],
+      identity: testIdentity("Root"), kind: .view(.offset), children: [nested],
       layoutBehavior: .offset(x: 0, y: 0))
     let proposal = ProposedSize(width: 20, height: 10)
     let engine = LayoutEngine()
@@ -748,14 +748,14 @@ private func reidentifiedTree(id: String) -> ResolvedNode {
     structuralPath: StructuralPath(components: [
       .init(rawValue: "Root"), .init(rawValue: "Leaf"),
     ]),
-    kind: .view("Test"),
+    kind: .view(.init("Test")),
     intrinsicSize: .init(width: 8, height: 2)
   )
   return ResolvedNode(
     viewNodeID: ViewNodeID(rawValue: 41),
     identity: testIdentity("Root"),
     structuralPath: StructuralPath(components: [.init(rawValue: "Root")]),
-    kind: .view("VStack"),
+    kind: .view(.vStack),
     children: [child],
     layoutBehavior: .stack(
       axis: .vertical,
@@ -806,7 +806,7 @@ private func customContainer(
   )
   return ResolvedNode(
     identity: testIdentity(name),
-    kind: .view("ShadowDepthProbe"),
+    kind: .view(.init("ShadowDepthProbe")),
     children: [child],
     layoutBehavior: .custom(
       CustomLayoutHandle(
@@ -850,7 +850,7 @@ private func leaf(
 ) -> ResolvedNode {
   ResolvedNode(
     identity: testIdentity(name),
-    kind: .view("Test"),
+    kind: .view(.init("Test")),
     intrinsicSize: size
   )
 }
@@ -862,7 +862,7 @@ private func stack(
 ) -> ResolvedNode {
   ResolvedNode(
     identity: testIdentity(name),
-    kind: .view(axis == .horizontal ? "HStack" : "VStack"),
+    kind: .view(axis == .horizontal ? .hStack : .vStack),
     children: children,
     layoutBehavior: .stack(
       axis: axis,

@@ -43,17 +43,17 @@ struct RuntimeRegistrationRestoreWalkTests {
     )
     graph.finishEvaluation(
       leafNode,
-      resolved: ResolvedNode(identity: leafIdentity, kind: .view("Leaf")),
+      resolved: ResolvedNode(identity: leafIdentity, kind: .view(.init("Leaf"))),
       accessedStateSlots: 0
     )
 
     // Wrap the leaf under a chain far deeper than any authored tree — and
     // deeper than a per-level recursive walk survives on a 512 KiB stack.
-    var resolved = ResolvedNode(identity: leafIdentity, kind: .view("Leaf"))
+    var resolved = ResolvedNode(identity: leafIdentity, kind: .view(.init("Leaf")))
     for index in 0..<Self.deepChainDepth {
       resolved = ResolvedNode(
         identity: testIdentity("wrap\(index)"),
-        kind: .view("Wrap"),
+        kind: .view(.init("Wrap")),
         children: [resolved]
       )
     }
@@ -94,7 +94,7 @@ struct RuntimeRegistrationRestoreWalkTests {
     )
     graph.finishEvaluation(
       leafNode,
-      resolved: ResolvedNode(identity: leafIdentity, kind: .view("Chain")),
+      resolved: ResolvedNode(identity: leafIdentity, kind: .view(.init("Chain"))),
       accessedStateSlots: 0
     )
 
@@ -108,14 +108,14 @@ struct RuntimeRegistrationRestoreWalkTests {
       let identity = testIdentity("chain\(index)")
       let childStub = ResolvedNode(
         identity: testIdentity("chain\(index - 1)"),
-        kind: .view("Chain")
+        kind: .view(.init("Chain"))
       )
       let node = graph.beginEvaluation(identity: identity, invalidator: nil)
       graph.finishEvaluation(
         node,
         resolved: ResolvedNode(
           identity: identity,
-          kind: .view("Chain"),
+          kind: .view(.init("Chain")),
           children: [childStub]
         ),
         accessedStateSlots: 0

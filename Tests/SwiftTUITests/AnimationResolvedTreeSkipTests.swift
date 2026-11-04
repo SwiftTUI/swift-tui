@@ -17,7 +17,7 @@ struct AnimationResolvedTreeSkipTests {
     let controller = AnimationController()
     let tree = ResolvedNode(
       identity: Identity(components: ["AnimationSkipRoot"]),
-      kind: .view("Root")
+      kind: .view(.init("Root"))
     )
     let plain = TransactionSnapshot()
 
@@ -53,7 +53,7 @@ struct AnimationResolvedTreeSkipTests {
   func activePropertyAnimationDoesNotBlockAnimationEquivalentTreeSkip() {
     let controller = AnimationController()
     let identity = Identity(components: ["AnimationSkipActiveLeaf"])
-    var baseline = ResolvedNode(identity: identity, kind: .view("Leaf"))
+    var baseline = ResolvedNode(identity: identity, kind: .view(.init("Leaf")))
     baseline.drawMetadata.baseStyle.explicitOpacity = 1
     let t0 = MonotonicInstant.now()
     controller.processResolvedTree(baseline, transaction: .init(), timestamp: t0)
@@ -79,7 +79,7 @@ struct AnimationResolvedTreeSkipTests {
     let identity = Identity(components: ["AnimationSkipDebugSignature"])
     let baseline = ResolvedNode(
       identity: identity,
-      kind: .view("Leaf"),
+      kind: .view(.init("Leaf")),
       transactionSnapshot: .init(debugSignature: "baseline")
     )
     controller.processResolvedTree(
@@ -92,7 +92,7 @@ struct AnimationResolvedTreeSkipTests {
     transactionOnlyChange.animationRequest = .disabled
     let reused = ResolvedNode(
       identity: identity,
-      kind: .view("Leaf"),
+      kind: .view(.init("Leaf")),
       transactionSnapshot: transactionOnlyChange
     )
     #expect(controller.canSkipResolvedTreeProcessing(transaction: .init()))
@@ -106,7 +106,7 @@ struct AnimationResolvedTreeSkipTests {
     let controller = AnimationController()
     let tree = ResolvedNode(
       identity: Identity(components: ["AnimationSkipGraphToken"]),
-      kind: .view("Root")
+      kind: .view(.init("Root"))
     )
     let transactionPlan = FrameAnimationTransactionPlan(base: .init())
     let timestamp = MonotonicInstant.now()

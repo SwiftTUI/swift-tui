@@ -668,7 +668,7 @@ private func dataDrivenViewKindNames(
 ) -> [String] {
   let current: [String]
   if case .view(let name) = node.kind {
-    current = [name]
+    current = [name.name]
   } else {
     current = []
   }

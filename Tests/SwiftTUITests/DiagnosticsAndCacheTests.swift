@@ -75,7 +75,7 @@ private func resolvedProbeTextNode(
   context.recordResolvedComputation()
   return ResolvedNode(
     identity: context.identity,
-    kind: .view("Text"),
+    kind: .view(.text),
     environmentSnapshot: context.environment,
     transactionSnapshot: context.transaction,
     drawPayload: .text(content)
@@ -111,7 +111,7 @@ private struct RecordingBranchLeaf: PrimitiveView, IterativeResolvableView {
     return [
       ResolvedNode(
         identity: context.identity,
-        kind: .view("Text"),
+        kind: .view(.text),
         environmentSnapshot: context.environment,
         transactionSnapshot: context.transaction,
         drawPayload: .text(label)
@@ -136,7 +136,7 @@ private struct RecordingBranchRoot: PrimitiveView, IterativeResolvableView {
       return [
         ResolvedNode(
           identity: context.identity,
-          kind: .view("Branches"),
+          kind: .view(.init("Branches")),
           children: children,
           environmentSnapshot: context.environment,
           transactionSnapshot: context.transaction
@@ -171,7 +171,7 @@ private struct ResolveProbeRoot: PrimitiveView, IterativeResolvableView {
       return [
         ResolvedNode(
           identity: context.identity,
-          kind: .view("ProbeRoot"),
+          kind: .view(.init("ProbeRoot")),
           children: [child],
           environmentSnapshot: context.environment,
           transactionSnapshot: context.transaction

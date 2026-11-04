@@ -119,7 +119,7 @@ private func traversalNode(
 ) -> ResolvedNode {
   ResolvedNode(
     identity: identity,
-    kind: .view(identity.path),
+    kind: .view(.init(identity.path)),
     children: children,
     lifecycleMetadata: lifecycle
   )

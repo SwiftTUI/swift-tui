@@ -21,13 +21,13 @@ public struct VStack<Content: View>: PrimitiveView, IterativeResolvableView {
     return resolveDeclaredChildrenWork(
       content,
       in: stackContext,
-      kindName: "VStack"
+      kindName: .vStack
     )
     .map { resolvedChildren in
       return [
         ResolvedNode(
           identity: context.identity,
-          kind: .view("VStack"),
+          kind: .view(.vStack),
           children: resolvedChildren,
           environmentSnapshot: context.environment,
           transactionSnapshot: context.transaction,

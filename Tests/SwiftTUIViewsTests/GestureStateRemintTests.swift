@@ -61,7 +61,7 @@ struct GestureStateRemintTests {
           identity: rootIdentity,
           kind: .root,
           children: [
-            ResolvedNode(identity: ownerIdentity, kind: .view("Owner"))
+            ResolvedNode(identity: ownerIdentity, kind: .view(.init("Owner")))
           ]
         )
       )

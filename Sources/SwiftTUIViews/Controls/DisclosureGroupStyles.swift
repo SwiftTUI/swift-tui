@@ -290,7 +290,7 @@ private struct DisclosureAccessibilityContent: PrimitiveView, IterativeResolvabl
         // An expanded empty slot still publishes its region and relationship.
         children = [
           ResolvedNode(
-            identity: context.identity, kind: .view("DisclosureContent"),
+            identity: context.identity, kind: .view(.disclosureContent),
             environmentSnapshot: context.environment, transactionSnapshot: context.transaction)
         ]
       }

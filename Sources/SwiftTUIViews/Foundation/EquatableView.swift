@@ -46,7 +46,7 @@ public struct EquatableView<Content: View & Equatable>: PrimitiveView, Iterative
     resolveDeclaredChildrenWork(
       content,
       in: context,
-      kindName: "EquatableView"
+      kindName: .equatableView
     )
   }
 }

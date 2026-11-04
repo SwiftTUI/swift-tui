@@ -150,7 +150,7 @@ struct TeardownReachabilityBaselineTests {
     let resolved = ResolvedNode(
       identity: rootIdentity,
       kind: .root,
-      children: [ResolvedNode(identity: childIdentity, kind: .view("Child"))]
+      children: [ResolvedNode(identity: childIdentity, kind: .view(.init("Child")))]
     )
     _ = graph.applySnapshot(resolved)
 
@@ -208,7 +208,7 @@ struct TeardownReachabilityBaselineTests {
     let orphan = graph.beginEvaluation(identity: orphanIdentity, invalidator: nil)
     _ = graph.finishEvaluation(
       orphan,
-      resolved: ResolvedNode(identity: orphanIdentity, kind: .view("Orphan")),
+      resolved: ResolvedNode(identity: orphanIdentity, kind: .view(.init("Orphan"))),
       accessedStateSlots: 0
     )
 

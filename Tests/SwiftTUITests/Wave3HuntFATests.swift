@@ -1338,14 +1338,14 @@ enum W3FAMorph {
     switch kind {
     case .fill:
       return ResolvedNode(
-        identity: Identity(components: ["w3fa-morph"]), kind: .view("Path"),
+        identity: Identity(components: ["w3fa-morph"]), kind: .view(.init("Path")),
         drawPayload: .shape(.init(geometry: geometry, operation: .fill(style: .color(.white)))))
     case .clip:
       var node = ResolvedNode(
-        identity: Identity(components: ["w3fa-clip"]), kind: .view("VStack"),
+        identity: Identity(components: ["w3fa-clip"]), kind: .view(.vStack),
         children: [
           ResolvedNode(
-            identity: Identity(components: ["w3fa-clip", "text"]), kind: .view("Text"),
+            identity: Identity(components: ["w3fa-clip", "text"]), kind: .view(.text),
             drawPayload: .text("####"))
         ])
       var metadata = node.drawMetadata

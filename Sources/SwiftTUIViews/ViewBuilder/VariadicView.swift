@@ -20,7 +20,7 @@ public struct VariadicView<Content: View>: PrimitiveView, IterativeResolvableVie
 
   package func appendDeclaredChildren(
     in context: ResolveContext,
-    kindName: String,
+    kindName: ViewKind,
     nextIndex: inout Int,
     into resolved: inout [ResolvedNode]
   ) {
@@ -33,12 +33,12 @@ public struct VariadicView<Content: View>: PrimitiveView, IterativeResolvableVie
 
   package func appendDeclaredStructure(
     in context: ResolveContext,
-    kindName: String,
+    kindName: ViewKind,
     nextIndex: inout Int,
     into resolved: inout DeclaredChildAccumulator
   ) {
     let slotContext = context.indexedChild(
-      kind: .init(rawValue: kindName),
+      kind: .init(rawValue: kindName.name),
       index: nextIndex
     )
     nextIndex += 1
@@ -57,12 +57,12 @@ public struct VariadicView<Content: View>: PrimitiveView, IterativeResolvableVie
 
   package func appendScopedDeclaredChildren(
     in context: DeclaredPayloadTraversalContext,
-    kindName: String,
+    kindName: ViewKind,
     nextIndex: inout Int,
     into children: inout [ScopedContentPayload]
   ) {
     let slotContext = context.indexedChild(
-      kind: .init(rawValue: kindName),
+      kind: .init(rawValue: kindName.name),
       index: nextIndex
     )
     nextIndex += 1
@@ -80,12 +80,12 @@ public struct VariadicView<Content: View>: PrimitiveView, IterativeResolvableVie
 
   package func appendPortalDeclaredChildren(
     in context: DeclaredPayloadTraversalContext,
-    kindName: String,
+    kindName: ViewKind,
     nextIndex: inout Int,
     into children: inout [PortalAttachmentContentPayload]
   ) {
     let slotContext = context.indexedChild(
-      kind: .init(rawValue: kindName),
+      kind: .init(rawValue: kindName.name),
       index: nextIndex
     )
     nextIndex += 1
@@ -103,7 +103,7 @@ public struct VariadicView<Content: View>: PrimitiveView, IterativeResolvableVie
 
   package func enumerateDeclaredChildren(
     in context: ResolveContext,
-    kindName: String,
+    kindName: ViewKind,
     nextIndex: inout Int,
     visitor: (
       _ child: Any,
@@ -112,7 +112,7 @@ public struct VariadicView<Content: View>: PrimitiveView, IterativeResolvableVie
     ) -> Void
   ) {
     let slotContext = context.indexedChild(
-      kind: .init(rawValue: kindName),
+      kind: .init(rawValue: kindName.name),
       index: nextIndex
     )
     nextIndex += 1

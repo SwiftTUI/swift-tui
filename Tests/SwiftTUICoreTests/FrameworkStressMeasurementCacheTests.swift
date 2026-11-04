@@ -421,7 +421,7 @@ struct FrameworkStressMeasurementCacheTests {
     let cache = MeasurementCache()
     let resolved = ResolvedNode(
       identity: testIdentity("022"),
-      kind: .view("NoRuntimeID"),
+      kind: .view(.init("NoRuntimeID")),
       intrinsicSize: .init(width: 2, height: 1)
     )
     let measured = MeasuredNode(
@@ -521,7 +521,7 @@ private func measurementCacheNode(
   ResolvedNode(
     viewNodeID: ViewNodeID(rawValue: id),
     identity: testIdentity(name),
-    kind: .view("MeasurementCacheStress"),
+    kind: .view(.init("MeasurementCacheStress")),
     intrinsicSize: size
   )
 }

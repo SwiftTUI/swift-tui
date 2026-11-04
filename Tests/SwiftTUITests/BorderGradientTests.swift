@@ -112,7 +112,7 @@ struct BorderGradientTests {
     func borderNode(phase: Double) -> ResolvedNode {
       ResolvedNode(
         identity: leafIdentity,
-        kind: .view("Border"),
+        kind: .view(.border),
         layoutBehavior: .border(
           .single,
           placement: .outset,

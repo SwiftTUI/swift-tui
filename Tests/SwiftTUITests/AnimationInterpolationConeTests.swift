@@ -71,14 +71,14 @@ struct AnimationInterpolationConeTests {
       return ResolvedNode(
         viewNodeID: ViewNodeID(rawValue: UInt64(index + 2)),
         identity: rootIdentity.child(.init(rawValue: "leaf-\(index)")),
-        kind: .view("Leaf"),
+        kind: .view(.init("Leaf")),
         drawMetadata: metadata
       )
     }
     return ResolvedNode(
       viewNodeID: ViewNodeID(rawValue: 1),
       identity: rootIdentity,
-      kind: .view("Root"),
+      kind: .view(.init("Root")),
       children: children
     )
   }

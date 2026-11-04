@@ -516,7 +516,7 @@ extension List {
       }
       var node = ResolvedNode(
         identity: context.identity,
-        kind: .view("List"),
+        kind: .view(.list),
         children: resolvedContent.children,
         environmentSnapshot: context.environment,
         transactionSnapshot: context.transaction,
@@ -542,7 +542,7 @@ extension List {
     return resolveDeclaredChildrenWork(
       content,
       in: context.settingEnvironment(\.isResolvingHostedCollectionContent, to: true),
-      kindName: "ListContent"
+      kindName: .listContent
     )
     .map { nodes in
       var result = ResolvedItems()
@@ -626,7 +626,7 @@ extension List {
           result.children.append(
             ResolvedNode(
               identity: node.identity.child(.named("ListSectionBreak")),
-              kind: .view("ListSectionBreak"),
+              kind: .view(.listSectionBreak),
               environmentSnapshot: node.environmentSnapshot,
               transactionSnapshot: node.transactionSnapshot,
               semanticMetadata: breakMetadata,

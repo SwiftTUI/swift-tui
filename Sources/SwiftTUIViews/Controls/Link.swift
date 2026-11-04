@@ -47,7 +47,7 @@ extension Link {
       opensLink: context.environmentValues.openLinkAction.usesHostDefault)
     return ResolvedNode(
       identity: context.identity,
-      kind: .view("Link"),
+      kind: .view(.link),
       environmentSnapshot: context.environment,
       transactionSnapshot: context.transaction,
       layoutMetadata: ambientTextLayoutMetadata(in: context),

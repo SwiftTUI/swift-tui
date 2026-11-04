@@ -99,7 +99,7 @@ struct PreferenceSurfaceTests {
       in: .init(identity: testIdentity("OverlayPreferenceRoot"))
     )
 
-    #expect(resolved.kind == .view("Overlay"))
+    #expect(resolved.kind == .view(.overlay))
     #expect(resolved.children.count == 2)
     #expect(
       resolved.preferenceValues[StringListPreferenceKey.self] == [
@@ -125,7 +125,7 @@ struct PreferenceSurfaceTests {
       in: .init(identity: testIdentity("BackgroundPreferenceRoot"))
     )
 
-    #expect(resolved.kind == .view("Background"))
+    #expect(resolved.kind == .view(.background))
     #expect(resolved.children.count == 2)
     #expect(
       resolved.preferenceValues[StringListPreferenceKey.self] == [

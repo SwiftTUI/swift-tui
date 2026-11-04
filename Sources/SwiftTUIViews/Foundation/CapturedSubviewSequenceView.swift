@@ -27,30 +27,32 @@ package struct CapturedSubviewSequenceView: PrimitiveView, IterativeResolvableVi
   }
 
   package func appendDeclaredChildrenWork(
-    in context: ResolveContext, kindName: String, into state: DeclaredChildrenWorkState
+    in context: ResolveContext, kindName: ViewKind, into state: DeclaredChildrenWorkState
   ) -> ResolveWork<Void> {
     .deferred {
       let childContext = context.indexedChild(
-        kind: .init(rawValue: kindName), index: state.nextIndex)
+        kind: .init(rawValue: kindName.name), index: state.nextIndex)
       state.nextIndex += 1
       return makeResolveWork(in: childContext).map { state.nodes.append(contentsOf: $0) }
     }
   }
 
   package func appendDeclaredChildren(
-    in context: ResolveContext, kindName: String, nextIndex: inout Int,
+    in context: ResolveContext, kindName: ViewKind, nextIndex: inout Int,
     into resolved: inout [ResolvedNode]
   ) {
-    let sequenceContext = context.indexedChild(kind: .init(rawValue: kindName), index: nextIndex)
+    let sequenceContext = context.indexedChild(
+      kind: .init(rawValue: kindName.name), index: nextIndex)
     nextIndex += 1
     resolved.append(contentsOf: resolveElements(in: sequenceContext))
   }
 
   package func appendScopedDeclaredChildren(
-    in context: DeclaredPayloadTraversalContext, kindName: String, nextIndex: inout Int,
+    in context: DeclaredPayloadTraversalContext, kindName: ViewKind, nextIndex: inout Int,
     into children: inout [ScopedContentPayload]
   ) {
-    let sequenceContext = context.indexedChild(kind: .init(rawValue: kindName), index: nextIndex)
+    let sequenceContext = context.indexedChild(
+      kind: .init(rawValue: kindName.name), index: nextIndex)
     nextIndex += 1
     children.append(
       ScopedContentPayload(resolveElementsWork: { _, placementRoot in
@@ -59,10 +61,11 @@ package struct CapturedSubviewSequenceView: PrimitiveView, IterativeResolvableVi
   }
 
   package func appendPortalDeclaredChildren(
-    in context: DeclaredPayloadTraversalContext, kindName: String, nextIndex: inout Int,
+    in context: DeclaredPayloadTraversalContext, kindName: ViewKind, nextIndex: inout Int,
     into children: inout [PortalAttachmentContentPayload]
   ) {
-    let sequenceContext = context.indexedChild(kind: .init(rawValue: kindName), index: nextIndex)
+    let sequenceContext = context.indexedChild(
+      kind: .init(rawValue: kindName.name), index: nextIndex)
     nextIndex += 1
     children.append(
       PortalAttachmentContentPayload(resolveElementsWork: { _, placementRoot in
@@ -71,10 +74,11 @@ package struct CapturedSubviewSequenceView: PrimitiveView, IterativeResolvableVi
   }
 
   package func enumerateDeclaredChildren(
-    in context: ResolveContext, kindName: String, nextIndex: inout Int,
+    in context: ResolveContext, kindName: ViewKind, nextIndex: inout Int,
     visitor: (Any, ResolveContext, @escaping @MainActor () -> ResolvedNode) -> Void
   ) {
-    let sequenceContext = context.indexedChild(kind: .init(rawValue: kindName), index: nextIndex)
+    let sequenceContext = context.indexedChild(
+      kind: .init(rawValue: kindName.name), index: nextIndex)
     nextIndex += 1
     // The captured slot is an opaque declaration, as with portal sequences.
     // Resolving it must pass through the same ownership seam as bulk layout.

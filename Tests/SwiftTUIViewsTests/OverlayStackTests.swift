@@ -14,7 +14,7 @@ struct OverlayStackTests {
     let rootIdentity = testIdentity("PortalRoot")
     let baseNode = ResolvedNode(
       identity: baseIdentity,
-      kind: .view("Base"),
+      kind: .view(.init("Base")),
       semanticMetadata: baseSemantics
     )
 
@@ -31,7 +31,7 @@ struct OverlayStackTests {
     let base = try #require(stack.children.first)
     let overlays = try #require(stack.children.last)
 
-    #expect(stack.kind == .view("OverlayStack"))
+    #expect(stack.kind == .view(.overlayStack))
     #expect(stack.semanticMetadata.focusScopeBoundary)
     #expect(stack.semanticMetadata.focusScopeIdentity == baseIdentity)
     #expect(base.identity == baseIdentity)
@@ -48,7 +48,7 @@ struct OverlayStackTests {
   func overlayEntriesExposeDeclarationOwnerEdgeAndStructuralStableKeys() throws {
     let baseNode = ResolvedNode(
       identity: testIdentity("Scene", "Base"),
-      kind: .view("Base")
+      kind: .view(.init("Base"))
     )
     let portalContext = ResolveContext(identity: testIdentity("PortalRoot"))
     let rekeyedContext = portalContext.replacingIdentity(with: testIdentity("RuntimePortalRoot"))

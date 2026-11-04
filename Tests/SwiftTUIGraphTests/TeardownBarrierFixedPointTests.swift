@@ -160,7 +160,7 @@ struct TeardownBarrierFixedPointTests {
     )
     var orphanResolved = ResolvedNode(
       identity: orphanIdentity,
-      kind: .view("Orphan")
+      kind: .view(.init("Orphan"))
     )
     if let entity {
       orphanResolved.attachingEntityIdentity(

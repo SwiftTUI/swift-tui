@@ -814,7 +814,7 @@ private struct ToastPresentationView: View {
       }
       VStack {
         PortalAttachmentGroupView(
-          kindName: "ToastContent",
+          kindName: .toastContent,
           payloads: item.contentPayloads
         )
       }

@@ -16,13 +16,13 @@ public struct Group<Content: View>: PrimitiveView, IterativeResolvableView, Decl
     resolveDeclaredChildrenWork(
       content,
       in: context,
-      kindName: "Group"
+      kindName: .group
     )
   }
 
   package func appendDeclaredChildren(
     in context: ResolveContext,
-    kindName: String,
+    kindName: ViewKind,
     nextIndex: inout Int,
     into resolved: inout [ResolvedNode]
   ) {
@@ -35,19 +35,19 @@ public struct Group<Content: View>: PrimitiveView, IterativeResolvableView, Decl
 
   package func appendDeclaredStructure(
     in context: ResolveContext,
-    kindName: String,
+    kindName: ViewKind,
     nextIndex: inout Int,
     into resolved: inout DeclaredChildAccumulator
   ) {
     let groupContext = context.indexedChild(
-      kind: .init(rawValue: kindName),
+      kind: .init(rawValue: kindName.name),
       index: nextIndex
     )
     nextIndex += 1
     var children = DeclaredChildAccumulator(indexed: resolved.indexed)
     var groupIndex = 0
     appendDeclaredContent(
-      content, in: groupContext, kindName: "Group",
+      content, in: groupContext, kindName: .group,
       nextIndex: &groupIndex, into: &children
     )
     children.normalizeOccurrences()
@@ -56,12 +56,12 @@ public struct Group<Content: View>: PrimitiveView, IterativeResolvableView, Decl
 
   package func appendScopedDeclaredChildren(
     in context: DeclaredPayloadTraversalContext,
-    kindName: String,
+    kindName: ViewKind,
     nextIndex: inout Int,
     into children: inout [ScopedContentPayload]
   ) {
     let groupContext = context.indexedChild(
-      kind: .init(rawValue: kindName),
+      kind: .init(rawValue: kindName.name),
       index: nextIndex
     )
     nextIndex += 1
@@ -69,7 +69,7 @@ public struct Group<Content: View>: PrimitiveView, IterativeResolvableView, Decl
     appendScopedDeclaredBuilderChildren(
       from: content,
       in: groupContext,
-      kindName: "Group",
+      kindName: .group,
       nextIndex: &groupIndex,
       into: &children
     )
@@ -77,12 +77,12 @@ public struct Group<Content: View>: PrimitiveView, IterativeResolvableView, Decl
 
   package func appendPortalDeclaredChildren(
     in context: DeclaredPayloadTraversalContext,
-    kindName: String,
+    kindName: ViewKind,
     nextIndex: inout Int,
     into children: inout [PortalAttachmentContentPayload]
   ) {
     let groupContext = context.indexedChild(
-      kind: .init(rawValue: kindName),
+      kind: .init(rawValue: kindName.name),
       index: nextIndex
     )
     nextIndex += 1
@@ -90,7 +90,7 @@ public struct Group<Content: View>: PrimitiveView, IterativeResolvableView, Decl
     appendPortalDeclaredBuilderChildren(
       from: content,
       in: groupContext,
-      kindName: "Group",
+      kindName: .group,
       nextIndex: &groupIndex,
       into: &children
     )
@@ -98,7 +98,7 @@ public struct Group<Content: View>: PrimitiveView, IterativeResolvableView, Decl
 
   package func enumerateDeclaredChildren(
     in context: ResolveContext,
-    kindName: String,
+    kindName: ViewKind,
     nextIndex: inout Int,
     visitor: (
       _ child: Any,
@@ -107,7 +107,7 @@ public struct Group<Content: View>: PrimitiveView, IterativeResolvableView, Decl
     ) -> Void
   ) {
     let groupContext = context.indexedChild(
-      kind: .init(rawValue: kindName),
+      kind: .init(rawValue: kindName.name),
       index: nextIndex
     )
     nextIndex += 1
@@ -115,7 +115,7 @@ public struct Group<Content: View>: PrimitiveView, IterativeResolvableView, Decl
     enumerateDeclaredChildViews(
       content,
       in: groupContext,
-      kindName: "Group",
+      kindName: .group,
       nextIndex: &groupIndex,
       visitor: visitor
     )

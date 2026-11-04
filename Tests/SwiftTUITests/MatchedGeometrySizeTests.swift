@@ -41,10 +41,10 @@ struct MatchedGeometrySizeTests {
     let destination = testIdentity("MatchedSize", label, "Destination")
     let start = MonotonicInstant(offset: .seconds(300))
 
-    var sourceNode = ResolvedNode(identity: source, kind: .view("Leaf"))
+    var sourceNode = ResolvedNode(identity: source, kind: .view(.init("Leaf")))
     sourceNode.matchedGeometry = MatchedGeometryConfig(key: key)
     controller.processResolvedTree(
-      ResolvedNode(identity: root, kind: .view("Root"), children: [sourceNode]),
+      ResolvedNode(identity: root, kind: .view(.init("Root")), children: [sourceNode]),
       transaction: .init(),
       timestamp: start
     )
@@ -62,13 +62,13 @@ struct MatchedGeometrySizeTests {
       )
     )
 
-    var destinationNode = ResolvedNode(identity: destination, kind: .view("Leaf"))
+    var destinationNode = ResolvedNode(identity: destination, kind: .view(.init("Leaf")))
     let config = MatchedGeometryConfig(key: key, properties: properties, anchor: anchor)
     destinationNode.matchedGeometry = config
     var transaction = TransactionSnapshot()
     transaction.animationRequest = .animate(animation.animationBox)
     controller.processResolvedTree(
-      ResolvedNode(identity: root, kind: .view("Root"), children: [destinationNode]),
+      ResolvedNode(identity: root, kind: .view(.init("Root")), children: [destinationNode]),
       transaction: transaction,
       timestamp: start
     )

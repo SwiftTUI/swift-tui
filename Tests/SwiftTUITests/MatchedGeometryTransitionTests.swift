@@ -60,7 +60,7 @@ struct MatchedGeometryTransitionTests {
       var node = ResolvedNode(
         viewNodeID: nodeID,
         identity: identity,
-        kind: .view("Leaf"),
+        kind: .view(.init("Leaf")),
         children: [],
         layoutBehavior: .intrinsic,
         drawMetadata: DrawMetadata()
@@ -79,7 +79,7 @@ struct MatchedGeometryTransitionTests {
     controller.finishTransitionCollection()
     controller.processResolvedTree(
       ResolvedNode(
-        identity: root, kind: .view("Root"), children: [leaf(source, nodeID: sourceNodeID)]),
+        identity: root, kind: .view(.init("Root")), children: [leaf(source, nodeID: sourceNodeID)]),
       transaction: .init(),
       timestamp: start
     )
@@ -107,7 +107,7 @@ struct MatchedGeometryTransitionTests {
     transaction.animationRequest = .animate(animation.animationBox)
     controller.processResolvedTree(
       ResolvedNode(
-        identity: root, kind: .view("Root"),
+        identity: root, kind: .view(.init("Root")),
         children: [leaf(destination, nodeID: destinationNodeID)]),
       transaction: transaction,
       timestamp: start

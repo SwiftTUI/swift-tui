@@ -38,7 +38,7 @@ struct GradientAnimationIntegrationTests {
     )
     let frame1 = ResolvedNode(
       identity: leafIdentity,
-      kind: .view("Gradient"),
+      kind: .view(.init("Gradient")),
       drawMetadata: frame1Metadata
     )
     let t0 = MonotonicInstant.now()
@@ -56,7 +56,7 @@ struct GradientAnimationIntegrationTests {
     )
     var frame2 = ResolvedNode(
       identity: leafIdentity,
-      kind: .view("Gradient"),
+      kind: .view(.init("Gradient")),
       drawMetadata: frame2Metadata
     )
     var transaction = TransactionSnapshot()
@@ -107,7 +107,7 @@ struct GradientAnimationIntegrationTests {
     )
     let frame1 = ResolvedNode(
       identity: leafIdentity,
-      kind: .view("Pattern"),
+      kind: .view(.init("Pattern")),
       drawMetadata: frame1Metadata
     )
     let t0 = MonotonicInstant.now()
@@ -126,7 +126,7 @@ struct GradientAnimationIntegrationTests {
     )
     var frame2 = ResolvedNode(
       identity: leafIdentity,
-      kind: .view("Pattern"),
+      kind: .view(.init("Pattern")),
       drawMetadata: frame2Metadata
     )
     var transaction = TransactionSnapshot()
@@ -176,7 +176,7 @@ struct GradientAnimationIntegrationTests {
     // Frame 1: Rectangle().fill(LinearGradient(.topLeading → .bottomTrailing)).
     let frame1 = ResolvedNode(
       identity: leafIdentity,
-      kind: .view("Rectangle"),
+      kind: .view(.init("Rectangle")),
       drawPayload: .shape(
         ShapePayload(
           geometry: .rectangle,
@@ -200,7 +200,7 @@ struct GradientAnimationIntegrationTests {
     // Frame 2: gradient rotated 90° under an explicit animation request.
     var frame2 = ResolvedNode(
       identity: leafIdentity,
-      kind: .view("Rectangle"),
+      kind: .view(.init("Rectangle")),
       drawPayload: .shape(
         ShapePayload(
           geometry: .rectangle,
@@ -280,11 +280,11 @@ struct GradientAnimationIntegrationTests {
       )
     }
     let frame1 = ResolvedNode(
-      identity: leafIdentity, kind: .view("Rectangle"), drawPayload: .shape(ripple(0)))
+      identity: leafIdentity, kind: .view(.init("Rectangle")), drawPayload: .shape(ripple(0)))
     let t0 = MonotonicInstant.now()
     controller.processResolvedTree(frame1, transaction: .init(), timestamp: t0)
     let frame2 = ResolvedNode(
-      identity: leafIdentity, kind: .view("Rectangle"), drawPayload: .shape(ripple(1)))
+      identity: leafIdentity, kind: .view(.init("Rectangle")), drawPayload: .shape(ripple(1)))
     var transaction = TransactionSnapshot()
     transaction.animationRequest = .animate(animation.animationBox)
     controller.processResolvedTree(frame2, transaction: transaction, timestamp: t0)
@@ -334,7 +334,7 @@ struct GradientAnimationIntegrationTests {
     // demo's exact shape.
     let frame1 = ResolvedNode(
       identity: leafIdentity,
-      kind: .view("Rectangle"),
+      kind: .view(.init("Rectangle")),
       drawPayload: .shape(
         ShapePayload(
           geometry: .rectangle,
@@ -360,7 +360,7 @@ struct GradientAnimationIntegrationTests {
 
     var frame2 = ResolvedNode(
       identity: leafIdentity,
-      kind: .view("Rectangle"),
+      kind: .view(.init("Rectangle")),
       drawPayload: .shape(
         ShapePayload(
           geometry: .rectangle,

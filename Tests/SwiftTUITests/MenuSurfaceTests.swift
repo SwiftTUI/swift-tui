@@ -187,13 +187,14 @@ struct MenuSurfaceTests {
       withIdentity: testIdentity("MenuDivider")
     )
 
-    #expect(expandedArtifacts.resolvedTree.contains { $0.kind == .view("MenuPresentation") })
-    #expect(!expandedArtifacts.resolvedTree.contains { $0.kind == .view("SheetPresentation") })
+    #expect(expandedArtifacts.resolvedTree.contains { $0.kind == .view(.init("MenuPresentation")) })
+    #expect(
+      !expandedArtifacts.resolvedTree.contains { $0.kind == .view(.init("SheetPresentation")) })
     #expect(surface.contains("Open"))
     #expect(surface.contains("Save"))
     #expect(surface.contains("Item 1"))
     #expect(surface.contains("Item 2"))
-    #expect(dividerNode?.kind == .view("Divider"))
+    #expect(dividerNode?.kind == .view(.divider))
     #expect(surface.contains("────"))
     // Menu items render as part of the portal overlay's focus scope, while
     // the base trigger remains focusable because menus are non-modal.

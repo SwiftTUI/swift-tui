@@ -369,7 +369,7 @@ struct ButtonFocusStabilityTests {
 
     let placed = artifacts.placedTree
     let rows = placed.flattenedDescendants
-      .filter { $0.kind == .view("HStack") }
+      .filter { $0.kind == .view(.hStack) }
     let innerRow = try #require(rows.first)
     #expect(innerRow.bounds.size.width == 10)
 
@@ -536,7 +536,7 @@ struct ButtonFocusStabilityTests {
     )
 
     let innerRow = try #require(
-      artifacts.placedTree.flattenedDescendants.first { $0.kind == .view("HStack") }
+      artifacts.placedTree.flattenedDescendants.first { $0.kind == .view(.hStack) }
     )
     #expect(innerRow.bounds.size.width == 10)
 

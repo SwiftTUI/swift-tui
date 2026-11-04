@@ -10,7 +10,7 @@ struct FrameworkStressBuilderIdentityTests {
   func builder001EmptyBuildArrayEmitsNoPhantomNode() {
     let resolved = resolveBuilder(Builder001Probe())
     #expect(builderTextNodes(resolved).map(builderText) == ["tail"])
-    #expect(!builderKinds(resolved).contains(.view("VariadicView")))
+    #expect(!builderKinds(resolved).contains(.view(.init("VariadicView"))))
   }
 
   @Test("stress builder identity 002 single buildArray emits exactly one child")
@@ -214,8 +214,8 @@ struct FrameworkStressBuilderIdentityTests {
     let erased = ViewBuilder.buildLimitedAvailability(Text("limited"))
     let resolved = Resolver().resolve(erased, in: .init(identity: testIdentity("Builder024")))
     let payload = try #require(resolved.children.first)
-    #expect(resolved.kind == .view("AnyView"))
-    #expect(payload.kind == .view("AnyViewPayload"))
+    #expect(resolved.kind == .view(.anyView))
+    #expect(payload.kind == .view(.anyViewPayload))
     #expect(payload.children.count == 1)
     #expect(payload.children[0].typeDiscriminator != nil)
   }
@@ -228,8 +228,8 @@ struct FrameworkStressBuilderIdentityTests {
       in: .init(identity: testIdentity("Builder025"))
     )
     #expect(resolved.identity == testIdentity("Builder025"))
-    #expect(resolved.kind == .view("Offset"))
-    let padding = builderNodes(resolved).first { $0.kind == .view("Padding") }
+    #expect(resolved.kind == .view(.offset))
+    let padding = builderNodes(resolved).first { $0.kind == .view(.padding) }
     #expect(padding?.identity.isDescendant(of: resolved.identity) == true)
     #expect(padding?.identity.description.contains("ID[\"inner\"]") == true)
   }

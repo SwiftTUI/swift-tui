@@ -471,7 +471,7 @@ private func composePortalRootTreeWork(
         identity: context.identity,
         structuralPath: context.structuralPath,
         structuralEdgeRole: .detachedOverlayRoot,
-        kind: .view("PresentationPortalRoot"),
+        kind: .view(.presentationPortalRoot),
         children: [baseNode],
         environmentSnapshot: context.environment,
         transactionSnapshot: context.transaction,

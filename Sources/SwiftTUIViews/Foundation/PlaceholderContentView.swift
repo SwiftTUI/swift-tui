@@ -53,7 +53,7 @@ public struct PlaceholderContentView<Base: View>: PrimitiveView, IterativeResolv
       restoreSnapshot.scopeRole = .restoresOuter
       let restoreNode = ResolvedNode(
         identity: restoreContext.identity,
-        kind: .view("PlaceholderRestore"),
+        kind: .view(.placeholderRestore),
         children: [contentNode],
         environmentSnapshot: context.environment,
         transactionSnapshot: restoreSnapshot
@@ -61,7 +61,7 @@ public struct PlaceholderContentView<Base: View>: PrimitiveView, IterativeResolv
       return [
         ResolvedNode(
           identity: context.identity,
-          kind: .view("PlaceholderContent"),
+          kind: .view(.placeholderContent),
           children: [restoreNode],
           environmentSnapshot: context.environment,
           transactionSnapshot: context.transaction

@@ -27,7 +27,7 @@ struct CustomLayoutContainerContractRenderTests {
     )
 
     let ribbon = artifacts.resolvedTree.children[0]
-    #expect(ribbon.kind == .view("RibbonLayout"))
+    #expect(ribbon.kind == .view(.init("RibbonLayout")))
     #expect(ribbon.children.count == 4)
     let spacer = ribbon.children[1]
     let divider = ribbon.children[2]
@@ -222,7 +222,7 @@ struct CustomLayoutContainerContractRenderTests {
     // The same erased value installs the axis its layout declares.
     let rowSpacer = row.resolvedTree.children[1]
     let columnSpacer = column.resolvedTree.children[1]
-    #expect(rowSpacer.kind == .view("Spacer"))
+    #expect(rowSpacer.kind == .view(.spacer))
     #expect(rowSpacer.drawMetadata.leafStackAxis == .horizontal)
     #expect(columnSpacer.drawMetadata.leafStackAxis == .vertical)
     // The surface is the proposal's size; the row fills its first line and

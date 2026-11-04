@@ -31,7 +31,7 @@ struct StrokeDashPhaseAnimationTests {
       drawMetadata.layoutBorderStroke = stroke
       return ResolvedNode(
         identity: identity,
-        kind: .view("Border"),
+        kind: .view(.border),
         layoutBehavior: .border(
           stroke.borderSet,
           placement: .outset,
@@ -46,7 +46,7 @@ struct StrokeDashPhaseAnimationTests {
     case .shapeStroke:
       return ResolvedNode(
         identity: identity,
-        kind: .view("Shape"),
+        kind: .view(.init("Shape")),
         drawPayload: .shape(
           ShapePayload(
             geometry: .rectangle,
@@ -56,7 +56,7 @@ struct StrokeDashPhaseAnimationTests {
     case .rule:
       return ResolvedNode(
         identity: identity,
-        kind: .view("Divider"),
+        kind: .view(.divider),
         drawPayload: .rule(stroke)
       )
     }

@@ -293,7 +293,7 @@ extension LayoutEngine {
       }
 
       let childOrigin =
-        if resolved.kind == .view("HostedTableCell"),
+        if resolved.kind == .view(.hostedTableCell),
           childMeasurement.measuredSize.width > bounds.size.width
         {
           bounds.origin
@@ -313,7 +313,7 @@ extension LayoutEngine {
             )
         }
       let childSize =
-        if resolved.kind == .view("HostedTableCell") {
+        if resolved.kind == .view(.hostedTableCell) {
           CellSize(width: bounds.size.width, height: childMeasurement.measuredSize.height)
         } else {
           childMeasurement.measuredSize

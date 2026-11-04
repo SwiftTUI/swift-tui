@@ -75,7 +75,7 @@ public struct Image: PrimitiveView, ResolvableView {
     }
 
     var node = resolveLeafNode(
-      kindName: "Image",
+      kindName: .image,
       intrinsicSize: resolvedAsset?.intrinsicCellSize ?? .zero,
       semanticMetadata: .init(
         accessibilityRole: .image,

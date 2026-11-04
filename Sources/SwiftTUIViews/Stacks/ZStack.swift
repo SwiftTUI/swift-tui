@@ -23,13 +23,13 @@ public struct ZStack<Content: View>: PrimitiveView, IterativeResolvableView {
     return resolveDeclaredChildrenWork(
       content,
       in: overlayContext,
-      kindName: "ZStack"
+      kindName: .zStack
     )
     .map { resolvedChildren in
       return [
         ResolvedNode(
           identity: context.identity,
-          kind: .view("ZStack"),
+          kind: .view(.zStack),
           children: resolvedChildren,
           environmentSnapshot: context.environment,
           transactionSnapshot: context.transaction,

@@ -27,7 +27,7 @@ struct PointerRouteView<Content: View>: PrimitiveView, ResolvableView {
       return [
         ResolvedNode(
           identity: identity,
-          kind: .view("PointerRoute"),
+          kind: .view(.pointerRoute),
           children: [child],
           environmentSnapshot: context.environment,
           transactionSnapshot: context.transaction,

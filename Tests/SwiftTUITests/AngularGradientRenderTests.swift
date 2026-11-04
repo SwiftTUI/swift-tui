@@ -146,7 +146,7 @@ struct AngularGradientRenderTests {
     let result = interpolatedAngle { gradient in
       ResolvedNode(
         identity: identity,
-        kind: .view("Border"),
+        kind: .view(.border),
         layoutBehavior: .border(
           .single, placement: .outset,
           foreground: BorderEdgeStyle(AnyShapeStyle(gradient)),
@@ -163,7 +163,7 @@ struct AngularGradientRenderTests {
     let result = interpolatedAngle { gradient in
       ResolvedNode(
         identity: identity,
-        kind: .view("Shape"),
+        kind: .view(.init("Shape")),
         drawPayload: .shape(
           ShapePayload(
             geometry: .rectangle,

@@ -321,7 +321,7 @@ package final class ViewNode {
     self.identity = identity
     committed = ResolvedNode(
       identity: identity,
-      kind: .view("EmptyView")
+      kind: .view(.emptyView)
     )
     children = []
     // PersistentState() defaults stateSlots=[:], dependencies=.init(),

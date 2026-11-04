@@ -5,7 +5,7 @@ import SwiftTUIViews
 func renderPipelineTree(
   from graphRoot: ResolvedNode
 ) -> ResolvedNode {
-  guard graphRoot.kind == .view("PresentationPortalRoot"),
+  guard graphRoot.kind == .view(.presentationPortalRoot),
     graphRoot.children.count == 1,
     let contentRoot = graphRoot.children.first
   else {

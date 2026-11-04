@@ -5,7 +5,7 @@ import SwiftTUICore
 /// leaves by their resolved kind instead of string-matching identity paths
 /// (see `RunLoop.rerenderScheduledFrame(from:convergence:)`).
 package enum PresentationTriggerLeafNode {
-  package static let kindName = "__presentationTrigger"
+  package static let kindName = ViewKind.presentationTrigger
 }
 
 /// A zero-size, layout-inert sibling leaf that is the **sole reader** of a
@@ -186,7 +186,7 @@ func resolvePresentationModifier<Base: View>(
       return [
         ResolvedNode(
           identity: context.identity,
-          kind: .view("Presentation"),
+          kind: .view(.presentation),
           children: [background, triggerNode],
           environmentSnapshot: context.environment,
           transactionSnapshot: context.transaction,

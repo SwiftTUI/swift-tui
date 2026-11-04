@@ -261,7 +261,7 @@ private struct ScopeOwnerPrimitive: PrimitiveView, ResolvableView {
       return [
         ResolvedNode(
           identity: context.identity,
-          kind: .view("ScopeOwnerPrimitive"),
+          kind: .view(.init("ScopeOwnerPrimitive")),
           environmentSnapshot: context.environment,
           transactionSnapshot: context.transaction
         )
@@ -550,7 +550,7 @@ struct DynamicPropertyUpdatePassTests {
     var leafIdentities: [Identity] = []
     var work: [ResolvedNode] = [firstFrame]
     while let current = work.popLast() {
-      if current.kind == .view("Text") {
+      if current.kind == .view(.text) {
         leafIdentities.append(current.identity)
       }
       work.append(contentsOf: current.children.reversed())
@@ -991,7 +991,7 @@ struct DynamicPropertyUpdatePassTests {
     var leafIdentities: [Identity] = []
     var work = [firstFrame]
     while let current = work.popLast() {
-      if current.kind == .view("Text") {
+      if current.kind == .view(.text) {
         leafIdentities.append(current.identity)
       }
       work.append(contentsOf: current.children.reversed())
@@ -1042,7 +1042,7 @@ struct DynamicPropertyUpdatePassTests {
     var leafIdentities: [Identity] = []
     var work = [firstFrame]
     while let current = work.popLast() {
-      if current.kind == .view("Text") {
+      if current.kind == .view(.text) {
         leafIdentities.append(current.identity)
       }
       work.append(contentsOf: current.children.reversed())

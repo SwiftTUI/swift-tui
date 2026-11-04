@@ -814,7 +814,7 @@ struct InteractiveRuntimeTests {
       enabledArtifacts.resolvedTree.descendant(with: InteractiveDemoIdentity.resetButton)
     )
 
-    #expect(disabledReset.kind == .view("Button"))
+    #expect(disabledReset.kind == .view(.button))
     #expect(disabledReset.environmentSnapshot.style.isEnabled == false)
     #expect(enabledReset.environmentSnapshot.style.isEnabled == true)
     #expect(
@@ -5103,7 +5103,7 @@ private func interactiveProbeTextNode(
   context.recordResolvedComputation()
   return ResolvedNode(
     identity: context.identity,
-    kind: .view("Text"),
+    kind: .view(.text),
     environmentSnapshot: context.environment,
     transactionSnapshot: context.transaction,
     drawPayload: .text(content)
@@ -5154,7 +5154,7 @@ private struct RunLoopInvalidationProbeRoot: PrimitiveView, IterativeResolvableV
       return [
         ResolvedNode(
           identity: context.identity,
-          kind: .view("ProbeRoot"),
+          kind: .view(.init("ProbeRoot")),
           children: [child],
           environmentSnapshot: context.environment,
           transactionSnapshot: context.transaction
@@ -5228,7 +5228,7 @@ private struct ReusedHandlerRoot: PrimitiveView, IterativeResolvableView {
       return [
         ResolvedNode(
           identity: context.identity,
-          kind: .view("Harness"),
+          kind: .view(.init("Harness")),
           children: [interactiveChild, dirtyChild],
           environmentSnapshot: context.environment,
           transactionSnapshot: context.transaction
@@ -5748,7 +5748,7 @@ private struct LifecycleRuntimeRoot: PrimitiveView, IterativeResolvableView {
       return [
         ResolvedNode(
           identity: context.identity,
-          kind: .view("RuntimeRoot"),
+          kind: .view(.init("RuntimeRoot")),
           children: children,
           environmentSnapshot: context.environment,
           transactionSnapshot: context.transaction

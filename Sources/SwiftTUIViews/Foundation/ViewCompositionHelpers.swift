@@ -147,7 +147,7 @@ private struct EntityRoutedScopedContentHost: PrimitiveView, IterativeResolvable
       return [
         ResolvedNode(
           identity: context.identity,
-          kind: .view("TabContentEntityHost"),
+          kind: .view(.tabContentEntityHost),
           children: [content],
           environmentSnapshot: context.environment,
           transactionSnapshot: context.transaction
@@ -271,11 +271,11 @@ package struct CapturedSubviewView: PrimitiveView, IterativeResolvableView {
 
 @MainActor
 package struct CapturedSubviewGroupView: PrimitiveView, IterativeResolvableView {
-  package var kindName: String
+  package var kindName: ViewKind
   package var payloads: [CapturedSubviewPayload]
 
   package init(
-    kindName: String,
+    kindName: ViewKind,
     payloads: [CapturedSubviewPayload]
   ) {
     self.kindName = kindName
@@ -442,7 +442,7 @@ package struct ScopedContentPayloadView: PrimitiveView, IterativeResolvableView 
 
 @MainActor
 package struct ScopedContentPayloadGroupView: PrimitiveView, IterativeResolvableView {
-  package var kindName: String
+  package var kindName: ViewKind
   package var payloads: [ScopedContentPayload]
 
   package func makeResolveWork(in context: ResolveContext) -> ResolveWork<[ResolvedNode]> {
@@ -459,7 +459,7 @@ package struct ScopedContentPayloadGroupView: PrimitiveView, IterativeResolvable
 
 @MainActor
 private func resolveScopedContentGroupElementsWork(
-  kindName: String = "Group",
+  kindName: ViewKind = .group,
   payloads: [ScopedContentPayload],
   layoutBehavior: LayoutBehavior = .intrinsic,
   layoutMetadata: LayoutMetadata = .init(),
@@ -471,7 +471,7 @@ private func resolveScopedContentGroupElementsWork(
   let result = DeclaredChildrenWorkState()
   return resolveSequentially(Array(payloads.enumerated())) { index, payload in
     payload.resolveElementsWork(
-      in: context.indexedChild(kind: .init(rawValue: kindName), index: index),
+      in: context.indexedChild(kind: .init(rawValue: kindName.name), index: index),
       placementRoot: context
     ).map { result.nodes.append(contentsOf: $0) }
   }.map {
@@ -480,7 +480,7 @@ private func resolveScopedContentGroupElementsWork(
     return ResolvedNode(
       identity: context.identity,
       kind: .view(kindName),
-      typeDiscriminator: kindName == "Group"
+      typeDiscriminator: kindName == .group
         ? ObjectIdentifier(SynthesizedGroupWrapperMarker.self) : nil,
       children: resolvedChildren,
       environmentSnapshot: context.environment,

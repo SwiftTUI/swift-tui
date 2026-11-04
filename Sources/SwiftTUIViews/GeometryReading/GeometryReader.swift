@@ -136,7 +136,7 @@ public struct GeometryReader<Content: View>: PrimitiveView, ResolvableView {
     return [
       ResolvedNode(
         identity: context.identity,
-        kind: .view("GeometryReader"),
+        kind: .view(.geometryReader),
         environmentSnapshot: context.environment,
         transactionSnapshot: context.transaction,
         layoutRealizedContent: boundary

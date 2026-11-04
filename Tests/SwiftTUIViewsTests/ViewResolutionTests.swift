@@ -16,12 +16,12 @@ struct ViewResolutionTests {
     let content = try #require(resolved.anyViewPayloadContent)
 
     #expect(resolved.identity == testIdentity("root"))
-    #expect(resolved.kind == .view("AnyView"))
-    #expect(payload.kind == .view("AnyViewPayload"))
+    #expect(resolved.kind == .view(.anyView))
+    #expect(payload.kind == .view(.anyViewPayload))
     #expect(payload.identity.lastComponent?.rawValue.contains("Text") == true)
     #expect(
       content.identity == testIdentity("root", payload.identity.lastComponent!.rawValue, "Content"))
-    #expect(content.kind == .view("Text"))
+    #expect(content.kind == .view(.text))
   }
 
   @Test("EmptyView resolves with no draw payload")
@@ -33,8 +33,8 @@ struct ViewResolutionTests {
     let content = try #require(resolved.anyViewPayloadContent)
 
     #expect(resolved.identity == testIdentity("root"))
-    #expect(resolved.kind == .view("AnyView"))
-    #expect(content.kind == .view("EmptyView"))
+    #expect(resolved.kind == .view(.anyView))
+    #expect(content.kind == .view(.emptyView))
   }
 
   @Test("HStack resolves children")
@@ -48,8 +48,8 @@ struct ViewResolutionTests {
       AnyView(view), in: ResolveContext(identity: testIdentity("root")))
     let content = try #require(resolved.anyViewPayloadContent)
 
-    #expect(resolved.kind == .view("AnyView"))
-    #expect(content.kind == .view("HStack"))
+    #expect(resolved.kind == .view(.anyView))
+    #expect(content.kind == .view(.hStack))
     #expect(!content.children.isEmpty)
   }
 
@@ -65,8 +65,8 @@ struct ViewResolutionTests {
     let content = try #require(resolved.anyViewPayloadContent)
 
     #expect(resolved.identity == testIdentity("root"))
-    #expect(resolved.kind == .view("AnyView"))
-    #expect(content.kind == .view("LazyVStack"))
+    #expect(resolved.kind == .view(.anyView))
+    #expect(content.kind == .view(.lazyVStack))
     #expect(content.indexedChildSource?.count == 2)
     #expect(
       content.layoutBehavior
@@ -91,8 +91,8 @@ struct ViewResolutionTests {
     let content = try #require(resolved.anyViewPayloadContent)
 
     #expect(resolved.identity == testIdentity("root"))
-    #expect(resolved.kind == .view("AnyView"))
-    #expect(content.kind == .view("LazyHStack"))
+    #expect(resolved.kind == .view(.anyView))
+    #expect(content.kind == .view(.lazyHStack))
     #expect(content.indexedChildSource?.count == 2)
     #expect(
       content.layoutBehavior
@@ -122,7 +122,7 @@ struct ViewResolutionTests {
       AnyView(view), in: ResolveContext(identity: testIdentity("root")))
     let content = try #require(resolved.anyViewPayloadContent)
 
-    #expect(content.kind == .view("LazyVStack"))
+    #expect(content.kind == .view(.lazyVStack))
     #expect(counter.count == 0)
     #expect(content.structuralEdgeRole == .viewportBarrier)
     #expect(content.indexedChildSource != nil)
@@ -143,7 +143,7 @@ struct ViewResolutionTests {
       AnyView(view), in: ResolveContext(identity: testIdentity("root")))
     let content = try #require(resolved.anyViewPayloadContent)
 
-    #expect(content.kind == .view("LazyHStack"))
+    #expect(content.kind == .view(.lazyHStack))
     #expect(counter.count == 0)
     #expect(content.structuralEdgeRole == .viewportBarrier)
     #expect(content.indexedChildSource != nil)
@@ -168,7 +168,7 @@ struct ViewResolutionTests {
       AnyView(view), in: ResolveContext(identity: testIdentity("root")))
     let content = try #require(resolved.anyViewPayloadContent)
 
-    #expect(content.kind == .view("LazyVStack"))
+    #expect(content.kind == .view(.lazyVStack))
     let source = try #require(content.indexedChildSource)
     #expect(source.count == 5)
     #expect(counter.count == 0)
@@ -196,11 +196,11 @@ struct ViewResolutionTests {
     let content = try #require(resolved.anyViewPayloadContent)
 
     #expect(resolved.identity == testIdentity("root"))
-    #expect(resolved.kind == .view("AnyView"))
-    #expect(content.kind == .view("Overlay"))
+    #expect(resolved.kind == .view(.anyView))
+    #expect(content.kind == .view(.overlay))
     #expect(content.children.count == 2)
-    #expect(content.children[0].kind == .view("Background"))
-    #expect(content.children[1].kind == .view("EmptyView"))
+    #expect(content.children[0].kind == .view(.background))
+    #expect(content.children[1].kind == .view(.emptyView))
   }
 }
 
@@ -211,9 +211,9 @@ private final class ResolveInvocationCounter {
 
 extension ResolvedNode {
   fileprivate var anyViewPayload: ResolvedNode? {
-    guard kind == .view("AnyView"),
+    guard kind == .view(.anyView),
       children.count == 1,
-      children[0].kind == .view("AnyViewPayload")
+      children[0].kind == .view(.anyViewPayload)
     else {
       return nil
     }

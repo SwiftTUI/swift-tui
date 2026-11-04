@@ -107,7 +107,7 @@ struct GraphNodeIndexQueryTests {
     let resolved = ResolvedNode(
       viewNodeID: ViewNodeID(rawValue: 3),
       identity: testIdentity("Root", "C"),
-      kind: .view("C")
+      kind: .view(.init("C"))
     )
     fixture.index.nodeIDsByStructuralPath = [resolved.structuralPath: [fixture.idA, fixture.idB]]
 
@@ -120,7 +120,7 @@ struct GraphNodeIndexQueryTests {
     // An unstamped node whose path is absent from the index yields the empty set.
     let unstamped = ResolvedNode(
       identity: testIdentity("Root", "Unindexed"),
-      kind: .view("Unindexed")
+      kind: .view(.init("Unindexed"))
     )
     #expect(
       GraphNodeIndexQuery.nodeIDs(forResolvedNode: unstamped, in: ViewGraph.GraphIndex()).isEmpty

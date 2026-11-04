@@ -22,7 +22,7 @@ struct AnimationCompletionRegistrationTests {
   private static func leaf(_ identity: Identity, opacity: Double) -> ResolvedNode {
     var metadata = DrawMetadata()
     metadata.baseStyle.explicitOpacity = opacity
-    return ResolvedNode(identity: identity, kind: .view("Leaf"), drawMetadata: metadata)
+    return ResolvedNode(identity: identity, kind: .view(.init("Leaf")), drawMetadata: metadata)
   }
 
   /// Runs frame 1 at full opacity and frame 2 at zero opacity under
@@ -113,7 +113,7 @@ struct AnimationCompletionRegistrationTests {
 
     // Nothing animatable changes between the frames: the batch strands.
     let identity = testIdentity("stranded-logical")
-    let frame = ResolvedNode(identity: identity, kind: .view("Leaf"))
+    let frame = ResolvedNode(identity: identity, kind: .view(.init("Leaf")))
     let t0 = MonotonicInstant.now()
     controller.processResolvedTree(frame, transaction: .init(), timestamp: t0)
     var transaction = TransactionSnapshot()
@@ -142,7 +142,7 @@ struct AnimationCompletionRegistrationTests {
     controller.registerCompletion(batchID: batchID, barrier: .removed) { log.record("removed") }
 
     let identity = testIdentity("stranded-mixed")
-    let frame = ResolvedNode(identity: identity, kind: .view("Leaf"))
+    let frame = ResolvedNode(identity: identity, kind: .view(.init("Leaf")))
     let t0 = MonotonicInstant.now()
     controller.processResolvedTree(frame, transaction: .init(), timestamp: t0)
     var transaction = TransactionSnapshot()

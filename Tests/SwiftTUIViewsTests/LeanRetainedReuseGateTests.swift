@@ -69,7 +69,7 @@ struct LeanRetainedReuseGateTests {
     var leafIdentities: [Identity] = []
     var work: [ResolvedNode] = [firstFrame]
     while let current = work.popLast() {
-      if current.kind == .view("Text") {
+      if current.kind == .view(.text) {
         leafIdentities.append(current.identity)
       }
       work.append(contentsOf: current.children.reversed())

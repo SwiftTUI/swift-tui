@@ -109,7 +109,7 @@ struct DroppedElementAnchoringTests {
     // Establishes that rows really are being dropped — otherwise the anchoring
     // question would be vacuous because nothing was consumed.
     let (_, resolved) = resolveDroppedRows()
-    let texts = collectKinds(of: resolved).filter { $0 == .view("Text") }
+    let texts = collectKinds(of: resolved).filter { $0 == .view(.text) }
     #expect(texts.count == 2)
   }
 

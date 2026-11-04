@@ -67,7 +67,7 @@ extension Section {
     let result = DeclaredChildrenWorkState()
     return resolveSequentially(work) { $0.map { result.nodes.append($0) } }.map {
       ResolvedNode(
-        identity: context.identity, kind: .view("Section"), children: result.nodes,
+        identity: context.identity, kind: .view(.section), children: result.nodes,
         environmentSnapshot: context.environment, transactionSnapshot: context.transaction,
         semanticMetadata: .init(sectionRole: .section, accessibilityRole: .section))
     }
@@ -80,10 +80,11 @@ extension Section {
     let childContext = context.child(component: component)
     return resolveDeclaredChildrenWork(
       view, in: childContext.child(component: .named("Views")),
-      kindName: "Section\(component.rawValue)"
+      kindName: .init("Section\(component.rawValue)")
     ).map {
       ResolvedNode(
-        identity: childContext.identity, kind: .view("Section\(component.rawValue)"), children: $0,
+        identity: childContext.identity, kind: .view(.init("Section\(component.rawValue)")),
+        children: $0,
         environmentSnapshot: childContext.environment,
         transactionSnapshot: childContext.transaction,
         semanticMetadata: .init(sectionRole: role))

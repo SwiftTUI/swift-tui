@@ -15,7 +15,7 @@ struct BuilderStructureTests {
       in: .init(identity: testIdentity("BuilderStructure", "TypedTraversal"))
     )
 
-    #expect(resolved.kind == .view("HStack"))
+    #expect(resolved.kind == .view(.hStack))
     #expect(resolved.children.map(resolvedNodeLabelText(from:)) == ["A", "B", "C", "D"])
   }
 
@@ -23,13 +23,13 @@ struct BuilderStructureTests {
   func scopedDeclaredBuilderChildrenPreserveNestedBuilderOutputOrder() {
     let resolved = Resolver().resolve(
       ScopedContentPayloadGroupView(
-        kindName: "ScopedProbe",
+        kindName: .init("ScopedProbe"),
         payloads: scopedDeclaredBuilderChildren(from: nestedBuilderProbe())
       ),
       in: .init(identity: testIdentity("BuilderStructure", "ScopedTraversal"))
     )
 
-    #expect(resolved.kind == .view("ScopedProbe"))
+    #expect(resolved.kind == .view(.init("ScopedProbe")))
     #expect(resolvedNodeLabelText(from: resolved) == "A B C D")
   }
 
@@ -40,7 +40,7 @@ struct BuilderStructureTests {
     )
     let resolved = Resolver().resolve(
       ScopedContentPayloadGroupView(
-        kindName: "ScopedAvailabilityProbe",
+        kindName: .init("ScopedAvailabilityProbe"),
         payloads: children
       ),
       in: .init(identity: testIdentity("BuilderStructure", "ScopedAvailability"))

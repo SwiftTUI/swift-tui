@@ -49,7 +49,7 @@ package struct PlacedNodeResolvedMetadata: Equatable, Sendable {
   package init(
     viewNodeID: ViewNodeID? = nil,
     identity: Identity = .init(components: [String]()),
-    kind: NodeKind = .view("Unknown"),
+    kind: NodeKind = .view(.unknown),
     environmentSnapshot: EnvironmentSnapshot = .init(),
     semanticRole: SemanticRole = .generic,
     layoutMetadata: LayoutMetadata = .init(),
@@ -408,7 +408,7 @@ package struct PlacedNode: Equatable, Sendable {
   package init(
     viewNodeID: ViewNodeID? = nil,
     identity: Identity,
-    kind: NodeKind = .view("Unknown"),
+    kind: NodeKind = .view(.unknown),
     environmentSnapshot: EnvironmentSnapshot = .init(),
     bounds: CellRect,
     contentBounds: CellRect? = nil,

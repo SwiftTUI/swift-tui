@@ -53,7 +53,7 @@ struct EntityRoutedOwnerPreparationTests {
         adoptedA,
         resolved: entityResolvedNode(
           identity: sharedIdentity,
-          kind: .view("A"),
+          kind: .view(.init("A")),
           entity: entityA
         ),
         accessedStateSlots: 1
@@ -72,7 +72,7 @@ struct EntityRoutedOwnerPreparationTests {
         adoptedB,
         resolved: entityResolvedNode(
           identity: sharedIdentity,
-          kind: .view("B"),
+          kind: .view(.init("B")),
           entity: entityB
         ),
         accessedStateSlots: 1

@@ -129,7 +129,7 @@ package func composeOverlayStackTreeWork(
     return ResolvedNode(
       identity: context.identity,
       structuralPath: context.structuralPath,
-      kind: .view("OverlayStack"),
+      kind: .view(.overlayStack),
       children: [hostedBaseNode, overlayNode],
       environmentSnapshot: hostContext.environment,
       transactionSnapshot: hostContext.transaction,
@@ -170,7 +170,7 @@ private struct OverlayStackOverlayHost: PrimitiveView, IterativeResolvableView {
       return [
         ResolvedNode(
           identity: context.identity,
-          kind: .view("OverlayStackOverlays"),
+          kind: .view(.overlayStackOverlays),
           children: children,
           environmentSnapshot: context.environment,
           transactionSnapshot: context.transaction,
@@ -211,7 +211,7 @@ private struct OverlayStackEntryHost: PrimitiveView, IterativeResolvableView {
       var entryNode = ResolvedNode(
         identity: context.identity,
         structuralEdgeRole: .detachedOverlayEntry,
-        kind: .view(entry.kindName),
+        kind: .view(.init(entry.kindName)),
         children: [bodyNode],
         environmentSnapshot: context.environment,
         transactionSnapshot: context.transaction,

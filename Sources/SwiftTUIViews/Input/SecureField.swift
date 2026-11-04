@@ -121,7 +121,7 @@ extension SecureField {
 
       return ResolvedNode(
         identity: context.identity,
-        kind: .view("SecureField"),
+        kind: .view(.secureField),
         children: [child],
         environmentSnapshot: context.environment,
         transactionSnapshot: context.transaction,

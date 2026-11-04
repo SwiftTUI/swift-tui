@@ -243,7 +243,7 @@ struct Phase2CommitPlannerTests {
       children: [
         ResolvedNode(
           identity: testIdentity("Root", "LazyVStack"),
-          kind: .view("LazyVStack"),
+          kind: .view(.lazyVStack),
           layoutBehavior: .lazyStack(
             axis: .vertical,
             spacing: 0,
@@ -261,12 +261,12 @@ struct Phase2CommitPlannerTests {
       children: [
         PlacedNode(
           identity: testIdentity("Root", "LazyVStack"),
-          kind: .view("LazyVStack"),
+          kind: .view(.lazyVStack),
           bounds: .init(origin: .zero, size: .zero),
           children: [
             PlacedNode(
               identity: testIdentity("Root", "LazyVStack", "ID[1]"),
-              kind: .view("LifecycleProbe"),
+              kind: .view(.init("LifecycleProbe")),
               bounds: .init(origin: .zero, size: .zero),
               semanticRole: .generic,
               lifecycleMetadata: .init(
@@ -354,7 +354,7 @@ private func lifecycleNode(
 ) -> ResolvedNode {
   ResolvedNode(
     identity: identity,
-    kind: .view("LifecycleProbe"),
+    kind: .view(.init("LifecycleProbe")),
     children: children,
     lifecycleMetadata: .init(
       appearHandlerIDs: appear,

@@ -131,12 +131,12 @@ struct RetainedValidationWorkTests {
     ResolvedNode(
       viewNodeID: .init(rawValue: 1),
       identity: testIdentity("Root"),
-      kind: .view("Root"),
+      kind: .view(.init("Root")),
       children: (0..<2).map { index in
         ResolvedNode(
           viewNodeID: .init(rawValue: UInt64(index + 2)),
           identity: testIdentity("Root", String(index)),
-          kind: .view("Child"),
+          kind: .view(.init("Child")),
           intrinsicSize: .init(width: 4, height: 1)
         )
       }

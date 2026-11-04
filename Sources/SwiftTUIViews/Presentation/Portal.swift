@@ -198,11 +198,11 @@ package struct PortalAttachmentSequenceView: PrimitiveView, IterativeResolvableV
   }
 
   package func appendDeclaredChildrenWork(
-    in context: ResolveContext, kindName: String, into state: DeclaredChildrenWorkState
+    in context: ResolveContext, kindName: ViewKind, into state: DeclaredChildrenWorkState
   ) -> ResolveWork<Void> {
     .deferred {
       let childContext = context.indexedChild(
-        kind: .init(rawValue: kindName), index: state.nextIndex)
+        kind: .init(rawValue: kindName.name), index: state.nextIndex)
       state.nextIndex += 1
       return makeResolveWork(in: childContext).map { state.nodes.append(contentsOf: $0) }
     }
@@ -210,12 +210,12 @@ package struct PortalAttachmentSequenceView: PrimitiveView, IterativeResolvableV
 
   package func appendDeclaredChildren(
     in context: ResolveContext,
-    kindName: String,
+    kindName: ViewKind,
     nextIndex: inout Int,
     into resolved: inout [ResolvedNode]
   ) {
     let sequenceContext = context.indexedChild(
-      kind: .init(rawValue: kindName),
+      kind: .init(rawValue: kindName.name),
       index: nextIndex
     )
     nextIndex += 1
@@ -224,12 +224,12 @@ package struct PortalAttachmentSequenceView: PrimitiveView, IterativeResolvableV
 
   package func appendScopedDeclaredChildren(
     in context: DeclaredPayloadTraversalContext,
-    kindName: String,
+    kindName: ViewKind,
     nextIndex: inout Int,
     into children: inout [ScopedContentPayload]
   ) {
     let sequenceContext = context.indexedChild(
-      kind: .init(rawValue: kindName),
+      kind: .init(rawValue: kindName.name),
       index: nextIndex
     )
     nextIndex += 1
@@ -242,12 +242,12 @@ package struct PortalAttachmentSequenceView: PrimitiveView, IterativeResolvableV
 
   package func appendPortalDeclaredChildren(
     in context: DeclaredPayloadTraversalContext,
-    kindName: String,
+    kindName: ViewKind,
     nextIndex: inout Int,
     into children: inout [PortalAttachmentContentPayload]
   ) {
     let sequenceContext = context.indexedChild(
-      kind: .init(rawValue: kindName),
+      kind: .init(rawValue: kindName.name),
       index: nextIndex
     )
     nextIndex += 1
@@ -262,7 +262,7 @@ package struct PortalAttachmentSequenceView: PrimitiveView, IterativeResolvableV
 
   package func enumerateDeclaredChildren(
     in context: ResolveContext,
-    kindName: String,
+    kindName: ViewKind,
     nextIndex: inout Int,
     visitor: (
       _ child: Any,
@@ -271,7 +271,7 @@ package struct PortalAttachmentSequenceView: PrimitiveView, IterativeResolvableV
     ) -> Void
   ) {
     let sequenceContext = context.indexedChild(
-      kind: .init(rawValue: kindName),
+      kind: .init(rawValue: kindName.name),
       index: nextIndex
     )
     nextIndex += 1
@@ -300,7 +300,7 @@ package func appendPortalDeclaredBuilderChildren<V: View>(
   appendPortalDeclaredBuilderChildren(
     from: view,
     in: .root,
-    kindName: "Group",
+    kindName: .group,
     nextIndex: &nextIndex,
     into: &children
   )
@@ -310,7 +310,7 @@ package func appendPortalDeclaredBuilderChildren<V: View>(
 package func appendPortalDeclaredBuilderChildren<V: View>(
   from view: V,
   in context: DeclaredPayloadTraversalContext,
-  kindName: String,
+  kindName: ViewKind,
   nextIndex: inout Int,
   into children: inout [PortalAttachmentContentPayload]
 ) {
@@ -395,7 +395,7 @@ package func portalAttachmentDeclaredBuilderChildren<V: View>(
 
 @MainActor
 package struct PortalAttachmentGroupView: PrimitiveView, IterativeResolvableView {
-  package var kindName: String
+  package var kindName: ViewKind
   package var payloads: [PortalAttachmentPayload]
 
   package func makeResolveWork(in context: ResolveContext) -> ResolveWork<[ResolvedNode]> {
@@ -406,7 +406,7 @@ package struct PortalAttachmentGroupView: PrimitiveView, IterativeResolvableView
       let result = DeclaredChildrenWorkState()
       return resolveSequentially(Array(payloads.enumerated())) { index, payload in
         payload.resolveElementsWork(
-          in: context.indexedChild(kind: .init(rawValue: kindName), index: index),
+          in: context.indexedChild(kind: .init(rawValue: kindName.name), index: index),
           placementRoot: context
         ).map {
           result.nodes.append(contentsOf: $0)

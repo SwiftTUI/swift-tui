@@ -109,9 +109,10 @@ struct CompositionalLazyStackTests {
     }
     for header in [false, true] {
       let source = makeCompositionalIndexedChildSource(
-        from: content(header), in: context, kindName: "ProofStack")
+        from: content(header), in: context, kindName: .init("ProofStack"))
       let actual = (0..<source.count).flatMap { source.childElements(at: $0) }
-      let eager = resolveDeclaredChildren(content(header), in: context, kindName: "ProofStack")
+      let eager = resolveDeclaredChildren(
+        content(header), in: context, kindName: .init("ProofStack"))
       #expect(actual.map(\.identity) == eager.map(\.identity))
       #expect(actual.map(\.structuralPath) == eager.map(\.structuralPath))
       #expect(actual.map(\.entityIdentity) == eager.map(\.entityIdentity))
@@ -133,9 +134,9 @@ struct CompositionalLazyStackTests {
     let context = ResolveContext(identity: testIdentity("ProofMembership"))
     IndexedChildRealizationProbe.reset()
     let before = makeCompositionalIndexedChildSource(
-      from: content([1, 2], header: false), in: context, kindName: "ProofStack")
+      from: content([1, 2], header: false), in: context, kindName: .init("ProofStack"))
     let after = makeCompositionalIndexedChildSource(
-      from: content([0, 1, 2, 3], header: true), in: context, kindName: "ProofStack")
+      from: content([0, 1, 2, 3], header: true), in: context, kindName: .init("ProofStack"))
     let tag = SelectionTag(value: 700)
     let first = try #require(before.elementIndex(forSelectionTag: tag))
     let second = try #require(after.elementIndex(forSelectionTag: tag))

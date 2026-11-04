@@ -480,7 +480,7 @@ private func animationTemporalNode(
   return ResolvedNode(
     viewNodeID: viewNodeID,
     identity: identity,
-    kind: .view("AnimationTemporalLeaf"),
+    kind: .view(.init("AnimationTemporalLeaf")),
     children: children,
     layoutBehavior: padding.map(LayoutBehavior.padding) ?? .intrinsic,
     drawMetadata: metadata
@@ -943,7 +943,7 @@ private func animationTemporalRoot(
   identity: Identity,
   children: [ResolvedNode] = []
 ) -> ResolvedNode {
-  ResolvedNode(identity: identity, kind: .view("AnimationTemporalRoot"), children: children)
+  ResolvedNode(identity: identity, kind: .view(.init("AnimationTemporalRoot")), children: children)
 }
 
 private func animationTemporalContainsOffset(in node: ResolvedNode) -> Bool {

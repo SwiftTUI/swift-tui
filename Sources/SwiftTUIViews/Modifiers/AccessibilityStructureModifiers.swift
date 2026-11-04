@@ -83,7 +83,7 @@ private struct AccessibilityRepresentationModifier<Representation: View>:
         }
         return [
           ResolvedNode(
-            identity: context.identity, kind: .view("AccessibilityRepresentation"),
+            identity: context.identity, kind: .view(.accessibilityRepresentation),
             children: [visual, virtual], environmentSnapshot: context.environment,
             transactionSnapshot: context.transaction,
             layoutBehavior: .decoration(primaryIndex: 0, alignment: .topLeading),

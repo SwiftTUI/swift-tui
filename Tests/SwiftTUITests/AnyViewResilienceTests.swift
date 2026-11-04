@@ -246,7 +246,7 @@ struct AnyViewResilienceTests {
     #expect(same.resolvedTree.descendant(withText: "Inner text 1") != nil)
 
     let initialOuterPayloads = initial.resolvedTree.descendantIdentities { node in
-      node.kind == .view("AnyViewPayload")
+      node.kind == .view(.anyViewPayload)
         && node.identity.lastComponent?.rawValue.contains("NestedAnyViewContainer") == true
     }
     let swapped = renderer.render(
@@ -258,15 +258,15 @@ struct AnyViewResilienceTests {
       )
     )
     let swappedOuterPayloads = swapped.resolvedTree.descendantIdentities { node in
-      node.kind == .view("AnyViewPayload")
+      node.kind == .view(.anyViewPayload)
         && node.identity.lastComponent?.rawValue.contains("NestedAnyViewContainer") == true
     }
     let swappedInnerTextPayloads = swapped.resolvedTree.descendantIdentities { node in
-      node.kind == .view("AnyViewPayload")
+      node.kind == .view(.anyViewPayload)
         && node.identity.path.contains("AnyViewInnerTextCounter")
     }
     let swappedInnerStackPayloads = swapped.resolvedTree.descendantIdentities { node in
-      node.kind == .view("AnyViewPayload")
+      node.kind == .view(.anyViewPayload)
         && node.identity.path.contains("AnyViewInnerStackCounter")
     }
 

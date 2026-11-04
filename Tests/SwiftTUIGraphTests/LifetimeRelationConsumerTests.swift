@@ -123,7 +123,7 @@ struct LifetimeRelationConsumerTests {
     let node = graph.beginEvaluation(identity: identity, invalidator: nil)
     _ = graph.finishEvaluation(
       node,
-      resolved: ResolvedNode(identity: identity, kind: .view("Fixture")),
+      resolved: ResolvedNode(identity: identity, kind: .view(.init("Fixture"))),
       accessedStateSlots: 0
     )
     return node

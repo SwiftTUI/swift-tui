@@ -61,7 +61,10 @@ struct RetainedFrameIndexPatchTests {
     let fragment = try #require(patched.placedFrameFragment(for: testIdentity("Root", "A")))
 
     #expect(patched.derivedByPatching)
-    #expect(fragment.entries.contains { $0.identity == testIdentity("Root", "A") && $0.bounds == movedBounds })
+    #expect(
+      fragment.entries.contains {
+        $0.identity == testIdentity("Root", "A") && $0.bounds == movedBounds
+      })
   }
 
   @Test("an inserted sibling falls back to a full rebuild")
@@ -69,7 +72,7 @@ struct RetainedFrameIndexPatchTests {
     let previous = RetainedFrameIndex(frame: frame(resolvedTree: twoRowTree()))
     var updatedTree = twoRowTree()
     updatedTree.children.append(
-      ResolvedNode(identity: testIdentity("Root", "C"), kind: .view("Text"))
+      ResolvedNode(identity: testIdentity("Root", "C"), kind: .view(.text))
     )
     let updatedFrame = frame(resolvedTree: updatedTree)
 
@@ -111,7 +114,7 @@ struct RetainedFrameIndexPatchTests {
     var updatedTree = twoRowTree()
     updatedTree.children[0] = ResolvedNode(
       identity: testIdentity("Root", "A"),
-      kind: .view("Renamed")
+      kind: .view(.init("Renamed"))
     )
     let updatedFrame = frame(resolvedTree: updatedTree)
 
@@ -128,8 +131,8 @@ struct RetainedFrameIndexPatchTests {
       identity: testIdentity("Root"),
       kind: .root,
       children: [
-        ResolvedNode(identity: duplicate, kind: .view("Row")),
-        ResolvedNode(identity: duplicate, kind: .view("Row")),
+        ResolvedNode(identity: duplicate, kind: .view(.init("Row"))),
+        ResolvedNode(identity: duplicate, kind: .view(.init("Row"))),
       ]
     )
     let previous = RetainedFrameIndex(frame: frame(resolvedTree: tree))
@@ -167,12 +170,12 @@ struct RetainedFrameIndexPatchTests {
     // refuted the first surgical-rekey patch design.
     var inner = ResolvedNode(
       identity: testIdentity("Root", "wrap", "leaf"),
-      kind: .view("Text")
+      kind: .view(.text)
     )
     inner.viewNodeID = ViewNodeID(rawValue: 7)
     var wrap = ResolvedNode(
       identity: testIdentity("Root", "wrap"),
-      kind: .view("Frame"),
+      kind: .view(.frame),
       children: [inner]
     )
     wrap.viewNodeID = ViewNodeID(rawValue: 7)
@@ -219,8 +222,8 @@ private func twoRowTree() -> ResolvedNode {
     identity: testIdentity("Root"),
     kind: .root,
     children: [
-      ResolvedNode(identity: testIdentity("Root", "A"), kind: .view("Text")),
-      ResolvedNode(identity: testIdentity("Root", "B"), kind: .view("Text")),
+      ResolvedNode(identity: testIdentity("Root", "A"), kind: .view(.text)),
+      ResolvedNode(identity: testIdentity("Root", "B"), kind: .view(.text)),
     ]
   )
 }

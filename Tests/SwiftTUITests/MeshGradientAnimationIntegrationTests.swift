@@ -225,7 +225,7 @@ struct MeshGradientAnimationIntegrationTests {
   private func meshNode(identity: Identity, gradient: MeshGradient) -> ResolvedNode {
     ResolvedNode(
       identity: identity,
-      kind: .view("MeshGradient"),
+      kind: .view(.init("MeshGradient")),
       drawPayload: .shape(
         ShapePayload(
           geometry: .rectangle,

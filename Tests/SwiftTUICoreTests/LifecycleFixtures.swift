@@ -49,7 +49,7 @@ func lifecycleTree(
 
 func lifecycleNode(
   _ identity: Identity,
-  kind: NodeKind = .view("LifecycleFixture"),
+  kind: NodeKind = .view(.init("LifecycleFixture")),
   appearHandlerIDs: [String] = [],
   disappearHandlerIDs: [String] = [],
   task: TaskDescriptor? = nil,

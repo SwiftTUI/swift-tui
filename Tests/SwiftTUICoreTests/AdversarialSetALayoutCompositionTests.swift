@@ -179,7 +179,7 @@ struct AdversarialSetALayoutCompositionTests {
 
   @Test func setA195SpacerMinimumSurvivesTwoTransparentWrappers() {
     var spacer = leaf(1, 7, 0)
-    spacer.kind = .view("Spacer")
+    spacer.kind = .view(.spacer)
     spacer.drawMetadata.leafStackAxis = .horizontal
     spacer.layoutMetadata = .init()
     let wrapped = wrap(.offset(x: 0, y: 0), [wrap(.padding(.init()), [spacer], id: 2)], id: 3)
@@ -198,7 +198,7 @@ struct AdversarialSetALayoutCompositionTests {
 
   @Test func setA197FixedSizeSpacerRemainsRigidInsidePadding() {
     var spacer = leaf(1, 3, 0)
-    spacer.kind = .view("Spacer")
+    spacer.kind = .view(.spacer)
     spacer.drawMetadata.leafStackAxis = .horizontal
     spacer.layoutMetadata = .init(fixedSizeHorizontal: true)
     let padded = wrap(.padding(.init(leading: 2, trailing: 1)), [spacer], id: 2)
@@ -243,7 +243,7 @@ struct AdversarialSetALayoutCompositionTests {
   private func leaf(_ id: Int, _ width: Int, _ height: Int) -> ResolvedNode {
     .init(
       viewNodeID: .init(rawValue: UInt64(id)), identity: testIdentity("SetAComposition", "\(id)"),
-      kind: .view("Probe"),
+      kind: .view(.init("Probe")),
       layoutMetadata: .init(fixedSizeHorizontal: true, fixedSizeVertical: true),
       intrinsicSize: .init(width: width, height: height))
   }
@@ -253,7 +253,7 @@ struct AdversarialSetALayoutCompositionTests {
   {
     .init(
       viewNodeID: .init(rawValue: UInt64(id)), identity: testIdentity("SetAComposition", "\(id)"),
-      kind: .view("Wrapper"), children: children, layoutBehavior: behavior)
+      kind: .view(.init("Wrapper")), children: children, layoutBehavior: behavior)
   }
 
   private func stack(_ children: [ResolvedNode], axis: Axis, spacing: Int, id: Int = 90)

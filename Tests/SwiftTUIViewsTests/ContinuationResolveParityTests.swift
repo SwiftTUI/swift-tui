@@ -114,7 +114,7 @@ struct ContinuationResolveParityTests {
     _ node: ResolvedNode,
     named name: String
   ) -> Bool {
-    if node.kind == .view(name) {
+    if node.kind == .view(.init(name)) {
       return true
     }
     return node.children.contains { containsKind($0, named: name) }

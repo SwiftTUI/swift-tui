@@ -186,7 +186,7 @@ public struct ProgressView<Label: View, CurrentValueLabel: View>: PrimitiveView,
     }.map { child in
       return ResolvedNode(
         identity: context.identity,
-        kind: .view("ProgressView"),
+        kind: .view(.progressView),
         children: [child],
         environmentSnapshot: context.environment,
         transactionSnapshot: context.transaction,

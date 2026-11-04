@@ -201,7 +201,7 @@ extension Slider {
       metadata.explicitInteractionRect = CellRect(origin: .zero, size: .zero)
       return ResolvedNode(
         identity: context.identity,
-        kind: .view("Slider"),
+        kind: .view(.slider),
         children: [child],
         environmentSnapshot: context.environment,
         transactionSnapshot: context.transaction,

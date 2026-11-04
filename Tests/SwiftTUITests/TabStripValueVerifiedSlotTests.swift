@@ -507,7 +507,7 @@ private final class ValueVerifiedSlotHarness<Root: View> {
   var tabContentProbeTopology: TabContentProbeTopology? {
     let nodes = runLoop.renderer.viewGraph.debugTotalStateSnapshot().nodesByNodeID.values
     guard
-      let control = nodes.first(where: { $0.committed.kind == .view("TabView") }),
+      let control = nodes.first(where: { $0.committed.kind == .view(.tabView) }),
       let authoredSlot = control.focusPresentationInertSlotIdentities.first(where: {
         $0.path.hasSuffix("/TabBody/VStack[1]")
       }),

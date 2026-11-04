@@ -159,7 +159,7 @@ struct StyleBodyViewNodeTests {
     ofKind name: String,
     in node: ResolvedNode
   ) -> ResolvedNode? {
-    if node.kind == .view(name) {
+    if node.kind == .view(.init(name)) {
       return node
     }
     for child in node.children {

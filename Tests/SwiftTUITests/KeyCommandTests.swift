@@ -127,7 +127,7 @@ struct KeyCommandTests {
 private func findPanelNode(in root: ResolvedNode) -> ResolvedNode? {
   var stack: [ResolvedNode] = [root]
   while let node = stack.popLast() {
-    if case .view(let name) = node.kind, name == "Panel" {
+    if case .view(let name) = node.kind, name == .panel {
       return node
     }
     stack.append(contentsOf: node.children)

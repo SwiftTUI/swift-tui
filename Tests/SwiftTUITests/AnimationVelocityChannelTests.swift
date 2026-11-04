@@ -15,7 +15,7 @@ struct AnimationVelocityChannelTests {
   private static func leaf(_ identity: Identity, opacity: Double) -> ResolvedNode {
     var metadata = DrawMetadata()
     metadata.baseStyle.explicitOpacity = opacity
-    return ResolvedNode(identity: identity, kind: .view("Leaf"), drawMetadata: metadata)
+    return ResolvedNode(identity: identity, kind: .view(.init("Leaf")), drawMetadata: metadata)
   }
 
   private static func opacity(of tree: ResolvedNode) -> Double {
@@ -163,7 +163,7 @@ struct AnimationVelocityChannelTests {
     func frame(_ opacity: Double?) -> ResolvedNode {
       ResolvedNode(
         identity: root,
-        kind: .view("Root"),
+        kind: .view(.init("Root")),
         children: opacity.map { [Self.leaf(identity, opacity: $0)] } ?? []
       )
     }

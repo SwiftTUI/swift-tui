@@ -145,7 +145,7 @@ extension TextEditor {
         actions: [.focus, .setValue, .editText, .selectText], value: .text(text.wrappedValue))
       return ResolvedNode(
         identity: context.identity,
-        kind: .view("TextEditor"),
+        kind: .view(.textEditor),
         children: [child],
         environmentSnapshot: context.environment,
         transactionSnapshot: context.transaction,
@@ -197,7 +197,7 @@ private struct TextEditorContentWidthProbe: PrimitiveView, IterativeResolvableVi
     return [
       ResolvedNode(
         identity: context.identity,
-        kind: .view("TextEditorContentWidthProbe"),
+        kind: .view(.textEditorContentWidthProbe),
         environmentSnapshot: context.environment,
         transactionSnapshot: context.transaction,
         layoutRealizedContent: boundary

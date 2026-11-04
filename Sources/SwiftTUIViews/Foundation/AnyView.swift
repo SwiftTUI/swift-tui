@@ -48,7 +48,8 @@ public struct AnyView: PrimitiveView, IterativeResolvableView {
     // The concrete logical type remains part of identity. A reload session
     // supplies only compiler-generated module aliases, so an ABI namespace
     // change cannot masquerade as a different authored payload type.
-    let component = HotReloadTypeNames.canonical(storage.typeID.identityComponent.rawValue,
+    let component = HotReloadTypeNames.canonical(
+      storage.typeID.identityComponent.rawValue,
       aliases: context.viewGraph?.hotReloadTypeAliases ?? [:])
     return makeResolveWork(in: context, payloadIdentity: .init(rawValue: component))
   }
@@ -83,7 +84,7 @@ public struct AnyView: PrimitiveView, IterativeResolvableView {
 
       let payloadShell = ResolvedNode(
         identity: payloadContext.identity,
-        kind: .view("AnyViewPayload"),
+        kind: .view(.anyViewPayload),
         typeDiscriminator: storage.typeID.typeDiscriminator,
         environmentSnapshot: context.environment,
         transactionSnapshot: context.transaction
@@ -94,7 +95,7 @@ public struct AnyView: PrimitiveView, IterativeResolvableView {
       )
       let payload = ResolvedNode(
         identity: payloadContext.identity,
-        kind: .view("AnyViewPayload"),
+        kind: .view(.anyViewPayload),
         typeDiscriminator: storage.typeID.typeDiscriminator,
         children: [content],
         environmentSnapshot: context.environment,
@@ -104,7 +105,7 @@ public struct AnyView: PrimitiveView, IterativeResolvableView {
       return [
         ResolvedNode(
           identity: context.identity,
-          kind: .view("AnyView"),
+          kind: .view(.anyView),
           typeDiscriminator: ObjectIdentifier(AnyView.self),
           children: [payload],
           environmentSnapshot: context.environment,

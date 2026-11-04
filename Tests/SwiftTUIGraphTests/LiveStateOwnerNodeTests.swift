@@ -24,7 +24,7 @@ struct LiveStateOwnerNodeTests {
         identity: rootIdentity,
         kind: .root,
         children: [
-          ResolvedNode(identity: childIdentity, kind: .view("Child"))
+          ResolvedNode(identity: childIdentity, kind: .view(.init("Child")))
         ]
       )
     )

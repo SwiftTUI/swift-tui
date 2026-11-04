@@ -82,10 +82,10 @@ struct AnimationTransactionSegmentationTests {
     let secondIdentity = testIdentity("stranded-root", "second")
     let unchanged = ResolvedNode(
       identity: rootIdentity,
-      kind: .view("Root"),
+      kind: .view(.init("Root")),
       children: [
-        ResolvedNode(identity: firstIdentity, kind: .view("First")),
-        ResolvedNode(identity: secondIdentity, kind: .view("Second")),
+        ResolvedNode(identity: firstIdentity, kind: .view(.init("First"))),
+        ResolvedNode(identity: secondIdentity, kind: .view(.init("Second"))),
       ]
     )
     let timestamp = MonotonicInstant.now()
@@ -126,7 +126,7 @@ struct AnimationTransactionSegmentationTests {
     let rootIdentity = testIdentity("insertion-root")
     let insertedIdentity = testIdentity("insertion-root", "inserted")
     let insertedNodeID = ViewNodeID(rawValue: 16_105)
-    let baseline = ResolvedNode(identity: rootIdentity, kind: .view("Root"))
+    let baseline = ResolvedNode(identity: rootIdentity, kind: .view(.init("Root")))
     let timestamp = MonotonicInstant.now()
     controller.processResolvedTree(baseline, transaction: .init(), timestamp: timestamp)
 
@@ -139,12 +139,12 @@ struct AnimationTransactionSegmentationTests {
     controller.finishTransitionCollection()
     let target = ResolvedNode(
       identity: rootIdentity,
-      kind: .view("Root"),
+      kind: .view(.init("Root")),
       children: [
         ResolvedNode(
           viewNodeID: insertedNodeID,
           identity: insertedIdentity,
-          kind: .view("Inserted")
+          kind: .view(.init("Inserted"))
         )
       ]
     )
@@ -186,12 +186,12 @@ struct AnimationTransactionSegmentationTests {
     controller.finishTransitionCollection()
     let baseline = ResolvedNode(
       identity: rootIdentity,
-      kind: .view("Root"),
+      kind: .view(.init("Root")),
       children: [
         ResolvedNode(
           viewNodeID: removedNodeID,
           identity: removedIdentity,
-          kind: .view("Removed")
+          kind: .view(.init("Removed"))
         )
       ]
     )
@@ -200,7 +200,7 @@ struct AnimationTransactionSegmentationTests {
 
     controller.beginTransitionCollection()
     controller.finishTransitionCollection()
-    let target = ResolvedNode(identity: rootIdentity, kind: .view("Root"))
+    let target = ResolvedNode(identity: rootIdentity, kind: .view(.init("Root")))
     controller.processResolvedTree(
       target,
       transactionPlan: FrameAnimationTransactionPlan(
@@ -229,7 +229,7 @@ struct AnimationTransactionSegmentationTests {
     let key = MatchedGeometryKey(id: "segmented-match")
     let baseline = ResolvedNode(
       identity: rootIdentity,
-      kind: .view("Root"),
+      kind: .view(.init("Root")),
       children: [matchedNode(identity: sourceIdentity, key: key)]
     )
     let timestamp = MonotonicInstant.now()
@@ -249,7 +249,7 @@ struct AnimationTransactionSegmentationTests {
     )
     let target = ResolvedNode(
       identity: rootIdentity,
-      kind: .view("Root"),
+      kind: .view(.init("Root")),
       children: [matchedNode(identity: destinationIdentity, key: key)]
     )
 
@@ -327,7 +327,7 @@ struct AnimationTransactionSegmentationTests {
   ) -> ResolvedNode {
     ResolvedNode(
       identity: rootIdentity,
-      kind: .view("Root"),
+      kind: .view(.init("Root")),
       children: [
         leaf(identity: firstIdentity, name: "First", opacity: firstOpacity),
         leaf(identity: secondIdentity, name: "Second", opacity: secondOpacity),
@@ -344,7 +344,7 @@ struct AnimationTransactionSegmentationTests {
     metadata.baseStyle.explicitOpacity = opacity
     return ResolvedNode(
       identity: identity,
-      kind: .view(name),
+      kind: .view(.init(name)),
       drawMetadata: metadata
     )
   }
@@ -353,7 +353,7 @@ struct AnimationTransactionSegmentationTests {
     identity: Identity,
     key: MatchedGeometryKey
   ) -> ResolvedNode {
-    var node = ResolvedNode(identity: identity, kind: .view("Matched"))
+    var node = ResolvedNode(identity: identity, kind: .view(.init("Matched")))
     node.matchedGeometry = MatchedGeometryConfig(key: key)
     return node
   }

@@ -22,7 +22,7 @@ struct NodeCheckpointImageStoreTests {
         identity: rootIdentity,
         kind: .root,
         children: [
-          ResolvedNode(identity: childIdentity, kind: .view("Child"))
+          ResolvedNode(identity: childIdentity, kind: .view(.init("Child")))
         ]
       )
     )
@@ -95,8 +95,8 @@ struct NodeCheckpointImageStoreTests {
         identity: rootIdentity,
         kind: .root,
         children: [
-          ResolvedNode(identity: childIdentity, kind: .view("Child")),
-          ResolvedNode(identity: insertedIdentity, kind: .view("Inserted")),
+          ResolvedNode(identity: childIdentity, kind: .view(.init("Child"))),
+          ResolvedNode(identity: insertedIdentity, kind: .view(.init("Inserted"))),
         ]
       )
     )
@@ -110,7 +110,7 @@ struct NodeCheckpointImageStoreTests {
         identity: rootIdentity,
         kind: .root,
         children: [
-          ResolvedNode(identity: childIdentity, kind: .view("Child"))
+          ResolvedNode(identity: childIdentity, kind: .view(.init("Child")))
         ]
       )
     )
@@ -132,10 +132,10 @@ struct NodeCheckpointImageStoreTests {
         identity: rootIdentity,
         kind: .root,
         children: [
-          ResolvedNode(identity: childIdentity, kind: .view("ChildUpdated")),
+          ResolvedNode(identity: childIdentity, kind: .view(.init("ChildUpdated"))),
           ResolvedNode(
             identity: testIdentity("StoreRoot", "Inserted"),
-            kind: .view("Inserted")
+            kind: .view(.init("Inserted"))
           ),
         ]
       )

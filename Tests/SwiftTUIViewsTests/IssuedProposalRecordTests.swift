@@ -66,7 +66,7 @@ struct IssuedProposalRecordTests {
   func viewThatFitsRecordsProbePrefix() throws {
     let resolved = ResolvedNode(
       identity: testIdentity("record-vtf"),
-      kind: .view("ViewThatFits"),
+      kind: .view(.viewThatFits),
       children: [
         leaf("tall", size: .init(width: 10, height: 30)),
         leaf("medium", size: .init(width: 10, height: 20)),
@@ -213,12 +213,12 @@ struct IssuedProposalRecordTests {
     let custom = ResolvedNode(
       viewNodeID: fixtureViewNodeID("live-overflow-probe"),
       identity: testIdentity("live-overflow", "Inner", "Probe"),
-      kind: .view("FixedProbe"),
+      kind: .view(.init("FixedProbe")),
       children: [
         ResolvedNode(
           viewNodeID: fixtureViewNodeID("live-overflow-leaf"),
           identity: leafIdentity,
-          kind: .view("Test"),
+          kind: .view(.init("Test")),
           intrinsicSize: .init(width: 6, height: 2)
         )
       ],
@@ -229,7 +229,7 @@ struct IssuedProposalRecordTests {
     let inner = ResolvedNode(
       viewNodeID: fixtureViewNodeID("live-overflow-inner"),
       identity: testIdentity("live-overflow", "Inner"),
-      kind: .view("VStack"),
+      kind: .view(.vStack),
       children: [custom],
       layoutBehavior: .stack(
         axis: .vertical,
@@ -241,7 +241,7 @@ struct IssuedProposalRecordTests {
     let resolved = ResolvedNode(
       viewNodeID: fixtureViewNodeID("live-overflow-root"),
       identity: testIdentity("live-overflow"),
-      kind: .view("VStack"),
+      kind: .view(.vStack),
       children: [inner],
       layoutBehavior: .stack(
         axis: .vertical,
@@ -280,14 +280,14 @@ struct IssuedProposalRecordTests {
       var chainNode = ResolvedNode(
         viewNodeID: fixtureViewNodeID("depth-mask-leaf"),
         identity: testIdentity("depth-mask", "C0", "C1", "C2", "C3", "C4", "Leaf"),
-        kind: .view("Test"),
+        kind: .view(.init("Test")),
         intrinsicSize: .init(width: leafWidth, height: 2)
       )
       for level in (1...4).reversed() {
         chainNode = ResolvedNode(
           viewNodeID: fixtureViewNodeID("depth-mask-c\(level)"),
           identity: Identity(components: ["depth-mask"] + (0...level).map { "C\($0)" }),
-          kind: .view("PassThrough"),
+          kind: .view(.init("PassThrough")),
           children: [chainNode],
           layoutBehavior: AnyLayout(PassThroughLayout()).resolvedBehavior
         )
@@ -295,7 +295,7 @@ struct IssuedProposalRecordTests {
       let chainRoot = ResolvedNode(
         viewNodeID: fixtureViewNodeID("depth-mask-c0"),
         identity: testIdentity("depth-mask", "C0"),
-        kind: .view("FixedMask"),
+        kind: .view(.init("FixedMask")),
         children: [chainNode],
         layoutBehavior: AnyLayout(FixedSizeIgnoringChildrenLayout()).resolvedBehavior
       )
@@ -306,7 +306,7 @@ struct IssuedProposalRecordTests {
       return ResolvedNode(
         viewNodeID: fixtureViewNodeID("depth-mask-root"),
         identity: testIdentity("depth-mask"),
-        kind: .view("VStack"),
+        kind: .view(.vStack),
         children: [chainRoot] + siblings,
         layoutBehavior: .stack(
           axis: .vertical,
@@ -362,14 +362,14 @@ struct IssuedProposalRecordTests {
         ResolvedNode(
           viewNodeID: fixtureViewNodeID("windowed-row\(index)"),
           identity: testIdentity("windowed", "Scroll", "Content", "List", "Row\(index)"),
-          kind: .view("Test"),
+          kind: .view(.init("Test")),
           intrinsicSize: .init(width: 20, height: 1)
         )
       }
       let list = ResolvedNode(
         viewNodeID: fixtureViewNodeID("windowed-list"),
         identity: testIdentity("windowed", "Scroll", "Content", "List"),
-        kind: .view("LazyVStack"),
+        kind: .view(.lazyVStack),
         layoutBehavior: .lazyStack(
           axis: .vertical,
           spacing: 0,
@@ -384,7 +384,7 @@ struct IssuedProposalRecordTests {
       let content = ResolvedNode(
         viewNodeID: fixtureViewNodeID("windowed-content"),
         identity: contentIdentity,
-        kind: .view("VStack"),
+        kind: .view(.vStack),
         children: [list],
         layoutBehavior: .stack(
           axis: .vertical,
@@ -396,7 +396,7 @@ struct IssuedProposalRecordTests {
       let scroll = ResolvedNode(
         viewNodeID: fixtureViewNodeID("windowed-scroll"),
         identity: testIdentity("windowed", "Scroll"),
-        kind: .view("ScrollView"),
+        kind: .view(.scrollView),
         children: [content],
         layoutBehavior: AnyLayout(
           ScrollViewLayout(axes: .vertical, position: .zero, indicatorAxes: [])
@@ -412,7 +412,7 @@ struct IssuedProposalRecordTests {
       return ResolvedNode(
         viewNodeID: fixtureViewNodeID("windowed-root"),
         identity: testIdentity("windowed"),
-        kind: .view("VStack"),
+        kind: .view(.vStack),
         children: [scroll] + padding,
         layoutBehavior: .stack(
           axis: .vertical,
@@ -530,12 +530,12 @@ struct IssuedProposalRecordTests {
     let inner = ResolvedNode(
       viewNodeID: fixtureViewNodeID("\(name)-inner"),
       identity: testIdentity(name, "Custom", "Inner"),
-      kind: .view("VStack"),
+      kind: .view(.vStack),
       children: [
         ResolvedNode(
           viewNodeID: fixtureViewNodeID("\(name)-leaf"),
           identity: leafIdentity,
-          kind: .view("Test"),
+          kind: .view(.init("Test")),
           intrinsicSize: .init(width: 6, height: 2)
         )
       ],
@@ -549,14 +549,14 @@ struct IssuedProposalRecordTests {
     let custom = ResolvedNode(
       viewNodeID: fixtureViewNodeID("\(name)-custom"),
       identity: testIdentity(name, "Custom"),
-      kind: .view("PassThrough"),
+      kind: .view(.init("PassThrough")),
       children: [inner],
       layoutBehavior: AnyLayout(PassThroughLayout()).resolvedBehavior
     )
     let root = ResolvedNode(
       viewNodeID: fixtureViewNodeID("\(name)-root"),
       identity: testIdentity(name),
-      kind: .view("VStack"),
+      kind: .view(.vStack),
       children: [custom],
       layoutBehavior: .stack(
         axis: .vertical,
@@ -603,7 +603,7 @@ struct IssuedProposalRecordTests {
   ) -> ResolvedNode {
     ResolvedNode(
       identity: testIdentity(name),
-      kind: .view("FixedProbe"),
+      kind: .view(.init("FixedProbe")),
       children: (0..<childCount).map { index in
         leaf("\(name)-c\(index)", size: .init(width: 6, height: 2))
       },
@@ -734,7 +734,7 @@ private func leaf(
   ResolvedNode(
     viewNodeID: fixtureViewNodeID(name),
     identity: testIdentity(name),
-    kind: .view("Test"),
+    kind: .view(.init("Test")),
     intrinsicSize: size
   )
 }
@@ -747,7 +747,7 @@ private func stack(
   ResolvedNode(
     viewNodeID: fixtureViewNodeID(name),
     identity: testIdentity(name),
-    kind: .view(axis == .horizontal ? "HStack" : "VStack"),
+    kind: .view(axis == .horizontal ? .hStack : .vStack),
     children: children,
     layoutBehavior: .stack(
       axis: axis,
@@ -765,7 +765,7 @@ private func flexibleWidthChild(
   ResolvedNode(
     viewNodeID: fixtureViewNodeID(name),
     identity: testIdentity(name),
-    kind: .view("FlexibleFrame"),
+    kind: .view(.flexibleFrame),
     children: [leaf("\(name)-content", size: size)],
     layoutBehavior: .flexibleFrame(
       minWidth: nil,

@@ -500,7 +500,7 @@ struct DynamicPropertyLeaseTests {
     var textIdentities: [Identity] = []
     var work = [root]
     while let current = work.popLast() {
-      if current.kind == .view("Text") {
+      if current.kind == .view(.text) {
         textIdentities.append(current.identity)
       }
       work.append(contentsOf: current.children.reversed())

@@ -2,13 +2,13 @@ import SwiftTUICore
 
 extension Group {
   package func appendDeclaredChildrenWork(
-    in context: ResolveContext, kindName: String, into state: DeclaredChildrenWorkState
+    in context: ResolveContext, kindName: ViewKind, into state: DeclaredChildrenWorkState
   ) -> ResolveWork<Void> {
     .deferred {
       let childContext = context.indexedChild(
-        kind: .init(rawValue: kindName), index: state.nextIndex)
+        kind: .init(rawValue: kindName.name), index: state.nextIndex)
       state.nextIndex += 1
-      return resolveDeclaredChildrenWork(content, in: childContext, kindName: "Group").map {
+      return resolveDeclaredChildrenWork(content, in: childContext, kindName: .group).map {
         state.nodes.append(contentsOf: $0)
       }
     }
@@ -17,7 +17,7 @@ extension Group {
 
 extension TupleView {
   package func appendDeclaredChildrenWork(
-    in context: ResolveContext, kindName: String, into state: DeclaredChildrenWorkState
+    in context: ResolveContext, kindName: ViewKind, into state: DeclaredChildrenWorkState
   ) -> ResolveWork<Void> {
     var work: [ResolveWork<Void>] = []
     for child in repeat each value {
@@ -32,7 +32,7 @@ extension VariadicView {
     .deferred {
       let state = DeclaredChildrenWorkState()
       return resolveSequentially(content) {
-        appendDeclaredChildWork($0, in: context, kindName: "Group", into: state)
+        appendDeclaredChildWork($0, in: context, kindName: .group, into: state)
       }.map {
         assignEntityIdentityOccurrences(to: &state.nodes)
         return state.nodes
@@ -41,11 +41,11 @@ extension VariadicView {
   }
 
   package func appendDeclaredChildrenWork(
-    in context: ResolveContext, kindName: String, into state: DeclaredChildrenWorkState
+    in context: ResolveContext, kindName: ViewKind, into state: DeclaredChildrenWorkState
   ) -> ResolveWork<Void> {
     .deferred {
       let childContext = context.indexedChild(
-        kind: .init(rawValue: kindName), index: state.nextIndex)
+        kind: .init(rawValue: kindName.name), index: state.nextIndex)
       state.nextIndex += 1
       let children = DeclaredChildrenWorkState()
       return resolveSequentially(content) {
@@ -57,11 +57,11 @@ extension VariadicView {
 
 extension ConditionalContent {
   package func appendDeclaredChildrenWork(
-    in context: ResolveContext, kindName: String, into state: DeclaredChildrenWorkState
+    in context: ResolveContext, kindName: ViewKind, into state: DeclaredChildrenWorkState
   ) -> ResolveWork<Void> {
     .deferred {
       let slotContext = context.indexedChild(
-        kind: .init(rawValue: kindName), index: state.nextIndex)
+        kind: .init(rawValue: kindName.name), index: state.nextIndex)
       state.nextIndex += 1
       let branch = DeclaredChildrenWorkState()
       let work: ResolveWork<Void>

@@ -116,7 +116,7 @@ package struct ScopedTransactionContent<Base: View, Content: View>: PrimitiveVie
       return [
         ResolvedNode(
           identity: context.identity,
-          kind: .view("ScopedTransaction"),
+          kind: .view(.scopedTransaction),
           children: [bodyNode],
           environmentSnapshot: context.environment,
           transactionSnapshot: snapshot

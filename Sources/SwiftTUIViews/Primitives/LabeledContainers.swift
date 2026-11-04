@@ -59,7 +59,7 @@ extension Label {
     }.map { child in
       return ResolvedNode(
         identity: context.identity,
-        kind: .view("Label"),
+        kind: .view(.label),
         children: [child],
         environmentSnapshot: context.environment,
         transactionSnapshot: context.transaction,
@@ -142,7 +142,7 @@ extension LabeledContent {
           ? nil : literal?.semanticMetadata.accessibilityLabel ?? literal?.content)
       return ResolvedNode(
         identity: context.identity,
-        kind: .view("LabeledContent"),
+        kind: .view(.labeledContent),
         children: [child],
         environmentSnapshot: context.environment,
         transactionSnapshot: context.transaction,
@@ -250,7 +250,7 @@ public struct ControlGroup<Label: View, Content: View>: PrimitiveView, Iterative
       configuration: configuration, in: context.child(component: .named("ControlGroupBody"))
     ).map { child in
       var node = ResolvedNode(
-        identity: context.identity, kind: .view("ControlGroup"), children: [child],
+        identity: context.identity, kind: .view(.controlGroup), children: [child],
         environmentSnapshot: context.environment, transactionSnapshot: context.transaction)
       if let owner { node.preferenceValues[CapturedSubviewOwnersPreferenceKey.self].insert(owner) }
       return [node]
@@ -310,7 +310,7 @@ public struct GroupBox<Label: View, Content: View>: PrimitiveView, IterativeReso
       return [
         ResolvedNode(
           identity: context.identity,
-          kind: .view("GroupBox"),
+          kind: .view(.groupBox),
           children: [child],
           environmentSnapshot: context.environment,
           transactionSnapshot: context.transaction

@@ -17,7 +17,7 @@ struct PathAnimationIntegrationTests {
     let time = MonotonicInstant.now()
     func node(_ path: Path) -> ResolvedNode {
       ResolvedNode(
-        identity: Identity(components: ["morph"]), kind: .view("Path"),
+        identity: Identity(components: ["morph"]), kind: .view(.init("Path")),
         drawPayload: .shape(
           .init(geometry: .path(BoxedPath(path), .nonZero), operation: .fill(style: .color(.white)))
         ))
@@ -311,16 +311,16 @@ struct PathAnimationIntegrationTests {
 
   private static func fillNode(_ geometry: ShapeGeometry) -> ResolvedNode {
     ResolvedNode(
-      identity: Identity(components: ["morph"]), kind: .view("Path"),
+      identity: Identity(components: ["morph"]), kind: .view(.init("Path")),
       drawPayload: .shape(.init(geometry: geometry, operation: .fill(style: .color(.white)))))
   }
 
   private static func clipNode(_ clips: [DrawMetadata.ShapeClip]) -> ResolvedNode {
     var node = ResolvedNode(
-      identity: Identity(components: ["clip"]), kind: .view("VStack"),
+      identity: Identity(components: ["clip"]), kind: .view(.vStack),
       children: [
         ResolvedNode(
-          identity: Identity(components: ["clip", "text"]), kind: .view("Text"),
+          identity: Identity(components: ["clip", "text"]), kind: .view(.text),
           drawPayload: .text("####"))
       ])
     var metadata = node.drawMetadata

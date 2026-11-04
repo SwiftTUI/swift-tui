@@ -265,16 +265,16 @@ struct PersistentCustomLayoutCacheTests {
   ) -> ResolvedNode {
     ResolvedNode(
       identity: testIdentity(name),
-      kind: .view("PersistentCacheFixture"),
+      kind: .view(.init("PersistentCacheFixture")),
       children: [
         ResolvedNode(
           identity: testIdentity("\(name)-a"),
-          kind: .view("Test"),
+          kind: .view(.init("Test")),
           intrinsicSize: .init(width: childWidth, height: 2)
         ),
         ResolvedNode(
           identity: testIdentity("\(name)-b"),
-          kind: .view("Test"),
+          kind: .view(.init("Test")),
           intrinsicSize: .init(width: childWidth, height: 2)
         ),
       ],

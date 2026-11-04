@@ -466,7 +466,7 @@ struct SwiftUISurfaceTests {
     let resolved = Resolver().resolve(root, in: .init(identity: testIdentity("Root")))
 
     #expect(resolved.identity == testIdentity("Root"))
-    #expect(resolved.kind == .view("VStack"))
+    #expect(resolved.kind == .view(.vStack))
     #expect(resolved.children.count == 4)
     #expect(resolved.children[0].identity == testIdentity("Root", "VStack[0]"))
     #expect(
@@ -485,7 +485,7 @@ struct SwiftUISurfaceTests {
     let resolved = Resolver().resolve(root, in: .init(identity: testIdentity("Root")))
 
     #expect(resolved.identity == testIdentity("Root"))
-    #expect(resolved.kind == .view("Group"))
+    #expect(resolved.kind == .view(.group))
     #expect(resolved.children.count == 2)
     #expect(resolved.children[0].identity == testIdentity("Root", "Group[0]"))
     #expect(resolved.children[1].identity == testIdentity("Root", "Group[1]"))
@@ -506,7 +506,7 @@ struct SwiftUISurfaceTests {
       context: .init(identity: testIdentity("Root"))
     )
 
-    #expect(artifacts.resolvedTree.kind == .view("VStack"))
+    #expect(artifacts.resolvedTree.kind == .view(.vStack))
     #expect(artifacts.placedTree.children.count == 3)
     #expect(artifacts.rasterSurface.lines == ["Hello", "Wide", " UI"])
   }
@@ -1514,9 +1514,9 @@ struct SwiftUISurfaceTests {
     )
 
     #expect(artifacts.measuredTree.measuredSize == .init(width: 6, height: 5))
-    #expect(artifacts.placedTree.kind == .view("Frame"))
+    #expect(artifacts.placedTree.kind == .view(.frame))
     #expect(artifacts.placedTree.children.count == 1)
-    #expect(artifacts.placedTree.children[0].kind == .view("Padding"))
+    #expect(artifacts.placedTree.children[0].kind == .view(.padding))
     #expect(artifacts.placedTree.children[0].bounds.origin == .init(x: 2, y: 2))
     #expect(artifacts.placedTree.children[0].bounds.size == .init(width: 4, height: 3))
   }
@@ -5032,7 +5032,7 @@ struct SwiftUISurfaceTests {
       )
     )
 
-    #expect(artifacts.resolvedTree.kind == .view("Button"))
+    #expect(artifacts.resolvedTree.kind == .view(.button))
     #expect(
       artifacts.semanticSnapshot.focusRegions.map(\.identity) == [testIdentity("DeleteButton")])
     #expect(actionRegistry.dispatch(identity: testIdentity("DeleteButton")))
@@ -5157,7 +5157,7 @@ struct SwiftUISurfaceTests {
       )
     )
 
-    #expect(artifacts.resolvedTree.kind == .view("Link"))
+    #expect(artifacts.resolvedTree.kind == .view(.link))
     #expect(artifacts.semanticSnapshot.focusRegions.map(\.identity) == [testIdentity("DocsLink")])
 
     guard case .richText(let payload) = artifacts.resolvedTree.drawPayload else {
@@ -5861,9 +5861,9 @@ struct SwiftUISurfaceTests {
     )
 
     #expect(artifacts.measuredTree.measuredSize == .init(width: 5, height: 3))
-    #expect(artifacts.placedTree.kind == .view("Frame"))
+    #expect(artifacts.placedTree.kind == .view(.frame))
     #expect(artifacts.placedTree.children.count == 1)
-    #expect(artifacts.placedTree.children[0].kind == .view("Offset"))
+    #expect(artifacts.placedTree.children[0].kind == .view(.offset))
     #expect(artifacts.placedTree.children[0].bounds.origin == .zero)
     #expect(artifacts.placedTree.children[0].children.map(\.bounds.origin) == [.init(x: 2, y: 1)])
     #expect(artifacts.rasterSurface.lines == ["", "  Hi", ""])
@@ -7417,8 +7417,8 @@ struct SwiftUISurfaceTests {
       context: .init(identity: testIdentity("Vertical"))
     )
 
-    #expect(horizontalResolved.kind == .view("HStackLayout"))
-    #expect(verticalResolved.kind == .view("VStackLayout"))
+    #expect(horizontalResolved.kind == .view(.init("HStackLayout")))
+    #expect(verticalResolved.kind == .view(.init("VStackLayout")))
     #expect(
       horizontalResolved.children.map(\.identity) == [
         testIdentity("Root", "Layout[0]"),
@@ -7459,7 +7459,7 @@ struct SwiftUISurfaceTests {
       context: .init(identity: testIdentity("Root"))
     )
 
-    #expect(resolved.kind == .view("HStackLayout"))
+    #expect(resolved.kind == .view(.init("HStackLayout")))
     #expect(resolved.children.map(resolvedNodeLabelText(from:)) == ["A", "B", "C"])
     #expect(
       artifacts.placedTree.children.map(\.bounds.origin) == [
@@ -7480,7 +7480,7 @@ struct SwiftUISurfaceTests {
       context: .init(identity: testIdentity("Root"))
     )
 
-    #expect(artifacts.resolvedTree.kind == .view("GappedRowLayout"))
+    #expect(artifacts.resolvedTree.kind == .view(.init("GappedRowLayout")))
     #expect(
       artifacts.resolvedTree.children[0].layoutMetadata.layoutValues == [
         String(reflecting: GapAfterKey.self): "2"

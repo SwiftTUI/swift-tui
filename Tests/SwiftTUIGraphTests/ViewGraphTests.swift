@@ -15,7 +15,7 @@ struct ViewGraphTests {
       children: [
         ResolvedNode(
           identity: testIdentity("Root", "Leaf"),
-          kind: .view("Leaf"),
+          kind: .view(.init("Leaf")),
           lifecycleMetadata: .init(
             appearHandlerIDs: ["appear-leaf"],
             disappearHandlerIDs: ["disappear-leaf"],
@@ -54,7 +54,7 @@ struct ViewGraphTests {
         children: [
           ResolvedNode(
             identity: testIdentity("Root", "Leaf"),
-            kind: .view("Leaf"),
+            kind: .view(.init("Leaf")),
             lifecycleMetadata: .init(
               appearHandlerIDs: ["appear-leaf"],
               disappearHandlerIDs: ["disappear-leaf"],
@@ -96,7 +96,7 @@ struct ViewGraphTests {
       children: [
         ResolvedNode(
           identity: testIdentity("Root", "Leaf"),
-          kind: .view("Leaf")
+          kind: .view(.init("Leaf"))
         )
       ]
     )
@@ -136,12 +136,12 @@ struct ViewGraphTests {
         children: [
           ResolvedNode(
             identity: readerIdentity,
-            kind: .view("Reader"),
+            kind: .view(.init("Reader")),
             children: [
-              ResolvedNode(identity: leafIdentity, kind: .view("Leaf"))
+              ResolvedNode(identity: leafIdentity, kind: .view(.init("Leaf")))
             ]
           ),
-          ResolvedNode(identity: stableIdentity, kind: .view("Stable")),
+          ResolvedNode(identity: stableIdentity, kind: .view(.init("Stable"))),
         ]
       )
     )
@@ -457,7 +457,7 @@ struct ViewGraphTests {
     _ = graph.applySnapshot(
       ResolvedNode(
         identity: portalRootIdentity,
-        kind: .view("PresentationPortalRoot")
+        kind: .view(.presentationPortalRoot)
       )
     )
 
@@ -507,7 +507,7 @@ struct ViewGraphTests {
     _ = graph.applySnapshot(
       ResolvedNode(
         identity: portalRootIdentity,
-        kind: .view("PresentationPortalRoot")
+        kind: .view(.presentationPortalRoot)
       )
     )
     graph.setEvaluator(for: portalRootIdentity) {}
@@ -627,7 +627,7 @@ struct ViewGraphTests {
       )
       graph.finishEvaluation(
         bodyNode,
-        resolved: ResolvedNode(identity: bodyIdentity, kind: .view("SheetBody")),
+        resolved: ResolvedNode(identity: bodyIdentity, kind: .view(.init("SheetBody"))),
         accessedStateSlots: 0
       )
     }
@@ -711,7 +711,7 @@ struct ViewGraphTests {
         identity: rootIdentity,
         kind: .root,
         children: [
-          ResolvedNode(identity: childIdentity, kind: .view("Child"))
+          ResolvedNode(identity: childIdentity, kind: .view(.init("Child")))
         ]
       )
     )
@@ -745,7 +745,7 @@ struct ViewGraphTests {
         identity: rootIdentity,
         kind: .root,
         children: [
-          ResolvedNode(identity: childIdentity, kind: .view("Child"))
+          ResolvedNode(identity: childIdentity, kind: .view(.init("Child")))
         ]
       )
     )
@@ -784,7 +784,7 @@ struct ViewGraphTests {
         children: [
           ResolvedNode(
             identity: childIdentity,
-            kind: .view("Child")
+            kind: .view(.init("Child"))
           )
         ]
       )
@@ -804,7 +804,7 @@ struct ViewGraphTests {
         children: [
           ResolvedNode(
             identity: childIdentity,
-            kind: .view("Child")
+            kind: .view(.init("Child"))
           )
         ]
       )
@@ -826,7 +826,7 @@ struct ViewGraphTests {
         children: [
           ResolvedNode(
             identity: childIdentity,
-            kind: .view("Child")
+            kind: .view(.init("Child"))
           )
         ]
       )
@@ -898,7 +898,7 @@ struct ViewGraphTests {
     childNode.recordEnvironmentRead(environmentKey)
     graph.finishEvaluation(
       childNode,
-      resolved: ResolvedNode(identity: childIdentity, kind: .view("Child")),
+      resolved: ResolvedNode(identity: childIdentity, kind: .view(.init("Child"))),
       accessedStateSlots: 0
     )
     graph.finishEvaluation(
@@ -907,7 +907,7 @@ struct ViewGraphTests {
         identity: rootIdentity,
         kind: .root,
         children: [
-          ResolvedNode(identity: childIdentity, kind: .view("Child"))
+          ResolvedNode(identity: childIdentity, kind: .view(.init("Child")))
         ]
       ),
       accessedStateSlots: 0
@@ -1150,7 +1150,7 @@ struct ViewGraphTests {
     )
     graph.finishEvaluation(
       childNode,
-      resolved: ResolvedNode(identity: childIdentity, kind: .view("Child")),
+      resolved: ResolvedNode(identity: childIdentity, kind: .view(.init("Child"))),
       accessedStateSlots: 0
     )
     graph.finishEvaluation(
@@ -1159,7 +1159,7 @@ struct ViewGraphTests {
         identity: rootIdentity,
         kind: .root,
         children: [
-          ResolvedNode(identity: childIdentity, kind: .view("Child"))
+          ResolvedNode(identity: childIdentity, kind: .view(.init("Child")))
         ]
       ),
       accessedStateSlots: 0
@@ -1207,7 +1207,7 @@ struct ViewGraphTests {
       resolved: ResolvedNode(
         identity: targetIdentity,
         structuralPath: structuralPath,
-        kind: .view("Target")
+        kind: .view(.init("Target"))
       ),
       accessedStateSlots: 0
     )
@@ -1241,7 +1241,7 @@ struct ViewGraphTests {
       resolved: ResolvedNode(
         identity: targetIdentity,
         structuralPath: structuralPath,
-        kind: .view("Target")
+        kind: .view(.init("Target"))
       ),
       accessedStateSlots: 0
     )
@@ -1254,7 +1254,7 @@ struct ViewGraphTests {
           ResolvedNode(
             identity: targetIdentity,
             structuralPath: structuralPath,
-            kind: .view("Target")
+            kind: .view(.init("Target"))
           )
         ]
       ),
@@ -1455,7 +1455,7 @@ struct ViewGraphTests {
     )
     graph.finishEvaluation(
       childNode,
-      resolved: ResolvedNode(identity: childIdentity, kind: .view("Child")),
+      resolved: ResolvedNode(identity: childIdentity, kind: .view(.init("Child"))),
       accessedStateSlots: 0
     )
     let childNodeID = graph.debugTotalStateSnapshot().nodeIDByIdentity[childIdentity]!
@@ -1528,7 +1528,7 @@ struct ViewGraphTests {
     )
     graph.finishEvaluation(
       childNode,
-      resolved: ResolvedNode(identity: childIdentity, kind: .view("Child")),
+      resolved: ResolvedNode(identity: childIdentity, kind: .view(.init("Child"))),
       accessedStateSlots: 0
     )
 
@@ -1601,7 +1601,7 @@ struct ViewGraphTests {
       resolved: ResolvedNode(
         identity: targetIdentity,
         structuralPath: structuralPath,
-        kind: .view("Target")
+        kind: .view(.init("Target"))
       ),
       accessedStateSlots: 0
     )
@@ -1696,14 +1696,14 @@ private func seedCommandGraph(
   )
   graph.finishEvaluation(
     childNode,
-    resolved: ResolvedNode(identity: childIdentity, kind: .view("Child")),
+    resolved: ResolvedNode(identity: childIdentity, kind: .view(.init("Child"))),
     accessedStateSlots: 0
   )
   for paddingIdentity in paddingSiblingIdentities {
     let paddingNode = graph.beginEvaluation(identity: paddingIdentity, invalidator: nil)
     graph.finishEvaluation(
       paddingNode,
-      resolved: ResolvedNode(identity: paddingIdentity, kind: .view("Padding")),
+      resolved: ResolvedNode(identity: paddingIdentity, kind: .view(.padding)),
       accessedStateSlots: 0
     )
   }
@@ -1712,8 +1712,8 @@ private func seedCommandGraph(
     resolved: ResolvedNode(
       identity: rootIdentity,
       kind: .root,
-      children: [ResolvedNode(identity: childIdentity, kind: .view("Child"))]
-        + paddingSiblingIdentities.map { ResolvedNode(identity: $0, kind: .view("Padding")) }
+      children: [ResolvedNode(identity: childIdentity, kind: .view(.init("Child")))]
+        + paddingSiblingIdentities.map { ResolvedNode(identity: $0, kind: .view(.padding)) }
     ),
     accessedStateSlots: 0
   )
@@ -1731,7 +1731,7 @@ private func seedContainerGraph(
   let containerNode = graph.beginEvaluation(identity: containerIdentity, invalidator: nil)
   graph.finishEvaluation(
     containerNode,
-    resolved: ResolvedNode(identity: containerIdentity, kind: .view("Container")),
+    resolved: ResolvedNode(identity: containerIdentity, kind: .view(.init("Container"))),
     accessedStateSlots: 0
   )
   graph.finishEvaluation(
@@ -1739,7 +1739,7 @@ private func seedContainerGraph(
     resolved: ResolvedNode(
       identity: rootIdentity,
       kind: .root,
-      children: [ResolvedNode(identity: containerIdentity, kind: .view("Container"))]
+      children: [ResolvedNode(identity: containerIdentity, kind: .view(.init("Container")))]
     ),
     accessedStateSlots: 0
   )
@@ -1795,16 +1795,16 @@ private func seedPortalGraph(
   let bodyNode = graph.beginEvaluation(identity: bodyIdentity, invalidator: nil)
   graph.finishEvaluation(
     bodyNode,
-    resolved: ResolvedNode(identity: bodyIdentity, kind: .view("SheetBody")),
+    resolved: ResolvedNode(identity: bodyIdentity, kind: .view(.init("SheetBody"))),
     accessedStateSlots: 0
   )
   graph.finishEvaluation(
     entryNode,
     resolved: ResolvedNode(
       identity: entryIdentity,
-      kind: .view("Sheet"),
+      kind: .view(.init("Sheet")),
       children: [
-        ResolvedNode(identity: bodyIdentity, kind: .view("SheetBody"))
+        ResolvedNode(identity: bodyIdentity, kind: .view(.init("SheetBody")))
       ]
     ),
     accessedStateSlots: 0
@@ -1813,13 +1813,13 @@ private func seedPortalGraph(
     overlaysNode,
     resolved: ResolvedNode(
       identity: overlaysIdentity,
-      kind: .view("OverlayStackOverlays"),
+      kind: .view(.overlayStackOverlays),
       children: [
         ResolvedNode(
           identity: entryIdentity,
-          kind: .view("Sheet"),
+          kind: .view(.init("Sheet")),
           children: [
-            ResolvedNode(identity: bodyIdentity, kind: .view("SheetBody"))
+            ResolvedNode(identity: bodyIdentity, kind: .view(.init("SheetBody")))
           ]
         )
       ]
@@ -1830,17 +1830,17 @@ private func seedPortalGraph(
     hostNode,
     resolved: ResolvedNode(
       identity: hostIdentity,
-      kind: .view("PortalHost"),
+      kind: .view(.init("PortalHost")),
       children: [
         ResolvedNode(
           identity: overlaysIdentity,
-          kind: .view("OverlayStackOverlays"),
+          kind: .view(.overlayStackOverlays),
           children: [
             ResolvedNode(
               identity: entryIdentity,
-              kind: .view("Sheet"),
+              kind: .view(.init("Sheet")),
               children: [
-                ResolvedNode(identity: bodyIdentity, kind: .view("SheetBody"))
+                ResolvedNode(identity: bodyIdentity, kind: .view(.init("SheetBody")))
               ]
             )
           ]
@@ -1853,21 +1853,21 @@ private func seedPortalGraph(
     rootNode,
     resolved: ResolvedNode(
       identity: portalRootIdentity,
-      kind: .view("PresentationPortalRoot"),
+      kind: .view(.presentationPortalRoot),
       children: [
         ResolvedNode(
           identity: hostIdentity,
-          kind: .view("PortalHost"),
+          kind: .view(.init("PortalHost")),
           children: [
             ResolvedNode(
               identity: overlaysIdentity,
-              kind: .view("OverlayStackOverlays"),
+              kind: .view(.overlayStackOverlays),
               children: [
                 ResolvedNode(
                   identity: entryIdentity,
-                  kind: .view("Sheet"),
+                  kind: .view(.init("Sheet")),
                   children: [
-                    ResolvedNode(identity: bodyIdentity, kind: .view("SheetBody"))
+                    ResolvedNode(identity: bodyIdentity, kind: .view(.init("SheetBody")))
                   ]
                 )
               ]
@@ -2005,7 +2005,7 @@ private func seedStructuralPathContributorCommandGraph(
     resolved: ResolvedNode(
       identity: targetIdentity,
       structuralPath: structuralPath,
-      kind: .view("Target")
+      kind: .view(.init("Target"))
     ),
     accessedStateSlots: 0
   )
@@ -2023,7 +2023,7 @@ private func seedStructuralPathContributorCommandGraph(
     resolved: ResolvedNode(
       identity: targetIdentity,
       structuralPath: structuralPath,
-      kind: .view("Target")
+      kind: .view(.init("Target"))
     ),
     accessedStateSlots: 0
   )
@@ -2036,7 +2036,7 @@ private func seedStructuralPathContributorCommandGraph(
         ResolvedNode(
           identity: targetIdentity,
           structuralPath: structuralPath,
-          kind: .view("Target")
+          kind: .view(.init("Target"))
         )
       ]
     ),
@@ -2060,10 +2060,10 @@ private func seedDependencyGraph(
     configureChild(identity, childNode)
     graph.finishEvaluation(
       childNode,
-      resolved: ResolvedNode(identity: identity, kind: .view(kindName)),
+      resolved: ResolvedNode(identity: identity, kind: .view(.init(kindName))),
       accessedStateSlots: 0
     )
-    return ResolvedNode(identity: identity, kind: .view(kindName))
+    return ResolvedNode(identity: identity, kind: .view(.init(kindName)))
   }
   graph.finishEvaluation(
     rootNode,

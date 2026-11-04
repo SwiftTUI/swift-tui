@@ -57,7 +57,7 @@ struct PaletteStyleHost: PrimitiveView, IterativeResolvableView {
     ).map { body in
       return [
         ResolvedNode(
-          identity: context.identity, kind: .view("PaletteStyleHost"), children: [body],
+          identity: context.identity, kind: .view(.paletteStyleHost), children: [body],
           environmentSnapshot: context.environment, transactionSnapshot: context.transaction)
       ]
 

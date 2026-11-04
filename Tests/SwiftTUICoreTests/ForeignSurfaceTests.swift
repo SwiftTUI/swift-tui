@@ -180,7 +180,7 @@ struct ForeignSurfaceStackLayoutTests {
   func foreignSurfaceFillsStackCross(axis: Axis) {
     let foreign = ResolvedNode(
       identity: testIdentity("foreign"),
-      kind: .view("ForeignSurface"),
+      kind: .view(.foreignSurface),
       drawPayload: .foreignSurface(
         ForeignSurfaceTests.StaticPayload(
           grid: ForeignGrid(size: CellSize(width: 0, height: 0), cells: [])
@@ -189,12 +189,12 @@ struct ForeignSurfaceStackLayoutTests {
     )
     let sibling = ResolvedNode(
       identity: testIdentity("sibling"),
-      kind: .view("Sibling"),
+      kind: .view(.init("Sibling")),
       intrinsicSize: CellSize(width: 5, height: 3)
     )
     let stack = ResolvedNode(
       identity: testIdentity("stack"),
-      kind: .view(axis == .horizontal ? "HStack" : "VStack"),
+      kind: .view(axis == .horizontal ? .hStack : .vStack),
       children: [foreign, sibling],
       layoutBehavior: .stack(
         axis: axis,

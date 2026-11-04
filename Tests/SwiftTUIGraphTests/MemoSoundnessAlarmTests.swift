@@ -49,7 +49,7 @@ struct MemoSoundnessAlarmTests {
   }
 
   private func leafPair() -> (ResolvedNode, ResolvedNode) {
-    let node = ResolvedNode(identity: testIdentity("Root"), kind: .view("Leaf"))
+    let node = ResolvedNode(identity: testIdentity("Root"), kind: .view(.init("Leaf")))
     return (node, node)
   }
 
@@ -73,7 +73,7 @@ struct MemoSoundnessAlarmTests {
     // the classifier and the histogram must both surface the content field.
     current.entityIdentity = EntityIdentity("entity", occurrence: 0)
     committed.entityIdentity = EntityIdentity("entity", occurrence: 1)
-    committed.kind = .view("Renamed")
+    committed.kind = .view(.init("Renamed"))
 
     #expect(current.memoUnsoundContentDivergence(from: committed) == "kind")
     #expect(current.memoFirstDifferingField(from: committed) == "kind")
@@ -81,9 +81,9 @@ struct MemoSoundnessAlarmTests {
 
   @Test("a child content divergence surfaces with its path")
   func childContentDivergenceSurfaces() {
-    let child = ResolvedNode(identity: testIdentity("Root", "Leaf"), kind: .view("Leaf"))
+    let child = ResolvedNode(identity: testIdentity("Root", "Leaf"), kind: .view(.init("Leaf")))
     var changedChild = child
-    changedChild.kind = .view("Renamed")
+    changedChild.kind = .view(.init("Renamed"))
     let current = ResolvedNode(
       identity: testIdentity("Root"), kind: .root, children: [child]
     )

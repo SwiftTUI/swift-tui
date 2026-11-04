@@ -154,11 +154,11 @@ struct TeardownContextEquivalenceTests {
     let identities = (0..<50).map { index in
       testIdentity("TeardownContextEquivalence", "Parented-\(index)")
     }
-    var subtree = ResolvedNode(identity: identities.last!, kind: .view("Leaf"))
+    var subtree = ResolvedNode(identity: identities.last!, kind: .view(.init("Leaf")))
     for identity in identities.dropLast().reversed() {
       subtree = ResolvedNode(
         identity: identity,
-        kind: .view("Branch"),
+        kind: .view(.init("Branch")),
         children: [subtree]
       )
     }
@@ -226,7 +226,7 @@ struct TeardownContextEquivalenceTests {
     let node = graph.beginEvaluation(identity: identity, invalidator: nil)
     _ = graph.finishEvaluation(
       node,
-      resolved: ResolvedNode(identity: identity, kind: .view(name)),
+      resolved: ResolvedNode(identity: identity, kind: .view(.init(name))),
       accessedStateSlots: 0
     )
     return node

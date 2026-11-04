@@ -17,7 +17,7 @@ struct AmbientTextAttributeResolveTests {
   private func textNodes(in root: ResolvedNode) -> [ResolvedNode] {
     var found: [ResolvedNode] = []
     func walk(_ node: ResolvedNode) {
-      if node.kind == .view("Text") {
+      if node.kind == .view(.text) {
         found.append(node)
       }
       for child in node.children {

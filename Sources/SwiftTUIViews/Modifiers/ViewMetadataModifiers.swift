@@ -254,7 +254,7 @@ public struct IDModifier<ID: Hashable & Sendable>: IterativePrimitiveViewModifie
         [
           ResolvedNode(
             identity: context.identity,
-            kind: .view("ExplicitIdentityHost"),
+            kind: .view(.explicitIdentityHost),
             children: [hosted],
             environmentSnapshot: context.environment,
             transactionSnapshot: context.transaction
@@ -350,7 +350,7 @@ package struct ExactIdentityModifier: IterativePrimitiveViewModifier, Sendable, 
         return [
           ResolvedNode(
             identity: context.identity,
-            kind: .view("ExplicitIdentityHost"),
+            kind: .view(.explicitIdentityHost),
             children: [hosted],
             environmentSnapshot: context.environment,
             transactionSnapshot: context.transaction

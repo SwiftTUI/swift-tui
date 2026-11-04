@@ -31,7 +31,7 @@ struct DeclaredChildRecompositionTests {
     let graph = ViewGraph()
     let rootIdentity = testIdentity("Root")
     let childIdentity = testIdentity("Root", "Consumer")
-    let child = ResolvedNode(identity: childIdentity, kind: .view("Consumer"))
+    let child = ResolvedNode(identity: childIdentity, kind: .view(.init("Consumer")))
     let populated = ResolvedNode(identity: rootIdentity, kind: .root, children: [child])
     _ = graph.applySnapshot(populated)
     let retiredNode = try #require(graph.nodeForIdentity(childIdentity))

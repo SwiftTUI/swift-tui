@@ -71,7 +71,7 @@ struct BuilderSlotStructuralIdentityTests {
     enumerateDeclaredChildViews(
       content,
       in: context,
-      kindName: "Group",
+      kindName: .group,
       nextIndex: &nextIndex
     ) { _, _, resolveOne in
       enumerated.append(resolveOne())

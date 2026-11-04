@@ -115,8 +115,8 @@ struct FrameTailPresentationDamageProducerTests {
       kind: .root,
       bounds: .init(origin: .zero, size: .init(width: 20, height: 6)),
       children: [
-        PlacedNode(identity: labelIdentity, kind: .view("Text"), bounds: labelBounds),
-        PlacedNode(identity: surfaceIdentity, kind: .view("ForeignSurface"), bounds: surfaceBounds),
+        PlacedNode(identity: labelIdentity, kind: .view(.text), bounds: labelBounds),
+        PlacedNode(identity: surfaceIdentity, kind: .view(.foreignSurface), bounds: surfaceBounds),
       ]
     )
     // The label is the invalidated node; the surface's grid changes alongside it.
@@ -217,12 +217,12 @@ struct FrameTailPresentationDamageProducerTests {
       children: [
         PlacedNode(
           identity: wrapperIdentity,
-          kind: .view("Offset"),
+          kind: .view(.offset),
           bounds: .init(origin: .init(x: 0, y: 1), size: .init(width: 20, height: 1)),
           children: [
             PlacedNode(
               identity: contentIdentity,
-              kind: .view("Text"),
+              kind: .view(.text),
               bounds: .init(
                 origin: .init(x: 0, y: contentRow),
                 size: .init(width: contentWidth, height: 1)

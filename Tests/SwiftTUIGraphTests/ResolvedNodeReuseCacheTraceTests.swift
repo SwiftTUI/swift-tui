@@ -54,7 +54,7 @@ struct ResolvedNodeReuseCacheTraceTests {
       namespace: "test",
       owner: owner,
       signature: "old",
-      node: ResolvedNode(identity: owner, kind: .view("Strip"))
+      node: ResolvedNode(identity: owner, kind: .view(.init("Strip")))
     )
     withTracingEnabled {
       #expect(query(graph, owner: owner, signature: "new") == nil)
@@ -72,7 +72,7 @@ struct ResolvedNodeReuseCacheTraceTests {
       namespace: "test",
       owner: owner,
       signature: "sig",
-      node: ResolvedNode(identity: testIdentity("Root", "Departed"), kind: .view("Strip"))
+      node: ResolvedNode(identity: testIdentity("Root", "Departed"), kind: .view(.init("Strip")))
     )
     withTracingEnabled {
       #expect(query(graph, owner: owner) == nil)

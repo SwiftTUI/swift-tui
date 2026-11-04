@@ -373,24 +373,19 @@ extension ResolvedNode {
     layoutBehavior: LayoutBehavior,
     hasHostedToolbar: Bool
   ) {
-    guard children.count == 1, isKind(children[0].kind, named: "ToolbarScope") else {
+    guard children.count == 1, children[0].kind == .view(.toolbarScope) else {
       return (children, layoutBehavior, false)
     }
     var node = children[0]
-    while isKind(node.kind, named: "ToolbarScope") || isKind(node.kind, named: "ToolbarInset") {
+    while node.kind == .view(.toolbarScope) || node.kind == .view(.toolbarInset) {
       guard let child = node.children.first else { return (children, layoutBehavior, false) }
       node = child
     }
-    guard isKind(node.kind, named: "ToolbarContent") else {
+    guard node.kind == .view(.toolbarContent) else {
       return (children, layoutBehavior, false)
     }
     return (node.children, node.layoutBehavior, true)
   }
-}
-
-private func isKind(_ kind: NodeKind, named name: String) -> Bool {
-  if case .view(let n) = kind, n == name { return true }
-  return false
 }
 
 private let toolbarStripReuseCacheNamespace = "SwiftTUI.toolbar-strip"
@@ -420,7 +415,7 @@ private func resolvedToolbarItemsStripWork(
     context.viewGraph?.storeResolvedNodeReuseCache(
       namespace: toolbarStripReuseCacheNamespace, owner: context.identity,
       signature: emptySignature,
-      node: ResolvedNode(identity: context.identity, kind: .view("EmptyToolbarStrip")))
+      node: ResolvedNode(identity: context.identity, kind: .view(.emptyToolbarStrip)))
     return .value(
       ResolvedToolbarStrip(
         node: nil, itemSetChanged: previous != nil && previous != emptySignature))
@@ -629,7 +624,7 @@ private struct ToolbarScopeNode: PrimitiveView, ResolvableView {
           let strip = bottomStrip ?? topStrip
           return [
             ResolvedNode(
-              identity: context.identity, kind: .view("ToolbarScope"),
+              identity: context.identity, kind: .view(.toolbarScope),
               children: [content] + (strip.map { [$0] } ?? []),
               environmentSnapshot: context.environment, transactionSnapshot: context.transaction,
               layoutBehavior: .safeAreaInset(
@@ -649,7 +644,7 @@ private struct ToolbarInsetNode: PrimitiveView, ResolvableView {
   func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
     [
       ResolvedNode(
-        identity: context.identity, kind: .view("ToolbarInset"), children: [content, strip],
+        identity: context.identity, kind: .view(.toolbarInset), children: [content, strip],
         environmentSnapshot: context.environment, transactionSnapshot: context.transaction,
         layoutBehavior: .safeAreaInset(
           edge: edge, alignment: edge == .top ? .top : .bottom, spacing: 0, safeArea: .zero)
@@ -677,7 +672,7 @@ private struct ToolbarContentNode: PrimitiveView, ResolvableView {
     return [
       ResolvedNode(
         identity: context.identity,
-        kind: .view("ToolbarContent"),
+        kind: .view(.toolbarContent),
         children: injectedChildren,
         environmentSnapshot: context.environment,
         transactionSnapshot: context.transaction,

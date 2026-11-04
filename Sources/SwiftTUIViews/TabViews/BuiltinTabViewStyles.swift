@@ -486,7 +486,7 @@ private struct LiteralTabsStripBaseRule: PrimitiveView, ResolvableView {
     drawMetadata.leafStackAxis = context.environmentValues.stackAxis
     return [
       resolveLeafNode(
-        kindName: "LiteralTabsStripBaseRule",
+        kindName: .literalTabsStripBaseRule,
         intrinsicSize: .init(width: 1, height: 1),
         drawMetadata: drawMetadata,
         drawPayload: .rule(.single),

@@ -20,9 +20,9 @@ struct DeclaredChildConsumptionTests {
   private func node(kind: NodeKind, identity: Identity) -> ResolvedNode {
     var node = ResolvedNode(identity: identity, kind: kind, children: [])
     switch kind {
-    case .view("EmptyView"):
+    case .view(.emptyView):
       node.typeDiscriminator = ObjectIdentifier(SynthesizedEmptyViewMarker.self)
-    case .view("Group"):
+    case .view(.group):
       node.typeDiscriminator = ObjectIdentifier(SynthesizedGroupWrapperMarker.self)
     default: break
     }
@@ -32,7 +32,7 @@ struct DeclaredChildConsumptionTests {
   @Test(
     "T254: debug names alone do not make structural wrappers", arguments: ["Group", "EmptyView"])
   func debugNameDoesNotDefineShape(name: String) {
-    let node = ResolvedNode(identity: identity(), kind: .view(name))
+    let node = ResolvedNode(identity: identity(), kind: .view(.init(name)))
     #expect(
       consumeDeclaredChild(node, resolvedUnder: identity(), in: nil, policy: .declaredBuilder).count
         == 1)
@@ -41,7 +41,7 @@ struct DeclaredChildConsumptionTests {
   @Test("an unmodified empty element is dropped")
   func unmodifiedEmptyIsDropped() {
     let consumed = consumeDeclaredChild(
-      node(kind: .view("EmptyView"), identity: identity()),
+      node(kind: .view(.emptyView), identity: identity()),
       resolvedUnder: identity(),
       in: nil,
       policy: .declaredBuilder
@@ -51,9 +51,9 @@ struct DeclaredChildConsumptionTests {
 
   @Test("an unmodified group is spliced into its children")
   func unmodifiedGroupIsSpliced() {
-    let childA = node(kind: .view("Text"), identity: identity().child(.named("a")))
-    let childB = node(kind: .view("Text"), identity: identity().child(.named("b")))
-    var group = node(kind: .view("Group"), identity: identity())
+    let childA = node(kind: .view(.text), identity: identity().child(.named("a")))
+    let childB = node(kind: .view(.text), identity: identity().child(.named("b")))
+    var group = node(kind: .view(.group), identity: identity())
     group.children = [childA, childB]
 
     let consumed = consumeDeclaredChild(
@@ -68,7 +68,7 @@ struct DeclaredChildConsumptionTests {
 
   @Test("anything else passes through as one child")
   func ordinaryChildPassesThrough() {
-    let text = node(kind: .view("Text"), identity: identity())
+    let text = node(kind: .view(.text), identity: identity())
     let consumed = consumeDeclaredChild(
       text,
       resolvedUnder: identity(),
@@ -87,8 +87,8 @@ struct DeclaredChildConsumptionTests {
     // Without this, a modified `Group` would have its children lifted and the
     // modifier silently discarded.
     let elsewhere = testIdentity("DeclaredChildConsumption", "Modified")
-    var group = node(kind: .view("Group"), identity: elsewhere)
-    group.children = [node(kind: .view("Text"), identity: elsewhere.child(.named("a")))]
+    var group = node(kind: .view(.group), identity: elsewhere)
+    group.children = [node(kind: .view(.text), identity: elsewhere.child(.named("a")))]
 
     let consumed = consumeDeclaredChild(
       group,
@@ -99,7 +99,7 @@ struct DeclaredChildConsumptionTests {
     #expect(consumed.count == 1)
     #expect(consumed[0].identity == elsewhere)
 
-    let empty = node(kind: .view("EmptyView"), identity: elsewhere)
+    let empty = node(kind: .view(.emptyView), identity: elsewhere)
     let consumedEmpty = consumeDeclaredChild(
       empty,
       resolvedUnder: identity(),
@@ -130,8 +130,8 @@ struct DeclaredChildConsumptionTests {
   func policyDoesNotChangeTheSplice() {
     // Reporting is about lifetime anchoring, never about what the container
     // receives — every policy must return the same children.
-    let child = node(kind: .view("Text"), identity: identity().child(.named("a")))
-    var group = node(kind: .view("Group"), identity: identity())
+    let child = node(kind: .view(.text), identity: identity().child(.named("a")))
+    var group = node(kind: .view(.group), identity: identity())
     group.children = [child]
 
     for policy in [
@@ -145,7 +145,7 @@ struct DeclaredChildConsumptionTests {
       )
       #expect(
         consumeDeclaredChild(
-          node(kind: .view("EmptyView"), identity: identity()),
+          node(kind: .view(.emptyView), identity: identity()),
           resolvedUnder: identity(),
           in: nil,
           policy: policy

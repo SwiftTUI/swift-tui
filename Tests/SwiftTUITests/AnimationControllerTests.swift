@@ -23,7 +23,7 @@ struct AnimationControllerSnapshotTests {
 
     let node = ResolvedNode(
       identity: Identity(components: [.named("test")]),
-      kind: .view("Leaf"),
+      kind: .view(.init("Leaf")),
       drawMetadata: drawMetadata
     )
 
@@ -42,7 +42,7 @@ struct AnimationControllerSnapshotTests {
 
     let node = ResolvedNode(
       identity: Identity(components: [.named("test")]),
-      kind: .view("Leaf"),
+      kind: .view(.init("Leaf")),
       environmentSnapshot: environment,
       drawMetadata: DrawMetadata()
     )
@@ -61,7 +61,7 @@ struct AnimationControllerSnapshotTests {
 
     let node = ResolvedNode(
       identity: Identity(components: [.named("test")]),
-      kind: .view("Leaf"),
+      kind: .view(.init("Leaf")),
       drawMetadata: drawMetadata
     )
 
@@ -73,11 +73,11 @@ struct AnimationControllerSnapshotTests {
   func removalSnapshotsCarryTransientRemovalEdgeRole() throws {
     let child = ResolvedNode(
       identity: testIdentity("RemovalSnapshot", "Child"),
-      kind: .view("Child")
+      kind: .view(.init("Child"))
     )
     let root = ResolvedNode(
       identity: testIdentity("RemovalSnapshot"),
-      kind: .view("Root"),
+      kind: .view(.init("Root")),
       children: [child]
     )
 
@@ -106,7 +106,7 @@ struct AnimationControllerSnapshotTests {
 
     let node = ResolvedNode(
       identity: Identity(components: [.named("test")]),
-      kind: .view("Leaf"),
+      kind: .view(.init("Leaf")),
       environmentSnapshot: environment,
       drawMetadata: drawMetadata
     )
@@ -539,7 +539,7 @@ struct AnimationPipelineIntegrationTests {
   }
 
   private static func findPositionContainerChildBounds(_ placed: PlacedNode) -> CellRect? {
-    if case .view(let name) = placed.kind, name == "Position" {
+    if case .view(let name) = placed.kind, name == .position {
       return placed.children.first?.bounds
     }
     for child in placed.children {
@@ -719,7 +719,7 @@ struct AnimationPipelineIntegrationTests {
   /// animation probe to verify the child has been placed at the
   /// interpolated offset.
   private static func findOffsetContainerChildBounds(_ placed: PlacedNode) -> CellRect? {
-    if case .view(let name) = placed.kind, name == "Offset" {
+    if case .view(let name) = placed.kind, name == .offset {
       return placed.children.first?.bounds
     }
     for child in placed.children {
@@ -1023,7 +1023,7 @@ struct AnimationPipelineIntegrationTests {
     seedMetadata.baseStyle.foregroundStyle = .color(Color.red)
     let seed = ResolvedNode(
       identity: leafIdentity,
-      kind: .view("Text"),
+      kind: .view(.text),
       drawMetadata: seedMetadata
     )
     let t0 = MonotonicInstant.now()
@@ -1034,7 +1034,7 @@ struct AnimationPipelineIntegrationTests {
     frame2Metadata.baseStyle.foregroundStyle = .color(Color.blue)
     let frame2 = ResolvedNode(
       identity: leafIdentity,
-      kind: .view("Text"),
+      kind: .view(.text),
       drawMetadata: frame2Metadata
     )
     var transaction = TransactionSnapshot()
@@ -1089,7 +1089,7 @@ struct AnimationPipelineIntegrationTests {
     redMetadata.baseStyle.foregroundStyle = .color(.red)
     let red = ResolvedNode(
       identity: identity,
-      kind: .view("Text"),
+      kind: .view(.text),
       drawMetadata: redMetadata
     )
     controller.processResolvedTree(red, transaction: .init(), timestamp: t0)
@@ -1099,7 +1099,7 @@ struct AnimationPipelineIntegrationTests {
     orangeMetadata.baseStyle.foregroundStyle = .color(orange)
     let canonicalTarget = ResolvedNode(
       identity: identity,
-      kind: .view("Text"),
+      kind: .view(.text),
       drawMetadata: orangeMetadata
     )
     var animatedTransaction = TransactionSnapshot()
@@ -1173,7 +1173,7 @@ struct AnimationPipelineIntegrationTests {
     let seed = ResolvedNode(
       viewNodeID: entityNodeID,
       identity: identityInA,
-      kind: .view("Text"),
+      kind: .view(.text),
       drawMetadata: seedMetadata
     )
     let t0 = MonotonicInstant.now()
@@ -1186,7 +1186,7 @@ struct AnimationPipelineIntegrationTests {
     let fading = ResolvedNode(
       viewNodeID: entityNodeID,
       identity: identityInA,
-      kind: .view("Text"),
+      kind: .view(.text),
       drawMetadata: fadeMetadata
     )
     var transaction = TransactionSnapshot()
@@ -1202,7 +1202,7 @@ struct AnimationPipelineIntegrationTests {
     var moved = ResolvedNode(
       viewNodeID: entityNodeID,
       identity: identityInB,
-      kind: .view("Text"),
+      kind: .view(.text),
       drawMetadata: movedMetadata
     )
 
@@ -1306,11 +1306,11 @@ struct AnimationPipelineIntegrationTests {
     let leafResolved = ResolvedNode(
       viewNodeID: leafNodeID,
       identity: leafIdentity,
-      kind: .view("Leaf")
+      kind: .view(.init("Leaf"))
     )
     let priorResolved = ResolvedNode(
       identity: rootIdentity,
-      kind: .view("Root"),
+      kind: .view(.init("Root")),
       children: [leafResolved]
     )
     let t0 = MonotonicInstant.now()
@@ -1318,12 +1318,12 @@ struct AnimationPipelineIntegrationTests {
 
     let priorPlaced = PlacedNode(
       identity: rootIdentity,
-      kind: .view("Root"),
+      kind: .view(.init("Root")),
       bounds: CellRect(origin: .zero, size: CellSize(width: 10, height: 1)),
       children: [
         PlacedNode(
           identity: leafIdentity,
-          kind: .view("Leaf"),
+          kind: .view(.init("Leaf")),
           bounds: CellRect(origin: .zero, size: CellSize(width: 5, height: 1))
         )
       ]
@@ -1334,7 +1334,7 @@ struct AnimationPipelineIntegrationTests {
     // capture the placed snapshot and schedule a placed-level overlay.
     let nextResolved = ResolvedNode(
       identity: rootIdentity,
-      kind: .view("Root"),
+      kind: .view(.init("Root")),
       children: []
     )
     controller.beginTransitionCollection()
@@ -1350,7 +1350,7 @@ struct AnimationPipelineIntegrationTests {
     // Apply placed overlays to a fresh placed tree (no leaf present).
     var livePlaced = PlacedNode(
       identity: rootIdentity,
-      kind: .view("Root"),
+      kind: .view(.init("Root")),
       bounds: CellRect(origin: .zero, size: CellSize(width: 10, height: 1)),
       children: []
     )
@@ -1391,7 +1391,7 @@ struct AnimationPipelineIntegrationTests {
     // Frame 1: only root exists (simulates a different tab active).
     let frame1 = ResolvedNode(
       identity: rootIdentity,
-      kind: .view("Root"),
+      kind: .view(.init("Root")),
       children: []
     )
     let t0 = MonotonicInstant.now()
@@ -1410,16 +1410,16 @@ struct AnimationPipelineIntegrationTests {
     let leafNode = ResolvedNode(
       viewNodeID: leafNodeID,
       identity: leafIdentity,
-      kind: .view("Leaf")
+      kind: .view(.init("Leaf"))
     )
     let parentNode = ResolvedNode(
       identity: parentIdentity,
-      kind: .view("Parent"),
+      kind: .view(.init("Parent")),
       children: [leafNode]
     )
     let frame2 = ResolvedNode(
       identity: rootIdentity,
-      kind: .view("Root"),
+      kind: .view(.init("Root")),
       children: [parentNode]
     )
     var transaction = TransactionSnapshot()
@@ -1475,17 +1475,17 @@ struct AnimationPipelineIntegrationTests {
     let leafNode = ResolvedNode(
       viewNodeID: leafNodeID,
       identity: leafIdentity,
-      kind: .view("Leaf")
+      kind: .view(.init("Leaf"))
     )
-    let siblingNode = ResolvedNode(identity: siblingIdentity, kind: .view("Sibling"))
+    let siblingNode = ResolvedNode(identity: siblingIdentity, kind: .view(.init("Sibling")))
     let containerNode = ResolvedNode(
       identity: containerIdentity,
-      kind: .view("Container"),
+      kind: .view(.init("Container")),
       children: [leafNode, siblingNode]
     )
     let frame1 = ResolvedNode(
       identity: rootIdentity,
-      kind: .view("Root"),
+      kind: .view(.init("Root")),
       children: [containerNode]
     )
     let t0 = MonotonicInstant.now()
@@ -1498,7 +1498,7 @@ struct AnimationPipelineIntegrationTests {
 
     let frame2 = ResolvedNode(
       identity: rootIdentity,
-      kind: .view("Root"),
+      kind: .view(.init("Root")),
       children: []
     )
     var transaction = TransactionSnapshot()
@@ -1688,7 +1688,7 @@ struct AnimationPipelineIntegrationTests {
     // Frame 1: root exists, leaf absent.
     let frame1 = ResolvedNode(
       identity: rootIdentity,
-      kind: .view("Root"),
+      kind: .view(.init("Root")),
       children: []
     )
     let t0 = MonotonicInstant.now()
@@ -1706,11 +1706,11 @@ struct AnimationPipelineIntegrationTests {
     let leafNode = ResolvedNode(
       viewNodeID: leafNodeID,
       identity: leafIdentity,
-      kind: .view("Leaf")
+      kind: .view(.init("Leaf"))
     )
     let frame2 = ResolvedNode(
       identity: rootIdentity,
-      kind: .view("Root"),
+      kind: .view(.init("Root")),
       children: [leafNode]
     )
     var transaction = TransactionSnapshot()
@@ -1747,7 +1747,7 @@ struct AnimationControllerPropertyTests {
     // finite dimensions exist).  maxWidth takes priority.
     let frame1 = ResolvedNode(
       identity: leafIdentity,
-      kind: .view("Leaf"),
+      kind: .view(.init("Leaf")),
       layoutBehavior: .flexibleFrame(
         minWidth: .finite(20),
         idealWidth: nil,
@@ -1771,7 +1771,7 @@ struct AnimationControllerPropertyTests {
     // Frame 2: maxWidth → 200 under withAnimation.
     var frame2 = ResolvedNode(
       identity: leafIdentity,
-      kind: .view("Leaf"),
+      kind: .view(.init("Leaf")),
       layoutBehavior: .flexibleFrame(
         minWidth: .finite(20),
         idealWidth: nil,
@@ -1833,11 +1833,11 @@ struct AnimationControllerPropertyTests {
     let leaf = ResolvedNode(
       viewNodeID: leafNodeID,
       identity: leafIdentity,
-      kind: .view("Leaf")
+      kind: .view(.init("Leaf"))
     )
     let root = ResolvedNode(
       identity: rootIdentity,
-      kind: .view("Root"),
+      kind: .view(.init("Root")),
       children: [leaf]
     )
     controller.beginTransitionCollection()
@@ -1852,7 +1852,7 @@ struct AnimationControllerPropertyTests {
 
     var frame2 = ResolvedNode(
       identity: rootIdentity,
-      kind: .view("Root"),
+      kind: .view(.init("Root")),
       children: []
     )
     controller.beginTransitionCollection()
@@ -1895,12 +1895,12 @@ struct AnimationControllerPropertyTests {
     let leaf = ResolvedNode(
       viewNodeID: leafNodeID,
       identity: leafIdentity,
-      kind: .view("Leaf"),
+      kind: .view(.init("Leaf")),
       layoutBehavior: .offset(x: 5, y: 0)
     )
     let root = ResolvedNode(
       identity: rootIdentity,
-      kind: .view("Root"),
+      kind: .view(.init("Root")),
       children: [leaf]
     )
 
@@ -1917,7 +1917,7 @@ struct AnimationControllerPropertyTests {
     // Frame 2: leaf gone.
     var frame2 = ResolvedNode(
       identity: rootIdentity,
-      kind: .view("Root"),
+      kind: .view(.init("Root")),
       children: []
     )
     controller.beginTransitionCollection()
@@ -1977,7 +1977,7 @@ struct AnimationControllerPropertyTests {
     // first-appearance.
     let seedRoot = ResolvedNode(
       identity: rootIdentity,
-      kind: .view("Root"),
+      kind: .view(.init("Root")),
       children: []
     )
     let tSeed = MonotonicInstant.now()
@@ -1995,11 +1995,11 @@ struct AnimationControllerPropertyTests {
     let leaf = ResolvedNode(
       viewNodeID: leafNodeID,
       identity: leafIdentity,
-      kind: .view("Leaf")
+      kind: .view(.init("Leaf"))
     )
     let root = ResolvedNode(
       identity: rootIdentity,
-      kind: .view("Root"),
+      kind: .view(.init("Root")),
       children: [leaf]
     )
     var transaction = TransactionSnapshot()
@@ -2012,12 +2012,12 @@ struct AnimationControllerPropertyTests {
     // (0, 0, 20, 5).
     var placed = PlacedNode(
       identity: rootIdentity,
-      kind: .view("Root"),
+      kind: .view(.init("Root")),
       bounds: CellRect(origin: .zero, size: CellSize(width: 20, height: 5)),
       children: [
         PlacedNode(
           identity: leafIdentity,
-          kind: .view("Leaf"),
+          kind: .view(.init("Leaf")),
           bounds: CellRect(origin: .zero, size: CellSize(width: 5, height: 1))
         )
       ]
@@ -2039,12 +2039,12 @@ struct AnimationControllerPropertyTests {
     // Halfway through the animation, delta should be about half a width.
     var placedHalf = PlacedNode(
       identity: rootIdentity,
-      kind: .view("Root"),
+      kind: .view(.init("Root")),
       bounds: CellRect(origin: .zero, size: CellSize(width: 20, height: 5)),
       children: [
         PlacedNode(
           identity: leafIdentity,
-          kind: .view("Leaf"),
+          kind: .view(.init("Leaf")),
           bounds: CellRect(origin: .zero, size: CellSize(width: 5, height: 1))
         )
       ]
@@ -2062,12 +2062,12 @@ struct AnimationControllerPropertyTests {
     // Well past the animation end, delta should be 0 (final position).
     var placedDone = PlacedNode(
       identity: rootIdentity,
-      kind: .view("Root"),
+      kind: .view(.init("Root")),
       bounds: CellRect(origin: .zero, size: CellSize(width: 20, height: 5)),
       children: [
         PlacedNode(
           identity: leafIdentity,
-          kind: .view("Leaf"),
+          kind: .view(.init("Leaf")),
           bounds: CellRect(origin: .zero, size: CellSize(width: 5, height: 1))
         )
       ]
@@ -2098,12 +2098,12 @@ struct AnimationControllerPropertyTests {
     let leaf = ResolvedNode(
       viewNodeID: leafNodeID,
       identity: leafIdentity,
-      kind: .view("Leaf"),
+      kind: .view(.init("Leaf")),
       layoutBehavior: .frame(width: 20, height: 10, alignment: .center)
     )
     let root = ResolvedNode(
       identity: rootIdentity,
-      kind: .view("Root"),
+      kind: .view(.init("Root")),
       children: [leaf]
     )
 
@@ -2119,7 +2119,7 @@ struct AnimationControllerPropertyTests {
 
     var frame2 = ResolvedNode(
       identity: rootIdentity,
-      kind: .view("Root"),
+      kind: .view(.init("Root")),
       children: []
     )
     controller.beginTransitionCollection()
@@ -2189,7 +2189,7 @@ struct AnimationControllerPropertyTests {
     // first-appearance.
     let seedRoot = ResolvedNode(
       identity: rootIdentity,
-      kind: .view("Root"),
+      kind: .view(.init("Root")),
       children: []
     )
     let tSeed = MonotonicInstant.now()
@@ -2207,12 +2207,12 @@ struct AnimationControllerPropertyTests {
 
     let frame1 = ResolvedNode(
       identity: rootIdentity,
-      kind: .view("Root"),
+      kind: .view(.init("Root")),
       children: [
         ResolvedNode(
           viewNodeID: leafNodeID,
           identity: leafIdentity,
-          kind: .view("Leaf")
+          kind: .view(.init("Leaf"))
         )
       ]
     )
@@ -2227,7 +2227,7 @@ struct AnimationControllerPropertyTests {
     // transition map to detect the removal.
     let frame2 = ResolvedNode(
       identity: rootIdentity,
-      kind: .view("Root"),
+      kind: .view(.init("Root")),
       children: []
     )
     controller.beginTransitionCollection()
@@ -2310,11 +2310,11 @@ struct AnimationControllerPropertyTests {
       let leaf = ResolvedNode(
         viewNodeID: leafNodeID,
         identity: leafIdentity,
-        kind: .view("Leaf")
+        kind: .view(.init("Leaf"))
       )
       let initial = ResolvedNode(
         identity: rootIdentity,
-        kind: .view("Root"),
+        kind: .view(.init("Root")),
         children: [leaf]
       )
       let start = MonotonicInstant.now()
@@ -2322,12 +2322,12 @@ struct AnimationControllerPropertyTests {
       controller.capturePlacedTree(
         PlacedNode(
           identity: rootIdentity,
-          kind: .view("Root"),
+          kind: .view(.init("Root")),
           bounds: CellRect(origin: .zero, size: .init(width: 8, height: 1)),
           children: [
             PlacedNode(
               identity: leafIdentity,
-              kind: .view("Leaf"),
+              kind: .view(.init("Leaf")),
               bounds: CellRect(origin: .zero, size: .init(width: 4, height: 1))
             )
           ]
@@ -2336,7 +2336,7 @@ struct AnimationControllerPropertyTests {
 
       let removed = ResolvedNode(
         identity: rootIdentity,
-        kind: .view("Root"),
+        kind: .view(.init("Root")),
         children: []
       )
       controller.beginTransitionCollection()
@@ -2348,7 +2348,7 @@ struct AnimationControllerPropertyTests {
 
       let livePlaced = PlacedNode(
         identity: rootIdentity,
-        kind: .view("Root"),
+        kind: .view(.init("Root")),
         bounds: CellRect(origin: .zero, size: .init(width: 8, height: 1))
       )
       _ = controller.placedAnimationOverlaySnapshot(
@@ -2402,7 +2402,7 @@ struct AnimationControllerPropertyTests {
 
     var frame = ResolvedNode(
       identity: Identity(components: [.named("superseded-leaf")]),
-      kind: .view("Leaf")
+      kind: .view(.init("Leaf"))
     )
     _ = controller.applyInterpolations(to: &frame, at: t0.advanced(by: .milliseconds(1)))
     #expect(fireCount.count == 1)
@@ -2434,7 +2434,7 @@ struct AnimationControllerPropertyTests {
     var frame1Metadata = DrawMetadata()
     frame1Metadata.baseStyle.explicitOpacity = 1.0
     let frame1 = ResolvedNode(
-      identity: leafIdentity, kind: .view("Leaf"), drawMetadata: frame1Metadata
+      identity: leafIdentity, kind: .view(.init("Leaf")), drawMetadata: frame1Metadata
     )
     let t0 = MonotonicInstant.now()
     controller.processResolvedTree(frame1, transaction: .init(), timestamp: t0)
@@ -2442,7 +2442,7 @@ struct AnimationControllerPropertyTests {
     var frame2Metadata = DrawMetadata()
     frame2Metadata.baseStyle.explicitOpacity = 0.0
     var frame2 = ResolvedNode(
-      identity: leafIdentity, kind: .view("Leaf"), drawMetadata: frame2Metadata
+      identity: leafIdentity, kind: .view(.init("Leaf")), drawMetadata: frame2Metadata
     )
     var transaction = TransactionSnapshot()
     transaction.animationRequest = .animate(animation.animationBox)
@@ -2482,7 +2482,7 @@ struct AnimationControllerPropertyTests {
     frame1Metadata.baseStyle.explicitOpacity = 1.0
     let frame1 = ResolvedNode(
       identity: leafIdentity,
-      kind: .view("Leaf"),
+      kind: .view(.init("Leaf")),
       drawMetadata: frame1Metadata
     )
     let t0 = MonotonicInstant.now()
@@ -2493,7 +2493,7 @@ struct AnimationControllerPropertyTests {
     frame2Metadata.baseStyle.explicitOpacity = 0.0
     var frame2 = ResolvedNode(
       identity: leafIdentity,
-      kind: .view("Leaf"),
+      kind: .view(.init("Leaf")),
       drawMetadata: frame2Metadata
     )
     var transaction = TransactionSnapshot()
@@ -2535,7 +2535,7 @@ struct AnimationControllerPropertyTests {
     frame1Metadata.baseStyle.explicitOpacity = 1.0
     let frame1 = ResolvedNode(
       identity: leafIdentity,
-      kind: .view("Leaf"),
+      kind: .view(.init("Leaf")),
       drawMetadata: frame1Metadata
     )
     let t0 = MonotonicInstant.now()
@@ -2547,7 +2547,7 @@ struct AnimationControllerPropertyTests {
     frame2Metadata.baseStyle.explicitOpacity = 0.0
     var frame2 = ResolvedNode(
       identity: leafIdentity,
-      kind: .view("Leaf"),
+      kind: .view(.init("Leaf")),
       drawMetadata: frame2Metadata
     )
     var transaction = TransactionSnapshot()
@@ -2580,7 +2580,7 @@ struct AnimationControllerPropertyTests {
     frame1Metadata.baseStyle.explicitOpacity = 1.0
     let frame1 = ResolvedNode(
       identity: leafIdentity,
-      kind: .view("Leaf"),
+      kind: .view(.init("Leaf")),
       drawMetadata: frame1Metadata
     )
     let t0 = MonotonicInstant.now()
@@ -2590,7 +2590,7 @@ struct AnimationControllerPropertyTests {
     frame2Metadata.baseStyle.explicitOpacity = 0.0
     var frame2 = ResolvedNode(
       identity: leafIdentity,
-      kind: .view("Leaf"),
+      kind: .view(.init("Leaf")),
       drawMetadata: frame2Metadata
     )
     var transaction = TransactionSnapshot()
@@ -2638,7 +2638,7 @@ struct AnimationControllerPropertyTests {
     let leafIdentity = Identity(components: [.named("untracked-leaf")])
     let frame1 = ResolvedNode(
       identity: leafIdentity,
-      kind: .view("Leaf")
+      kind: .view(.init("Leaf"))
     )
     let t0 = MonotonicInstant.now()
     controller.processResolvedTree(frame1, transaction: .init(), timestamp: t0)
@@ -2690,7 +2690,7 @@ struct AnimationControllerPropertyTests {
     let leafIdentity = Identity(components: [.named("stranded-transaction-leaf")])
     let frame1 = ResolvedNode(
       identity: leafIdentity,
-      kind: .view("Leaf")
+      kind: .view(.init("Leaf"))
     )
     let t0 = MonotonicInstant.now()
     controller.processResolvedTree(frame1, transaction: .init(), timestamp: t0)
@@ -2728,7 +2728,7 @@ struct AnimationControllerPropertyTests {
     }
 
     let leafIdentity = Identity(components: [.named("disabled-leaf")])
-    let frame1 = ResolvedNode(identity: leafIdentity, kind: .view("Leaf"))
+    let frame1 = ResolvedNode(identity: leafIdentity, kind: .view(.init("Leaf")))
     let t0 = MonotonicInstant.now()
     controller.processResolvedTree(frame1, transaction: .init(), timestamp: t0)
 
@@ -2766,7 +2766,7 @@ struct AnimationControllerPropertyTests {
     controller.registerCompletion(batchID: batchID) {}
 
     let leafIdentity = Identity(components: [.named("drain-surface-leaf")])
-    let frame1 = ResolvedNode(identity: leafIdentity, kind: .view("Leaf"))
+    let frame1 = ResolvedNode(identity: leafIdentity, kind: .view(.init("Leaf")))
     let t0 = MonotonicInstant.now()
     controller.processResolvedTree(frame1, transaction: .init(), timestamp: t0)
 
@@ -2809,7 +2809,7 @@ struct AnimationControllerPropertyTests {
     }
 
     let leafIdentity = Identity(components: [.named("forever-leaf")])
-    let frame1 = ResolvedNode(identity: leafIdentity, kind: .view("Leaf"))
+    let frame1 = ResolvedNode(identity: leafIdentity, kind: .view(.init("Leaf")))
     let t0 = MonotonicInstant.now()
     controller.processResolvedTree(frame1, transaction: .init(), timestamp: t0)
 
@@ -2841,7 +2841,7 @@ struct AnimationControllerPropertyTests {
     frame1Metadata.baseStyle.explicitOpacity = 1.0
     let frame1 = ResolvedNode(
       identity: leafIdentity,
-      kind: .view("Leaf"),
+      kind: .view(.init("Leaf")),
       drawMetadata: frame1Metadata
     )
     let t0 = MonotonicInstant.now()
@@ -2852,7 +2852,7 @@ struct AnimationControllerPropertyTests {
     frame2Metadata.baseStyle.explicitOpacity = 0.0
     var frame2 = ResolvedNode(
       identity: leafIdentity,
-      kind: .view("Leaf"),
+      kind: .view(.init("Leaf")),
       drawMetadata: frame2Metadata
     )
     var transaction = TransactionSnapshot()
@@ -2912,7 +2912,7 @@ struct AnimationControllerPropertyTests {
     frame1Metadata.baseStyle.explicitOpacity = 1.0
     let frame1 = ResolvedNode(
       identity: leafIdentity,
-      kind: .view("Leaf"),
+      kind: .view(.init("Leaf")),
       drawMetadata: frame1Metadata
     )
     let t0 = MonotonicInstant.now()
@@ -2924,7 +2924,7 @@ struct AnimationControllerPropertyTests {
     frame2Metadata.baseStyle.explicitOpacity = 0.0
     let frame2 = ResolvedNode(
       identity: leafIdentity,
-      kind: .view("Leaf"),
+      kind: .view(.init("Leaf")),
       drawMetadata: frame2Metadata
     )
     var transaction = TransactionSnapshot()
@@ -2966,7 +2966,7 @@ struct AnimationControllerPropertyTests {
     frame3Metadata.baseStyle.explicitOpacity = 0.5
     let frame3 = ResolvedNode(
       identity: leafIdentity,
-      kind: .view("Leaf"),
+      kind: .view(.init("Leaf")),
       drawMetadata: frame3Metadata
     )
     let retargetAt = t0.advanced(by: .milliseconds(100))
@@ -3005,7 +3005,7 @@ struct AnimationControllerPropertyTests {
     // Frame 1: uniform padding of 4 on all sides.
     let frame1 = ResolvedNode(
       identity: leafIdentity,
-      kind: .view("Leaf"),
+      kind: .view(.init("Leaf")),
       layoutBehavior: .padding(EdgeInsets(top: 4, leading: 4, bottom: 4, trailing: 4))
     )
     let t0 = MonotonicInstant.now()
@@ -3014,7 +3014,7 @@ struct AnimationControllerPropertyTests {
     // Frame 2: top grows to 20, others unchanged.
     var frame2 = ResolvedNode(
       identity: leafIdentity,
-      kind: .view("Leaf"),
+      kind: .view(.init("Leaf")),
       layoutBehavior: .padding(EdgeInsets(top: 20, leading: 4, bottom: 4, trailing: 4))
     )
     var transaction = TransactionSnapshot()
@@ -3055,7 +3055,7 @@ struct AnimationControllerPropertyTests {
     frame1Metadata.borderShapeStyle = .color(Color.red)
     let frame1 = ResolvedNode(
       identity: leafIdentity,
-      kind: .view("Leaf"),
+      kind: .view(.init("Leaf")),
       drawMetadata: frame1Metadata
     )
 
@@ -3067,7 +3067,7 @@ struct AnimationControllerPropertyTests {
     frame2Metadata.borderShapeStyle = .color(Color.blue)
     var frame2 = ResolvedNode(
       identity: leafIdentity,
-      kind: .view("Leaf"),
+      kind: .view(.init("Leaf")),
       drawMetadata: frame2Metadata
     )
     var transaction = TransactionSnapshot()
@@ -3119,11 +3119,11 @@ struct AnimationControllerRemovalTests {
     let leaf = ResolvedNode(
       viewNodeID: leafNodeID,
       identity: leafIdentity,
-      kind: .view("Leaf")
+      kind: .view(.init("Leaf"))
     )
     let root = ResolvedNode(
       identity: Identity(components: [.named("root")]),
-      kind: .view("Root"),
+      kind: .view(.init("Root")),
       children: [leaf]
     )
     let t0 = MonotonicInstant.now()
@@ -3143,7 +3143,7 @@ struct AnimationControllerRemovalTests {
     // frame to detect the removal correctly.
     var root2 = ResolvedNode(
       identity: Identity(components: [.named("root")]),
-      kind: .view("Root"),
+      kind: .view(.init("Root")),
       children: []
     )
     controller.beginTransitionCollection()
@@ -3214,16 +3214,16 @@ struct AnimationControllerRemovalTests {
     let leaf = ResolvedNode(
       viewNodeID: leafNodeID,
       identity: leafIdentity,
-      kind: .view("Leaf")
+      kind: .view(.init("Leaf"))
     )
     let padding = ResolvedNode(
       identity: paddingIdentity,
-      kind: .view("Padding"),
+      kind: .view(.padding),
       children: [leaf]
     )
     let overlay = ResolvedNode(
       identity: overlayIdentity,
-      kind: .view("Overlay"),
+      kind: .view(.overlay),
       children: [padding]
     )
     let t0 = MonotonicInstant.now()
@@ -3235,7 +3235,7 @@ struct AnimationControllerRemovalTests {
     // resolved tree — mirrors the real gallery behavior.
     var overlay2 = ResolvedNode(
       identity: overlayIdentity,
-      kind: .view("Overlay"),
+      kind: .view(.overlay),
       children: []
     )
     controller.beginTransitionCollection()
@@ -3299,11 +3299,11 @@ struct AnimationControllerRemovalTests {
     let leaf = ResolvedNode(
       viewNodeID: leafNodeID,
       identity: leafIdentity,
-      kind: .view("Leaf")
+      kind: .view(.init("Leaf"))
     )
     let root = ResolvedNode(
       identity: Identity(components: [.named("root")]),
-      kind: .view("Root"),
+      kind: .view(.init("Root")),
       children: [leaf]
     )
     let t0 = MonotonicInstant.now()
@@ -3312,7 +3312,7 @@ struct AnimationControllerRemovalTests {
     // Frame 2: leaf removed mid-animation.
     var root2 = ResolvedNode(
       identity: Identity(components: [.named("root")]),
-      kind: .view("Root"),
+      kind: .view(.init("Root")),
       children: []
     )
     controller.beginTransitionCollection()
@@ -3329,7 +3329,7 @@ struct AnimationControllerRemovalTests {
     // A new tree with a completely different identity should NOT see
     // the pre-reset leaf re-injected.
     let freshIdentity = Identity(components: [.named("fresh")])
-    var fresh = ResolvedNode(identity: freshIdentity, kind: .view("Fresh"))
+    var fresh = ResolvedNode(identity: freshIdentity, kind: .view(.init("Fresh")))
     controller.processResolvedTree(fresh, transaction: .init(), timestamp: t0)
     let result = controller.applyInterpolations(to: &fresh, at: t0)
 
@@ -3365,11 +3365,11 @@ struct AnimationControllerRemovalTests {
     let leaf = ResolvedNode(
       viewNodeID: leafNodeID,
       identity: leafIdentity,
-      kind: .view("Leaf")
+      kind: .view(.init("Leaf"))
     )
     let root = ResolvedNode(
       identity: Identity(components: [.named("root")]),
-      kind: .view("Root"),
+      kind: .view(.init("Root")),
       children: [leaf]
     )
     let t0 = MonotonicInstant.now()
@@ -3379,7 +3379,7 @@ struct AnimationControllerRemovalTests {
     // because the branch is gone from the resolved tree.
     let root2 = ResolvedNode(
       identity: Identity(components: [.named("root")]),
-      kind: .view("Root"),
+      kind: .view(.init("Root")),
       children: []
     )
     controller.beginTransitionCollection()
@@ -3430,7 +3430,7 @@ struct Phase3ParityTests {
     frame1Metadata.baseStyle.explicitOpacity = 1.0
     let frame1 = ResolvedNode(
       identity: leafIdentity,
-      kind: .view("Leaf"),
+      kind: .view(.init("Leaf")),
       drawMetadata: frame1Metadata
     )
     let t0 = MonotonicInstant.now()
@@ -3440,7 +3440,7 @@ struct Phase3ParityTests {
     frame2Metadata.baseStyle.explicitOpacity = 0.0
     var frame2 = ResolvedNode(
       identity: leafIdentity,
-      kind: .view("Leaf"),
+      kind: .view(.init("Leaf")),
       drawMetadata: frame2Metadata
     )
     var transaction = TransactionSnapshot()
@@ -3469,7 +3469,7 @@ struct Phase3ParityTests {
     frame1Metadata.baseStyle.foregroundStyle = .color(Color.red)
     let frame1 = ResolvedNode(
       identity: leafIdentity,
-      kind: .view("Leaf"),
+      kind: .view(.init("Leaf")),
       drawMetadata: frame1Metadata
     )
     let t0 = MonotonicInstant.now()
@@ -3479,7 +3479,7 @@ struct Phase3ParityTests {
     frame2Metadata.baseStyle.foregroundStyle = .color(Color.blue)
     var frame2 = ResolvedNode(
       identity: leafIdentity,
-      kind: .view("Leaf"),
+      kind: .view(.init("Leaf")),
       drawMetadata: frame2Metadata
     )
     var transaction = TransactionSnapshot()
@@ -3513,7 +3513,7 @@ struct Phase3ParityTests {
     let leafIdentity = Identity(components: [.named("parity-leaf")])
     let frame1 = ResolvedNode(
       identity: leafIdentity,
-      kind: .view("Leaf"),
+      kind: .view(.init("Leaf")),
       layoutBehavior: .padding(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0))
     )
     let t0 = MonotonicInstant.now()
@@ -3521,7 +3521,7 @@ struct Phase3ParityTests {
 
     var frame2 = ResolvedNode(
       identity: leafIdentity,
-      kind: .view("Leaf"),
+      kind: .view(.init("Leaf")),
       layoutBehavior: .padding(EdgeInsets(top: 20, leading: 20, bottom: 20, trailing: 20))
     )
     var transaction = TransactionSnapshot()
@@ -3553,7 +3553,7 @@ struct Phase3ParityTests {
     let leafIdentity = Identity(components: [.named("parity-leaf")])
     let frame1 = ResolvedNode(
       identity: leafIdentity,
-      kind: .view("Leaf"),
+      kind: .view(.init("Leaf")),
       layoutBehavior: .offset(x: 0, y: 0)
     )
     let t0 = MonotonicInstant.now()
@@ -3561,7 +3561,7 @@ struct Phase3ParityTests {
 
     var frame2 = ResolvedNode(
       identity: leafIdentity,
-      kind: .view("Leaf"),
+      kind: .view(.init("Leaf")),
       layoutBehavior: .offset(x: 20, y: 40)
     )
     var transaction = TransactionSnapshot()
@@ -3590,7 +3590,7 @@ struct Phase3ParityTests {
     let leafIdentity = Identity(components: [.named("parity-leaf")])
     let frame1 = ResolvedNode(
       identity: leafIdentity,
-      kind: .view("Leaf"),
+      kind: .view(.init("Leaf")),
       layoutBehavior: .position(x: 0, y: 0)
     )
     let t0 = MonotonicInstant.now()
@@ -3598,7 +3598,7 @@ struct Phase3ParityTests {
 
     var frame2 = ResolvedNode(
       identity: leafIdentity,
-      kind: .view("Leaf"),
+      kind: .view(.init("Leaf")),
       layoutBehavior: .position(x: 20, y: 40)
     )
     var transaction = TransactionSnapshot()
@@ -3630,7 +3630,7 @@ struct Phase3ParityTests {
     let leafIdentity = Identity(components: [.named("parity-offset-x-leaf")])
     let frame1 = ResolvedNode(
       identity: leafIdentity,
-      kind: .view("Leaf"),
+      kind: .view(.init("Leaf")),
       layoutBehavior: .offset(x: 0, y: 10)
     )
     let t0 = MonotonicInstant.now()
@@ -3639,7 +3639,7 @@ struct Phase3ParityTests {
     // Change ONLY x.
     var frame2 = ResolvedNode(
       identity: leafIdentity,
-      kind: .view("Leaf"),
+      kind: .view(.init("Leaf")),
       layoutBehavior: .offset(x: 20, y: 10)
     )
     var transaction = TransactionSnapshot()
@@ -3668,7 +3668,7 @@ struct Phase3ParityTests {
     let leafIdentity = Identity(components: [.named("parity-offset-y-leaf")])
     let frame1 = ResolvedNode(
       identity: leafIdentity,
-      kind: .view("Leaf"),
+      kind: .view(.init("Leaf")),
       layoutBehavior: .offset(x: 10, y: 0)
     )
     let t0 = MonotonicInstant.now()
@@ -3677,7 +3677,7 @@ struct Phase3ParityTests {
     // Change ONLY y.
     var frame2 = ResolvedNode(
       identity: leafIdentity,
-      kind: .view("Leaf"),
+      kind: .view(.init("Leaf")),
       layoutBehavior: .offset(x: 10, y: 40)
     )
     var transaction = TransactionSnapshot()
@@ -3706,7 +3706,7 @@ struct Phase3ParityTests {
     let leafIdentity = Identity(components: [.named("parity-position-x-leaf")])
     let frame1 = ResolvedNode(
       identity: leafIdentity,
-      kind: .view("Leaf"),
+      kind: .view(.init("Leaf")),
       layoutBehavior: .position(x: 0, y: 10)
     )
     let t0 = MonotonicInstant.now()
@@ -3714,7 +3714,7 @@ struct Phase3ParityTests {
 
     var frame2 = ResolvedNode(
       identity: leafIdentity,
-      kind: .view("Leaf"),
+      kind: .view(.init("Leaf")),
       layoutBehavior: .position(x: 20, y: 10)
     )
     var transaction = TransactionSnapshot()
@@ -3741,7 +3741,7 @@ struct Phase3ParityTests {
     let leafIdentity = Identity(components: [.named("parity-position-y-leaf")])
     let frame1 = ResolvedNode(
       identity: leafIdentity,
-      kind: .view("Leaf"),
+      kind: .view(.init("Leaf")),
       layoutBehavior: .position(x: 10, y: 0)
     )
     let t0 = MonotonicInstant.now()
@@ -3749,7 +3749,7 @@ struct Phase3ParityTests {
 
     var frame2 = ResolvedNode(
       identity: leafIdentity,
-      kind: .view("Leaf"),
+      kind: .view(.init("Leaf")),
       layoutBehavior: .position(x: 10, y: 40)
     )
     var transaction = TransactionSnapshot()
@@ -3778,7 +3778,7 @@ struct Phase3ParityTests {
     let leafIdentity = Identity(components: [.named("parity-leaf")])
     let frame1 = ResolvedNode(
       identity: leafIdentity,
-      kind: .view("Leaf"),
+      kind: .view(.init("Leaf")),
       layoutBehavior: .frame(width: 10, height: 5, alignment: .center)
     )
     let t0 = MonotonicInstant.now()
@@ -3786,7 +3786,7 @@ struct Phase3ParityTests {
 
     var frame2 = ResolvedNode(
       identity: leafIdentity,
-      kind: .view("Leaf"),
+      kind: .view(.init("Leaf")),
       layoutBehavior: .frame(width: 30, height: 5, alignment: .center)
     )
     var transaction = TransactionSnapshot()
@@ -3818,7 +3818,7 @@ struct Phase3ParityTests {
     let leafIdentity = Identity(components: [.named("parity-leaf")])
     let frame1 = ResolvedNode(
       identity: leafIdentity,
-      kind: .view("Leaf"),
+      kind: .view(.init("Leaf")),
       layoutBehavior: .frame(width: 10, height: 0, alignment: .center)
     )
     let t0 = MonotonicInstant.now()
@@ -3826,7 +3826,7 @@ struct Phase3ParityTests {
 
     var frame2 = ResolvedNode(
       identity: leafIdentity,
-      kind: .view("Leaf"),
+      kind: .view(.init("Leaf")),
       layoutBehavior: .frame(width: 10, height: 20, alignment: .center)
     )
     var transaction = TransactionSnapshot()
@@ -3860,7 +3860,7 @@ struct Phase3ParityTests {
     frame1Metadata.borderShapeStyle = .color(Color.red)
     let frame1 = ResolvedNode(
       identity: leafIdentity,
-      kind: .view("Leaf"),
+      kind: .view(.init("Leaf")),
       drawMetadata: frame1Metadata
     )
     let t0 = MonotonicInstant.now()
@@ -3870,7 +3870,7 @@ struct Phase3ParityTests {
     frame2Metadata.borderShapeStyle = .color(Color.blue)
     var frame2 = ResolvedNode(
       identity: leafIdentity,
-      kind: .view("Leaf"),
+      kind: .view(.init("Leaf")),
       drawMetadata: frame2Metadata
     )
     var transaction = TransactionSnapshot()
@@ -3902,7 +3902,7 @@ struct Phase3ParityTests {
     let blend = BorderBlend([.red, .blue])
     let frame1 = ResolvedNode(
       identity: leafIdentity,
-      kind: .view("Leaf"),
+      kind: .view(.init("Leaf")),
       layoutBehavior: .border(
         BorderSet.single,
         placement: .outset,
@@ -3918,7 +3918,7 @@ struct Phase3ParityTests {
 
     var frame2 = ResolvedNode(
       identity: leafIdentity,
-      kind: .view("Leaf"),
+      kind: .view(.init("Leaf")),
       layoutBehavior: .border(
         BorderSet.single,
         placement: .outset,

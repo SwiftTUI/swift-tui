@@ -31,7 +31,7 @@ struct RuntimeRegistrationRestoreScopingTests {
       let node = graph.beginEvaluation(identity: identity, invalidator: nil)
       recordFocus(on: node, identity: identity, namespace: MatchedGeometryNamespace(0))
       graph.finishEvaluation(
-        node, resolved: ResolvedNode(identity: identity, kind: .view("Focusable")),
+        node, resolved: ResolvedNode(identity: identity, kind: .view(.init("Focusable"))),
         accessedStateSlots: 0)
       nodes[node.viewNodeID] = node
     }
@@ -58,9 +58,10 @@ struct RuntimeRegistrationRestoreScopingTests {
       RegistrationKindDriver.record(.pointerHandler, on: owner, identity: routeIdentity)
     }
     let wrapper = graph.beginEvaluation(identity: wrapperIdentity, invalidator: nil)
-    let routed = ResolvedNode(identity: routeIdentity, kind: .view("RouteWrapper"))
+    let routed = ResolvedNode(identity: routeIdentity, kind: .view(.init("RouteWrapper")))
     graph.finishEvaluation(wrapper, resolved: routed, accessedStateSlots: 0)
-    let hosted = ResolvedNode(identity: ownerIdentity, kind: .view("Host"), children: [routed])
+    let hosted = ResolvedNode(
+      identity: ownerIdentity, kind: .view(.init("Host")), children: [routed])
     graph.finishEvaluation(owner, resolved: hosted, accessedStateSlots: 0)
     graph.finishEvaluation(
       root, resolved: ResolvedNode(identity: rootIdentity, kind: .root, children: [hosted]),
@@ -107,7 +108,7 @@ struct RuntimeRegistrationRestoreScopingTests {
     recordFocus(on: aNode, identity: aIdentity, namespace: namespace)
     graph.finishEvaluation(
       aNode,
-      resolved: ResolvedNode(identity: aIdentity, kind: .view("A")),
+      resolved: ResolvedNode(identity: aIdentity, kind: .view(.init("A"))),
       accessedStateSlots: 0
     )
     let resolved = graph.snapshot(rootIdentity: rootIdentity)
@@ -168,14 +169,14 @@ struct RuntimeRegistrationRestoreScopingTests {
     recordFocus(on: customNode, identity: rewritten, namespace: namespace)
     graph.finishEvaluation(
       customNode,
-      resolved: ResolvedNode(identity: rewritten, kind: .view("Custom")),
+      resolved: ResolvedNode(identity: rewritten, kind: .view(.init("Custom"))),
       accessedStateSlots: 0
     )
     let bNode = graph.beginEvaluation(identity: bIdentity, invalidator: nil)
     recordFocus(on: bNode, identity: bIdentity, namespace: namespace)
     graph.finishEvaluation(
       bNode,
-      resolved: ResolvedNode(identity: bIdentity, kind: .view("Z")),
+      resolved: ResolvedNode(identity: bIdentity, kind: .view(.init("Z"))),
       accessedStateSlots: 0
     )
     graph.finishEvaluation(
@@ -184,8 +185,8 @@ struct RuntimeRegistrationRestoreScopingTests {
         identity: rootIdentity,
         kind: .root,
         children: [
-          ResolvedNode(identity: rewritten, kind: .view("Custom")),
-          ResolvedNode(identity: bIdentity, kind: .view("Z")),
+          ResolvedNode(identity: rewritten, kind: .view(.init("Custom"))),
+          ResolvedNode(identity: bIdentity, kind: .view(.init("Z"))),
         ]
       ),
       accessedStateSlots: 0
@@ -208,7 +209,7 @@ struct RuntimeRegistrationRestoreScopingTests {
     recordFocus(on: custom2, identity: rewritten, namespace: namespace)
     graph.finishEvaluation(
       custom2,
-      resolved: ResolvedNode(identity: rewritten, kind: .view("Custom")),
+      resolved: ResolvedNode(identity: rewritten, kind: .view(.init("Custom"))),
       accessedStateSlots: 0
     )
     let resolved2 = graph.snapshot(rootIdentity: rootIdentity)
@@ -266,7 +267,7 @@ struct RuntimeRegistrationRestoreScopingTests {
     recordFocusedValues(on: customNode, identity: detached)
     graph.finishEvaluation(
       customNode,
-      resolved: ResolvedNode(identity: authored, kind: .view("Custom")),
+      resolved: ResolvedNode(identity: authored, kind: .view(.init("Custom"))),
       accessedStateSlots: 0
     )
     graph.finishEvaluation(
@@ -274,7 +275,7 @@ struct RuntimeRegistrationRestoreScopingTests {
       resolved: ResolvedNode(
         identity: rootIdentity,
         kind: .root,
-        children: [ResolvedNode(identity: authored, kind: .view("Custom"))]
+        children: [ResolvedNode(identity: authored, kind: .view(.init("Custom")))]
       ),
       accessedStateSlots: 0
     )
@@ -293,7 +294,7 @@ struct RuntimeRegistrationRestoreScopingTests {
     recordFocusedValues(on: custom2, identity: detached)
     graph.finishEvaluation(
       custom2,
-      resolved: ResolvedNode(identity: authored, kind: .view("Custom")),
+      resolved: ResolvedNode(identity: authored, kind: .view(.init("Custom"))),
       accessedStateSlots: 0
     )
     let resolved2 = graph.snapshot(rootIdentity: rootIdentity)
@@ -349,7 +350,7 @@ struct RuntimeRegistrationRestoreScopingTests {
     recordFocusedValues(on: customNode, identity: firstGeneration)
     graph.finishEvaluation(
       customNode,
-      resolved: ResolvedNode(identity: authored, kind: .view("Custom")),
+      resolved: ResolvedNode(identity: authored, kind: .view(.init("Custom"))),
       accessedStateSlots: 0
     )
     graph.finishEvaluation(
@@ -357,7 +358,7 @@ struct RuntimeRegistrationRestoreScopingTests {
       resolved: ResolvedNode(
         identity: rootIdentity,
         kind: .root,
-        children: [ResolvedNode(identity: authored, kind: .view("Custom"))]
+        children: [ResolvedNode(identity: authored, kind: .view(.init("Custom")))]
       ),
       accessedStateSlots: 0
     )
@@ -374,7 +375,7 @@ struct RuntimeRegistrationRestoreScopingTests {
     recordFocusedValues(on: custom2, identity: secondGeneration)
     graph.finishEvaluation(
       custom2,
-      resolved: ResolvedNode(identity: authored, kind: .view("Custom")),
+      resolved: ResolvedNode(identity: authored, kind: .view(.init("Custom"))),
       accessedStateSlots: 0
     )
     let resolved2 = graph.snapshot(rootIdentity: rootIdentity)
@@ -439,14 +440,14 @@ struct RuntimeRegistrationRestoreScopingTests {
     customNode.endRegistrationCapture()
     graph.finishEvaluation(
       customNode,
-      resolved: ResolvedNode(identity: authored, kind: .view("Custom")),
+      resolved: ResolvedNode(identity: authored, kind: .view(.init("Custom"))),
       accessedStateSlots: 0
     )
     for identity in ballast {
       let node = graph.beginEvaluation(identity: identity, invalidator: nil)
       graph.finishEvaluation(
         node,
-        resolved: ResolvedNode(identity: identity, kind: .view("Ballast")),
+        resolved: ResolvedNode(identity: identity, kind: .view(.init("Ballast"))),
         accessedStateSlots: 0
       )
     }
@@ -455,8 +456,8 @@ struct RuntimeRegistrationRestoreScopingTests {
       resolved: ResolvedNode(
         identity: rootIdentity,
         kind: .root,
-        children: [ResolvedNode(identity: authored, kind: .view("Custom"))]
-          + ballast.map { ResolvedNode(identity: $0, kind: .view("Ballast")) }
+        children: [ResolvedNode(identity: authored, kind: .view(.init("Custom")))]
+          + ballast.map { ResolvedNode(identity: $0, kind: .view(.init("Ballast"))) }
       ),
       accessedStateSlots: 0
     )
@@ -485,7 +486,7 @@ struct RuntimeRegistrationRestoreScopingTests {
     custom2.endRegistrationCapture()
     graph.finishEvaluation(
       custom2,
-      resolved: ResolvedNode(identity: authored, kind: .view("Custom")),
+      resolved: ResolvedNode(identity: authored, kind: .view(.init("Custom"))),
       accessedStateSlots: 0
     )
     let resolved2 = graph.snapshot(rootIdentity: rootIdentity)
@@ -532,7 +533,7 @@ struct RuntimeRegistrationRestoreScopingTests {
         let node = graph.beginEvaluation(identity: identity, invalidator: nil)
         graph.finishEvaluation(
           node,
-          resolved: ResolvedNode(identity: identity, kind: .view("Ballast")),
+          resolved: ResolvedNode(identity: identity, kind: .view(.init("Ballast"))),
           accessedStateSlots: 0
         )
       }
@@ -551,7 +552,7 @@ struct RuntimeRegistrationRestoreScopingTests {
     departingNode.endRegistrationCapture()
     graph.finishEvaluation(
       departingNode,
-      resolved: ResolvedNode(identity: departingIdentity, kind: .view("Departing")),
+      resolved: ResolvedNode(identity: departingIdentity, kind: .view(.init("Departing"))),
       accessedStateSlots: 0
     )
     seedBallast()
@@ -560,8 +561,8 @@ struct RuntimeRegistrationRestoreScopingTests {
       resolved: ResolvedNode(
         identity: rootIdentity,
         kind: .root,
-        children: [ResolvedNode(identity: departingIdentity, kind: .view("Departing"))]
-          + ballast.map { ResolvedNode(identity: $0, kind: .view("Ballast")) }
+        children: [ResolvedNode(identity: departingIdentity, kind: .view(.init("Departing")))]
+          + ballast.map { ResolvedNode(identity: $0, kind: .view(.init("Ballast"))) }
       ),
       accessedStateSlots: 0
     )
@@ -592,7 +593,7 @@ struct RuntimeRegistrationRestoreScopingTests {
     arrivingNode.endRegistrationCapture()
     graph.finishEvaluation(
       arrivingNode,
-      resolved: ResolvedNode(identity: arrivingIdentity, kind: .view("Arriving")),
+      resolved: ResolvedNode(identity: arrivingIdentity, kind: .view(.init("Arriving"))),
       accessedStateSlots: 0
     )
     seedBallast()
@@ -601,8 +602,8 @@ struct RuntimeRegistrationRestoreScopingTests {
       resolved: ResolvedNode(
         identity: rootIdentity,
         kind: .root,
-        children: [ResolvedNode(identity: arrivingIdentity, kind: .view("Arriving"))]
-          + ballast.map { ResolvedNode(identity: $0, kind: .view("Ballast")) }
+        children: [ResolvedNode(identity: arrivingIdentity, kind: .view(.init("Arriving")))]
+          + ballast.map { ResolvedNode(identity: $0, kind: .view(.init("Ballast"))) }
       ),
       accessedStateSlots: 0
     )
@@ -755,7 +756,7 @@ struct RuntimeRegistrationRestoreScopingTests {
         RegistrationKindDriver.record(kind, on: controlNode, identity: controlIdentity)
       }
     }
-    let control = ResolvedNode(identity: controlIdentity, kind: .view("Control"))
+    let control = ResolvedNode(identity: controlIdentity, kind: .view(.init("Control")))
     graph.finishEvaluation(controlNode, resolved: control, accessedStateSlots: 0)
     graph.finishEvaluation(
       rootNode,
@@ -832,7 +833,7 @@ struct RuntimeRegistrationRestoreScopingTests {
         handler: { true },
         followUpInvalidationIdentity: nil
       )
-      let resolvedChild = ResolvedNode(identity: identity, kind: .view("Item"))
+      let resolvedChild = ResolvedNode(identity: identity, kind: .view(.init("Item")))
       graph.finishEvaluation(node, resolved: resolvedChild, accessedStateSlots: 0)
       children.append(resolvedChild)
       itemNodes.append(node)
@@ -932,7 +933,7 @@ struct RuntimeRegistrationRestoreScopingTests {
         handler: { true },
         followUpInvalidationIdentity: nil
       )
-      let resolvedChild = ResolvedNode(identity: identity, kind: .view("Item"))
+      let resolvedChild = ResolvedNode(identity: identity, kind: .view(.init("Item")))
       graph.finishEvaluation(node, resolved: resolvedChild, accessedStateSlots: 0)
       children.append(resolvedChild)
       itemNodes.append(node)
@@ -1025,7 +1026,7 @@ struct RuntimeRegistrationRestoreScopingTests {
     )
     graph.finishEvaluation(
       itemNode,
-      resolved: ResolvedNode(identity: itemIdentity, kind: .view("Item")),
+      resolved: ResolvedNode(identity: itemIdentity, kind: .view(.init("Item"))),
       accessedStateSlots: 0
     )
     graph.finishEvaluation(
@@ -1033,7 +1034,7 @@ struct RuntimeRegistrationRestoreScopingTests {
       resolved: ResolvedNode(
         identity: rootIdentity,
         kind: .root,
-        children: [ResolvedNode(identity: itemIdentity, kind: .view("Item"))]
+        children: [ResolvedNode(identity: itemIdentity, kind: .view(.init("Item")))]
       ),
       accessedStateSlots: 0
     )
@@ -1119,7 +1120,7 @@ struct RuntimeRegistrationRestoreScopingTests {
       handler: { true },
       followUpInvalidationIdentity: nil
     )
-    let resolvedContent = ResolvedNode(identity: contentIdentity, kind: .view("Content"))
+    let resolvedContent = ResolvedNode(identity: contentIdentity, kind: .view(.init("Content")))
     graph.finishEvaluation(
       contentNode,
       resolved: resolvedContent,
@@ -1129,7 +1130,7 @@ struct RuntimeRegistrationRestoreScopingTests {
       boundaryNode,
       resolved: ResolvedNode(
         identity: boundaryIdentity,
-        kind: .view("GeometryReader"),
+        kind: .view(.geometryReader),
         children: [resolvedContent]
       ),
       accessedStateSlots: 0
@@ -1142,7 +1143,7 @@ struct RuntimeRegistrationRestoreScopingTests {
         children: [
           ResolvedNode(
             identity: boundaryIdentity,
-            kind: .view("GeometryReader"),
+            kind: .view(.geometryReader),
             children: [resolvedContent]
           )
         ]
@@ -1249,7 +1250,7 @@ struct RuntimeRegistrationRestoreScopingTests {
     recordFocus(on: aNode, identity: aIdentity, namespace: namespace)
     graph.finishEvaluation(
       aNode,
-      resolved: ResolvedNode(identity: aIdentity, kind: .view("A")),
+      resolved: ResolvedNode(identity: aIdentity, kind: .view(.init("A"))),
       accessedStateSlots: 0
     )
     let resolved = graph.snapshot(rootIdentity: rootIdentity)
@@ -1320,7 +1321,7 @@ struct RuntimeRegistrationRestoreScopingTests {
     )
     graph.finishEvaluation(
       aNode,
-      resolved: ResolvedNode(identity: aIdentity, kind: .view("A")),
+      resolved: ResolvedNode(identity: aIdentity, kind: .view(.init("A"))),
       accessedStateSlots: 0
     )
     let resolved = graph.snapshot(rootIdentity: rootIdentity)
@@ -1464,7 +1465,7 @@ struct RuntimeRegistrationRestoreScopingTests {
     }
     graph.finishEvaluation(
       islandNode,
-      resolved: ResolvedNode(identity: islandIdentity, kind: .view("Island")),
+      resolved: ResolvedNode(identity: islandIdentity, kind: .view(.init("Island"))),
       accessedStateSlots: 0
     )
     // Production anchors a capture-hosted island to its declaring host; see
@@ -1474,7 +1475,7 @@ struct RuntimeRegistrationRestoreScopingTests {
     anchorSeededIsland(islandNode, hostedBy: rootNode, in: graph)
     graph.finishEvaluation(
       rootNode,
-      resolved: ResolvedNode(identity: rootIdentity, kind: .view("Root")),
+      resolved: ResolvedNode(identity: rootIdentity, kind: .view(.init("Root"))),
       accessedStateSlots: 0
     )
     graph.finishEvaluation(
@@ -1482,7 +1483,7 @@ struct RuntimeRegistrationRestoreScopingTests {
       resolved: ResolvedNode(
         identity: portalIdentity,
         kind: .root,
-        children: [ResolvedNode(identity: rootIdentity, kind: .view("Root"))]
+        children: [ResolvedNode(identity: rootIdentity, kind: .view(.init("Root")))]
       ),
       accessedStateSlots: 0
     )
@@ -1535,7 +1536,7 @@ struct RuntimeRegistrationRestoreScopingTests {
       let child = graph.beginEvaluation(identity: childIdentity, invalidator: nil)
       graph.finishEvaluation(
         child,
-        resolved: ResolvedNode(identity: childIdentity, kind: .view("Leaf")),
+        resolved: ResolvedNode(identity: childIdentity, kind: .view(.init("Leaf"))),
         accessedStateSlots: 0
       )
     }
@@ -1543,8 +1544,8 @@ struct RuntimeRegistrationRestoreScopingTests {
       aNode,
       resolved: ResolvedNode(
         identity: aIdentity,
-        kind: .view("A"),
-        children: aChildIdentities.map { ResolvedNode(identity: $0, kind: .view("Leaf")) }
+        kind: .view(.init("A")),
+        children: aChildIdentities.map { ResolvedNode(identity: $0, kind: .view(.init("Leaf"))) }
       ),
       accessedStateSlots: 0
     )
@@ -1552,15 +1553,15 @@ struct RuntimeRegistrationRestoreScopingTests {
     let bChild = graph.beginEvaluation(identity: bChildIdentity, invalidator: nil)
     graph.finishEvaluation(
       bChild,
-      resolved: ResolvedNode(identity: bChildIdentity, kind: .view("Leaf")),
+      resolved: ResolvedNode(identity: bChildIdentity, kind: .view(.init("Leaf"))),
       accessedStateSlots: 0
     )
     graph.finishEvaluation(
       bNode,
       resolved: ResolvedNode(
         identity: bIdentity,
-        kind: .view("B"),
-        children: [ResolvedNode(identity: bChildIdentity, kind: .view("Leaf"))]
+        kind: .view(.init("B")),
+        children: [ResolvedNode(identity: bChildIdentity, kind: .view(.init("Leaf")))]
       ),
       accessedStateSlots: 0
     )
@@ -1570,8 +1571,8 @@ struct RuntimeRegistrationRestoreScopingTests {
         identity: rootIdentity,
         kind: .root,
         children: [
-          ResolvedNode(identity: aIdentity, kind: .view("A")),
-          ResolvedNode(identity: bIdentity, kind: .view("B")),
+          ResolvedNode(identity: aIdentity, kind: .view(.init("A"))),
+          ResolvedNode(identity: bIdentity, kind: .view(.init("B"))),
         ]
       ),
       accessedStateSlots: 0
@@ -1629,7 +1630,7 @@ struct RuntimeRegistrationRestoreScopingTests {
     recordFocus(on: aNode, identity: aIdentity, namespace: namespace)
     graph.finishEvaluation(
       aNode,
-      resolved: ResolvedNode(identity: aIdentity, kind: .view("A")),
+      resolved: ResolvedNode(identity: aIdentity, kind: .view(.init("A"))),
       accessedStateSlots: 0
     )
     let resolved = graph.snapshot(rootIdentity: rootIdentity)
@@ -1702,7 +1703,7 @@ struct RuntimeRegistrationRestoreScopingTests {
     recordFocus(on: aNode, identity: aIdentity, namespace: namespace)
     graph.finishEvaluation(
       aNode,
-      resolved: ResolvedNode(identity: aIdentity, kind: .view("A")),
+      resolved: ResolvedNode(identity: aIdentity, kind: .view(.init("A"))),
       accessedStateSlots: 0
     )
     let resolved = graph.snapshot(rootIdentity: rootIdentity)
@@ -1871,14 +1872,14 @@ struct RuntimeRegistrationRestoreScopingTests {
     recordFocus(on: aNode, identity: aIdentity, namespace: namespace)
     graph.finishEvaluation(
       aNode,
-      resolved: ResolvedNode(identity: aIdentity, kind: .view("A")),
+      resolved: ResolvedNode(identity: aIdentity, kind: .view(.init("A"))),
       accessedStateSlots: 0
     )
     let bNode = graph.beginEvaluation(identity: bIdentity, invalidator: nil)
     recordFocus(on: bNode, identity: bIdentity, namespace: namespace)
     graph.finishEvaluation(
       bNode,
-      resolved: ResolvedNode(identity: bIdentity, kind: .view("B")),
+      resolved: ResolvedNode(identity: bIdentity, kind: .view(.init("B"))),
       accessedStateSlots: 0
     )
     graph.finishEvaluation(
@@ -1887,8 +1888,8 @@ struct RuntimeRegistrationRestoreScopingTests {
         identity: rootIdentity,
         kind: .root,
         children: [
-          ResolvedNode(identity: aIdentity, kind: .view("A")),
-          ResolvedNode(identity: bIdentity, kind: .view("B")),
+          ResolvedNode(identity: aIdentity, kind: .view(.init("A"))),
+          ResolvedNode(identity: bIdentity, kind: .view(.init("B"))),
         ]
       ),
       accessedStateSlots: 0
@@ -1954,7 +1955,7 @@ struct RuntimeRegistrationRestoreScopingTests {
     )
     graph.finishEvaluation(
       aNode,
-      resolved: ResolvedNode(identity: aIdentity, kind: .view("A")),
+      resolved: ResolvedNode(identity: aIdentity, kind: .view(.init("A"))),
       accessedStateSlots: 0
     )
     let bNode = graph.beginEvaluation(identity: bIdentity, invalidator: nil)
@@ -1967,7 +1968,7 @@ struct RuntimeRegistrationRestoreScopingTests {
     )
     graph.finishEvaluation(
       bNode,
-      resolved: ResolvedNode(identity: bIdentity, kind: .view("B")),
+      resolved: ResolvedNode(identity: bIdentity, kind: .view(.init("B"))),
       accessedStateSlots: 0
     )
     graph.finishEvaluation(
@@ -1976,8 +1977,8 @@ struct RuntimeRegistrationRestoreScopingTests {
         identity: rootIdentity,
         kind: .root,
         children: [
-          ResolvedNode(identity: aIdentity, kind: .view("A")),
-          ResolvedNode(identity: bIdentity, kind: .view("B")),
+          ResolvedNode(identity: aIdentity, kind: .view(.init("A"))),
+          ResolvedNode(identity: bIdentity, kind: .view(.init("B"))),
         ]
       ),
       accessedStateSlots: 0
@@ -2198,7 +2199,7 @@ struct RuntimeRegistrationRestoreScopingTests {
     }
 
     let siblingResolvedNodes = siblings.map {
-      ResolvedNode(identity: $0.identity, kind: .view($0.label))
+      ResolvedNode(identity: $0.identity, kind: .view(.init($0.label)))
     }
     let rootChildren: [ResolvedNode]
     if let wrapperLabel = shape.kind.wrapperLabel {
@@ -2208,7 +2209,7 @@ struct RuntimeRegistrationRestoreScopingTests {
         wrapperNode,
         resolved: ResolvedNode(
           identity: wrapperIdentity,
-          kind: .view(wrapperLabel),
+          kind: .view(.init(wrapperLabel)),
           children: siblingResolvedNodes
         ),
         accessedStateSlots: 0
@@ -2216,7 +2217,7 @@ struct RuntimeRegistrationRestoreScopingTests {
       rootChildren = [
         ResolvedNode(
           identity: wrapperIdentity,
-          kind: .view(wrapperLabel),
+          kind: .view(.init(wrapperLabel)),
           children: siblingResolvedNodes
         )
       ]
@@ -2252,7 +2253,7 @@ struct RuntimeRegistrationRestoreScopingTests {
     )
     graph.finishEvaluation(
       node,
-      resolved: ResolvedNode(identity: identity, kind: .view(label)),
+      resolved: ResolvedNode(identity: identity, kind: .view(.init(label))),
       accessedStateSlots: 0
     )
     return node

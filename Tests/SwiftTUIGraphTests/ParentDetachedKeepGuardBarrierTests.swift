@@ -35,18 +35,18 @@ struct ParentDetachedKeepGuardBarrierTests {
     let resolvedOption =
       graph.finishEvaluation(
         optionNode,
-        resolved: ResolvedNode(identity: optionIdentity, kind: .view("Option")),
+        resolved: ResolvedNode(identity: optionIdentity, kind: .view(.init("Option"))),
         accessedStateSlots: 0
-      ) ?? ResolvedNode(identity: optionIdentity, kind: .view("Option"))
+      ) ?? ResolvedNode(identity: optionIdentity, kind: .view(.init("Option")))
     graph.withResolveLifetimeScope(hostedBy: controlNode) {
       graph.reportDetachedResolvedLifetimeResult(resolvedOption)
     }
     let resolvedControl =
       graph.finishEvaluation(
         controlNode,
-        resolved: ResolvedNode(identity: controlIdentity, kind: .view("Control")),
+        resolved: ResolvedNode(identity: controlIdentity, kind: .view(.init("Control"))),
         accessedStateSlots: 0
-      ) ?? ResolvedNode(identity: controlIdentity, kind: .view("Control"))
+      ) ?? ResolvedNode(identity: controlIdentity, kind: .view(.init("Control")))
 
     var rootChildren = [resolvedControl]
     if keeperCommitted {
@@ -54,9 +54,9 @@ struct ParentDetachedKeepGuardBarrierTests {
       let resolvedKeeper =
         graph.finishEvaluation(
           keeperNode,
-          resolved: ResolvedNode(identity: keeperIdentity, kind: .view("Keeper")),
+          resolved: ResolvedNode(identity: keeperIdentity, kind: .view(.init("Keeper"))),
           accessedStateSlots: 0
-        ) ?? ResolvedNode(identity: keeperIdentity, kind: .view("Keeper"))
+        ) ?? ResolvedNode(identity: keeperIdentity, kind: .view(.init("Keeper")))
       rootChildren.append(resolvedKeeper)
     }
     graph.finishEvaluation(
@@ -78,7 +78,7 @@ struct ParentDetachedKeepGuardBarrierTests {
     let optionNode = graph.beginEvaluation(identity: optionIdentity, invalidator: nil)
     _ = graph.finishEvaluation(
       optionNode,
-      resolved: ResolvedNode(identity: optionIdentity, kind: .view("Option")),
+      resolved: ResolvedNode(identity: optionIdentity, kind: .view(.init("Option"))),
       accessedStateSlots: 0
     )
     #expect(
@@ -137,16 +137,16 @@ struct ParentDetachedKeepGuardBarrierTests {
     let resolvedOption =
       graph.finishEvaluation(
         optionNode,
-        resolved: ResolvedNode(identity: optionIdentity, kind: .view("Option")),
+        resolved: ResolvedNode(identity: optionIdentity, kind: .view(.init("Option"))),
         accessedStateSlots: 0
-      ) ?? ResolvedNode(identity: optionIdentity, kind: .view("Option"))
+      ) ?? ResolvedNode(identity: optionIdentity, kind: .view(.init("Option")))
     let keeperNode = graph.beginEvaluation(identity: keeperIdentity, invalidator: nil)
     let resolvedKeeper =
       graph.finishEvaluation(
         keeperNode,
-        resolved: ResolvedNode(identity: keeperIdentity, kind: .view("Keeper")),
+        resolved: ResolvedNode(identity: keeperIdentity, kind: .view(.init("Keeper"))),
         accessedStateSlots: 0
-      ) ?? ResolvedNode(identity: keeperIdentity, kind: .view("Keeper"))
+      ) ?? ResolvedNode(identity: keeperIdentity, kind: .view(.init("Keeper")))
     let rootNode = graph.beginEvaluation(identity: rootIdentity, invalidator: nil)
     _ = graph.finishEvaluation(
       rootNode,

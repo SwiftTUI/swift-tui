@@ -18,7 +18,7 @@ struct ScrollViewLayoutInsetSeedTests {
   private func contentNode(_ name: String, size: CellSize) -> ResolvedNode {
     ResolvedNode(
       identity: testIdentity(name),
-      kind: .view("Content"),
+      kind: .view(.init("Content")),
       intrinsicSize: size
     )
   }
@@ -134,7 +134,7 @@ struct ScrollViewLayoutInsetSeedTests {
     let content = contentNode("RetainedContent", size: .init(width: 40, height: 100))
     let scroll = ResolvedNode(
       identity: testIdentity("Scroll"),
-      kind: .view("ScrollView"),
+      kind: .view(.scrollView),
       children: [content],
       layoutBehavior: AnyLayout(verticalScrollLayout()).resolvedBehavior
     )
@@ -200,7 +200,7 @@ struct ScrollViewLayoutInsetSeedTests {
     let content = contentNode("ShadowSeedContent", size: .init(width: 40, height: 100))
     let scroll = ResolvedNode(
       identity: testIdentity("ShadowSeedScroll"),
-      kind: .view("ScrollView"),
+      kind: .view(.scrollView),
       children: [content],
       layoutBehavior: AnyLayout(verticalScrollLayout()).resolvedBehavior
     )

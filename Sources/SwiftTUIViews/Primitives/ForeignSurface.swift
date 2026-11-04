@@ -14,7 +14,7 @@ public struct ForeignSurface<Payload: ForeignSurfacePayload>: PrimitiveView, Res
   package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
     [
       resolveLeafNode(
-        kindName: "ForeignSurface",
+        kindName: .foreignSurface,
         drawPayload: .foreignSurface(payload),
         in: context
       )

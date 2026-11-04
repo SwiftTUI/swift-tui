@@ -109,7 +109,7 @@ struct FocusParticipationPolicyTests {
   func automaticParticipationMatchesClassification(_ entry: RoleClassification) {
     let metadata = SemanticMetadata(accessibilityRole: entry.role)
     #expect(
-      metadata.participatesInTopLevelFocus(kind: .view("Probe"))
+      metadata.participatesInTopLevelFocus(kind: .view(.init("Probe")))
         == entry.isAutomaticallyFocusable,
       "\(entry.caseName): automatic focus classification changed"
     )
@@ -119,17 +119,17 @@ struct FocusParticipationPolicyTests {
   func explicitParticipationOverridesRole() {
     var included = SemanticMetadata(accessibilityRole: .image)
     included.isFocusable = true
-    #expect(included.participatesInTopLevelFocus(kind: .view("Probe")))
+    #expect(included.participatesInTopLevelFocus(kind: .view(.init("Probe"))))
 
     var excluded = SemanticMetadata(accessibilityRole: .button)
     excluded.isFocusable = false
-    #expect(!excluded.participatesInTopLevelFocus(kind: .view("Probe")))
+    #expect(!excluded.participatesInTopLevelFocus(kind: .view(.init("Probe"))))
   }
 
   @Test("a role-less non-control node does not participate automatically")
   func roleLessNonControlDoesNotParticipate() {
     let metadata = SemanticMetadata()
-    #expect(!metadata.participatesInTopLevelFocus(kind: .view("Text")))
+    #expect(!metadata.participatesInTopLevelFocus(kind: .view(.text)))
     #expect(!metadata.participatesInTopLevelFocus(kind: .root))
   }
 }

@@ -36,15 +36,15 @@ struct ViewNodeSnapshotRebuildTests {
     let siblingResolved = try #require(
       graph.finishEvaluation(
         sibling,
-        resolved: ResolvedNode(identity: siblingIdentity, kind: .view("Sibling")),
+        resolved: ResolvedNode(identity: siblingIdentity, kind: .view(.init("Sibling"))),
         accessedStateSlots: 0
       )
     )
     let placeholderValue = ResolvedNode(
       identity: placeholderIdentity,
-      kind: .view("TabBody"),
+      kind: .view(.init("TabBody")),
       children: [
-        ResolvedNode(identity: interiorIdentity, kind: .view("Interior"))
+        ResolvedNode(identity: interiorIdentity, kind: .view(.init("Interior")))
       ]
     )
     let hostResolved = try #require(
@@ -52,7 +52,7 @@ struct ViewNodeSnapshotRebuildTests {
         host,
         resolved: ResolvedNode(
           identity: hostIdentity,
-          kind: .view("Host"),
+          kind: .view(.init("Host")),
           children: [placeholderValue, siblingResolved]
         ),
         accessedStateSlots: 0
@@ -83,7 +83,7 @@ struct ViewNodeSnapshotRebuildTests {
     )
     _ = graph.finishEvaluation(
       siblingReapplied,
-      resolved: ResolvedNode(identity: siblingIdentity, kind: .view("Sibling")),
+      resolved: ResolvedNode(identity: siblingIdentity, kind: .view(.init("Sibling"))),
       accessedStateSlots: 0
     )
     #expect(!host.hasCachedSnapshot, "the sibling apply must stale the host's cache")
@@ -115,9 +115,9 @@ struct ViewNodeSnapshotRebuildTests {
         host,
         resolved: ResolvedNode(
           identity: hostIdentity,
-          kind: .view("Host"),
+          kind: .view(.init("Host")),
           children: [
-            ResolvedNode(identity: placeholderIdentity, kind: .view("TabBody"))
+            ResolvedNode(identity: placeholderIdentity, kind: .view(.init("TabBody")))
           ]
         ),
         accessedStateSlots: 0

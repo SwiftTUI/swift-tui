@@ -511,9 +511,9 @@ private func connectPlanningNode(
   parent.apply(
     resolved: ResolvedNode(
       identity: parent.identity,
-      kind: .view("PlanningNode"),
+      kind: .view(.init("PlanningNode")),
       children: children.map { child in
-        ResolvedNode(identity: child.identity, kind: .view("PlanningChild"))
+        ResolvedNode(identity: child.identity, kind: .view(.init("PlanningChild")))
       }
     ),
     children: children
@@ -560,6 +560,6 @@ private func planningResolvedNode(
 ) -> ResolvedNode {
   ResolvedNode(
     identity: Identity(components: components),
-    kind: .view("PlanningChild")
+    kind: .view(.init("PlanningChild"))
   )
 }

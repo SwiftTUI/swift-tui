@@ -15,7 +15,7 @@ struct MeasureSizeStabilityCutoffTests {
     ResolvedNode(
       viewNodeID: ViewNodeID(rawValue: 3),
       identity: testIdentity("Root", "Inner", "B"),
-      kind: .view("Test"),
+      kind: .view(.init("Test")),
       intrinsicSize: size
     )
   }
@@ -24,18 +24,18 @@ struct MeasureSizeStabilityCutoffTests {
     ResolvedNode(
       viewNodeID: ViewNodeID(rawValue: 1),
       identity: testIdentity("Root"),
-      kind: .view("VStack"),
+      kind: .view(.vStack),
       children: [
         ResolvedNode(
           viewNodeID: ViewNodeID(rawValue: 4),
           identity: testIdentity("Root", "A"),
-          kind: .view("Test"),
+          kind: .view(.init("Test")),
           intrinsicSize: .init(width: 5, height: 1)
         ),
         ResolvedNode(
           viewNodeID: ViewNodeID(rawValue: 2),
           identity: testIdentity("Root", "Inner"),
-          kind: .view("VStack"),
+          kind: .view(.vStack),
           children: [leafB(size: leafBSize)],
           layoutBehavior: .stack(
             axis: .vertical,
@@ -195,17 +195,17 @@ struct MeasureSizeStabilityCutoffTests {
       ResolvedNode(
         viewNodeID: ViewNodeID(rawValue: 11),
         identity: testIdentity("Root"),
-        kind: .view("VStack"),
+        kind: .view(.vStack),
         children: [
           ResolvedNode(
             viewNodeID: ViewNodeID(rawValue: 12),
             identity: testIdentity("Root", "Lazy"),
-            kind: .view("LazyVStack"),
+            kind: .view(.lazyVStack),
             children: [
               ResolvedNode(
                 viewNodeID: ViewNodeID(rawValue: 13),
                 identity: bIdentity,
-                kind: .view("Test"),
+                kind: .view(.init("Test")),
                 intrinsicSize: .init(width: 4, height: 1)
               )
             ],
@@ -273,24 +273,24 @@ struct MeasureSizeStabilityCutoffTests {
       ResolvedNode(
         viewNodeID: ViewNodeID(rawValue: UInt64(40 + index)),
         identity: testIdentity("Root", "Filler\(index)"),
-        kind: .view("Test"),
+        kind: .view(.init("Test")),
         intrinsicSize: .init(width: 5, height: 1)
       )
     }
     return ResolvedNode(
       viewNodeID: ViewNodeID(rawValue: 31),
       identity: testIdentity("Root"),
-      kind: .view("VStack"),
+      kind: .view(.vStack),
       children: fillers + [
         ResolvedNode(
           viewNodeID: ViewNodeID(rawValue: 33),
           identity: testIdentity("Root", "F"),
-          kind: .view("Frame"),
+          kind: .view(.frame),
           children: [
             ResolvedNode(
               viewNodeID: ViewNodeID(rawValue: 34),
               identity: testIdentity("Root", "F", "B"),
-              kind: .view("Test"),
+              kind: .view(.init("Test")),
               intrinsicSize: .init(width: innerLeafWidth, height: 1)
             )
           ],
@@ -466,7 +466,7 @@ struct MeasureSizeStabilityCutoffTests {
     let leaf = ResolvedNode(
       viewNodeID: ViewNodeID(rawValue: 21),
       identity: testIdentity("Baseline"),
-      kind: .view("Test"),
+      kind: .view(.init("Test")),
       intrinsicSize: .init(width: 9, height: 3)
     )
     _ = engine.measure(leaf, proposal: .unspecified, passContext: nil)

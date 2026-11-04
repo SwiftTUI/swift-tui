@@ -43,7 +43,7 @@ struct FrameHeadDraftProjectionTests {
     var draft = makeDraft(renderer)
     let replacement = ResolvedNode(
       identity: testIdentity("FrameHeadProjection", "Replacement"),
-      kind: .view("Text"),
+      kind: .view(.text),
       children: []
     )
 
@@ -62,7 +62,7 @@ struct FrameHeadDraftProjectionTests {
     var draft = makeDraft(renderer)
     let replacement = ResolvedNode(
       identity: testIdentity("FrameHeadProjection", "TailWrite"),
-      kind: .view("Text"),
+      kind: .view(.text),
       children: []
     )
 

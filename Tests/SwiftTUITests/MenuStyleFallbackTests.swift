@@ -91,12 +91,12 @@ private func subtreeRootCount(_ node: ResolvedNode, under identity: Identity) ->
 /// The child count of every `MenuState` node: the menu's dedicated state host
 /// carries exactly one style body, never the discarded resolve beside it.
 private func menuStateChildCounts(_ node: ResolvedNode) -> [Int] {
-  let own = node.kind == .view("MenuState") ? [node.children.count] : []
+  let own = node.kind == .view(.menuState) ? [node.children.count] : []
   return own + node.children.flatMap(menuStateChildCounts)
 }
 
 private func routeCount(_ node: ResolvedNode, identity: Identity) -> Int {
-  let own = node.kind == .view("PointerRoute") && node.identity == identity ? 1 : 0
+  let own = node.kind == .view(.pointerRoute) && node.identity == identity ? 1 : 0
   return own + node.children.reduce(0) { $0 + routeCount($1, identity: identity) }
 }
 

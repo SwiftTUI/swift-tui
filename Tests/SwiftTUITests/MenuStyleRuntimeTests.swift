@@ -279,7 +279,7 @@ private struct MenuDisableFixture: View {
   }
 }
 private func menuRouteCount(_ node: ResolvedNode, identity: Identity) -> Int {
-  let own = node.kind == .view("PointerRoute") && node.identity == identity ? 1 : 0
+  let own = node.kind == .view(.pointerRoute) && node.identity == identity ? 1 : 0
   return own + node.children.reduce(0) { $0 + menuRouteCount($1, identity: identity) }
 }
 @MainActor private final class MenuConfigurationProbe { var configuration: MenuStyleConfiguration? }

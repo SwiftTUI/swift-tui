@@ -19,9 +19,9 @@ public struct TableRow<Content: View>: PrimitiveView, IterativeResolvableView {
 
 extension TableRow {
   private func resolvedNode(in context: ResolveContext) -> ResolveWork<ResolvedNode> {
-    resolveDeclaredChildrenWork(content, in: context, kindName: "Cell").map {
+    resolveDeclaredChildrenWork(content, in: context, kindName: .cell).map {
       ResolvedNode(
-        identity: context.identity, kind: .view("TableRow"), children: $0,
+        identity: context.identity, kind: .view(.tableRow), children: $0,
         environmentSnapshot: context.environment, transactionSnapshot: context.transaction,
         semanticMetadata: .init(accessibilityRole: .tableRow))
     }
@@ -548,7 +548,7 @@ extension Table {
         columnCount: resolvedColumns.count + (isSelectable ? 1 : 0))
       var node = ResolvedNode(
         identity: context.identity,
-        kind: .view("Table"),
+        kind: .view(.table),
         children: resolvedContent.children,
         environmentSnapshot: context.environment,
         transactionSnapshot: context.transaction,
@@ -587,7 +587,7 @@ extension Table {
         // Rebuild its geometry around the authored cell, never around itself.
         let identity = row.identity.child(.indexed("HostedTableCell", index: index))
         let authoredCell =
-          cell.identity == identity && cell.kind == .view("HostedTableCell")
+          cell.identity == identity && cell.kind == .view(.hostedTableCell)
           ? cell.children.first ?? cell : cell
         let cell = singleLineHostedTableCell(authoredCell)
         let width = widths.indices.contains(index) ? widths[index] : 1
@@ -597,7 +597,7 @@ extension Table {
           : Alignment.leading
         var hostedCell = ResolvedNode(
           identity: identity,
-          kind: .view("HostedTableCell"),
+          kind: .view(.hostedTableCell),
           children: [cell],
           environmentSnapshot: cell.environmentSnapshot,
           transactionSnapshot: cell.transactionSnapshot,
@@ -651,7 +651,7 @@ extension Table {
     return resolveDeclaredChildrenWork(
       rows,
       in: context,
-      kindName: "TableContent"
+      kindName: .tableContent
     )
     .map { nodes in
       var result = ResolvedRows()

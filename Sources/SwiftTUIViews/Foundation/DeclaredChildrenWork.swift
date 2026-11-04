@@ -8,14 +8,15 @@ package final class DeclaredChildrenWorkState {
 
 @MainActor
 package func appendDeclaredChildWork<V: View>(
-  _ view: V, in context: ResolveContext, kindName: String,
+  _ view: V, in context: ResolveContext, kindName: ViewKind,
   into state: DeclaredChildrenWorkState
 ) -> ResolveWork<Void> {
   .deferred {
     if let structural = view as? any DeclaredChildrenView {
       return structural.appendDeclaredChildrenWork(in: context, kindName: kindName, into: state)
     }
-    let childContext = context.indexedChild(kind: .init(rawValue: kindName), index: state.nextIndex)
+    let childContext = context.indexedChild(
+      kind: .init(rawValue: kindName.name), index: state.nextIndex)
     state.nextIndex += 1
     return resolvingStyleRouteAlternative {
       if context.viewGraph != nil {
@@ -36,7 +37,7 @@ package func appendDeclaredChildWork<V: View>(
 
 @MainActor
 package func resolveDeclaredChildrenWork<V: View>(
-  _ view: V, in context: ResolveContext, kindName: String
+  _ view: V, in context: ResolveContext, kindName: ViewKind
 ) -> ResolveWork<[ResolvedNode]> {
   .deferred {
     let state = DeclaredChildrenWorkState()

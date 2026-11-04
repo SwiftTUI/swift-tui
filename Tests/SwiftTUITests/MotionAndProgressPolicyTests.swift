@@ -490,7 +490,7 @@ struct ReducedMotionCompletionDeliveryTests {
     // machinery: immediate deadline) and fire on the next controller tick.
     var leaf = ResolvedNode(
       identity: testIdentity("ReducedMotionCompletionLeaf"),
-      kind: .view("Leaf")
+      kind: .view(.init("Leaf"))
     )
     _ = controller.applyInterpolations(
       to: &leaf,
@@ -567,7 +567,7 @@ struct ReducedMotionCompletionDeliveryTests {
 
     var leaf = ResolvedNode(
       identity: testIdentity("ReducedMotionSegmentLeaf"),
-      kind: .view("Leaf")
+      kind: .view(.init("Leaf"))
     )
     _ = controller.applyInterpolations(
       to: &leaf,

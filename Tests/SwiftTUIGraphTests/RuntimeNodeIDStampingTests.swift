@@ -36,7 +36,7 @@ struct RuntimeNodeIDStampingTests {
       children: [
         ResolvedNode(
           identity: testIdentity("Root", "Leaf"),
-          kind: .view("Leaf")
+          kind: .view(.init("Leaf"))
         )
       ]
     )
@@ -54,7 +54,7 @@ struct RuntimeNodeIDStampingTests {
         ResolvedNode(
           viewNodeID: ViewNodeID(rawValue: 8),
           identity: testIdentity("Root", "Leaf"),
-          kind: .view("Leaf")
+          kind: .view(.init("Leaf"))
         )
       ]
     )
@@ -74,7 +74,7 @@ struct RuntimeNodeIDStampingTests {
     node.children = [
       ResolvedNode(
         identity: testIdentity("Root", "Leaf"),
-        kind: .view("Leaf")
+        kind: .view(.init("Leaf"))
       )
     ]
     #expect(node.subtreeRuntimeNodeIDsStamped == false)
@@ -83,7 +83,7 @@ struct RuntimeNodeIDStampingTests {
       ResolvedNode(
         viewNodeID: ViewNodeID(rawValue: 8),
         identity: testIdentity("Root", "Leaf"),
-        kind: .view("Leaf")
+        kind: .view(.init("Leaf"))
       )
     ]
     #expect(node.subtreeRuntimeNodeIDsStamped)
@@ -103,7 +103,7 @@ struct RuntimeNodeIDStampingTests {
         ResolvedNode(
           viewNodeID: ViewNodeID(rawValue: 8),
           identity: testIdentity("Root", "Leaf"),
-          kind: .view("Leaf")
+          kind: .view(.init("Leaf"))
         )
       ]
     )
@@ -112,7 +112,7 @@ struct RuntimeNodeIDStampingTests {
     node.setChildrenPreservingDerivedState([
       ResolvedNode(
         identity: testIdentity("Root", "Leaf"),
-        kind: .view("Leaf")
+        kind: .view(.init("Leaf"))
       )
     ])
     #expect(node.subtreeRuntimeNodeIDsStamped)
@@ -160,7 +160,7 @@ struct RuntimeNodeIDStampingTests {
         children: [
           ResolvedNode(
             identity: testIdentity("Root", "Branch"),
-            kind: .view("Branch")
+            kind: .view(.init("Branch"))
           )
         ]
       )
@@ -173,7 +173,7 @@ struct RuntimeNodeIDStampingTests {
     let stampedGrandchild = ResolvedNode(
       viewNodeID: ViewNodeID(rawValue: 99),
       identity: testIdentity("Root", "Branch", "Spliced"),
-      kind: .view("Spliced")
+      kind: .view(.init("Spliced"))
     )
     var branchPayload = committed.children[0]
     branchPayload.viewNodeID = nil
@@ -201,15 +201,15 @@ struct RuntimeNodeIDStampingTests {
       children: [
         ResolvedNode(
           identity: testIdentity("Root", "Branch"),
-          kind: .view("Branch"),
+          kind: .view(.init("Branch")),
           children: [
             ResolvedNode(
               identity: testIdentity("Root", "Branch", "LeafA"),
-              kind: .view("LeafA")
+              kind: .view(.init("LeafA"))
             ),
             ResolvedNode(
               identity: testIdentity("Root", "Branch", "LeafB"),
-              kind: .view("LeafB")
+              kind: .view(.init("LeafB"))
             ),
           ]
         )

@@ -175,7 +175,7 @@ private func preferredWindowContentSize(
   resolved: ResolvedNode,
   measured: MeasuredNode
 ) -> CellSize? {
-  if isWindowHostLayout(resolved) {
+  if resolved.typeDiscriminator == ObjectIdentifier(WindowHostLayout.self) {
     let childMeasurements = measured.childMeasurements
     guard !childMeasurements.isEmpty else {
       return measured.measuredSize
@@ -197,13 +197,4 @@ private func preferredWindowContentSize(
   }
 
   return nil
-}
-
-private func isWindowHostLayout(
-  _ node: ResolvedNode
-) -> Bool {
-  guard case .view("WindowHostLayout") = node.kind else {
-    return false
-  }
-  return true
 }

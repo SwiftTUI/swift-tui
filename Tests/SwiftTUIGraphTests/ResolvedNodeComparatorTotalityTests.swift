@@ -114,11 +114,11 @@ struct ResolvedNodeComparatorTotalityTests {
   func dynamicPropertyCertificationSurvivesSnapshotRebuild() {
     let child = ResolvedNode(
       identity: testIdentity("DynamicPropertyCertification", "child"),
-      kind: .view("Text")
+      kind: .view(.text)
     )
     var direct = ResolvedNode(
       identity: testIdentity("DynamicPropertyCertification", "direct"),
-      kind: .view("Host")
+      kind: .view(.init("Host"))
     )
     direct.directDynamicPropertyReuseCertified = false
 
@@ -135,7 +135,7 @@ struct ResolvedNodeComparatorTotalityTests {
 
     var ancestor = ResolvedNode(
       identity: testIdentity("DynamicPropertyCertification", "ancestor"),
-      kind: .view("VStack"),
+      kind: .view(.vStack),
       children: [direct]
     )
     #expect(ancestor.directDynamicPropertyReuseCertified)
@@ -229,7 +229,7 @@ struct ResolvedNodeComparatorTotalityTests {
   // MARK: - Value-level teeth for the memo oracle's documented exemptions
 
   private func leafPair() -> (ResolvedNode, ResolvedNode) {
-    let node = ResolvedNode(identity: testIdentity("Root"), kind: .view("Leaf"))
+    let node = ResolvedNode(identity: testIdentity("Root"), kind: .view(.init("Leaf")))
     return (node, node)
   }
 
@@ -274,12 +274,12 @@ struct ResolvedNodeComparatorTotalityTests {
   @Test("memo oracle recurses: a grandchild content diff defeats reuse")
   func memoOracleRecursesIntoChildren() {
     let grandchild = ResolvedNode(
-      identity: testIdentity("Root", "Child", "Leaf"), kind: .view("Leaf")
+      identity: testIdentity("Root", "Child", "Leaf"), kind: .view(.init("Leaf"))
     )
     var changedGrandchild = grandchild
-    changedGrandchild.kind = .view("Renamed")
+    changedGrandchild.kind = .view(.init("Renamed"))
     let child = ResolvedNode(
-      identity: testIdentity("Root", "Child"), kind: .view("Child"), children: [grandchild]
+      identity: testIdentity("Root", "Child"), kind: .view(.init("Child")), children: [grandchild]
     )
     var changedChild = child
     changedChild._storedChildren = [changedGrandchild]
@@ -295,7 +295,7 @@ struct ResolvedNodeComparatorTotalityTests {
 
   @Test("memo oracle flips on a children count mismatch")
   func memoOracleFlipsOnChildCountMismatch() {
-    let child = ResolvedNode(identity: testIdentity("Root", "Leaf"), kind: .view("Leaf"))
+    let child = ResolvedNode(identity: testIdentity("Root", "Leaf"), kind: .view(.init("Leaf")))
     let current = ResolvedNode(identity: testIdentity("Root"), kind: .root, children: [child])
     let committed = ResolvedNode(identity: testIdentity("Root"), kind: .root, children: [])
     #expect(!current.memoReuseEquivalent(to: committed))

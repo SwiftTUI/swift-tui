@@ -489,7 +489,7 @@ private struct OutlineRow<Content: View>: PrimitiveView, IterativeResolvableView
     return resolveDeclaredChildrenWork(
       rowBody(prefix: prefix, spacing: isHosted ? 1 : 0),
       in: context.child(component: .named("Content")),
-      kindName: "OutlineRow"
+      kindName: .outlineRow
     ).map { children in
       var metadata = SemanticMetadata(isHostedCollectionRowBoundary: true)
       metadata.accessibilityProperties = .init(
@@ -497,7 +497,7 @@ private struct OutlineRow<Content: View>: PrimitiveView, IterativeResolvableView
       return [
         ResolvedNode(
           identity: context.identity,
-          kind: .view("OutlineRow"),
+          kind: .view(.outlineRow),
           children: children,
           environmentSnapshot: context.environment,
           transactionSnapshot: context.transaction,

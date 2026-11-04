@@ -21,14 +21,14 @@ public struct ViewThatFits<Content: View>: PrimitiveView, IterativeResolvableVie
       resolveDeclaredChildrenWork(
         content,
         in: context,
-        kindName: "ViewThatFits"
+        kindName: .viewThatFits
       )
     }
     .map { resolvedChildren in
       return [
         ResolvedNode(
           identity: context.identity,
-          kind: .view("ViewThatFits"),
+          kind: .view(.viewThatFits),
           children: resolvedChildren,
           environmentSnapshot: context.environment,
           transactionSnapshot: context.transaction,

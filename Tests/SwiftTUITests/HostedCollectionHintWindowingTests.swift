@@ -26,7 +26,7 @@ struct HostedCollectionHintWindowingTests {
     var node = Resolver().resolve(content(), in: .init(identity: testIdentity("VacuousHosted")))
     if wrapped {
       node = ResolvedNode(
-        identity: testIdentity("Wrapper"), kind: .view("Wrapper"),
+        identity: testIdentity("Wrapper"), kind: .view(.init("Wrapper")),
         children: [node], layoutBehavior: .frame(width: nil, height: nil, alignment: .topLeading))
     }
     let engine = LayoutEngine(cache: MeasurementCache())

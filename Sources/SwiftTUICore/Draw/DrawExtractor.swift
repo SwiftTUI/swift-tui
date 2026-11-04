@@ -582,7 +582,7 @@ extension DrawExtractor {
     kind: NodeKind,
     children: [PlacedNode]
   ) -> BorderMask? {
-    guard kind == .view("Overlay"),
+    guard kind == .view(.overlay),
       children.count == 2
     else {
       return nil
@@ -597,7 +597,7 @@ extension DrawExtractor {
     inheritedBorderMask: BorderMask?,
     overlayBorderMask: BorderMask?
   ) -> BorderMask? {
-    if kind == .view("Overlay"), index == 0, let overlayBorderMask {
+    if kind == .view(.overlay), index == 0, let overlayBorderMask {
       return overlayBorderMask
     }
     return inheritedBorderMask
@@ -608,7 +608,7 @@ extension DrawExtractor {
     kind: NodeKind,
     inheritedValue: Bool
   ) -> Bool {
-    guard kind == .view("Background") else {
+    guard kind == .view(.background) else {
       return inheritedValue
     }
     if index == 0 {

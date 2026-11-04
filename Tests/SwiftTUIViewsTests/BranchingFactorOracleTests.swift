@@ -178,7 +178,7 @@ struct BranchingFactorOracleTests {
   func viewThatFits() throws {
     let resolved = ResolvedNode(
       identity: testIdentity("vtf"),
-      kind: .view("ViewThatFits"),
+      kind: .view(.viewThatFits),
       children: [
         leaf("tall", size: .init(width: 10, height: 30)),
         leaf("medium", size: .init(width: 10, height: 20)),
@@ -446,7 +446,7 @@ struct BranchingFactorOracleTests {
   private func customGridNode(childCount: Int) -> ResolvedNode {
     ResolvedNode(
       identity: testIdentity("grid"),
-      kind: .view("TwoColumnGridLayout"),
+      kind: .view(.init("TwoColumnGridLayout")),
       children: (0..<childCount).map { index in
         leaf("cell-\(index)", size: .init(width: 6, height: 2))
       },
@@ -519,7 +519,7 @@ private func leaf(
   ResolvedNode(
     viewNodeID: fixtureViewNodeID(name),
     identity: testIdentity(name),
-    kind: .view("Test"),
+    kind: .view(.init("Test")),
     intrinsicSize: size
   )
 }
@@ -528,7 +528,7 @@ private func spacer(_ name: String) -> ResolvedNode {
   ResolvedNode(
     viewNodeID: fixtureViewNodeID(name),
     identity: testIdentity(name),
-    kind: .view("Spacer"),
+    kind: .view(.spacer),
     intrinsicSize: .zero
   )
 }
@@ -541,7 +541,7 @@ private func stack(
   ResolvedNode(
     viewNodeID: fixtureViewNodeID(name),
     identity: testIdentity(name),
-    kind: .view(axis == .horizontal ? "HStack" : "VStack"),
+    kind: .view(axis == .horizontal ? .hStack : .vStack),
     children: children,
     layoutBehavior: .stack(
       axis: axis,
@@ -560,7 +560,7 @@ private func flexibleWidthChild(
 ) -> ResolvedNode {
   ResolvedNode(
     identity: testIdentity(name),
-    kind: .view("FlexibleFrame"),
+    kind: .view(.flexibleFrame),
     children: [leaf("\(name)-content", size: size)],
     layoutBehavior: .flexibleFrame(
       minWidth: nil,
@@ -581,7 +581,7 @@ private func indexedLazyStack(
 ) -> ResolvedNode {
   ResolvedNode(
     identity: testIdentity(name),
-    kind: .view(axis == .horizontal ? "LazyHStack" : "LazyVStack"),
+    kind: .view(axis == .horizontal ? .lazyHStack : .lazyVStack),
     layoutBehavior: .lazyStack(
       axis: axis,
       spacing: 0,

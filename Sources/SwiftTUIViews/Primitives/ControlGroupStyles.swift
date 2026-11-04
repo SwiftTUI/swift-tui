@@ -234,7 +234,7 @@ extension ControlGroupStyleConfiguration.Content: ResolvableView, DeclaredChildr
     sequence.makeResolveWork(in: context)
   }
   package func appendDeclaredChildrenWork(
-    in context: ResolveContext, kindName: String, into state: DeclaredChildrenWorkState
+    in context: ResolveContext, kindName: ViewKind, into state: DeclaredChildrenWorkState
   ) -> ResolveWork<Void> {
     sequence.appendDeclaredChildrenWork(in: context, kindName: kindName, into: state)
   }
@@ -244,7 +244,7 @@ extension ControlGroupStyleConfiguration.Content: ResolvableView, DeclaredChildr
   }
 
   package func appendDeclaredChildren(
-    in context: ResolveContext, kindName: String, nextIndex: inout Int,
+    in context: ResolveContext, kindName: ViewKind, nextIndex: inout Int,
     into resolved: inout [ResolvedNode]
   ) {
     sequence.appendDeclaredChildren(
@@ -252,7 +252,7 @@ extension ControlGroupStyleConfiguration.Content: ResolvableView, DeclaredChildr
   }
 
   package func appendScopedDeclaredChildren(
-    in context: DeclaredPayloadTraversalContext, kindName: String, nextIndex: inout Int,
+    in context: DeclaredPayloadTraversalContext, kindName: ViewKind, nextIndex: inout Int,
     into children: inout [ScopedContentPayload]
   ) {
     sequence.appendScopedDeclaredChildren(
@@ -260,7 +260,7 @@ extension ControlGroupStyleConfiguration.Content: ResolvableView, DeclaredChildr
   }
 
   package func appendPortalDeclaredChildren(
-    in context: DeclaredPayloadTraversalContext, kindName: String, nextIndex: inout Int,
+    in context: DeclaredPayloadTraversalContext, kindName: ViewKind, nextIndex: inout Int,
     into children: inout [PortalAttachmentContentPayload]
   ) {
     sequence.appendPortalDeclaredChildren(
@@ -268,7 +268,7 @@ extension ControlGroupStyleConfiguration.Content: ResolvableView, DeclaredChildr
   }
 
   package func enumerateDeclaredChildren(
-    in context: ResolveContext, kindName: String, nextIndex: inout Int,
+    in context: ResolveContext, kindName: ViewKind, nextIndex: inout Int,
     visitor: (Any, ResolveContext, @escaping @MainActor () -> ResolvedNode) -> Void
   ) {
     sequence.enumerateDeclaredChildren(

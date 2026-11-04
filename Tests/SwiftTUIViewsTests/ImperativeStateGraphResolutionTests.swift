@@ -152,7 +152,7 @@ struct ImperativeStateGraphResolutionTests {
       ResolvedNode(
         identity: ownerIdentity,
         kind: .root,
-        children: [ResolvedNode(identity: descendantIdentity, kind: .view("Button"))]
+        children: [ResolvedNode(identity: descendantIdentity, kind: .view(.button))]
       )
     )
     let descendant = try #require(graph.nodeForIdentity(descendantIdentity))
@@ -244,10 +244,10 @@ struct ImperativeStateGraphResolutionTests {
         children: [
           ResolvedNode(
             identity: wrapperIdentity,
-            kind: .view("Wrapper"),
-            children: [ResolvedNode(identity: leafIdentity, kind: .view("Button"))]
+            kind: .view(.init("Wrapper")),
+            children: [ResolvedNode(identity: leafIdentity, kind: .view(.button))]
           ),
-          ResolvedNode(identity: siblingIdentity, kind: .view("Mount")),
+          ResolvedNode(identity: siblingIdentity, kind: .view(.init("Mount"))),
         ]
       )
     )
@@ -283,8 +283,8 @@ struct ImperativeStateGraphResolutionTests {
         children: [
           ResolvedNode(
             identity: ownerIdentity,
-            kind: .view("Owner"),
-            children: [ResolvedNode(identity: leafIdentity, kind: .view("Button"))]
+            kind: .view(.init("Owner")),
+            children: [ResolvedNode(identity: leafIdentity, kind: .view(.button))]
           )
         ]
       )
@@ -320,7 +320,7 @@ struct ImperativeStateGraphResolutionTests {
       ResolvedNode(
         identity: rootIdentity,
         kind: .root,
-        children: [ResolvedNode(identity: ownerIdentity, kind: .view("Candidate"))]
+        children: [ResolvedNode(identity: ownerIdentity, kind: .view(.init("Candidate")))]
       )
     )
     graph.beginFrame()
@@ -341,7 +341,7 @@ struct ImperativeStateGraphResolutionTests {
         identity: rootIdentity,
         kind: .root,
         children: [
-          ResolvedNode(identity: successorIdentity, kind: .view("Successor"))
+          ResolvedNode(identity: successorIdentity, kind: .view(.init("Successor")))
         ]
       )
     )
@@ -377,7 +377,7 @@ struct ImperativeStateGraphResolutionTests {
         ResolvedNode(
           identity: rootIdentity,
           kind: .root,
-          children: [ResolvedNode(identity: ownerIdentity, kind: .view("Owner"))]
+          children: [ResolvedNode(identity: ownerIdentity, kind: .view(.init("Owner")))]
         )
       )
     }
@@ -472,7 +472,7 @@ struct ImperativeStateGraphResolutionTests {
       ResolvedNode(
         identity: rootIdentity,
         kind: .root,
-        children: [ResolvedNode(identity: originalIdentity, kind: .view("Original"))]
+        children: [ResolvedNode(identity: originalIdentity, kind: .view(.init("Original")))]
       )
     )
     graph.beginFrame()
@@ -492,7 +492,7 @@ struct ImperativeStateGraphResolutionTests {
         identity: rootIdentity,
         kind: .root,
         children: [
-          ResolvedNode(identity: replacementIdentity, kind: .view("Replacement"))
+          ResolvedNode(identity: replacementIdentity, kind: .view(.init("Replacement")))
         ]
       )
     )

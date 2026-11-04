@@ -253,7 +253,7 @@ public struct ScrollView<Content: View>: PrimitiveView, IterativeResolvableView 
         return [
           ResolvedNode(
             identity: context.identity,
-            kind: .view("ScrollView"),
+            kind: .view(.scrollView),
             children: [child],
             environmentSnapshot: context.environment,
             transactionSnapshot: context.transaction,

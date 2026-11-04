@@ -27,8 +27,8 @@ struct ViewGraphCheckpointRestoreTests {
         identity: rootIdentity,
         kind: .root,
         children: [
-          ResolvedNode(identity: childIdentity, kind: .view("Child")),
-          ResolvedNode(identity: siblingIdentity, kind: .view("Sibling")),
+          ResolvedNode(identity: childIdentity, kind: .view(.init("Child"))),
+          ResolvedNode(identity: siblingIdentity, kind: .view(.init("Sibling"))),
         ]
       )
     )
@@ -39,7 +39,7 @@ struct ViewGraphCheckpointRestoreTests {
     updateNode(
       graph,
       identity: childIdentity,
-      kind: .view("ChildUpdated")
+      kind: .view(.init("ChildUpdated"))
     )
     draft.recordPreparedCheckpoint(from: graph)
 
@@ -130,8 +130,8 @@ struct ViewGraphCheckpointRestoreTests {
         identity: rootIdentity,
         kind: .root,
         children: [
-          ResolvedNode(identity: childIdentity, kind: .view("Child")),
-          ResolvedNode(identity: siblingIdentity, kind: .view("Sibling")),
+          ResolvedNode(identity: childIdentity, kind: .view(.init("Child"))),
+          ResolvedNode(identity: siblingIdentity, kind: .view(.init("Sibling"))),
         ]
       )
     )
@@ -142,7 +142,7 @@ struct ViewGraphCheckpointRestoreTests {
     updateNode(
       graph,
       identity: childIdentity,
-      kind: .view("ChildUpdated")
+      kind: .view(.init("ChildUpdated"))
     )
     draft.recordPreparedCheckpoint(from: graph)
     let prepared = graph.debugTotalStateSnapshot()
@@ -166,7 +166,7 @@ struct ViewGraphCheckpointRestoreTests {
         identity: rootIdentity,
         kind: .root,
         children: [
-          ResolvedNode(identity: childIdentity, kind: .view("Child"))
+          ResolvedNode(identity: childIdentity, kind: .view(.init("Child")))
         ]
       )
     )
@@ -179,7 +179,7 @@ struct ViewGraphCheckpointRestoreTests {
       identity: rootIdentity,
       kind: .root,
       children: [
-        ResolvedNode(identity: insertedIdentity, kind: .view("Inserted"))
+        ResolvedNode(identity: insertedIdentity, kind: .view(.init("Inserted")))
       ]
     )
     draft.recordPreparedCheckpoint(from: graph)
@@ -204,8 +204,8 @@ struct ViewGraphCheckpointRestoreTests {
         identity: rootIdentity,
         kind: .root,
         children: [
-          ResolvedNode(identity: childIdentity, kind: .view("Child")),
-          ResolvedNode(identity: siblingIdentity, kind: .view("Sibling")),
+          ResolvedNode(identity: childIdentity, kind: .view(.init("Child"))),
+          ResolvedNode(identity: siblingIdentity, kind: .view(.init("Sibling"))),
         ]
       )
     )
@@ -217,7 +217,7 @@ struct ViewGraphCheckpointRestoreTests {
     updateNode(
       graph,
       identity: childIdentity,
-      kind: .view("ChildUpdated")
+      kind: .view(.init("ChildUpdated"))
     )
     draft.recordPreparedCheckpoint(from: graph)
 
@@ -268,7 +268,7 @@ struct ViewGraphCheckpointRestoreTests {
         identity: rootIdentity,
         kind: .root,
         children: childIdentities.map {
-          ResolvedNode(identity: $0, kind: .view("Child"))
+          ResolvedNode(identity: $0, kind: .view(.init("Child")))
         }
       )
     )
@@ -299,7 +299,7 @@ struct ViewGraphCheckpointRestoreTests {
         identity: rootIdentity,
         kind: .root,
         children: [
-          ResolvedNode(identity: childIdentity, kind: .view("Child"))
+          ResolvedNode(identity: childIdentity, kind: .view(.init("Child")))
         ]
       )
     )
@@ -309,7 +309,7 @@ struct ViewGraphCheckpointRestoreTests {
     updateNode(
       graph,
       identity: childIdentity,
-      kind: .view("ChildUpdated")
+      kind: .view(.init("ChildUpdated"))
     )
     draft.recordPreparedCheckpoint(from: graph)
     let prepared = graph.debugTotalStateSnapshot()
@@ -338,7 +338,7 @@ struct ViewGraphCheckpointRestoreTests {
         identity: rootIdentity,
         kind: .root,
         children: [
-          ResolvedNode(identity: childIdentity, kind: .view("Child"))
+          ResolvedNode(identity: childIdentity, kind: .view(.init("Child")))
         ]
       )
     )
@@ -347,7 +347,7 @@ struct ViewGraphCheckpointRestoreTests {
     updateNode(
       graph,
       identity: childIdentity,
-      kind: .view("ChildUpdated")
+      kind: .view(.init("ChildUpdated"))
     )
     draft.recordPreparedCheckpoint(from: graph)
     draft.restoreBaselineState(in: graph)

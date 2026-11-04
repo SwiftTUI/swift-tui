@@ -39,7 +39,7 @@ public struct InsetShape<Base: InsettableShape>: InsettableShape, ResolvableView
   package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
     [
       resolveLeafNode(
-        kindName: kindName,
+        kindName: .init(kindName, custom: true),
         drawPayload: .shape(
           .init(
             geometry: geometry,

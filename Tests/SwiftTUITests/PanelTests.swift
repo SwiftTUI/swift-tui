@@ -192,7 +192,7 @@ struct PanelTests {
 
     // Stability at the resolved-tree level: find the Panel in each
     // resolved tree and compare its identity. Panel nodes are marked
-    // with `focusScopeBoundary == true` and `kind == .view("Panel")`.
+    // with `focusScopeBoundary == true` and `kind == .view(.panel)`.
     let panel1 = findPanelNode(in: resolved1)
     let panel2 = findPanelNode(in: resolved2)
     #expect(panel1 != nil)
@@ -322,13 +322,13 @@ private struct ForEachPanelProbe: View {
 }
 
 /// Traverses `root` to find the resolved node produced by a `Panel`.
-/// Panels set `kind == .view("Panel")` and mark themselves as focus
+/// Panels set `kind == .view(.panel)` and mark themselves as focus
 /// scope boundaries; either predicate uniquely identifies the node.
 @MainActor
 private func findPanelNode(in root: ResolvedNode) -> ResolvedNode? {
   var stack: [ResolvedNode] = [root]
   while let node = stack.popLast() {
-    if case .view(let name) = node.kind, name == "Panel" {
+    if case .view(let name) = node.kind, name == .panel {
       return node
     }
     stack.append(contentsOf: node.children)
@@ -342,7 +342,7 @@ private func findPanelNode(in root: ResolvedNode) -> ResolvedNode? {
 private func findPlacedPanelNode(in root: PlacedNode) -> PlacedNode? {
   var stack: [PlacedNode] = [root]
   while let node = stack.popLast() {
-    if case .view(let name) = node.kind, name == "Panel" {
+    if case .view(let name) = node.kind, name == .panel {
       return node
     }
     stack.append(contentsOf: node.children)
@@ -379,9 +379,9 @@ private func resolveForTest<V: View>(_ view: V) -> ResolvedNode {
 
 extension ResolvedNode {
   fileprivate var anyViewPayloadContent: ResolvedNode? {
-    guard kind == .view("AnyView"),
+    guard kind == .view(.anyView),
       children.count == 1,
-      children[0].kind == .view("AnyViewPayload"),
+      children[0].kind == .view(.anyViewPayload),
       children[0].children.count == 1
     else {
       return nil

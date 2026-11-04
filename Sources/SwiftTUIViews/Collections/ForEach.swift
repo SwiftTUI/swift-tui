@@ -50,11 +50,11 @@ where Data: RandomAccessCollection, ID: Hashable & Sendable, Content: View {
 
 extension ForEach: DeclaredChildrenView {
   package func appendDeclaredChildrenWork(
-    in context: ResolveContext, kindName: String, into state: DeclaredChildrenWorkState
+    in context: ResolveContext, kindName: ViewKind, into state: DeclaredChildrenWorkState
   ) -> ResolveWork<Void> {
     .deferred {
       let childContext = context.indexedChild(
-        kind: .init(rawValue: kindName), index: state.nextIndex)
+        kind: .init(rawValue: kindName.name), index: state.nextIndex)
       state.nextIndex += 1
       return makeResolveWork(in: childContext).map { state.nodes.append(contentsOf: $0) }
     }
@@ -62,12 +62,12 @@ extension ForEach: DeclaredChildrenView {
 
   package func appendDeclaredChildren(
     in context: ResolveContext,
-    kindName: String,
+    kindName: ViewKind,
     nextIndex: inout Int,
     into resolved: inout [ResolvedNode]
   ) {
     let childContext = context.indexedChild(
-      kind: .init(rawValue: kindName),
+      kind: .init(rawValue: kindName.name),
       index: nextIndex
     )
     nextIndex += 1
@@ -76,12 +76,12 @@ extension ForEach: DeclaredChildrenView {
 
   package func appendScopedDeclaredChildren(
     in context: DeclaredPayloadTraversalContext,
-    kindName: String,
+    kindName: ViewKind,
     nextIndex: inout Int,
     into children: inout [ScopedContentPayload]
   ) {
     let slotContext = context.indexedChild(
-      kind: .init(rawValue: kindName),
+      kind: .init(rawValue: kindName.name),
       index: nextIndex
     )
     nextIndex += 1
@@ -117,12 +117,12 @@ extension ForEach: DeclaredChildrenView {
 
   package func appendPortalDeclaredChildren(
     in context: DeclaredPayloadTraversalContext,
-    kindName: String,
+    kindName: ViewKind,
     nextIndex: inout Int,
     into children: inout [PortalAttachmentContentPayload]
   ) {
     let slotContext = context.indexedChild(
-      kind: .init(rawValue: kindName),
+      kind: .init(rawValue: kindName.name),
       index: nextIndex
     )
     nextIndex += 1
@@ -160,7 +160,7 @@ extension ForEach: DeclaredChildrenView {
 
   package func enumerateDeclaredChildren(
     in context: ResolveContext,
-    kindName: String,
+    kindName: ViewKind,
     nextIndex: inout Int,
     visitor: (
       _ child: Any,
@@ -169,7 +169,7 @@ extension ForEach: DeclaredChildrenView {
     ) -> Void
   ) {
     let childContext = context.indexedChild(
-      kind: .init(rawValue: kindName),
+      kind: .init(rawValue: kindName.name),
       index: nextIndex
     )
     nextIndex += 1

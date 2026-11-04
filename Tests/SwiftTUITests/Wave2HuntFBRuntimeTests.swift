@@ -333,7 +333,7 @@ struct Wave2HuntFBRuntimeTests {
   func w2fb005TrimmedFillMorphsPathWhileIntervalSnaps() throws {
     func node(_ geometry: ShapeGeometry) -> ResolvedNode {
       ResolvedNode(
-        identity: Identity(components: ["w2fb005"]), kind: .view("Path"),
+        identity: Identity(components: ["w2fb005"]), kind: .view(.init("Path")),
         drawPayload: .shape(.init(geometry: geometry, operation: .fill(style: .color(.white)))))
     }
     let from = Path(Rect(origin: .zero, size: .init(width: 0.2, height: 1)))

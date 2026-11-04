@@ -38,7 +38,7 @@ struct DropDestinationTests {
 private func findPanelNode(in root: ResolvedNode) -> ResolvedNode? {
   var stack: [ResolvedNode] = [root]
   while let node = stack.popLast() {
-    if case .view("Panel") = node.kind { return node }
+    if case .view(.panel) = node.kind { return node }
     stack.append(contentsOf: node.children)
   }
   return nil

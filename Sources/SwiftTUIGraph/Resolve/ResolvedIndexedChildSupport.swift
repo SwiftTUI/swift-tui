@@ -427,7 +427,7 @@ package func applyingHostedTableColumnWidths(
   var node = source
   node.children = node.children.enumerated().map { index, child in
     var child = applyingHostedTableColumnWidths(widths, to: child)
-    if child.kind == .view("HostedTableCell"),
+    if child.kind == .view(.hostedTableCell),
       case .frame(_, let height, let alignment) = child.layoutBehavior,
       widths.indices.contains(index)
     {

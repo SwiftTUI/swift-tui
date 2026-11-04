@@ -21,12 +21,12 @@ struct StructuralEquivalenceLockTests {
     let original = ResolvedNode(
       identity: testIdentity("Root", "VStack[2]"),
       structuralPath: path,
-      kind: .view("Text")
+      kind: .view(.text)
     )
     let reidentified = ResolvedNode(
       identity: testIdentity("Root", "VStack[2]", "ID[changed]"),
       structuralPath: path,
-      kind: .view("Text")
+      kind: .view(.text)
     )
 
     #expect(original.isEquivalentForMeasurement(to: reidentified))
@@ -54,7 +54,7 @@ struct StructuralEquivalenceLockTests {
 
     for pair in pairs {
       let left = ResolvedNode(
-        identity: testIdentity("Root"), kind: .view("Legacy"), typeDiscriminator: pair.left)
+        identity: testIdentity("Root"), kind: .view(.init("Legacy")), typeDiscriminator: pair.left)
       var right = left
       right.typeDiscriminator = pair.right
 
@@ -69,12 +69,12 @@ struct StructuralEquivalenceLockTests {
   func nestedWildcardDeniesWitnessRefresh() {
     let original = ResolvedNode(
       identity: testIdentity("Root"),
-      kind: .view("Container"),
+      kind: .view(.init("Container")),
       typeDiscriminator: ObjectIdentifier(String.self),
       children: [
         ResolvedNode(
           identity: testIdentity("Root", "Child"),
-          kind: .view("Legacy"),
+          kind: .view(.init("Legacy")),
           typeDiscriminator: ObjectIdentifier(Int.self)
         )
       ]
@@ -92,12 +92,12 @@ struct StructuralEquivalenceLockTests {
     let original = ResolvedNode(
       identity: testIdentity("Root", "Item"),
       structuralPath: slot("Root", "VStack[1]"),
-      kind: .view("Text")
+      kind: .view(.text)
     )
     let moved = ResolvedNode(
       identity: testIdentity("Root", "Item"),
       structuralPath: slot("Root", "VStack[2]"),
-      kind: .view("Text")
+      kind: .view(.text)
     )
 
     #expect(!original.isEquivalentForMeasurement(to: moved))
@@ -111,13 +111,13 @@ struct StructuralEquivalenceLockTests {
       var node = ResolvedNode(
         identity: testIdentity("Leaf"),
         structuralPath: slot("Leaf"),
-        kind: .view("Text")
+        kind: .view(.text)
       )
       for depth in (0..<256).reversed() {
         node = ResolvedNode(
           identity: testIdentity("HostedRow", "\(depth)"),
           structuralPath: slot("HostedRow", "\(depth)"),
-          kind: .view("HostedRow"),
+          kind: .view(.init("HostedRow")),
           children: [node]
         )
       }

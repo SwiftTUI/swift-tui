@@ -43,17 +43,17 @@ struct FrameTailPresentationDamageReachabilityTests {
         children: [
           PlacedNode(
             identity: layoutIdentity,
-            kind: .view("VStack"),
+            kind: .view(.vStack),
             bounds: .init(origin: .zero, size: .init(width: 20, height: 6)),
             children: [
               PlacedNode(
                 identity: cleanIdentity,
-                kind: .view("Text"),
+                kind: .view(.text),
                 bounds: .init(origin: .zero, size: .init(width: 20, height: 1))
               ),
               PlacedNode(
                 identity: dirtyIdentity,
-                kind: .view("Text"),
+                kind: .view(.text),
                 bounds: .init(
                   origin: .init(x: 0, y: dirtyRow),
                   size: .init(width: 20, height: 1)
@@ -107,7 +107,7 @@ struct FrameTailPresentationDamageReachabilityTests {
         children: [
           PlacedNode(
             identity: dirtyIdentity,
-            kind: .view("Text"),
+            kind: .view(.text),
             bounds: .init(
               origin: .init(x: 0, y: dirtyRow),
               size: .init(width: 20, height: 1)
@@ -159,12 +159,12 @@ struct FrameTailPresentationDamageReachabilityTests {
         children: [
           PlacedNode(
             identity: buttonIdentity,
-            kind: .view("Button"),
+            kind: .view(.button),
             bounds: .init(origin: .zero, size: .init(width: 20, height: 1))
           ),
           PlacedNode(
             identity: labelIdentity,
-            kind: .view("Text"),
+            kind: .view(.text),
             bounds: .init(origin: .init(x: 0, y: 1), size: .init(width: labelWidth, height: 1))
           ),
         ]
@@ -203,7 +203,7 @@ struct FrameTailPresentationDamageReachabilityTests {
     func row(_ identity: Identity, _ y: Int) -> PlacedNode {
       PlacedNode(
         identity: identity,
-        kind: .view("Text"),
+        kind: .view(.text),
         bounds: .init(origin: .init(x: 0, y: y), size: .init(width: 20, height: 1))
       )
     }
@@ -255,7 +255,7 @@ struct FrameTailPresentationDamageReachabilityTests {
         children: [
           PlacedNode(
             identity: dirtyIdentity,
-            kind: .view("Text"),
+            kind: .view(.text),
             bounds: .init(origin: .zero, size: .init(width: 20, height: 1))
           )
         ]
@@ -298,7 +298,7 @@ struct FrameTailPresentationDamageReachabilityTests {
       children: [
         PlacedNode(
           identity: dirtyIdentity,
-          kind: .view("Text"),
+          kind: .view(.text),
           bounds: .init(origin: .zero, size: .init(width: 20, height: 1))
         )
       ]
@@ -309,8 +309,8 @@ struct FrameTailPresentationDamageReachabilityTests {
       identity: sceneIdentity,
       kind: .root,
       children: [
-        ResolvedNode(identity: dirtyIdentity, kind: .view("Text")),
-        ResolvedNode(identity: dirtyIdentity, kind: .view("Text")),
+        ResolvedNode(identity: dirtyIdentity, kind: .view(.text)),
+        ResolvedNode(identity: dirtyIdentity, kind: .view(.text)),
       ]
     )
 
@@ -340,7 +340,7 @@ struct FrameTailPresentationDamageReachabilityTests {
     func row(_ y: Int) -> PlacedNode {
       PlacedNode(
         identity: dirtyIdentity,
-        kind: .view("Text"),
+        kind: .view(.text),
         bounds: .init(origin: .init(x: 0, y: y), size: .init(width: 20, height: 1))
       )
     }
@@ -389,7 +389,7 @@ struct FrameTailPresentationDamageReachabilityTests {
         children: [
           PlacedNode(
             identity: dirtyIdentity,
-            kind: .view("Text"),
+            kind: .view(.text),
             bounds: .init(origin: .init(x: 0, y: dirtyRow), size: .init(width: 20, height: 1))
           )
         ]
@@ -440,7 +440,7 @@ struct FrameTailPresentationDamageReachabilityTests {
         children: [
           PlacedNode(
             identity: dirtyIdentity,
-            kind: .view("Text"),
+            kind: .view(.text),
             bounds: .init(origin: .init(x: 0, y: dirtyRow), size: .init(width: 20, height: 1))
           )
         ]

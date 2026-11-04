@@ -150,7 +150,7 @@ extension Button {
 
       return ResolvedNode(
         identity: context.identity,
-        kind: .view("Button"),
+        kind: .view(.button),
         children: [child],
         environmentSnapshot: context.environment,
         transactionSnapshot: context.transaction,

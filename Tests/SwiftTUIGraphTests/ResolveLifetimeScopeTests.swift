@@ -201,7 +201,7 @@ struct ResolveLifetimeScopeTests {
     let node = graph.beginEvaluation(identity: identity, invalidator: nil)
     _ = graph.finishEvaluation(
       node,
-      resolved: ResolvedNode(identity: identity, kind: .view(name)),
+      resolved: ResolvedNode(identity: identity, kind: .view(.init(name))),
       accessedStateSlots: 0
     )
     return node

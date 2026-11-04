@@ -959,7 +959,7 @@ public struct TabViewStyleBodyConfiguration: Sendable {
         return [
           ResolvedNode(
             identity: context.identity,
-            kind: .view("Group"),
+            kind: .view(.group),
             typeDiscriminator: ObjectIdentifier(SynthesizedGroupWrapperMarker.self),
             children: [child],
             environmentSnapshot: context.environment,

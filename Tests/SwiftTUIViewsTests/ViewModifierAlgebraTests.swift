@@ -13,9 +13,9 @@ struct ViewModifierAlgebraTests {
       in: .init(identity: testIdentity("ViewModifier", "Body"))
     )
 
-    #expect(resolved.kind == .view("Offset"))
+    #expect(resolved.kind == .view(.offset))
     #expect(resolved.children.count == 1)
-    #expect(resolved.children[0].kind == .view("Padding"))
+    #expect(resolved.children[0].kind == .view(.padding))
   }
 
   @Test("ViewModifier.concat composes modifier values in order")
@@ -26,9 +26,9 @@ struct ViewModifierAlgebraTests {
       in: .init(identity: testIdentity("ViewModifier", "Concat"))
     )
 
-    #expect(resolved.kind == .view("Offset"))
+    #expect(resolved.kind == .view(.offset))
     #expect(resolved.children.count == 1)
-    #expect(resolved.children[0].kind == .view("Padding"))
+    #expect(resolved.children[0].kind == .view(.padding))
   }
 
   @Test("id rewrites identity through modifier application")
@@ -42,7 +42,7 @@ struct ViewModifierAlgebraTests {
     )
 
     #expect(resolved.identity == rootIdentity.explicitID("ExplicitID"))
-    #expect(resolved.kind == .view("Padding"))
+    #expect(resolved.kind == .view(.padding))
   }
 
   @Test("package exact Identity overload rewrites to a runtime identity")
@@ -56,7 +56,7 @@ struct ViewModifierAlgebraTests {
     )
 
     #expect(resolved.identity == explicitIdentity)
-    #expect(resolved.kind == .view("Padding"))
+    #expect(resolved.kind == .view(.padding))
   }
 
   @Test("tab metadata peeking walks ModifiedContent chains")

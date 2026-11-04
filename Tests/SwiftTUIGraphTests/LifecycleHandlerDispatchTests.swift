@@ -29,8 +29,8 @@ struct LifecycleHandlerDispatchTests {
         identity: rootIdentity,
         kind: .root,
         children: [
-          ResolvedNode(identity: testIdentity("DispatchRoot", "A"), kind: .view("A")),
-          ResolvedNode(identity: testIdentity("DispatchRoot", "B"), kind: .view("B")),
+          ResolvedNode(identity: testIdentity("DispatchRoot", "A"), kind: .view(.init("A"))),
+          ResolvedNode(identity: testIdentity("DispatchRoot", "B"), kind: .view(.init("B"))),
         ]
       )
     )
@@ -79,8 +79,8 @@ struct LifecycleHandlerDispatchTests {
         identity: rootIdentity,
         kind: .root,
         children: [
-          ResolvedNode(identity: testIdentity("SnapshotRoot", "A"), kind: .view("A")),
-          ResolvedNode(identity: testIdentity("SnapshotRoot", "B"), kind: .view("B")),
+          ResolvedNode(identity: testIdentity("SnapshotRoot", "A"), kind: .view(.init("A"))),
+          ResolvedNode(identity: testIdentity("SnapshotRoot", "B"), kind: .view(.init("B"))),
         ]
       )
     )
@@ -122,7 +122,7 @@ struct LifecycleHandlerDispatchTests {
         identity: rootIdentity,
         kind: .root,
         children: [
-          ResolvedNode(identity: testIdentity("TeardownRoot", "Owner"), kind: .view("Owner"))
+          ResolvedNode(identity: testIdentity("TeardownRoot", "Owner"), kind: .view(.init("Owner")))
         ]
       )
     )

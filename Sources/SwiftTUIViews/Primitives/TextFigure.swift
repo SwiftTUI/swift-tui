@@ -43,7 +43,7 @@ public struct TextFigure: PrimitiveView, ResolvableView {
     stampedDrawMetadata.strikethroughStyle = decorations.strikethrough
     return [
       resolveLeafNode(
-        kindName: "TextFigure",
+        kindName: .textFigure,
         drawMetadata: stampedDrawMetadata,
         drawPayload: .textFigure(
           .init(

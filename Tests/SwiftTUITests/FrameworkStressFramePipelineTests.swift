@@ -337,7 +337,7 @@ private func framePipelineArtifacts(
     ResolvedNode(
       viewNodeID: node.viewNodeID,
       identity: node.identity,
-      kind: .view("FramePipelineArtifact"),
+      kind: .view(.init("FramePipelineArtifact")),
       children: node.children.map(resolved),
       drawPayload: node.drawPayload,
       intrinsicSize: node.bounds.size
@@ -681,7 +681,7 @@ private func framePipelineLifecycleTree(
     children.append(
       ResolvedNode(
         identity: testIdentity(prefix, "Root", "Leaf"),
-        kind: .view("FramePipelineLifecycleLeaf"),
+        kind: .view(.init("FramePipelineLifecycleLeaf")),
         lifecycleMetadata: .init(
           appearHandlerIDs: ["appear"],
           disappearHandlerIDs: ["disappear"],
@@ -694,7 +694,7 @@ private func framePipelineLifecycleTree(
     children.append(
       ResolvedNode(
         identity: testIdentity(prefix, "Root", "Sibling"),
-        kind: .view("FramePipelineLifecycleSibling"),
+        kind: .view(.init("FramePipelineLifecycleSibling")),
         lifecycleMetadata: .init(
           appearHandlerIDs: ["sibling-appear"],
           disappearHandlerIDs: ["sibling-disappear"],
@@ -824,7 +824,7 @@ private func framePipelineIndexedLifecycleResolved(prefix: String) -> ResolvedNo
     children: [
       ResolvedNode(
         identity: lazyIdentity,
-        kind: .view("LazyVStack"),
+        kind: .view(.lazyVStack),
         layoutBehavior: .lazyStack(
           axis: .vertical,
           spacing: 0,
@@ -859,7 +859,7 @@ private func framePipelineIndexedLifecyclePlaced(
     children: [
       PlacedNode(
         identity: lazyIdentity,
-        kind: .view("LazyVStack"),
+        kind: .view(.lazyVStack),
         bounds: .init(origin: .zero, size: .init(width: 8, height: 1)),
         children: includesLeaf ? [leaf] : [],
         semanticRole: .container

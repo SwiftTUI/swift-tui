@@ -38,20 +38,20 @@ struct CollectionSupportTests {
   func collectionTextExtractionFlattensNestedTextNodes() {
     let node = ResolvedNode(
       identity: testIdentity("Root"),
-      kind: .view("Group"),
+      kind: .view(.group),
       children: [
         .init(
           identity: testIdentity("Root", "0"),
-          kind: .view("Text"),
+          kind: .view(.text),
           drawPayload: .text("Alpha")
         ),
         .init(
           identity: testIdentity("Root", "1"),
-          kind: .view("Group"),
+          kind: .view(.group),
           children: [
             .init(
               identity: testIdentity("Root", "1", "0"),
-              kind: .view("Text"),
+              kind: .view(.text),
               drawPayload: .text("Beta")
             )
           ]
@@ -76,16 +76,16 @@ struct CollectionSupportTests {
     )
     let node = ResolvedNode(
       identity: testIdentity("RichRow"),
-      kind: .view("Group"),
+      kind: .view(.group),
       children: [
         .init(
           identity: testIdentity("RichRow", "0"),
-          kind: .view("Text"),
+          kind: .view(.text),
           drawPayload: .richText(richPayload)
         ),
         .init(
           identity: testIdentity("RichRow", "1"),
-          kind: .view("Text"),
+          kind: .view(.text),
           drawPayload: .text("Beta")
         ),
       ]
@@ -98,11 +98,11 @@ struct CollectionSupportTests {
   func collectionTextExtractionUsesTextFigureSourceText() {
     let node = ResolvedNode(
       identity: testIdentity("FigureRow"),
-      kind: .view("Group"),
+      kind: .view(.group),
       children: [
         .init(
           identity: testIdentity("FigureRow", "0"),
-          kind: .view("TextFigure"),
+          kind: .view(.textFigure),
           drawPayload: .textFigure(
             .init(
               content: "Alpha",
@@ -112,7 +112,7 @@ struct CollectionSupportTests {
         ),
         .init(
           identity: testIdentity("FigureRow", "1"),
-          kind: .view("Text"),
+          kind: .view(.text),
           drawPayload: .text("Beta")
         ),
       ]
@@ -132,17 +132,17 @@ struct CollectionSupportTests {
   func tableRowCellPayloadsPreserveMergedCellStyling() {
     let row = ResolvedNode(
       identity: testIdentity("Row"),
-      kind: .view("TableRow"),
+      kind: .view(.tableRow),
       children: [
         .init(
           identity: testIdentity("Row", "0"),
-          kind: .view("Text"),
+          kind: .view(.text),
           drawMetadata: .init(foregroundStyle: .color(Color.yellow)),
           drawPayload: .text("Alpha")
         ),
         .init(
           identity: testIdentity("Row", "1"),
-          kind: .view("Text"),
+          kind: .view(.text),
           drawPayload: .text("Beta")
         ),
       ],

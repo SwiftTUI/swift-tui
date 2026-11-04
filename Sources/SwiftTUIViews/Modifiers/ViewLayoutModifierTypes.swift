@@ -27,7 +27,7 @@ public struct PaddingModifier: IterativePrimitiveViewModifier, Sendable, Equatab
       return [
         ResolvedNode(
           identity: context.identity,
-          kind: .view("Padding"),
+          kind: .view(.padding),
           children: [contentNode],
           environmentSnapshot: context.environment,
           transactionSnapshot: context.transaction,
@@ -62,7 +62,7 @@ public struct SafeAreaPaddingModifier: IterativePrimitiveViewModifier, Sendable,
       return [
         ResolvedNode(
           identity: context.identity,
-          kind: .view("SafeAreaPadding"),
+          kind: .view(.safeAreaPadding),
           children: [contentNode],
           environmentSnapshot: context.environment,
           transactionSnapshot: context.transaction,
@@ -92,7 +92,7 @@ public struct IgnoreSafeAreaModifier: IterativePrimitiveViewModifier, Sendable, 
       return [
         ResolvedNode(
           identity: context.identity,
-          kind: .view("IgnoreSafeArea"),
+          kind: .view(.ignoreSafeArea),
           children: [contentNode],
           environmentSnapshot: context.environment,
           transactionSnapshot: context.transaction,
@@ -142,7 +142,7 @@ public struct SafeAreaInsetModifier<Inset: View>: IterativePrimitiveViewModifier
         return [
           ResolvedNode(
             identity: context.identity,
-            kind: .view("SafeAreaInset"),
+            kind: .view(.safeAreaInset),
             children: [baseNode, insetNode],
             environmentSnapshot: context.environment,
             transactionSnapshot: context.transaction,
@@ -190,7 +190,7 @@ public struct BorderModifier: IterativePrimitiveViewModifier, Sendable, Equatabl
       return [
         ResolvedNode(
           identity: context.identity,
-          kind: .view("Border"),
+          kind: .view(.border),
           children: [contentNode],
           environmentSnapshot: context.environment,
           transactionSnapshot: context.transaction,
@@ -228,7 +228,7 @@ public struct FrameModifier: IterativePrimitiveViewModifier, Sendable, Equatable
       return [
         ResolvedNode(
           identity: context.identity,
-          kind: .view("Frame"),
+          kind: .view(.frame),
           children: [contentNode],
           environmentSnapshot: context.environment,
           transactionSnapshot: context.transaction,
@@ -259,7 +259,7 @@ public struct OffsetModifier: IterativePrimitiveViewModifier, Sendable, Equatabl
       return [
         ResolvedNode(
           identity: context.identity,
-          kind: .view("Offset"),
+          kind: .view(.offset),
           children: [contentNode],
           environmentSnapshot: context.environment,
           transactionSnapshot: context.transaction,
@@ -287,7 +287,7 @@ public struct PositionModifier: IterativePrimitiveViewModifier, Sendable, Equata
       return [
         ResolvedNode(
           identity: context.identity,
-          kind: .view("Position"),
+          kind: .view(.position),
           children: [contentNode],
           environmentSnapshot: context.environment,
           transactionSnapshot: context.transaction,
@@ -338,7 +338,7 @@ public struct FlexibleFrameModifier: IterativePrimitiveViewModifier, Sendable, E
       return [
         ResolvedNode(
           identity: context.identity,
-          kind: .view("FlexibleFrame"),
+          kind: .view(.flexibleFrame),
           children: [contentNode],
           environmentSnapshot: context.environment,
           transactionSnapshot: context.transaction,
@@ -385,7 +385,7 @@ public struct OverlayModifier<OverlayContent: View>: IterativePrimitiveViewModif
         return [
           ResolvedNode(
             identity: context.identity,
-            kind: .view("Overlay"),
+            kind: .view(.overlay),
             children: [baseNode, overlayNode],
             environmentSnapshot: context.environment,
             transactionSnapshot: context.transaction,
@@ -451,7 +451,7 @@ public struct BackgroundModifier<BackgroundContent: View>: IterativePrimitiveVie
         return [
           ResolvedNode(
             identity: context.identity,
-            kind: .view("Background"),
+            kind: .view(.background),
             children: [backgroundNode, baseNode],
             environmentSnapshot: context.environment,
             transactionSnapshot: context.transaction,

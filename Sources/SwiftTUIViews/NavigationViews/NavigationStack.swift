@@ -100,7 +100,7 @@ public struct NavigationStack<Root: View>: PrimitiveView, ActionScope, Iterative
           visibleContent.semanticMetadata.isAccessibilityContent = true
           var stackNode = ResolvedNode(
             identity: context.identity,
-            kind: .view("NavigationStack"),
+            kind: .view(.navigationStack),
             children: [visibleContent],
             environmentSnapshot: context.environment,
             transactionSnapshot: context.transaction,
@@ -757,7 +757,7 @@ private struct NavigationDestinationSurface: PrimitiveView, ActionScope, Iterati
       return [
         ResolvedNode(
           identity: context.identity,
-          kind: .view("NavigationDestination"),
+          kind: .view(.navigationDestination),
           children: [payloadNode],
           environmentSnapshot: context.environment,
           transactionSnapshot: context.transaction,

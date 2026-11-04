@@ -88,7 +88,7 @@ struct GesturePairedRouteLivenessTests {
         handler: { true },
         followUpInvalidationIdentity: nil
       )
-      let resolvedChild = ResolvedNode(identity: identity, kind: .view("Item"))
+      let resolvedChild = ResolvedNode(identity: identity, kind: .view(.init("Item")))
       graph.finishEvaluation(node, resolved: resolvedChild, accessedStateSlots: 0)
       children.append(resolvedChild)
       itemNodes.append(node)

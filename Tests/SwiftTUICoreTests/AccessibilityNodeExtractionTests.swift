@@ -752,7 +752,7 @@ private func placedNode(
 ) -> PlacedNode {
   PlacedNode(
     identity: identity,
-    kind: .view("Test"),
+    kind: .view(.init("Test")),
     bounds: bounds,
     children: children,
     semanticMetadata: semanticMetadata,

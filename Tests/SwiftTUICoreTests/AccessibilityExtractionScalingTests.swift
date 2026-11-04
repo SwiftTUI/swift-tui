@@ -71,7 +71,7 @@ struct AccessibilityExtractionScalingTests {
             rect: .init(origin: .init(x: 0, y: index), size: .init(width: 4, height: 1))))
       }
       let placed = PlacedNode(
-        identity: parent, kind: .view("Text"), bounds: rect,
+        identity: parent, kind: .view(.text), bounds: rect,
         drawPayload: .richText(.init(runs: runs)))
       var result: [AccessibilityNode] = []
       let elapsed = (0..<3).map { _ in

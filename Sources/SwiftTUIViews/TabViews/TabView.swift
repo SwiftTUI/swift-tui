@@ -443,7 +443,7 @@ extension TabView {
 
       var node = ResolvedNode(
         identity: context.identity,
-        kind: .view("TabView"),
+        kind: .view(.tabView),
         children: [child],
         environmentSnapshot: context.environment,
         transactionSnapshot: context.transaction,
@@ -630,7 +630,7 @@ extension TabView {
     let declared = pairedLazyDeclaredChildren(
       from: content,
       in: context.child(component: .named("TabOptions")),
-      kindName: "Tab",
+      kindName: .tab,
       debugName: "TabBody",
       lifecyclePolicy: .dormantStatePreserving
     )

@@ -68,7 +68,7 @@ public struct Canvas<Drawing: CanvasDrawing>: PrimitiveView, ResolvableView {
   package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
     [
       resolveLeafNode(
-        kindName: "Canvas",
+        kindName: .canvas,
         semanticMetadata: .init(
           accessibilityRole: .image,
           accessibilityVisualContent: .init(kind: "Canvas")

@@ -67,7 +67,7 @@ struct PromptActionPortalSurface: View {
             if !item.messagePayloads.isEmpty {
               VStack(alignment: .leading, spacing: 0) {
                 PortalAttachmentGroupView(
-                  kindName: "PresentationMessage", payloads: item.messagePayloads)
+                  kindName: .presentationMessage, payloads: item.messagePayloads)
               }
               .padding(.init(horizontal: 1, vertical: 1))
             }
@@ -157,7 +157,7 @@ struct FullScreenContentPortalSurface: View {
   let presentation: FullScreenSurfaceStylePresentation
 
   var body: some View {
-    PortalAttachmentGroupView(kindName: "PresentationContent", payloads: item.contentPayloads)
+    PortalAttachmentGroupView(kindName: .presentationContent, payloads: item.contentPayloads)
       .padding(presentation.contentInsets)
       .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
       .background { Rectangle().fill(presentation.backgroundStyle) }
@@ -193,7 +193,7 @@ private struct PortalScrollingContent: View {
   var body: some View {
     ScrollView(.vertical) {
       VStack(alignment: .leading, spacing: 0) {
-        PortalAttachmentGroupView(kindName: "PresentationContent", payloads: payloads)
+        PortalAttachmentGroupView(kindName: .presentationContent, payloads: payloads)
       }
       .padding(contentInsets)
     }

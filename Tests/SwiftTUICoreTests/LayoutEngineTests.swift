@@ -25,7 +25,7 @@ struct LayoutEngineTests {
       for (index, behavior) in wrappers.enumerated() {
         for hasSibling in [false, true] {
           let wrapped = ResolvedNode(
-            identity: testIdentity("wrapped-\(index)"), kind: .view("Wrapper"),
+            identity: testIdentity("wrapped-\(index)"), kind: .view(.init("Wrapper")),
             children: [spacer("inside")], layoutBehavior: behavior)
           let resolved = stack(
             "stack", axis: axis,
@@ -52,7 +52,7 @@ struct LayoutEngineTests {
             layoutMetadata: .init(minimumWidth: size, minimumHeight: size))
         }
         let node = ResolvedNode(
-          identity: testIdentity("decoration"), kind: .view("Background"), children: children,
+          identity: testIdentity("decoration"), kind: .view(.background), children: children,
           layoutBehavior: .decoration(primaryIndex: primaryIndex, alignment: .center))
         #expect(
           engine.derivedMinimumMainSize(
@@ -71,7 +71,7 @@ struct LayoutEngineTests {
         guide == .leading ? (context == nil ? 0 : 3) : nil
       })
     let child = ResolvedNode(
-      identity: testIdentity("custom-guide"), kind: .view("Custom"),
+      identity: testIdentity("custom-guide"), kind: .view(.init("Custom")),
       layoutBehavior: .custom(handle))
     let root = stack(
       "fallback", axis: .vertical,
@@ -108,10 +108,10 @@ struct LayoutEngineTests {
           .settingVerticalAlignmentGuide(
             .firstTextBaseline, debugName: "baseline", computeValue: { _ in 1 }))
       let inset = ResolvedNode(
-        identity: testIdentity("inset-wrapper"), kind: .view("Padding"), children: [guided],
+        identity: testIdentity("inset-wrapper"), kind: .view(.padding), children: [guided],
         layoutBehavior: .padding(.init(top: 1, leading: 1)))
       let node = ResolvedNode(
-        identity: testIdentity("safe"), kind: .view("SafeAreaInset"),
+        identity: testIdentity("safe"), kind: .view(.safeAreaInset),
         children: [leaf("base", size: .init(width: 10, height: 10)), inset],
         layoutBehavior: .safeAreaInset(
           edge: edge, alignment: .init(horizontal: .center, vertical: .firstTextBaseline),
@@ -137,7 +137,7 @@ struct LayoutEngineTests {
         "large", size: .init(width: 10, height: 10),
         layoutMetadata: .init(minimumWidth: 10, minimumHeight: 10))
       let frame = ResolvedNode(
-        identity: testIdentity("fixed"), kind: .view("Frame"), children: [content],
+        identity: testIdentity("fixed"), kind: .view(.frame), children: [content],
         layoutBehavior: .frame(
           width: axis == .horizontal ? 2 : nil, height: axis == .vertical ? 2 : nil,
           alignment: .topLeading))
@@ -181,18 +181,18 @@ struct LayoutEngineTests {
               "guided", size: .init(width: 1, height: 1),
               layoutMetadata: intermediate ? LayoutMetadata() : metadata)
             let inner = ResolvedNode(
-              identity: testIdentity("inner"), kind: .view("Frame"),
+              identity: testIdentity("inner"), kind: .view(.frame),
               children: [content],
               layoutBehavior: .frame(width: 1, height: 1, alignment: .topLeading),
               layoutMetadata: intermediate ? metadata : LayoutMetadata())
             // A leaf guide uses padding directly; an intermediate guide must be
             // found before the walk reaches the unguided leaf below its frame.
             let padding = ResolvedNode(
-              identity: testIdentity("padding"), kind: .view("Padding"),
+              identity: testIdentity("padding"), kind: .view(.padding),
               children: [intermediate ? inner : content],
               layoutBehavior: .padding(.init(top: 1, leading: 1, bottom: 1, trailing: 1)))
             let outer = ResolvedNode(
-              identity: testIdentity("outer"), kind: .view("Frame"),
+              identity: testIdentity("outer"), kind: .view(.frame),
               children: [padding],
               layoutBehavior: flexible
                 ? .flexibleFrame(
@@ -219,7 +219,7 @@ struct LayoutEngineTests {
     let inset = flexibleWidthFrame(
       "inset", maxWidth: .infinity, child: leaf("inset-text", size: .init(width: 1, height: 1)))
     let safeArea = ResolvedNode(
-      identity: testIdentity("safe-area"), kind: .view("SafeAreaInset"),
+      identity: testIdentity("safe-area"), kind: .view(.safeAreaInset),
       children: [leaf("base", size: .init(width: 1, height: 1)), inset],
       layoutBehavior: .safeAreaInset(edge: .top, alignment: .center, spacing: 0, safeArea: .init()))
     let column = stack(
@@ -1942,7 +1942,7 @@ struct LayoutEngineTests {
     let engine = LayoutEngine()
     let resolved = ResolvedNode(
       identity: testIdentity("frame"),
-      kind: .view("FlexibleFrame"),
+      kind: .view(.flexibleFrame),
       children: [leaf("content", size: .init(width: 4, height: 1))],
       layoutBehavior: .flexibleFrame(
         minWidth: 2,
@@ -1990,7 +1990,7 @@ struct LayoutEngineTests {
     )
     let resolved = ResolvedNode(
       identity: testIdentity("overlay"),
-      kind: .view("Overlay"),
+      kind: .view(.overlay),
       children: [centered, leadingAligned],
       layoutBehavior: .overlay(alignment: .center)
     )
@@ -2018,7 +2018,7 @@ struct LayoutEngineTests {
     let engine = LayoutEngine()
 
     let frame = ResolvedNode(
-      identity: testIdentity("frame"), kind: .view("Frame"), children: [children[1]],
+      identity: testIdentity("frame"), kind: .view(.frame), children: [children[1]],
       layoutBehavior: .frame(
         width: axis == .vertical ? 2 : nil, height: axis == .horizontal ? 2 : nil,
         alignment: .center))
@@ -2032,11 +2032,11 @@ struct LayoutEngineTests {
     let centred = LayoutBehavior.lazyStack(
       axis: axis, spacing: 0, horizontalAlignment: .center, verticalAlignment: .center)
     let eager = ResolvedNode(
-      identity: testIdentity("eager"), kind: .view("Stack"), children: children,
+      identity: testIdentity("eager"), kind: .view(.init("Stack")), children: children,
       layoutBehavior: .stack(
         axis: axis, spacing: 0, horizontalAlignment: .center, verticalAlignment: .center))
     let lazy = ResolvedNode(
-      identity: testIdentity("lazy"), kind: .view("Lazy"), children: children,
+      identity: testIdentity("lazy"), kind: .view(.init("Lazy")), children: children,
       layoutBehavior: centred)
     let indexed = indexedLazyStack(
       "indexed", axis: axis, children: children,
@@ -2073,7 +2073,7 @@ struct LayoutEngineTests {
 
     // A ZStack centres on both axes at once.
     let overlay = ResolvedNode(
-      identity: testIdentity("zstack"), kind: .view("ZStack"),
+      identity: testIdentity("zstack"), kind: .view(.zStack),
       children: [
         leaf("square", size: .init(width: 2, height: 2)),
         leaf("dot", size: .init(width: 1, height: 1)),
@@ -2103,14 +2103,14 @@ struct LayoutEngineTests {
     let guided = leaf("guided", size: .init(width: 1, height: 1), layoutMetadata: metadata)
     let engine = LayoutEngine()
     let frame = ResolvedNode(
-      identity: testIdentity("frame"), kind: .view("Frame"), children: [guided],
+      identity: testIdentity("frame"), kind: .view(.frame), children: [guided],
       layoutBehavior: .frame(
         width: axis == .vertical ? 2 : nil, height: axis == .horizontal ? 2 : nil,
         alignment: .center))
     let framed = engine.place(frame, measured: engine.measure(frame), origin: .zero)
     #expect(framed.children.map { cross($0.bounds.origin) } == [1])
     let node = ResolvedNode(
-      identity: testIdentity("stack"), kind: .view("Stack"), children: [wide, guided],
+      identity: testIdentity("stack"), kind: .view(.init("Stack")), children: [wide, guided],
       layoutBehavior: .stack(
         axis: axis, spacing: 0, horizontalAlignment: .center, verticalAlignment: .center))
     let measured = engine.measure(node)
@@ -2147,14 +2147,14 @@ struct LayoutEngineTests {
     let engine = LayoutEngine()
     for (child, expected) in [(derived, 0), (constant, 1)] {
       let frame = ResolvedNode(
-        identity: testIdentity("frame"), kind: .view("Frame"), children: [child],
+        identity: testIdentity("frame"), kind: .view(.frame), children: [child],
         layoutBehavior: .frame(
           width: axis == .vertical ? 4 : nil, height: axis == .horizontal ? 4 : nil,
           alignment: .center))
       let framed = engine.place(frame, measured: engine.measure(frame), origin: .zero)
       #expect(framed.children.map { cross($0.bounds.origin) } == [expected], "\(child.identity)")
       let node = ResolvedNode(
-        identity: testIdentity("stack"), kind: .view("Stack"), children: [wide, child],
+        identity: testIdentity("stack"), kind: .view(.init("Stack")), children: [wide, child],
         layoutBehavior: .stack(
           axis: axis, spacing: 0, horizontalAlignment: .center, verticalAlignment: .center))
       let placed = engine.place(node, measured: engine.measure(node), origin: .zero)
@@ -2194,7 +2194,7 @@ struct LayoutEngineTests {
     ]
     for (name, behavior) in containers {
       let node = ResolvedNode(
-        identity: testIdentity(name), kind: .view(name), children: [filler, dot],
+        identity: testIdentity(name), kind: .view(.init(name)), children: [filler, dot],
         layoutBehavior: behavior)
       let measured = engine.measure(node)
       #expect(cross(measured.measuredSize) == 2, "\(name) \(measured.measuredSize)")
@@ -2208,7 +2208,7 @@ struct LayoutEngineTests {
     let engine = LayoutEngine()
     let resolved = ResolvedNode(
       identity: testIdentity("viewThatFits"),
-      kind: .view("ViewThatFits"),
+      kind: .view(.viewThatFits),
       children: [
         leaf("wide", size: .init(width: 7, height: 1)),
         leaf("fit", size: .init(width: 5, height: 1)),
@@ -2235,7 +2235,7 @@ struct LayoutEngineTests {
     let adornment = leaf("safe-area-adornment", size: .init(width: 8, height: 2))
     let resolved = ResolvedNode(
       identity: testIdentity("safe-area-inset"),
-      kind: .view("SafeAreaInset"),
+      kind: .view(.safeAreaInset),
       children: [base, adornment],
       layoutBehavior: .safeAreaInset(
         edge: .top,
@@ -2265,7 +2265,7 @@ struct LayoutEngineTests {
     let second = leaf("decoration-fallback-second", size: .init(width: 4, height: 1))
     let resolved = ResolvedNode(
       identity: testIdentity("decoration-fallback"),
-      kind: .view("Decoration"),
+      kind: .view(.init("Decoration")),
       children: [first, second],
       layoutBehavior: .decoration(primaryIndex: 5, alignment: .center)
     )
@@ -2288,7 +2288,7 @@ struct LayoutEngineTests {
     let engine = LayoutEngine()
     let resolved = ResolvedNode(
       identity: testIdentity("padding"),
-      kind: .view("Padding"),
+      kind: .view(.padding),
       children: [leaf("content", size: .init(width: 20, height: 10))],
       layoutBehavior: .padding(.init(top: 1, leading: 2, bottom: 1, trailing: 2))
     )
@@ -2311,7 +2311,7 @@ struct LayoutEngineTests {
     let engine = LayoutEngine()
     let resolved = ResolvedNode(
       identity: testIdentity("offset"),
-      kind: .view("Offset"),
+      kind: .view(.offset),
       children: [leaf("content", size: .init(width: 4, height: 1))],
       layoutBehavior: .offset(x: 2, y: 1)
     )
@@ -2334,7 +2334,7 @@ struct LayoutEngineTests {
     let engine = LayoutEngine()
     let resolved = ResolvedNode(
       identity: testIdentity("text"),
-      kind: .view("Text"),
+      kind: .view(.text),
       layoutMetadata: .init(textWrappingStrategy: .wordBoundary),
       drawPayload: .text("界界界界界")
     )
@@ -2369,7 +2369,7 @@ struct LayoutEngineTests {
   func supportsRetainedReuseTracksResolvedMutations() {
     var parent = ResolvedNode(
       identity: testIdentity("parent"),
-      kind: .view("Container"),
+      kind: .view(.init("Container")),
       children: [leaf("child", size: .init(width: 1, height: 1))]
     )
 
@@ -2382,7 +2382,7 @@ struct LayoutEngineTests {
     parent.children = [
       ResolvedNode(
         identity: testIdentity("custom"),
-        kind: .view("Custom"),
+        kind: .view(.init("Custom")),
         layoutBehavior: .custom(CustomLayoutHandle(NoOpCustomLayoutProxy()))
       )
     ]
@@ -2391,7 +2391,7 @@ struct LayoutEngineTests {
     parent.children = [
       ResolvedNode(
         identity: testIdentity("custom"),
-        kind: .view("Custom"),
+        kind: .view(.init("Custom")),
         layoutBehavior: .custom(
           CustomLayoutHandle(
             NoOpCustomLayoutProxy(),
@@ -2404,7 +2404,7 @@ struct LayoutEngineTests {
     parent.children = [
       ResolvedNode(
         identity: testIdentity("custom"),
-        kind: .view("Custom"),
+        kind: .view(.init("Custom")),
         layoutBehavior: .custom(
           CustomLayoutHandle(
             NoOpCustomLayoutProxy(),
@@ -2695,7 +2695,7 @@ private func leaf(
   _ name: String,
   size: CellSize,
   viewNodeID: ViewNodeID? = nil,
-  kind: NodeKind = .view("Test"),
+  kind: NodeKind = .view(.init("Test")),
   environmentSnapshot: EnvironmentSnapshot = .init(),
   layoutBehavior: LayoutBehavior = .intrinsic,
   layoutMetadata: LayoutMetadata = .init(),
@@ -2738,7 +2738,7 @@ private func lazyStack(
 ) -> ResolvedNode {
   ResolvedNode(
     identity: testIdentity(name),
-    kind: .view(axis == .horizontal ? "LazyHStack" : "LazyVStack"),
+    kind: .view(axis == .horizontal ? .lazyHStack : .lazyVStack),
     children: children,
     layoutBehavior: .lazyStack(
       axis: axis,
@@ -2760,7 +2760,7 @@ private func indexedLazyStack(
 ) -> ResolvedNode {
   ResolvedNode(
     identity: testIdentity(name),
-    kind: .view(axis == .horizontal ? "LazyHStack" : "LazyVStack"),
+    kind: .view(axis == .horizontal ? .lazyHStack : .lazyVStack),
     layoutBehavior: .lazyStack(
       axis: axis,
       spacing: 0,
@@ -2794,7 +2794,7 @@ final class RealizationCounter: Sendable {
 private func spacer(_ name: String) -> ResolvedNode {
   ResolvedNode(
     identity: testIdentity(name),
-    kind: .view("Spacer"),
+    kind: .view(.spacer),
     intrinsicSize: .zero
   )
 }
@@ -2807,7 +2807,7 @@ private func flexibleWidthFrame(
 ) -> ResolvedNode {
   ResolvedNode(
     identity: testIdentity(name),
-    kind: .view("FlexibleFrame"),
+    kind: .view(.flexibleFrame),
     children: [child],
     layoutBehavior: .flexibleFrame(
       minWidth: nil,
@@ -2830,7 +2830,7 @@ private func stack(
 ) -> ResolvedNode {
   ResolvedNode(
     identity: testIdentity(name),
-    kind: .view(axis == .horizontal ? "HStack" : "VStack"),
+    kind: .view(axis == .horizontal ? .hStack : .vStack),
     children: children,
     layoutBehavior: .stack(
       axis: axis,
@@ -2953,11 +2953,11 @@ struct PlacementMismatchDiagnosticsTests {
     arguments: [0, 1, 2, 3])
   func overlayMismatch(measurementCount: Int) {
     let children = (0..<2).map {
-      ResolvedNode(identity: testIdentity("OverlayMismatch", "\($0)"), kind: .view("Child"))
+      ResolvedNode(identity: testIdentity("OverlayMismatch", "\($0)"), kind: .view(.init("Child")))
     }
     var overlay = ResolvedNode(
       identity: testIdentity("OverlayMismatch"),
-      kind: .view("Overlay"), children: children)
+      kind: .view(.overlay), children: children)
     overlay.layoutBehavior = .overlay(alignment: .center)
     let measured = MeasuredNode(
       identity: overlay.identity, proposal: .unspecified,
@@ -2981,10 +2981,11 @@ struct PlacementMismatchDiagnosticsTests {
   @Test("a wrapper with a child but no measurement records a mismatch issue")
   func wrapperMismatchRecordsIssue() {
     let engine = LayoutEngine()
-    let child = ResolvedNode(identity: testIdentity("Mismatch", "Child"), kind: .view("Child"))
+    let child = ResolvedNode(
+      identity: testIdentity("Mismatch", "Child"), kind: .view(.init("Child")))
     var wrapper = ResolvedNode(
       identity: testIdentity("Mismatch"),
-      kind: .view("Padded"),
+      kind: .view(.init("Padded")),
       children: [child]
     )
     wrapper.layoutBehavior = .padding(.init(top: 1, leading: 1, bottom: 1, trailing: 1))
@@ -3016,7 +3017,7 @@ struct PlacementMismatchDiagnosticsTests {
   @Test("a childless wrapper records nothing")
   func childlessWrapperRecordsNothing() {
     let engine = LayoutEngine()
-    var wrapper = ResolvedNode(identity: testIdentity("Childless"), kind: .view("Padded"))
+    var wrapper = ResolvedNode(identity: testIdentity("Childless"), kind: .view(.init("Padded")))
     wrapper.layoutBehavior = .padding(.init(top: 1, leading: 1, bottom: 1, trailing: 1))
     let measured = MeasuredNode(
       identity: wrapper.identity,
@@ -3039,11 +3040,11 @@ struct PlacementMismatchDiagnosticsTests {
   @Test("an intrinsic container with truncated measurements records a mismatch issue")
   func intrinsicTruncationRecordsIssue() {
     let engine = LayoutEngine()
-    let childA = ResolvedNode(identity: testIdentity("Trunc", "A"), kind: .view("A"))
-    let childB = ResolvedNode(identity: testIdentity("Trunc", "B"), kind: .view("B"))
+    let childA = ResolvedNode(identity: testIdentity("Trunc", "A"), kind: .view(.init("A")))
+    let childB = ResolvedNode(identity: testIdentity("Trunc", "B"), kind: .view(.init("B")))
     let container = ResolvedNode(
       identity: testIdentity("Trunc"),
-      kind: .view("Container"),
+      kind: .view(.init("Container")),
       children: [childA, childB]
     )
     let measured = MeasuredNode(
@@ -3086,7 +3087,7 @@ private func viewportDependenceFixture(wrapped: Bool) -> ResolvedNode {
   let lazy = ResolvedNode(
     viewNodeID: testViewNodeID("vd-lazy"),
     identity: testIdentity("vd-lazy"),
-    kind: .view("LazyVStack"),
+    kind: .view(.lazyVStack),
     layoutBehavior: .lazyStack(
       axis: .vertical, spacing: 0, horizontalAlignment: .leading, verticalAlignment: .top),
     indexedChildSource: TestIndexedChildSource(
@@ -3096,7 +3097,7 @@ private func viewportDependenceFixture(wrapped: Bool) -> ResolvedNode {
   return ResolvedNode(
     viewNodeID: testViewNodeID("vd-wrapper"),
     identity: testIdentity("vd-wrapper"),
-    kind: .view("Padding"),
+    kind: .view(.padding),
     children: [lazy],
     layoutBehavior: .padding(.init(top: 0, leading: 1, bottom: 0, trailing: 1))
   )
