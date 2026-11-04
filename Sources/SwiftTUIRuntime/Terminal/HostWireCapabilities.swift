@@ -179,7 +179,7 @@ package struct HostWireResyncRequest: Equatable, Sendable {
   package enum Scope: Equatable, Sendable {
     case keyframe
     /// An empty list requests every image payload.
-    case images([String])
+    case images([ImageWireID])
   }
 
   package let scope: Scope
@@ -256,7 +256,8 @@ package struct HostWireResyncRequest: Equatable, Sendable {
       case "keyframe":
         return HostWireResyncRequest(scope: .keyframe)
       case "images":
-        return HostWireResyncRequest(scope: .images(imageIDs ?? []))
+        return HostWireResyncRequest(
+          scope: .images((imageIDs ?? []).map(ImageWireID.init(rawValue:))))
       default:
         return nil
       }

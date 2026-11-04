@@ -352,7 +352,7 @@ struct AdversarialSetAImageBoundaryTests {
     let last = try #require(compositor.decodedVariant(for: attachment, fallbackBackground: .black))
     #expect(try Self.decode(encoded.bytes).pixels == first.image.pixels)
     #expect(last.image.pixels == first.image.pixels)
-    #expect(encoded.id == first.id && last.id == first.id)
+    #expect(encoded.id == first.id.rawValue && last.id == first.id)
     let encodedAgain = try #require(
       compositor.encodedPNGPayload(for: attachment, fallbackBackground: .black))
     #expect(encodedAgain == encoded)

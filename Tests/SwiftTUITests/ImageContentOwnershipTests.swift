@@ -53,7 +53,7 @@ struct ImageContentOwnershipTests {
       resolvedReference: initial.reference, pixelSize: initial.pixelSize)
     let initialContent = try #require(contents.content(for: attachment))
     let initialID = initialContent.id
-    var known: Set<String> = []
+    var known: Set<ImageWireID> = []
     for frame in 0..<100 {
       let encoded = WebSurfaceFrameEncoder.encodeImages(
         [attachment], fallbackBackground: .black,
@@ -102,7 +102,7 @@ struct ImageContentOwnershipTests {
     let attachment = RasterImageAttachment(
       identity: Identity(components: ["workload"]),
       bounds: .init(origin: .zero, size: .init(width: 32, height: 8)), source: .path(file.path))
-    var known: Set<String> = []
+    var known: Set<ImageWireID> = []
     for _ in 0..<100 {
       #expect(
         WebSurfaceFrameEncoder.encodeImages(

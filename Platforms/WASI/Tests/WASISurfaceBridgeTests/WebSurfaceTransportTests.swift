@@ -568,7 +568,7 @@
 
       #expect(frame["version"] as? Int == 2)
       #expect(image["dataBase64"] as? String == "iVBORw==")
-      #expect(state.knownImageIDs == Set([imageID]))
+      #expect(state.knownImageIDs == Set([ImageWireID(rawValue: imageID)]))
     }
 
     @Test("300 animated 80x24 frames keep style epochs and record bytes bounded")
@@ -1218,7 +1218,7 @@
       #expect(id.hasPrefix("gif:"))
       #expect(!id.hasPrefix("blend:png:"))
       #expect(image["dataBase64"] as? String == "R0lGODlhAQABAIAAAA==")
-      #expect(state.knownImageIDs == Set([id]))
+      #expect(state.knownImageIDs == Set([ImageWireID(rawValue: id)]))
     }
 
     @Test("parser handles resize and style commands split across chunks")

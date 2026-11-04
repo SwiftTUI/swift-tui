@@ -146,7 +146,7 @@ struct OrderedImageCompositionTests {
     try host.present(surface)
     let delivered = await host.waitForSurface()
     #expect(try pixels(delivered.imageAttachments[1]) == [rgbaPixel(red: 0, green: 0, blue: 0)])
-    var known: Set<String> = []
+    var known: Set<ImageWireID> = []
     let wire = WebSurfaceFrameEncoder.encodeImages(
       surface.imageAttachments, fallbackBackground: .white, knownImageIDs: &known)
     let object = try #require(

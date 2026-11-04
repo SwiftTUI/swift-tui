@@ -261,7 +261,7 @@ package enum WebSurfaceFrameEncoder {
     generation: UInt64,
     geometryRevisionsEnabled: Bool,
     sharedViewportEnabled: Bool,
-    knownImageIDs: inout Set<String>
+    knownImageIDs: inout Set<ImageWireID>
   ) throws -> (output: String, styles: HostWireStyleTable) {
     var styles = HostWireStyleTable(gridSize: model.gridSize)
     var rows: [String] = []

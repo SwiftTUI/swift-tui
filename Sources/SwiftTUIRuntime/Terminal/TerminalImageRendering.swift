@@ -388,7 +388,7 @@ final class TerminalImageRenderer: Sendable {
         let imageID =
           if let presentation {
             kittyVariantImageID(
-              variantID: presentation.id,
+              variantID: presentation.id.rawValue,
               rgbaTransmitSize: isDownsampled ? transmitPixelSize : nil
             )
           } else if let content {
@@ -416,7 +416,7 @@ final class TerminalImageRenderer: Sendable {
           referencedImageIDs.insert(imageID)
         } else if let payload = kittyPayload(
           sourceID: sourceID,
-          variantID: presentation?.id,
+          variantID: presentation?.id.rawValue,
           image: image,
           rgbaOutputSize: transmitPixelSize,
           preferRawRGBA: presentation != nil
@@ -455,7 +455,7 @@ final class TerminalImageRenderer: Sendable {
           let payload = sixelPayload(
             for: displayAttachment,
             sourceID: sourceID,
-            variantID: presentation?.id,
+            variantID: presentation?.id.rawValue,
             image: image,
             capabilityProfile: capabilityProfile,
             graphicsCapabilities: graphicsCapabilities
@@ -511,7 +511,7 @@ final class TerminalImageRenderer: Sendable {
 
     let key = TerminalImageVariantKey(
       sourceID: sourceID,
-      variantID: variant?.id,
+      variantID: variant?.id.rawValue,
       mode: mode,
       outputSize: outputSize,
       paletteSize: paletteSize

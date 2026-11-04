@@ -104,7 +104,7 @@ struct WebSurfaceWireTotalityTests {
       Set(AccessibilityPoliteness.allCases.map(\.description))
         == HostWireSchema.liveRegionTokens)
     #expect(
-      Set(WebSurfaceImageFormat.allCases.map(\.jsonValue))
+      Set(WebSurfaceImageFormat.allCases.map(\.rawValue))
         == HostWireSchema.imageFormatTokens)
     #expect(
       Set(ImageScalingMode.allCases.map(\.rawValue))

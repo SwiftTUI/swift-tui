@@ -11,14 +11,20 @@ import Synchronization
   import Musl
 #endif
 
+struct ImageContentOwnerID: Hashable, Sendable {
+  let ordinal: UInt64
+}
+
 /// Immutable encoded content owned independently of any image placement.
 /// IDs are unique for this owner lifetime and cannot alias a retired owner.
 @_spi(Runners) public final class ImageContent: Sendable {
-  @_spi(Runners) public let id: String
+  @_spi(Runners) public var id: String { "image-content:\(ownerID.ordinal)" }
+  let ownerID: ImageContentOwnerID
   @_spi(Runners) public let bytes: [UInt8]
-  @_spi(Runners) public let format: String
+  @_spi(Runners) public let format: WebSurfaceImageFormat
   /// The existing deterministic wire identifier, computed once at admission.
-  @_spi(Runners) public let wireID: String
+  @_spi(Runners) public var wireID: String { encodedID.rawValue }
+  package let encodedID: ImageWireID
   package let kittyDigest: UInt32
   package let blendPrimaryDigest: UInt64
   package let blendSecondaryDigest: UInt64
@@ -27,17 +33,17 @@ import Synchronization
 
   fileprivate init(bytes: [UInt8]) {
     self.bytes = bytes
-    id = Self.nextID.withLock { next in
+    ownerID = Self.nextID.withLock { next in
       precondition(next < UInt64.max, "Image content identity exhausted")
       next += 1
-      return "image-content:\(next)"
+      return ImageContentOwnerID(ordinal: next)
     }
     if bytes.starts(with: [0xFF, 0xD8, 0xFF]) {
-      format = "jpeg"
+      format = .jpeg
     } else if bytes.starts(with: Array("GIF87a".utf8)) || bytes.starts(with: Array("GIF89a".utf8)) {
-      format = "gif"
+      format = .gif
     } else {
-      format = "png"
+      format = .png
     }
     func addingCount(to seed: UInt64) -> UInt64 {
       var hash = seed
@@ -59,8 +65,7 @@ import Synchronization
       primary = (primary ^ UInt64(byte)) &* 0x100_0000_01b3
       secondary = (secondary ^ UInt64(byte)) &* 0x100_0000_01b3
     }
-    let hex = String(wire, radix: 16)
-    wireID = "\(format):\(String(repeating: "0", count: 16 - hex.count))\(hex):\(bytes.count)"
+    encodedID = .encoded(format, digest: wire, count: bytes.count)
     kittyDigest = kitty
     blendPrimaryDigest = primary
     blendSecondaryDigest = secondary

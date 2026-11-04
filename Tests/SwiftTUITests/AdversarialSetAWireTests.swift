@@ -53,7 +53,7 @@ struct AdversarialSetAWireTests {
     #expect(oversizedID.utf8.count == 1026)
     let admitted = try #require(
       HostWireResyncRequest.fromRequestJSON(#"{"scope":"images","ids":["\#(admittedID)"]}"#))
-    #expect(admitted.scope == .images([admittedID]))
+    #expect(admitted.scope == .images([.init(rawValue: admittedID)]))
     let rejectsOversizedID =
       HostWireResyncRequest.fromRequestJSON(#"{"scope":"images","ids":["\#(oversizedID)"]}"#)
       == nil

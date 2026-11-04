@@ -18,20 +18,22 @@ import SwiftTUICore
 /// side. Mirrors the JSON `format` field on each transmitted image
 /// record, and disambiguates the MIME type that the consumer will
 /// pass to `Blob`/`<img>` when decoding.
-package enum WebSurfaceImageFormat: CaseIterable, Sendable, Equatable {
-  case png
-  case jpeg
-  case gif
+@_spi(Runners) public enum WebSurfaceImageFormat: String, CaseIterable, Sendable {
+  case png, jpeg, gif
+}
 
-  /// String that appears in the surface JSON's `format` field — and
-  /// becomes the suffix of `image/<value>` in the consumer's MIME.
-  package var jsonValue: String {
-    switch self {
-    case .png: return "png"
-    case .jpeg: return "jpeg"
-    case .gif: return "gif"
-    }
+package struct ImageWireID: RawRepresentable, Hashable, Sendable, ExpressibleByStringLiteral {
+  package let rawValue: String
+  package init(rawValue: String) { self.rawValue = rawValue }
+  package init(stringLiteral value: String) { self.init(rawValue: value) }
+
+  package static func encoded(_ format: WebSurfaceImageFormat, digest: UInt64, count: Int) -> Self {
+    let hex = String(digest, radix: 16)
+    return Self(
+      rawValue: "\(format.rawValue):\(String(repeating: "0", count: 16 - hex.count))\(hex):\(count)"
+    )
   }
+  package static func blended(_ digest: String) -> Self { Self(rawValue: "blend:png:\(digest)") }
 }
 
 private let webSurfaceImageBlendCompositor = ImageBlendCompositor()
@@ -44,7 +46,7 @@ extension WebSurfaceFrameEncoder {
   package static func encodeImages(
     _ attachments: [RasterImageAttachment],
     fallbackBackground: Color,
-    knownImageIDs: inout Set<String>,
+    knownImageIDs: inout Set<ImageWireID>,
     contentRepository: ImageContentRepository = .shared,
     presentationLayers: [RasterPresentationLayer] = []
   ) -> [String] {
@@ -57,7 +59,7 @@ extension WebSurfaceFrameEncoder {
   package static func encodeImagesBounded(
     _ attachments: [RasterImageAttachment],
     fallbackBackground: Color,
-    knownImageIDs: inout Set<String>,
+    knownImageIDs: inout Set<ImageWireID>,
     contentRepository: ImageContentRepository = .shared,
     presentationLayers: [RasterPresentationLayer] = []
   ) throws -> [String] {
@@ -75,8 +77,8 @@ extension WebSurfaceFrameEncoder {
           contentRepository: contentRepository
         )
       else { continue }
-      guard payload.id.utf8.count <= 1024 else { throw HostWireBudget.Exceeded.limit }
-      _ = try HostWireBudget.jsonStringBytes(payload.id)
+      guard payload.id.rawValue.utf8.count <= 1024 else { throw HostWireBudget.Exceeded.limit }
+      _ = try HostWireBudget.jsonStringBytes(payload.id.rawValue)
       guard payload.bytes.count <= (HostWireBudget.recordBytes - 2) / 4 * 3 else {
         throw HostWireBudget.Exceeded.limit
       }
@@ -108,8 +110,8 @@ extension WebSurfaceFrameEncoder {
   /// static scene would then be rejected on every frame. A record places at
   /// most ``HostWireBudget/images`` attachments, so enough unplaced IDs exist.
   private static func forgetUnreferencedImageIDs(
-    toAdmit referencedIDs: Set<String>,
-    knownImageIDs: inout Set<String>
+    toAdmit referencedIDs: Set<ImageWireID>,
+    knownImageIDs: inout Set<ImageWireID>
   ) {
     let overflow =
       knownImageIDs.count + referencedIDs.subtracting(knownImageIDs).count - HostWireBudget.images
@@ -122,13 +124,13 @@ extension WebSurfaceFrameEncoder {
   private static func encodeImage(
     _ attachment: RasterImageAttachment,
     payload: ImagePayload,
-    knownImageIDs: inout Set<String>
+    knownImageIDs: inout Set<ImageWireID>
   ) -> String {
     let imageID = payload.id
     let shouldTransmitData = knownImageIDs.insert(imageID).inserted
     var fields = [
-      "\"id\":\(jsonString(imageID))",
-      "\"format\":\(jsonString(payload.format.jsonValue))",
+      "\"id\":\(jsonString(imageID.rawValue))",
+      "\"format\":\(jsonString(payload.format.rawValue))",
       "\"bounds\":\(encodeRect(payload.bounds))",
       "\"visibleBounds\":\(encodeRect(payload.visibleBounds))",
       "\"scalingMode\":\(jsonString(attachment.scalingMode.rawValue))",
@@ -146,7 +148,7 @@ extension WebSurfaceFrameEncoder {
   private struct ImagePayload {
     var bytes: [UInt8]
     var format: WebSurfaceImageFormat
-    var id: String
+    var id: ImageWireID
     var pixelSize: PixelSize?
     var bounds: CellRect
     var visibleBounds: CellRect
@@ -165,7 +167,7 @@ extension WebSurfaceFrameEncoder {
       return ImagePayload(
         bytes: blended.bytes,
         format: .png,
-        id: blended.id,
+        id: blended.wireID,
         pixelSize: blended.pixelSize,
         bounds: attachment.visibleBounds,
         visibleBounds: attachment.visibleBounds
@@ -176,40 +178,14 @@ extension WebSurfaceFrameEncoder {
       return nil
     }
     let bytes = content.bytes
-    let format = imageFormat(for: bytes)
     return ImagePayload(
       bytes: bytes,
-      format: format,
-      id: content.wireID,
+      format: content.format,
+      id: content.encodedID,
       pixelSize: attachment.pixelSize,
       bounds: attachment.bounds,
       visibleBounds: attachment.visibleBounds
     )
-  }
-
-  /// Detects the container format from the leading magic bytes. Used
-  /// to set the JSON `format` field and pick a MIME type on the JS
-  /// side. Defaults to PNG so unknown blobs at least try the most
-  /// common path.
-  private static func imageFormat(
-    for bytes: [UInt8]
-  ) -> WebSurfaceImageFormat {
-    if bytes.count >= 8,
-      bytes[0] == 0x89, bytes[1] == 0x50, bytes[2] == 0x4E, bytes[3] == 0x47,
-      bytes[4] == 0x0D, bytes[5] == 0x0A, bytes[6] == 0x1A, bytes[7] == 0x0A
-    {
-      return .png
-    }
-    if bytes.count >= 3, bytes[0] == 0xFF, bytes[1] == 0xD8, bytes[2] == 0xFF {
-      return .jpeg
-    }
-    if bytes.count >= 6,
-      bytes[0] == 0x47, bytes[1] == 0x49, bytes[2] == 0x46, bytes[3] == 0x38,
-      bytes[4] == 0x37 || bytes[4] == 0x39, bytes[5] == 0x61
-    {
-      return .gif
-    }
-    return .png
   }
 
   private static func encodeSize(

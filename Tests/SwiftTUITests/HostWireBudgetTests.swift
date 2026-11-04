@@ -159,7 +159,8 @@ import Testing
     #expect(
       WebSurfaceFrameEncoder.encode(surface(history), state: &state).hasPrefix("\u{1E}surface:"))
     #expect(state.knownImageIDs.count == HostWireBudget.images)
-    let largeIDs = Set(large.compactMap { ImageContentRepository.shared.content(for: $0)?.wireID })
+    let largeIDs = Set(
+      large.compactMap { ImageContentRepository.shared.content(for: $0)?.encodedID })
     #expect(largeIDs.count == large.count)
     #expect(largeIDs.isSubset(of: state.knownImageIDs))
 

@@ -353,7 +353,7 @@ package struct HostWireEncodingState: Sendable {
   /// keyed by `stylesBase`. Negotiated, because the shape mis-indexes on a
   /// decoder that replaces its table wholesale.
   package var styleAppendEnabled: Bool
-  package var knownImageIDs: Set<String>
+  package var knownImageIDs: Set<ImageWireID>
   package var persistentStyles: HostWireStyleTable
   package var hasBaseline: Bool
   package var baselineSize: CellSize?
@@ -363,7 +363,7 @@ package struct HostWireEncodingState: Sendable {
     geometryRevisionsEnabled: Bool = false,
     sharedViewportEnabled: Bool = false,
     styleAppendEnabled: Bool = false,
-    knownImageIDs: Set<String> = [],
+    knownImageIDs: Set<ImageWireID> = [],
     hasBaseline: Bool = false,
     baselineSize: CellSize? = nil,
     epochID: UInt32? = nil

@@ -243,7 +243,7 @@
         damage: fullRowDamage(width: 1),
         state: &state
       )
-      state.requestResync(.init(scope: .images([id])))
+      state.requestResync(.init(scope: .images([.init(rawValue: id)])))
       let repaired = encode(
         surface: imageSurface(),
         sequence: 4,

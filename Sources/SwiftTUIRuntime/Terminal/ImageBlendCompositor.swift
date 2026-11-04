@@ -4,23 +4,27 @@ import SwiftTUICore
 // image blend modes against this compositor when drawing a `HostedRasterSurface`.
 // Exposed via `@_spi(Runners)` so it stays out of the canonical public surface.
 @_spi(Runners) public struct BlendedImageEncodedPayload: Equatable, Sendable {
-  @_spi(Runners) public var id: String
+  package var wireID: ImageWireID
+  @_spi(Runners) public var id: String {
+    get { wireID.rawValue }
+    set { wireID = ImageWireID(rawValue: newValue) }
+  }
   @_spi(Runners) public var bytes: [UInt8]
   @_spi(Runners) public var pixelSize: PixelSize
 
   package init(
-    id: String,
+    id: ImageWireID,
     bytes: [UInt8],
     pixelSize: PixelSize
   ) {
-    self.id = id
+    self.wireID = id
     self.bytes = bytes
     self.pixelSize = pixelSize
   }
 }
 
 struct BlendedImageVariant: Sendable {
-  var id: String
+  var id: ImageWireID
   var image: DecodedImage
   var attachment: RasterImageAttachment
 }
@@ -68,12 +72,12 @@ package struct ImageBlendCompositorCacheSnapshot: Sendable, Equatable {
   /// Shared cache payloads contain pixels, never an attachment owner's routing
   /// or placement metadata. Each lookup binds them to the current attachment.
   private struct DecodedPayload: Sendable {
-    var id: String
+    var id: ImageWireID
     var image: DecodedImage
   }
 
   private struct CacheEntry: Sendable {
-    var id: String
+    var id: ImageWireID
     var pixelSize: PixelSize
     var encodedBytes: [UInt8]
     var decodedImage: DecodedImage?
@@ -91,7 +95,7 @@ package struct ImageBlendCompositorCacheSnapshot: Sendable, Equatable {
     }
 
     var retainedMetadataBytes: Int {
-      id.utf8.count
+      id.rawValue.utf8.count
         + (MemoryLayout<Int>.stride * 4)
     }
 
@@ -224,12 +228,12 @@ package struct ImageBlendCompositorCacheSnapshot: Sendable, Equatable {
       var entry =
         cache.peek(key)
         ?? CacheEntry(
-          id: payload.id,
+          id: payload.wireID,
           pixelSize: payload.pixelSize,
           encodedBytes: payload.bytes,
           decodedImage: nil
         )
-      entry.id = payload.id
+      entry.id = payload.wireID
       entry.pixelSize = payload.pixelSize
       entry.encodedBytes = payload.bytes
       cache.upsert(key, value: entry, cost: Self.cost(for: entry, key: key), policy: policy)
@@ -338,17 +342,17 @@ package struct ImageBlendCompositorCacheSnapshot: Sendable, Equatable {
           continue
         }
         let bytes: [UInt8]
-        let wireID: String
+        let wireID: ImageWireID
         let bounds: CellRect
         if prior.compositing != nil,
           let payload = encodedPNGPayload(for: prior, fallbackBackground: fallbackBackground)
         {
           bytes = payload.bytes
-          wireID = payload.id
+          wireID = payload.wireID
           bounds = prior.visibleBounds
         } else if let content = repository.contents.content(for: prior) {
           bytes = content.bytes
-          wireID = content.wireID
+          wireID = content.encodedID
           bounds = prior.bounds
         } else {
           continue
@@ -369,7 +373,7 @@ package struct ImageBlendCompositorCacheSnapshot: Sendable, Equatable {
           OrderedImageBackdrop(
             image: image,
             key: .init(
-              ownerID: content.id, wireID: wireID, bounds: bounds,
+              ownerID: content.ownerID, wireID: wireID, bounds: bounds,
               visibleBounds: prior.visibleBounds, opacity: prior.opacity, occluders: occluders)))
       }
       guard !backdrop.isEmpty,
@@ -416,7 +420,7 @@ package struct ImageBlendCompositorCacheSnapshot: Sendable, Equatable {
 
     let placementOpacity = precompositePlacementOpacity ? attachment.opacity : 1
     let key = ImageBlendCacheKey(
-      source: content.id,
+      source: content.ownerID,
       fingerprint: ImageBlendSourceFingerprint(content),
       bounds: attachment.bounds,
       visibleBounds: attachment.visibleBounds,
@@ -507,7 +511,7 @@ package struct ImageBlendCompositorCacheSnapshot: Sendable, Equatable {
 
     let outputSize = blendedOutputSize(for: attachment, compositing: compositing)
     let key = ImageBlendCacheKey(
-      source: content.id,
+      source: content.ownerID,
       fingerprint: ImageBlendSourceFingerprint(content),
       bounds: attachment.bounds,
       visibleBounds: attachment.visibleBounds,
@@ -958,14 +962,15 @@ package struct ImageBlendCompositorCacheSnapshot: Sendable, Equatable {
 
 private struct OrderedImageBackdrop: Sendable {
   struct Key: Hashable, Sendable {
-    var ownerID: String
-    var wireID: String
+    var ownerID: ImageContentOwnerID
+    var wireID: ImageWireID
     var bounds: CellRect
     var visibleBounds: CellRect
     var opacity: Double
     var occluders: [CellRect]
     var retainedBytes: Int {
-      ownerID.utf8.count + wireID.utf8.count + 128 + occluders.count * MemoryLayout<CellRect>.stride
+      MemoryLayout<ImageContentOwnerID>.stride + wireID.rawValue.utf8.count + 128 + occluders.count
+        * MemoryLayout<CellRect>.stride
     }
   }
   var image: DecodedImage
@@ -999,7 +1004,7 @@ private struct OrderedImageBackdrop: Sendable {
 }
 
 private struct ImageBlendCacheKey: Hashable, Sendable {
-  var source: String
+  var source: ImageContentOwnerID
   var fingerprint: ImageBlendSourceFingerprint
   var bounds: CellRect
   var visibleBounds: CellRect
@@ -1013,7 +1018,7 @@ private struct ImageBlendCacheKey: Hashable, Sendable {
   var orderedBackdrop: [OrderedImageBackdrop.Key] = []
 
   var retainedByteEstimate: Int {
-    source.utf8.count
+    MemoryLayout<ImageContentOwnerID>.stride
       + orderedBackdrop.reduce(0) { $0 + $1.retainedBytes }
       + fallbackBackground.profile.name.utf8.count
       + (MemoryLayout<Int>.stride * 14)
@@ -1051,7 +1056,7 @@ private func proportionalPixelSample(
 
 private func blendedImageID(
   for key: ImageBlendCacheKey
-) -> String {
+) -> ImageWireID {
   var hasher = ImageBlendStableHasher()
   hasher.combine("swift-tui-blended-image-v1")
   hasher.combine(key.fingerprint)
@@ -1069,7 +1074,7 @@ private func blendedImageID(
   if !key.orderedBackdrop.isEmpty {
     hasher.combine("ordered-images-v1")
     for layer in key.orderedBackdrop {
-      hasher.combine(layer.wireID)
+      hasher.combine(layer.wireID.rawValue)
       hasher.combine(layer.bounds)
       hasher.combine(layer.visibleBounds)
       hasher.combine(layer.opacity.bitPattern)
@@ -1077,7 +1082,7 @@ private func blendedImageID(
       for rect in layer.occluders { hasher.combine(rect) }
     }
   }
-  return "blend:png:\(hexString(hasher.value))"
+  return .blended(hexString(hasher.value))
 }
 
 private struct ImageBlendStableHasher {

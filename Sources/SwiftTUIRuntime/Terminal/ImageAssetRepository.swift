@@ -26,7 +26,7 @@ struct ImageLookupKey: Sendable {
   var source: ImageSource
   var resourceRoots: [String]
   var cellPixelSize: PixelSize
-  var contentID: String? = nil
+  var contentID: ImageContentOwnerID? = nil
 }
 
 /// Entry-count + byte cost for the repository's decode/resolution caches.
@@ -166,7 +166,7 @@ private func isPNGBytes(_ bytes: [UInt8]) -> Bool {
 
 final class ImageAssetRepository: Sendable {
   private enum DecodedKey: Hashable, Sendable {
-    case content(String)
+    case content(ImageContentOwnerID)
     case named(String)
   }
   // Both caches live for the process (`sharedImageAssetRepository`), so without a
@@ -225,7 +225,7 @@ final class ImageAssetRepository: Sendable {
       source: source,
       resourceRoots: resourceRoots,
       cellPixelSize: cellPixelSize,
-      contentID: content.id
+      contentID: content.ownerID
     )
 
     if let cached = storage.withLockUnchecked({ $0.resolutions.recordAccess(lookupKey) }) {
@@ -278,7 +278,7 @@ final class ImageAssetRepository: Sendable {
   }
 
   private func decodedImageThrowing(for content: ImageContent) throws -> DecodedImage? {
-    let key = DecodedKey.content(content.id)
+    let key = DecodedKey.content(content.ownerID)
     if let cached = storage.withLockUnchecked({ $0.decodedImages.recordAccess(key) }) {
       return cached
     }
@@ -328,7 +328,7 @@ final class ImageAssetRepository: Sendable {
 
   private func decodedKey(for reference: ImageAssetReference) -> DecodedKey? {
     if case .namedResource(let name) = reference { return .named(name) }
-    return contents.content(for: reference).map { .content($0.id) }
+    return contents.content(for: reference).map { .content($0.ownerID) }
   }
 
   private func resolvedReference(
