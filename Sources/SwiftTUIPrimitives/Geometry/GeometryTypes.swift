@@ -675,6 +675,7 @@ public struct IdentityComponent: Hashable, Sendable, Codable, CustomStringConver
 
   private enum Shape: Sendable {
     case plain
+    case overlayEntry
     case indexed(kind: String, index: Int)
     case qualifiedID(base: String)
   }
@@ -685,8 +686,23 @@ public struct IdentityComponent: Hashable, Sendable, Codable, CustomStringConver
     self.shape = shape
   }
 
+  private static let overlayEntryPrefix = "entry:"
+
+  package static func overlayEntry(_ key: String) -> Self {
+    Self(overlayEntryPrefix + key, shape: .overlayEntry)
+  }
+
+  package var isOverlayEntry: Bool {
+    if case .overlayEntry = shape { return true }
+    return false
+  }
+
   /// Imports a component from an existing path or wire record.
   public init(rawValue: String) {
+    if rawValue.hasPrefix(Self.overlayEntryPrefix) {
+      self.init(rawValue, shape: .overlayEntry)
+      return
+    }
     guard rawValue.last == "]" else {
       self.init(rawValue, shape: .plain)
       return

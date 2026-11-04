@@ -171,7 +171,7 @@ package enum PresentationOverlayCompositionPolicy: Sendable {
 package protocol ManagedPresentationCoordinator: PresentationCoordinator
 where Item: PortalPresentationItem {
   static var modalPolicy: PortalModalPolicy { get }
-  static var overlayKindName: String { get }
+  static var overlayKind: PresentationOverlayKind { get }
   static var overlayCompositionPolicy: PresentationOverlayCompositionPolicy { get }
 
   var isActive: Bool { get }

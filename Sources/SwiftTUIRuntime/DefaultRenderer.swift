@@ -162,7 +162,7 @@ public struct DefaultRenderer {
   package func debugRuntimeSubsystemSnapshot() -> RuntimeSubsystemSnapshot {
     let presentationEntries = presentationPortalState.overlayEntries().map {
       RuntimeSubsystemSnapshot.PresentationPortalSnapshot.EntrySnapshot(
-        id: $0.id,
+        id: $0.id.description,
         ordering: $0.ordering,
         kindName: $0.kindName,
         modalPolicy: $0.modalPolicy,

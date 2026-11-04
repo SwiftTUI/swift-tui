@@ -362,7 +362,7 @@ struct DefaultRendererFrameHeadCoordinator {
       presentationPortalState.overlayEntries().map { entry in
         PresentationOverlayEntryIdentityScheme.entryIdentity(
           portalRootIdentity: portalRootIdentity,
-          entryID: "\(entry.id)"
+          entryID: entry.id
         )
       }
     )

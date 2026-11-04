@@ -103,7 +103,7 @@ package final class PresentationFamilyItemStore<Item: PortalPresentationItem> {
   private func applySync(
     sourceIdentity: Identity,
     items: [Item],
-    continuityItemsByStableKey: [String: TrackedPresentationItem<Item>]? = nil
+    continuityItemsByStableKey: [PortalEntryID.OwnerKey: TrackedPresentationItem<Item>]? = nil
   ) {
     guard !items.isEmpty else {
       declarativeItemsBySource[sourceIdentity] = [:]
@@ -132,7 +132,7 @@ package final class PresentationFamilyItemStore<Item: PortalPresentationItem> {
     // in-place can otherwise overwrite the old source that a later item needs
     // for its lookup, spuriously reminting that surviving item's ordinal.
     let continuityItemsByStableKey = mergedActiveItems().values.reduce(
-      into: [String: TrackedPresentationItem<Item>]()
+      into: [PortalEntryID.OwnerKey: TrackedPresentationItem<Item>]()
     ) { itemsByStableKey, trackedItem in
       let stableKey = trackedItem.item.portalEntryID.ownerStableKey
       if let existing = itemsByStableKey[stableKey],

@@ -7,11 +7,11 @@ package final class PresentationCoordinatorBox<C: ManagedPresentationCoordinator
 where C.Item: PortalPresentationItem, C.Item.ID: Sendable {
   package struct Checkpoint: Sendable {
     fileprivate var coordinator: StoredPresentationCoordinatorCheckpoint<C.Item>?
-    fileprivate var visibleQueueHead: String?
+    fileprivate var visibleQueueHead: PortalEntryID.OwnerKey?
     fileprivate var visibleQueueOrdinal: Int?
   }
 
-  private var visibleQueueHead: String?
+  private var visibleQueueHead: PortalEntryID.OwnerKey?
   private var visibleQueueOrdinal: Int?
   private var coordinator: C?
   private weak var configuredInvalidator: (any Invalidating)?
@@ -148,16 +148,16 @@ where C.Item: PortalPresentationItem, C.Item.ID: Sendable {
     activationOrdinal: Int,
     coordinator: C
   ) -> OverlayStackEntry {
-    let stableID = "\(C.overlayKindName):\(item.portalEntryID.ownerStableKey)"
+    let stableID = OverlayEntryKey.presentation(C.overlayKind, item.portalEntryID.ownerStableKey)
     return OverlayStackEntry(
       id: stableID,
       portalEntryID: item.portalEntryID,
       ordering: PortalOrdering(
         zIndex: C.zIndex,
         activationOrdinal: activationOrdinal,
-        stableTieBreaker: stableID
+        stableTieBreaker: stableID.description
       ),
-      kindName: C.overlayKindName,
+      kindName: C.overlayKind.rawValue,
       modalPolicy: coordinator.modalPolicy(for: item),
       acceptsEscape: coordinator.dismissAction(for: item) != nil,
       dismiss: coordinator.dismissAction(for: item),
@@ -390,7 +390,7 @@ package final class PresentationCoordinatorRegistry {
           return nil
         }
         return DismissStackEntry(
-          id: entry.id,
+          id: entry.id.description,
           ordering: entry.ordering,
           acceptsEscape: entry.acceptsEscape,
           dismiss: dismiss

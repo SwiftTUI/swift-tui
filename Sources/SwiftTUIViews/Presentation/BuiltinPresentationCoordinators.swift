@@ -9,7 +9,7 @@ package final class AlertPresentationCoordinator:
 {
   package static let zIndex = 260
   package static let modalPolicy = PortalModalPolicy.disablesBaseInteraction
-  package static let overlayKindName = "AlertPresentation"
+  package static let overlayKind = PresentationOverlayKind.alert
   package static let overlayCompositionPolicy =
     PresentationOverlayCompositionPolicy.oldestActiveItem
 
@@ -52,7 +52,7 @@ package final class ConfirmationDialogPresentationCoordinator:
 {
   package static let zIndex = 240
   package static let modalPolicy = PortalModalPolicy.disablesBaseInteraction
-  package static let overlayKindName = "ConfirmationDialogPresentation"
+  package static let overlayKind = PresentationOverlayKind.confirmationDialog
   package static let overlayCompositionPolicy =
     PresentationOverlayCompositionPolicy.oldestActiveItem
 
@@ -97,7 +97,7 @@ package final class SheetPresentationCoordinator:
 {
   package static let zIndex = 200
   package static let modalPolicy = PortalModalPolicy.disablesBaseInteraction
-  package static let overlayKindName = "SheetPresentation"
+  package static let overlayKind = PresentationOverlayKind.sheet
 
   @ViewBuilder
   package func makeBody(
@@ -138,7 +138,7 @@ package final class PopoverPresentationCoordinator:
 {
   package static let zIndex = 220
   package static let modalPolicy = PortalModalPolicy.disablesBaseInteraction
-  package static let overlayKindName = "PopoverPresentation"
+  package static let overlayKind = PresentationOverlayKind.popover
 
   @ViewBuilder
   package func makeBody(
@@ -185,7 +185,7 @@ package final class MenuPresentationCoordinator:
 {
   package static let zIndex = 180
   package static let modalPolicy = PortalModalPolicy.nonModal
-  package static let overlayKindName = "MenuPresentation"
+  package static let overlayKind = PresentationOverlayKind.menu
 
   @ViewBuilder
   package func makeBody(
@@ -226,7 +226,7 @@ package final class ToastPresentationCoordinator:
 {
   package static let zIndex = 100
   package static let modalPolicy = PortalModalPolicy.nonModal
-  package static let overlayKindName = "ToastPresentation"
+  package static let overlayKind = PresentationOverlayKind.toast
   package static let overlayCompositionPolicy =
     PresentationOverlayCompositionPolicy.aggregateNewestItem
 

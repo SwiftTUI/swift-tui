@@ -24,11 +24,21 @@ package struct PortalEntryID: Hashable, Sendable, CustomStringConvertible {
     return "\(sourceIdentity.path)#\(token)"
   }
 
-  package var ownerStableKey: String {
-    if let sourceEntityIdentity {
-      return "entity:\(sourceEntityIdentity.scopedDescription)#\(token)"
+  package enum OwnerKey: Hashable, Sendable, CustomStringConvertible {
+    case entity(EntityIdentity, token: String)
+    case source(StructuralPath, token: String)
+
+    package var description: String {
+      switch self {
+      case .entity(let entity, let token): "entity:\(entity.scopedDescription)#\(token)"
+      case .source(let path, let token): "source:\(path)#\(token)"
+      }
     }
-    return "source:\(sourceStructuralPath.description)#\(token)"
+  }
+
+  package var ownerStableKey: OwnerKey {
+    if let sourceEntityIdentity { return .entity(sourceEntityIdentity, token: token) }
+    return .source(sourceStructuralPath, token: token)
   }
 
   package var placementStableKey: String {

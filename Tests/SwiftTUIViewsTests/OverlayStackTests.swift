@@ -121,7 +121,7 @@ struct OverlayStackTests {
     activationOrdinal: Int
   ) -> OverlayStackEntry {
     OverlayStackEntry(
-      id: id,
+      id: .unowned(id),
       portalEntryID: portalEntryID,
       ordering: .init(
         zIndex: zIndex,

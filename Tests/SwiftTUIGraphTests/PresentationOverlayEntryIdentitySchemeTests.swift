@@ -20,11 +20,11 @@ struct PresentationOverlayEntryIdentitySchemeTests {
       portalRoot
       .child(.named("PortalHost"))
       .child(.named("overlays"))
-      .child(.init(rawValue: PresentationOverlayEntryIdentityScheme.entryComponent(id: "sheet-3")))
+      .child(OverlayEntryKey.unowned("sheet-3").component)
 
     let derived = PresentationOverlayEntryIdentityScheme.entryIdentity(
       portalRootIdentity: portalRoot,
-      entryID: "sheet-3"
+      entryID: .unowned("sheet-3")
     )
 
     #expect(minted == derived)
@@ -34,7 +34,7 @@ struct PresentationOverlayEntryIdentitySchemeTests {
   func matcherRecognizesMintAndDescendants() {
     let entry = PresentationOverlayEntryIdentityScheme.entryIdentity(
       portalRootIdentity: portalRoot,
-      entryID: "sheet-3"
+      entryID: .unowned("sheet-3")
     )
     #expect(
       PresentationOverlayEntryIdentityScheme.isEntryIdentity(

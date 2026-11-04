@@ -1,7 +1,7 @@
 import SwiftTUICore
 
 package struct OverlayStackEntry: Sendable {
-  package var id: String
+  package var id: OverlayEntryKey
   package var portalEntryID: PortalEntryID?
   package var ordering: PortalOrdering
   package var kindName: String
@@ -18,7 +18,7 @@ package struct OverlayStackEntry: Sendable {
   package var sourceEnvironmentValues: EnvironmentValues?
 
   package init(
-    id: String,
+    id: OverlayEntryKey,
     portalEntryID: PortalEntryID? = nil,
     ordering: PortalOrdering,
     kindName: String,
@@ -44,7 +44,7 @@ package struct OverlayStackEntry: Sendable {
   }
 
   package var surfaceStableKey: String {
-    portalEntryID?.placementStableKey ?? id
+    portalEntryID?.placementStableKey ?? id.description
   }
 
   package func declarationOwnerEdge(
@@ -74,8 +74,9 @@ package func composeOverlayStackTreeWork(
   // "PortalHost"/"overlays" must stay byte-identical to
   // `PresentationOverlayEntryIdentityScheme` (`.named` requires literals;
   // the scheme's structural test locks these).
-  let hostContext = context.child(component: .named("PortalHost"))
-  var overlayContext = hostContext.child(component: .named("overlays"))
+  let hostContext = context.child(component: PresentationOverlayEntryIdentityScheme.hostComponent)
+  var overlayContext = hostContext.child(
+    component: PresentationOverlayEntryIdentityScheme.overlaysComponent)
   // Retained-subtree reuse is value-blind: it serves the committed overlays
   // subtree whenever this identity's subtree does not intersect the frame's
   // invalidation set — and an overlay-entry set change never invalidates it
@@ -90,7 +91,7 @@ package func composeOverlayStackTreeWork(
   // state (slots key off their stable identities).
   let desiredEntryIdentities = sortedEntries.map { entry in
     overlayContext.identity.child(
-      .init(rawValue: PresentationOverlayEntryIdentityScheme.entryComponent(id: "\(entry.id)"))
+      entry.id.component
     )
   }
   // `forceEntryRefresh` covers the same-entry-list staleness the identity
@@ -155,9 +156,7 @@ private struct OverlayStackOverlayHost: PrimitiveView, IterativeResolvableView {
     var children: [ResolvedNode] = []
     return resolveSequentially(Array(entries.enumerated())) { index, entry in
       let entryContext = context.child(
-        component: .init(
-          rawValue: PresentationOverlayEntryIdentityScheme.entryComponent(id: "\(entry.id)")
-        )
+        component: entry.id.component
       )
       return resolveViewWork(
         OverlayStackEntryHost(
