@@ -307,16 +307,9 @@ import SwiftTUIViews
     environmentValues.terminalAppearance = resources.presentationSurface.appearance
     environmentValues.theme = resources.presentationSurface.theme
 
-    var environmentSnapshot = EnvironmentSnapshot(
-      debugSignature: sessionName,
+    let environmentSnapshot = EnvironmentSnapshot(
       values: resources.environmentValues
     )
-    environmentSnapshot.values["surface"] = resources.sceneSurface.name
-    environmentSnapshot.values["session"] = sessionName
-    environmentSnapshot.values["scene"] = configuration.identifier.rawValue
-    if let title = configuration.title {
-      environmentSnapshot.values["windowTitle"] = title
-    }
 
     let runLoop = RunLoop<SceneSessionState, WindowHostView<Root>>(
       rootIdentity: configuration.rootIdentity,
