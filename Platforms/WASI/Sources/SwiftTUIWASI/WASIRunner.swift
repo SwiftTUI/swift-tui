@@ -159,7 +159,7 @@ public enum WASIRunner {
         return selections[0]
       }
 
-      return selections.first(where: { $0.identifier.rawValue == selector })
+      return selections.first(where: { $0.identifier == selector })
         ?? selections[0]
     }
 
@@ -285,12 +285,12 @@ public enum WASIRunner {
       return TerminalRenderStyleCodec.decodeBase64(encoded)
     }
 
-    private static func wasiSceneSelector() -> String? {
+    private static func wasiSceneSelector() -> WindowIdentifier? {
       if let selector = environmentValue(named: "SWIFTTUI_SCENE"), !selector.isEmpty {
-        return selector
+        return WindowIdentifier(selector)
       }
 
-      return CommandLine.arguments.dropFirst().first
+      return CommandLine.arguments.dropFirst().first.map { WindowIdentifier($0) }
     }
 
     private static func wasiSurfaceSize() -> CellSize {

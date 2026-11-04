@@ -4,7 +4,7 @@ import SwiftTUICore
 @MainActor
 package final class TerminalReaderSceneHub {
   private struct Entry {
-    var id: String
+    var id: WindowIdentifier
     var title: String?
     var surface: TerminalReaderSurface
     var input: SharedSceneInputReader
@@ -16,7 +16,7 @@ package final class TerminalReaderSceneHub {
     entries = endpoints.compactMap { endpoint in
       guard let surface = endpoint.surface.terminal as? TerminalReaderSurface else { return nil }
       return .init(
-        id: endpoint.descriptor.id.rawValue, title: endpoint.descriptor.title,
+        id: endpoint.descriptor.id, title: endpoint.descriptor.title,
         surface: surface, input: endpoint.input)
     }
   }
@@ -27,12 +27,12 @@ package final class TerminalReaderSceneHub {
   package var listing: String {
     "Scenes:\n"
       + entries.enumerated().map {
-        "\($0.offset == selected ? "Current: " : "")\(TerminalReaderModel.safe($0.element.id))"
+        "\($0.offset == selected ? "Current: " : "")\(TerminalReaderModel.safe($0.element.id.rawValue))"
           + ($0.element.title.map { " — " + TerminalReaderModel.safe($0) } ?? "")
       }.joined(separator: "\n") + "\nUse scene ID to review and operate a scene."
   }
 
-  package func select(_ id: String) -> String {
+  package func select(_ id: WindowIdentifier) -> String {
     guard let index = entries.firstIndex(where: { $0.id == id }) else {
       return "Unknown scene. " + listing
     }
@@ -44,7 +44,8 @@ package final class TerminalReaderSceneHub {
       entries[index].surface.externalReaderOutput =
         primary.surface.terminal as? any TerminalCommandPresentationSurface
     }
-    return "Scene \(TerminalReaderModel.safe(id)).\n" + entries[index].surface.commands.model.read()
+    return "Scene \(TerminalReaderModel.safe(id.rawValue)).\n"
+      + entries[index].surface.commands.model.read()
   }
 
   package func route(_ events: [InputEvent]) -> [InputEvent] {

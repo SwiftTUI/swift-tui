@@ -40,7 +40,7 @@
     func largeSceneList() async throws {
       let scenes = (0..<1200).map {
         SceneInfo(
-          id: "scene-\($0)", title: "Scene \($0) with a descriptive title",
+          id: .init("scene-\($0)"), title: "Scene \($0) with a descriptive title",
           ptyPath: "/dev/pts/\($0)", isAttached: false)
       }
       let server = SceneDiscoveryServer(

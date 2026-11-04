@@ -3,6 +3,7 @@
 #if !os(Windows)
 
   import Foundation
+  import SwiftTUIPrimitives
   import Testing
 
   @testable import SwiftTUICLIAttach
@@ -49,6 +50,8 @@
     func parseAttachRequest() throws {
       let request = try SocketRequest.parse("ATTACH dashboard\n")
       #expect(request == .attach(sceneID: "dashboard"))
+      let normalized = try SocketRequest.parse("ATTACH My Window\n")
+      #expect(normalized == .attach(sceneID: "My-Window"))
     }
 
     @Test("Invalid request throws error")

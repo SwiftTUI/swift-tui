@@ -3,12 +3,12 @@
 
   /// Describes a scene that can be attached to.
   package struct SceneInfo: Sendable {
-    package let id: String
+    package let id: WindowIdentifier
     package let title: String?
     package let ptyPath: String?
     package let isAttached: Bool
 
-    package init(id: String, title: String?, ptyPath: String?, isAttached: Bool) {
+    package init(id: WindowIdentifier, title: String?, ptyPath: String?, isAttached: Bool) {
       self.id = id
       self.title = title
       self.ptyPath = ptyPath
@@ -17,7 +17,7 @@
   }
 
   import SwiftTUIPlatformIO
-  import SwiftTUIPrimitives
+  package import SwiftTUIPrimitives
 
   #if canImport(Darwin)
     import Darwin
@@ -46,7 +46,7 @@
     /// Produces a compact JSON object string — no Foundation required.
     func jsonString() -> String {
       var fields: [String] = []
-      fields.append("\"id\":\(jsonStringLiteral(id))")
+      fields.append("\"id\":\(jsonStringLiteral(id.rawValue))")
       if let title {
         fields.append("\"title\":\(jsonStringLiteral(title))")
       } else {
@@ -79,7 +79,7 @@
   enum SocketRequest: Equatable, Sendable {
     case list
     case companion
-    case attach(sceneID: String)
+    case attach(sceneID: WindowIdentifier)
 
     static func parse(_ raw: String) throws(SocketProtocolError) -> SocketRequest {
       let line = raw.hasSuffix("\n") ? String(raw.dropLast()) : raw
@@ -93,7 +93,7 @@
       if line.hasPrefix("ATTACH ") {
         let sceneID = String(line.dropFirst("ATTACH ".count))
         if sceneID.isEmpty { throw .missingSceneID }
-        return .attach(sceneID: sceneID)
+        return .attach(sceneID: WindowIdentifier(sceneID))
       }
       let command =
         line.split(separator: " " as Character, maxSplits: 1).first.map(String.init) ?? line
@@ -168,14 +168,14 @@
 
     private let sceneProvider: @Sendable () -> [SceneInfo]
     private let companionURL: String?
-    private let attachHandler: @Sendable (String) -> SocketResponse
+    private let attachHandler: @Sendable (WindowIdentifier) -> SocketResponse
 
     package init(
       appName: String,
       identifier: String,
       sceneProvider: @escaping @Sendable () -> [SceneInfo],
       companionURL: String? = nil,
-      attachHandler: @escaping @Sendable (String) -> SocketResponse
+      attachHandler: @escaping @Sendable (WindowIdentifier) -> SocketResponse
     ) {
       let dir = "/tmp/swifttui/\(appName)"
       self.socketPath = "\(dir)/\(identifier).sock"
@@ -366,7 +366,7 @@
       fd: Int32,
       sceneProvider: @escaping @Sendable () -> [SceneInfo],
       companionURL: String?,
-      attachHandler: @escaping @Sendable (String) -> SocketResponse
+      attachHandler: @escaping @Sendable (WindowIdentifier) -> SocketResponse
     ) async {
       defer { sceneClose(fd) }
 

@@ -69,11 +69,12 @@ struct WebHostSecurityTests {
 
   @Test("external bind banner warns about local-network reachability")
   func externalBindBannerWarnsAboutLocalNetworkReachability() {
+    let channel = WebHostSceneChannel()
     let session = WebHostServerSession(
       baseURL: URL(string: "http://127.0.0.1:9123/")!,
       webSocketURL: URL(string: "ws://127.0.0.1:9123/ws/scene/main?token=test-token")!,
       token: WebHostToken(rawValue: "test-token"),
-      channel: WebHostSceneChannel(),
+      channel: channel, channels: ["main": channel],
       stopHandler: {}
     )
 

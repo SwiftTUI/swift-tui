@@ -161,7 +161,7 @@ public enum TerminalRunner {
       let registry = SceneInfoRegistry(
         entries: sceneRuntimes.map { runtime in
           .init(
-            id: runtime.selection.identifier.rawValue,
+            id: runtime.selection.identifier,
             title: runtime.selection.title,
             ptyPath: runtime.attachPtyPath,
             isPrimary: runtime.isPrimary
@@ -186,7 +186,7 @@ public enum TerminalRunner {
 
     var sceneTasks: [Task<RunLoopResult<SceneSessionState>, any Error>] = []
     for runtime in sceneRuntimes {
-      let sceneID = runtime.selection.identifier.rawValue
+      let sceneID = runtime.selection.identifier
       let task = Task { @MainActor in
         #if os(macOS) || os(iOS) || os(Linux) || os(Android)
           try await runtime.run(
@@ -565,7 +565,8 @@ public enum TerminalRunner {
         }
 
         guard let resolvedID = id else { return nil }
-        return SceneInfo(id: resolvedID, title: title, ptyPath: ptyPath, isAttached: isAttached)
+        return SceneInfo(
+          id: WindowIdentifier(resolvedID), title: title, ptyPath: ptyPath, isAttached: isAttached)
       }
 
       // Expect outer array

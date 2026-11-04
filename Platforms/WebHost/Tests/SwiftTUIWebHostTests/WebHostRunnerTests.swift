@@ -87,7 +87,7 @@ struct WebHostRunnerTests {
       AsyncStream<WebHostSocketMessage>.Iterator
     ) {
       let (input, continuation) = AsyncStream<WebHostSocketMessage>.makeStream()
-      let output = await session.channels[id]!.attach(client: input)
+      let output = await session.channels[.init(id)]!.attach(client: input)
       continuation.yield(.data(Array("\u{001E}caps:{\"acceptsDeltaFrames\":false}\n".utf8)))
       return (continuation, output.makeAsyncIterator())
     }

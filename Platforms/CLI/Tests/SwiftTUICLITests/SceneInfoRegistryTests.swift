@@ -31,7 +31,7 @@
       let registry = SceneInfoRegistry(
         entries: [primary, secondary].map { runtime in
           .init(
-            id: runtime.selection.identifier.rawValue,
+            id: runtime.selection.identifier,
             title: runtime.selection.title,
             ptyPath: runtime.attachPtyPath,
             isPrimary: runtime.isPrimary

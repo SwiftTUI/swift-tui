@@ -86,7 +86,7 @@ package final class TerminalReaderInput: @preconcurrency TerminalInputReading,
           return ([], false)
         }
         if line.hasPrefix("scene "), let sceneHub {
-          let message = sceneHub.select(String(line.dropFirst(6)))
+          let message = sceneHub.select(WindowIdentifier(line.dropFirst(6)))
           line = ""
           let selected = sceneHub.selectedSurface ?? surface
           try selected.emit(message)

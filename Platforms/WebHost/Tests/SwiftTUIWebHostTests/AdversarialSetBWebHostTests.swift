@@ -217,7 +217,7 @@ struct AdversarialSetBWebHostTests {
   }
 
   // Scene ids and titles survive the manifest and the socket route: hostile
-  // titles are escaped, exactly one scene is default, ids with "/" and "?"
+  // titles are escaped, exactly one scene is default, normalized and punctuated ids
   // route, and an empty or duplicate scene set is refused before binding.
   @Test func setB339SceneManifestAndRoutesKeepIdentityExactly() async throws {
     let title = "q\"\\\n\u{2028}\t\u{01}é"
@@ -226,9 +226,9 @@ struct AdversarialSetBWebHostTests {
       .init(id: "x?y", title: nil, isDefault: true),
     ]
     let manifest = try setBJSON(WebHostRouteTable.sceneManifest(scenes))
-    #expect(manifest["defaultSceneId"] as? String == "a/b")
+    #expect(manifest["defaultSceneId"] as? String == "a-b")
     let entries = try #require(manifest["scenes"] as? [[String: Any]])
-    #expect(entries.map { $0["id"] as? String } == ["a/b", "x?y"])
+    #expect(entries.map { $0["id"] as? String } == ["a-b", "x?y"])
     #expect(entries.first?["title"] as? String == title)
     #expect(entries.map { $0["isDefault"] as? Bool } == [true, false])
     let noDefault = try setBJSON(
@@ -240,14 +240,14 @@ struct AdversarialSetBWebHostTests {
       ("Upgrade", "websocket"), ("Connection", "Upgrade"), ("Sec-WebSocket-Version", "13"),
       ("Sec-WebSocket-Key", "dGhlIHNhbXBsZSBub25jZQ=="),
     ]
-    for id in ["a/b", "x?y"] {
+    for id in ["a-b", "x?y"] {
       let routed = routes.route(
         setBHead("/ws/scene/\(id)", query: ["token": setBToken.rawValue], headers: upgrade))
       guard case .webSocketUpgrade(let response, let sceneID) = routed else {
         Issue.record("expected an upgrade for scene \(id), got \(routed)")
         continue
       }
-      #expect(sceneID == id)
+      #expect(sceneID.rawValue == id)
       #expect(response.status == 101)
     }
     await #expect(throws: WebHostServerError.invalidScenes) {

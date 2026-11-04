@@ -1,5 +1,6 @@
 import Dispatch
 import Foundation
+package import SwiftTUIPrimitives
 import Synchronization
 
 /// The in-tree loopback HTTP + WebSocket host behind `WebHostRunner`.
@@ -121,13 +122,13 @@ final class WebHostConnectionCoordinator: Sendable {
 
   private let listenerFD: WebHostSocketDescriptor
   private let routes: WebHostRouteTable
-  private let channels: [String: WebHostSceneChannel]
+  private let channels: [WindowIdentifier: WebHostSceneChannel]
   private let state = Mutex(State())
 
   init(
     listenerFD: WebHostSocketDescriptor,
     routes: WebHostRouteTable,
-    channels: [String: WebHostSceneChannel]
+    channels: [WindowIdentifier: WebHostSceneChannel]
   ) {
     self.listenerFD = listenerFD
     self.routes = routes
@@ -251,7 +252,7 @@ final class WebHostLoopbackConnection: Sendable {
 
   private let fd: WebHostSocketDescriptor
   private let routes: WebHostRouteTable
-  private let channels: [String: WebHostSceneChannel]
+  private let channels: [WindowIdentifier: WebHostSceneChannel]
   private let onClose: @Sendable (WebHostLoopbackConnection) -> Void
   private let state = Mutex(State())
   private let outboxSignal = DispatchSemaphore(value: 0)
@@ -264,7 +265,7 @@ final class WebHostLoopbackConnection: Sendable {
   init(
     fd: WebHostSocketDescriptor,
     routes: WebHostRouteTable,
-    channels: [String: WebHostSceneChannel],
+    channels: [WindowIdentifier: WebHostSceneChannel],
     onClose: @escaping @Sendable (WebHostLoopbackConnection) -> Void
   ) {
     self.fd = fd
@@ -639,7 +640,7 @@ struct WebHostRouteTable: Sendable {
 
   enum RoutedRequest: Equatable, Sendable {
     case plain(WebHostHTTPResponse)
-    case webSocketUpgrade(WebHostHTTPResponse, sceneID: String)
+    case webSocketUpgrade(WebHostHTTPResponse, sceneID: WindowIdentifier)
   }
 
   func route(
@@ -683,7 +684,7 @@ struct WebHostRouteTable: Sendable {
   }
 
   private func webSocketUpgrade(
-    _ head: WebHostHTTPRequestHead, sceneID: String
+    _ head: WebHostHTTPRequestHead, sceneID: WindowIdentifier
   ) -> RoutedRequest {
     guard head.version == "HTTP/1.1", !head.hasDuplicateSingletonHeaders,
       head.headerValue("Host")?.isEmpty == false
@@ -773,9 +774,10 @@ struct WebHostRouteTable: Sendable {
     let primary = scenes.first(where: \.isDefault) ?? scenes[0]
     let entries = scenes.map { scene in
       let title = scene.title.map { ",\"title\":\(jsonString($0))" } ?? ""
-      return "{\"id\":\(jsonString(scene.id))\(title),\"isDefault\":\(scene.id == primary.id)}"
+      return
+        "{\"id\":\(jsonString(scene.id.rawValue))\(title),\"isDefault\":\(scene.id == primary.id)}"
     }.joined(separator: ",")
-    return "{\"defaultSceneId\":\(jsonString(primary.id)),\"scenes\":[\(entries)]}"
+    return "{\"defaultSceneId\":\(jsonString(primary.id.rawValue)),\"scenes\":[\(entries)]}"
   }
 
 }

@@ -74,7 +74,7 @@ struct WebHostSceneChannelTerminalLifecycleTests {
       baseURL: URL(string: "http://127.0.0.1:1/")!,
       webSocketURL: URL(string: "ws://127.0.0.1:1/ws")!,
       token: WebHostToken(rawValue: "test-token"),
-      channel: channel,
+      channel: channel, channels: ["main": channel],
       stopHandler: { [spy, channel] in
         await spy.record(phaseAtStop: channel.consumeObservations().phase)
       }

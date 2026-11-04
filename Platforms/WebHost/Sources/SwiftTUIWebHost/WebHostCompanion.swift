@@ -15,11 +15,11 @@ package enum WebHostCompanion {
       token: token,
       scenes: endpoints.enumerated().map { index, endpoint in
         .init(
-          id: endpoint.descriptor.id.rawValue, title: endpoint.descriptor.title,
+          id: endpoint.descriptor.id, title: endpoint.descriptor.title,
           isDefault: index == 0)
       })
     for endpoint in endpoints {
-      let channel = session.channels[endpoint.descriptor.id.rawValue]!
+      let channel = session.channels[endpoint.descriptor.id]!
       let transport = WebSocketSurfaceTransport(
         surfaceSize: endpoint.surface.surfaceSize, sink: channel)
       endpoint.surface.attachBrowser(transport, isConnected: { transport.isConnected })

@@ -156,7 +156,7 @@ struct WebHostServerTests {
         url.scheme = "ws"
         let socket = try WebSocketTestClient.connect(to: url.url!)
         sockets.append(socket)
-        try await session.channels[id]!.send(Array("hello-\(id)".utf8))
+        try await session.channels[.init(id)]!.send(Array("hello-\(id)".utf8))
         #expect(String(decoding: try socket.receiveMessage(), as: UTF8.self) == "hello-\(id)")
       }
       #expect(await session.channels["first"]!.currentConnectionToken() == 1)

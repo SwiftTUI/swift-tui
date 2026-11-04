@@ -85,7 +85,7 @@ public enum WebHostRunner {
     )
     let scenes = selections.map { candidate in
       WebHostSceneDescriptor(
-        id: candidate.identifier.rawValue, title: candidate.title,
+        id: candidate.identifier, title: candidate.title,
         isDefault: candidate.identifier == selection.identifier)
     }
     let session = try await server.start(
@@ -103,7 +103,7 @@ public enum WebHostRunner {
     // and connection changes attach presentation/input to these existing owners.
     let sceneTasks = selections.map { selection in
       Task { @MainActor in
-        let channel = session.channels[selection.identifier.rawValue]!
+        let channel = session.channels[selection.identifier]!
         let transport = WebSocketSurfaceTransport(
           surfaceSize: CellSize(width: 80, height: 24), sink: channel)
         let signalReader = InProcessSignalReader()

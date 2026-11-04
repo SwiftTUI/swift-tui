@@ -1,12 +1,13 @@
 package import Foundation
+package import SwiftTUIPrimitives
 
 package struct WebHostSceneDescriptor: Equatable, Sendable {
-  package var id: String
+  package var id: WindowIdentifier
   package var title: String?
   package var isDefault: Bool
 
   package init(
-    id: String,
+    id: WindowIdentifier,
     title: String? = nil,
     isDefault: Bool = true
   ) {
@@ -21,7 +22,7 @@ package struct WebHostServerSession: Sendable {
   package var webSocketURL: URL
   package var token: WebHostToken
   package var channel: WebHostSceneChannel
-  package var channels: [String: WebHostSceneChannel]
+  package var channels: [WindowIdentifier: WebHostSceneChannel]
 
   private let stopHandler: @Sendable () async -> Void
 
@@ -30,14 +31,14 @@ package struct WebHostServerSession: Sendable {
     webSocketURL: URL,
     token: WebHostToken,
     channel: WebHostSceneChannel,
-    channels: [String: WebHostSceneChannel] = [:],
+    channels: [WindowIdentifier: WebHostSceneChannel],
     stopHandler: @escaping @Sendable () async -> Void
   ) {
     self.baseURL = baseURL
     self.webSocketURL = webSocketURL
     self.token = token
     self.channel = channel
-    self.channels = channels.isEmpty ? [webSocketURL.lastPathComponent: channel] : channels
+    self.channels = channels
     self.stopHandler = stopHandler
   }
 

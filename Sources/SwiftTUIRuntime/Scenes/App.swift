@@ -1,4 +1,5 @@
 public import SwiftTUICore
+public import SwiftTUIPrimitives
 public import SwiftTUIViews
 
 /// Errors thrown while turning an ``App`` or ``Scene`` declaration into a
@@ -54,28 +55,7 @@ extension Scene where Self: AnyObject {
 }
 
 /// A typed identifier for a terminal window scene.
-public struct WindowIdentifier: Hashable, Sendable, Codable, RawRepresentable,
-  ExpressibleByStringLiteral, CustomStringConvertible
-{
-  public typealias RawValue = String
-  public let rawValue: String
-
-  public init(rawValue: String) {
-    self.rawValue = normalizedWindowIdentifier(rawValue)
-  }
-
-  public init<S: StringProtocol>(_ rawValue: S) {
-    self.init(rawValue: String(rawValue))
-  }
-
-  public init(stringLiteral value: StringLiteralType) {
-    self.init(value)
-  }
-
-  public var description: String {
-    rawValue
-  }
-}
+public typealias WindowIdentifier = SwiftTUIPrimitives.WindowIdentifier
 
 extension Never: Scene {
   /// Primitive scenes use `Never` as their body type.
@@ -245,22 +225,4 @@ extension App where Self: AnyObject {
       "SwiftTUI apps must be value types (a struct or an enum); a class cannot conform to App"
   )
   public static var _appValueTypeWitness: Void { () }
-}
-
-private func normalizedWindowIdentifier(_ value: String) -> String {
-  let trimmed = value.trimmedUnicodeWhitespace()
-  guard !trimmed.isEmpty else {
-    return "window"
-  }
-
-  return String(
-    trimmed.map { character in
-      switch character {
-      case "/", " ":
-        "-"
-      default:
-        character
-      }
-    }
-  )
 }

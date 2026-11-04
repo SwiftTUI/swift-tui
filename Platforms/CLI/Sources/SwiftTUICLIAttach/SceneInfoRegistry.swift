@@ -1,4 +1,5 @@
 #if !canImport(WASILibc) && !os(Windows)
+  package import SwiftTUIPrimitives
   import Synchronization
 
   /// Tracks the attachable scenes of a running app for the discovery server.
@@ -9,12 +10,12 @@
   /// launcher maps its runtimes into entries at the call site.
   package final class SceneInfoRegistry: Sendable {
     package struct Entry: Sendable {
-      let id: String
+      let id: WindowIdentifier
       let title: String?
       let ptyPath: String?
       let isPrimary: Bool
 
-      package init(id: String, title: String?, ptyPath: String?, isPrimary: Bool) {
+      package init(id: WindowIdentifier, title: String?, ptyPath: String?, isPrimary: Bool) {
         self.id = id
         self.title = title
         self.ptyPath = ptyPath
@@ -23,7 +24,7 @@
     }
 
     private let entries: [Entry]
-    private let attachedSceneIDs: Mutex<Set<String>>
+    private let attachedSceneIDs: Mutex<Set<WindowIdentifier>>
 
     package init(entries: [Entry]) {
       self.entries = entries
@@ -48,11 +49,11 @@
       }
     }
 
-    package func markAttached(sceneID: String) {
+    package func markAttached(sceneID: WindowIdentifier) {
       _ = attachedSceneIDs.withLock { $0.insert(sceneID) }
     }
 
-    package func markDetached(sceneID: String) {
+    package func markDetached(sceneID: WindowIdentifier) {
       attachedSceneIDs.withLock { attachedSceneIDs in
         guard let entry = entries.first(where: { $0.id == sceneID }), !entry.isPrimary else {
           return
@@ -61,7 +62,7 @@
       }
     }
 
-    package func attachResponse(for sceneID: String) -> SocketResponse {
+    package func attachResponse(for sceneID: WindowIdentifier) -> SocketResponse {
       guard let entry = entries.first(where: { $0.id == sceneID }) else {
         return .error("scene not found: \(sceneID)")
       }
