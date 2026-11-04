@@ -123,19 +123,7 @@ import SwiftTUICore
         environment["COLORTERM"],
       ]
       .compactMap { $0?.lowercased() }
-      let roughMarkers = [
-        "ghostty",
-        "alacritty",
-        "rio",
-        "contour",
-        "xterm.js",
-        "xtermjs",
-      ]
-      return identityValues.contains { identity in
-        roughMarkers.contains { marker in
-          identity.contains(marker)
-        }
-      }
+      return identityValues.contains(where: TerminalFamily.roughPixelMatch)
     }
 
     private func trustedCellPixelMetrics() -> CellPixelMetrics? {

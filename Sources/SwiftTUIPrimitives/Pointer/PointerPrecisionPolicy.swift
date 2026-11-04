@@ -1,3 +1,71 @@
+/// Known terminal families, after resolving the TERM and TERM_PROGRAM boundary.
+package enum TerminalFamily: String, CaseIterable, Sendable {
+  case wezterm, kitty, ghostty, alacritty, foot, konsole, mintty, tmux, iterm2
+  case screen, st, putty, xterm, rio, contour
+  case xtermJS = "xterm.js"
+
+  package static func resolve(_ term: String, program: String? = nil) -> Self? {
+    // Only generic xterm entries permit an outer emulator to refine TERM.
+    if isGenericXterm(term) {
+      switch program?.lowercased() {
+      case "wezterm": return .wezterm
+      case "ghostty": return .ghostty
+      case "iterm.app": return .iterm2
+      default: break
+      }
+    }
+    func matches(_ value: String) -> Bool {
+      term == value || term.hasPrefix(value + "-") || term.hasPrefix(value + ".")
+    }
+    if matches("xterm-kitty") { return .kitty }
+    if matches("xterm-ghostty") { return .ghostty }
+    if matches(Self.xtermJS.rawValue) { return .xtermJS }
+    return allCases.first { matches($0.rawValue) }
+  }
+
+  package var supportsLinksAndSync: Bool {
+    switch self {
+    case .wezterm, .kitty, .ghostty, .alacritty, .foot, .konsole, .mintty, .tmux, .iterm2: true
+    default: false
+    }
+  }
+
+  package var supportsMouse: Bool {
+    switch self {
+    case .rio, .contour: false
+    default: true
+    }
+  }
+
+  /// The permissive pixel-coordinate policy accepts emulator hints in compound names too.
+  package static func roughPixelMatch(_ value: String) -> Bool {
+    [.ghostty, .alacritty, .rio, .contour, .xtermJS].contains { (family: Self) in
+      value.contains(family.rawValue)
+    } || value.contains("xtermjs")
+  }
+
+  package var displayName: String {
+    switch self {
+    case .wezterm: "WezTerm"
+    case .iterm2: "iTerm2"
+    default: rawValue
+    }
+  }
+
+  /// xterm's own color and direct-color entries, which name no emulator. The
+  /// direct entries are `xterm-direct` and its numbered variants
+  /// (`xterm-direct2`, `xterm-direct16`, `xterm-direct256`), numbered as
+  /// `namesDirectColor` reads them.
+  package static func isGenericXterm(_ term: String) -> Bool {
+    if ["xterm", "xterm-color", "xterm-16color", "xterm-88color", "xterm-256color"].contains(term) {
+      return true
+    }
+    guard term.hasPrefix("xterm-direct") else { return false }
+    return term.dropFirst("xterm-direct".count).allSatisfy { ("0"..."9").contains($0) }
+  }
+
+}
+
 /// Pre-resolved terminal mouse input mode.
 public enum TerminalMouseInputMode: Equatable, Sendable {
   /// Do not request terminal mouse reports.
@@ -126,7 +194,7 @@ public struct TerminalMouseInputCompatibilityMatrix: Equatable, Sendable {
   public static let documentedSupport = Self(
     entries: [
       .init(
-        terminalName: "xterm",
+        terminalName: TerminalFamily.xterm.displayName,
         environmentMatches: [
           .init(variable: "XTERM_VERSION", value: "xterm", comparison: .contains)
         ],
@@ -136,7 +204,7 @@ public struct TerminalMouseInputCompatibilityMatrix: Equatable, Sendable {
         sourceURL: "https://invisible-island.net/xterm/ctlseqs/ctlseqs.html"
       ),
       .init(
-        terminalName: "xterm.js",
+        terminalName: TerminalFamily.xtermJS.displayName,
         environmentMatches: [
           .init(variable: "TERM_PROGRAM", value: "xterm.js", comparison: .equals),
           .init(variable: "TERM_PROGRAM", value: "xtermjs", comparison: .equals),
@@ -147,7 +215,7 @@ public struct TerminalMouseInputCompatibilityMatrix: Equatable, Sendable {
         sourceURL: "https://xtermjs.org/docs/api/vtfeatures/"
       ),
       .init(
-        terminalName: "foot",
+        terminalName: TerminalFamily.foot.displayName,
         environmentMatches: [
           .init(variable: "TERM", value: "foot", comparison: .hasPrefix),
           .init(variable: "TERM_PROGRAM", value: "foot", comparison: .equals),
@@ -157,7 +225,7 @@ public struct TerminalMouseInputCompatibilityMatrix: Equatable, Sendable {
         sourceURL: "https://manpages.ubuntu.com/manpages/noble/man7/foot-ctlseqs.7.html"
       ),
       .init(
-        terminalName: "kitty",
+        terminalName: TerminalFamily.kitty.displayName,
         environmentMatches: [
           .init(variable: "TERM", value: "xterm-kitty", comparison: .equals),
           .init(variable: "TERM_PROGRAM", value: "kitty", comparison: .equals),
@@ -168,7 +236,7 @@ public struct TerminalMouseInputCompatibilityMatrix: Equatable, Sendable {
         sourceURL: "https://sw.kovidgoyal.net/kitty/changelog/"
       ),
       .init(
-        terminalName: "WezTerm",
+        terminalName: TerminalFamily.wezterm.displayName,
         environmentMatches: [
           .init(variable: "TERM_PROGRAM", value: "wezterm", comparison: .equals),
           .init(variable: "WEZTERM_EXECUTABLE", value: "wezterm", comparison: .contains),
@@ -179,7 +247,7 @@ public struct TerminalMouseInputCompatibilityMatrix: Equatable, Sendable {
         sourceURL: "https://wezterm.org/changelog.html"
       ),
       .init(
-        terminalName: "iTerm2",
+        terminalName: TerminalFamily.iterm2.displayName,
         environmentMatches: [
           .init(variable: "TERM_PROGRAM", value: "iterm.app", comparison: .equals),
           .init(variable: "LC_TERMINAL", value: "iterm2", comparison: .equals),

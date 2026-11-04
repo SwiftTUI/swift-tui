@@ -233,7 +233,7 @@ public struct TerminalCapabilityProfile: Equatable, Sendable {
     // (`identifiesHyperlinkEmulator`); an empty one names nothing.
     let isWindowsTerminal =
       environment["WT_SESSION"] != nil
-      && (term.isEmpty || isGenericXterm(term))
+      && (term.isEmpty || TerminalFamily.isGenericXterm(term))
       && (environment["TERM_PROGRAM"] ?? "").isEmpty
     var profile = Self(
       glyphLevel: glyphLevel,
@@ -256,22 +256,6 @@ public struct TerminalCapabilityProfile: Equatable, Sendable {
   // These protocols have different adoption histories. In particular, xterm's
   // SGR mouse support does not imply OSC 8 or synchronized output, and rxvt's
   // mouse protocol is not SGR. Match terminal families, never arbitrary substrings.
-  private static func matches(_ term: String, families: [String]) -> Bool {
-    families.contains { term == $0 || term.hasPrefix($0 + "-") || term.hasPrefix($0 + ".") }
-  }
-
-  /// xterm's own color and direct-color entries, which name no emulator. The
-  /// direct entries are `xterm-direct` and its numbered variants
-  /// (`xterm-direct2`, `xterm-direct16`, `xterm-direct256`), numbered as
-  /// `namesDirectColor` reads them.
-  private static func isGenericXterm(_ term: String) -> Bool {
-    if ["xterm", "xterm-color", "xterm-16color", "xterm-88color", "xterm-256color"].contains(term) {
-      return true
-    }
-    guard term.hasPrefix("xterm-direct") else { return false }
-    return term.dropFirst("xterm-direct".count).allSatisfy { ("0"..."9").contains($0) }
-  }
-
   /// terminfo's direct-color entries (`RGB`, `colors#0x1000000`) are named
   /// `<family>-direct` or `<family>-direct<N>` (`foot-direct`,
   /// `xterm-direct256`). No other ncurses entry declares 24-bit color, so the
@@ -286,25 +270,9 @@ public struct TerminalCapabilityProfile: Equatable, Sendable {
     return last.dropFirst("direct".count).allSatisfy { ("0"..."9").contains($0) }
   }
 
-  private static func identifiedTerminal(term: String, environment: [String: String]) -> String {
-    // TERM_PROGRAM can survive inside a multiplexer. Only refine generic xterm
-    // entries; an intervening terminal's explicit TERM remains authoritative.
-    guard isGenericXterm(term) else { return term }
-    switch environment["TERM_PROGRAM"]?.lowercased() {
-    case "wezterm": return "wezterm"
-    case "ghostty": return "ghostty"
-    case "iterm.app": return "iterm2"
-    default: return term
-    }
-  }
-
   private static func supportsHyperlinks(term: String, environment: [String: String]) -> Bool {
-    matches(
-      identifiedTerminal(term: term, environment: environment),
-      families: [
-        "wezterm", "kitty", "xterm-kitty", "ghostty", "xterm-ghostty", "alacritty",
-        "foot", "konsole", "mintty", "tmux", "iterm2",
-      ]) || identifiesHyperlinkEmulator(term: term, environment: environment)
+    TerminalFamily.resolve(term, program: environment["TERM_PROGRAM"])?.supportsLinksAndSync == true
+      || identifiesHyperlinkEmulator(term: term, environment: environment)
   }
 
   /// Emulators that keep a generic xterm `TERM`, announce themselves through
@@ -320,7 +288,7 @@ public struct TerminalCapabilityProfile: Equatable, Sendable {
     term: String,
     environment: [String: String]
   ) -> Bool {
-    guard isGenericXterm(term) else { return false }
+    guard TerminalFamily.isGenericXterm(term) else { return false }
     if let program = environment["TERM_PROGRAM"], !program.isEmpty {
       return program.lowercased() == "vscode"
     }
@@ -334,23 +302,13 @@ public struct TerminalCapabilityProfile: Equatable, Sendable {
   }
 
   private static func supportsMouseReporting(term: String) -> Bool {
-    matches(
-      term,
-      families: [
-        "xterm", "screen", "tmux", "wezterm", "kitty", "ghostty", "alacritty",
-        "foot", "st", "konsole", "mintty", "putty", "iterm2",
-      ])
+    TerminalFamily.resolve(term)?.supportsMouse == true
   }
 
   private static func supportsSynchronizedOutput(term: String, environment: [String: String])
     -> Bool
   {
-    matches(
-      identifiedTerminal(term: term, environment: environment),
-      families: [
-        "wezterm", "kitty", "xterm-kitty", "ghostty", "xterm-ghostty", "alacritty",
-        "foot", "konsole", "mintty", "tmux", "iterm2",
-      ])
+    TerminalFamily.resolve(term, program: environment["TERM_PROGRAM"])?.supportsLinksAndSync == true
   }
 }
 
