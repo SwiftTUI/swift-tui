@@ -1,22 +1,28 @@
 package struct PreferenceObservationKeySuffix: Hashable, Sendable,
   CustomStringConvertible
 {
-  package var preferenceKeyID: ObjectIdentifier
-  package var keyDebugName: String
+  private let keyType: Any.Type
+  package var preferenceKeyID: ObjectIdentifier { ObjectIdentifier(keyType) }
+
+  package static func == (lhs: Self, rhs: Self) -> Bool {
+    lhs.preferenceKeyID == rhs.preferenceKeyID && lhs.ordinal == rhs.ordinal
+  }
+  package func hash(into hasher: inout Hasher) {
+    hasher.combine(preferenceKeyID)
+    hasher.combine(ordinal)
+  }
   package var ordinal: Int
 
   package init<K: PreferenceKey>(
     key: K.Type,
-    keyDebugName: String,
     ordinal: Int
   ) {
-    preferenceKeyID = ObjectIdentifier(key)
-    self.keyDebugName = keyDebugName
+    keyType = key
     self.ordinal = ordinal
   }
 
   package var description: String {
-    "preference[\(keyDebugName)][\(ordinal)]"
+    "preference[\(String(reflecting: keyType))][\(ordinal)]"
   }
 }
 
@@ -26,28 +32,21 @@ package typealias PreferenceObservationKey =
 package struct PreferenceObservationRegistrationSnapshot: Sendable {
   package var identity: Identity
   package var key: PreferenceObservationKey
-  package var handlerID: String
+  package var handlerID: String { "\(identity)#\(key.suffix)" }
   fileprivate let box: any PreferenceObservationBox
-
-  fileprivate var keyDebugName: String {
-    box.keyDebugName
-  }
 
   fileprivate init(
     identity: Identity,
     key: PreferenceObservationKey,
-    handlerID: String,
     box: any PreferenceObservationBox
   ) {
     self.identity = identity
     self.key = key
-    self.handlerID = handlerID
     self.box = box
   }
 }
 
 private protocol PreferenceObservationBox: Sendable {
-  var keyDebugName: String { get }
   var valueSnapshot: String { get }
 
   func value<Value>(as type: Value.Type) -> Value?
@@ -61,10 +60,6 @@ private struct TypedPreferenceObservationBox<Key: PreferenceKey>: PreferenceObse
 where Key.Value: Equatable {
   let value: Key.Value
   let action: @MainActor (Key.Value) -> Void
-
-  var keyDebugName: String {
-    String(reflecting: Key.self)
-  }
 
   var valueSnapshot: String {
     String(reflecting: value)
@@ -112,24 +107,21 @@ package final class LocalPreferenceObservationRegistry: Equatable {
     value: K.Value,
     action: @escaping @MainActor (K.Value) -> Void
   ) where K.Value: Equatable {
-    let keyDebugName = String(reflecting: key)
+    let keyID = ObjectIdentifier(key)
     let ordinal = registrations.values.count { registration in
       registration.identity == identity
-        && registration.keyDebugName == keyDebugName
+        && registration.key.suffix.preferenceKeyID == keyID
     }
     let registrationKey = PreferenceObservationKey(
       ownerNodeID: ViewNodeContext.current?.viewNodeID,
       suffix: .init(
         key: key,
-        keyDebugName: keyDebugName,
         ordinal: ordinal
       )
     )
-    let handlerID = "\(identity)#preference[\(keyDebugName)][\(ordinal)]"
     let registration = PreferenceObservationRegistrationSnapshot(
       identity: identity,
       key: registrationKey,
-      handlerID: handlerID,
       box: TypedPreferenceObservationBox<K>(
         value: value,
         action: action
@@ -194,10 +186,13 @@ package final class LocalPreferenceObservationRegistry: Equatable {
 
   private func sortedRegistrations() -> [PreferenceObservationRegistrationSnapshot] {
     registrations.values.sorted { lhs, rhs in
-      if lhs.handlerID != rhs.handlerID {
-        return lhs.handlerID < rhs.handlerID
+      let left = lhs.key.ownerNodeID?.rawValue
+      let right = rhs.key.ownerNodeID?.rawValue
+      if left != right { return left.map { l in right.map { l < $0 } ?? false } ?? true }
+      if lhs.key.suffix.ordinal != rhs.key.suffix.ordinal {
+        return lhs.key.suffix.ordinal < rhs.key.suffix.ordinal
       }
-      return String(describing: lhs.key) < String(describing: rhs.key)
+      return lhs.handlerID < rhs.handlerID
     }
   }
 }
