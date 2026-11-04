@@ -70,7 +70,7 @@ struct AnimationInterpolationConeTests {
       metadata.baseStyle.explicitOpacity = opacities[index] ?? 1
       return ResolvedNode(
         viewNodeID: ViewNodeID(rawValue: UInt64(index + 2)),
-        identity: rootIdentity.child("leaf-\(index)"),
+        identity: rootIdentity.child(.init(rawValue: "leaf-\(index)")),
         kind: .view("Leaf"),
         drawMetadata: metadata
       )

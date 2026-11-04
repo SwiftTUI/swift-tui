@@ -2001,7 +2001,7 @@ struct RuntimeRegistrationRestoreScopingTests {
     func siblings(rootIdentity: Identity) -> [SeamSibling] {
       (0..<siblingCount).map { index in
         SeamSibling(
-          identity: rootIdentity.child("S\(index)"),
+          identity: rootIdentity.child(.init(rawValue: "S\(index)")),
           label: "S\(index)",
           marker: "s\(index)-0"
         )
@@ -2114,7 +2114,7 @@ struct RuntimeRegistrationRestoreScopingTests {
     }
 
     func islandIdentity(for sibling: SeamSibling) -> Identity? {
-      islandLabel.map { sibling.identity.child($0) }
+      islandLabel.map { sibling.identity.child(.init(rawValue: $0)) }
     }
   }
 
@@ -2202,7 +2202,7 @@ struct RuntimeRegistrationRestoreScopingTests {
     }
     let rootChildren: [ResolvedNode]
     if let wrapperLabel = shape.kind.wrapperLabel {
-      let wrapperIdentity = rootIdentity.child(wrapperLabel)
+      let wrapperIdentity = rootIdentity.child(.init(rawValue: wrapperLabel))
       let wrapperNode = graph.beginEvaluation(identity: wrapperIdentity, invalidator: nil)
       graph.finishEvaluation(
         wrapperNode,
@@ -2331,7 +2331,7 @@ struct RuntimeRegistrationRestoreScopingTests {
       node.recordActionRegistration(
         identity: identity,
         handler: { marker.hasSuffix("1") },
-        followUpInvalidationIdentity: identity.child("follow-up-\(marker)")
+        followUpInvalidationIdentity: identity.child(.init(rawValue: "follow-up-\(marker)"))
       )
       node.recordKeyPressHandlerRegistration(identity: identity, ordinal: 0) { _ in
         marker.hasSuffix("1")

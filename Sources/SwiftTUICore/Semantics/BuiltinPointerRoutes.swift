@@ -123,7 +123,7 @@ package func listRowIndex(
   else {
     return nil
   }
-  return builtinRouteRowIndex(in: component, kind: "ListRow")
+  return component.index(ofKind: "ListRow")
 }
 
 /// `identity` without the occurrence components a later duplicate's row
@@ -133,7 +133,7 @@ private func rowRoute(of identity: Identity, container: Identity) -> Identity? {
   var route = identity
   while route.parent != container {
     guard let last = route.lastComponent,
-      !Identity(components: [last]).entityOccurrenceComponents.isEmpty,
+      last.hasEntityOccurrence,
       let parent = route.parent
     else { return nil }
     route = parent
@@ -150,25 +150,11 @@ extension Identity {
     guard let rowIdentity else { return self }
     let own =
       container.isAncestor(of: rowIdentity)
-      ? Identity(components: Array(rowIdentity.components.dropFirst(container.components.count)))
+      ? Identity(
+        components: Array(rowIdentity.typedComponents.dropFirst(container.typedComponents.count)))
       : rowIdentity
     return own.entityOccurrenceComponents.reduce(self) { $0.child($1) }
   }
-}
-
-private func builtinRouteRowIndex(
-  in component: String,
-  kind: String
-) -> Int? {
-  // `IdentityComponent.indexed` encodes as `Kind[n]`.
-  guard component.count > kind.count + 2,
-    component.hasPrefix(kind + "["),
-    component.hasSuffix("]")
-  else {
-    return nil
-  }
-  let digits = component.dropFirst(kind.count + 1).dropLast()
-  return Int(digits)
 }
 
 /// See ``listRowIdentity(for:rowIndex:rowIdentity:)`` for `rowIdentity`.
@@ -186,5 +172,5 @@ package func routeIDHasTerminalComponent(
   hasTerminalComponent component: BuiltinPointerRouteComponent
 ) -> Bool {
   routeID.kind == .primary
-    && routeID.identity.lastComponent == component.identityComponent.rawValue
+    && routeID.identity.lastComponent == component.identityComponent
 }

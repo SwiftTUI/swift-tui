@@ -42,7 +42,7 @@ implementation/vendor targets are named below; they have no symbol count here.
 | Owning module | Direct product roots | Top-level | All public |
 |---|---|---:|---:|
 | [`SwiftTUI`](PUBLIC_API_BASELINE.md#swifttui) | `SwiftTUI` | 1 | 4 |
-| [`SwiftTUIRuntime`](PUBLIC_API_BASELINE.md#swifttuiruntime) | `SwiftTUIRuntime` | 60 | 531 |
+| [`SwiftTUIRuntime`](PUBLIC_API_BASELINE.md#swifttuiruntime) | `SwiftTUIRuntime` | 60 | 525 |
 | [`SwiftTUIProfiling`](PUBLIC_API_BASELINE.md#swifttuiprofiling) | `SwiftTUIProfiling` | 9 | 52 |
 | [`SwiftTUIViews`](PUBLIC_API_BASELINE.md#swifttuiviews) | `SwiftTUIViews` | 418 | 2585 |
 | [`SwiftTUIAnimatedImage`](PUBLIC_API_BASELINE.md#swifttuianimatedimage) | `SwiftTUIAnimatedImage` | 5 | 36 |
@@ -56,8 +56,8 @@ implementation/vendor targets are named below; they have no symbol count here.
 | [`SwiftTUIWebHostCLI`](PUBLIC_API_BASELINE.md#swifttuiwebhostcli) | `SwiftTUIWebHostCLI` | 2 | 8 |
 | [`SwiftTUIAndroidHost`](PUBLIC_API_BASELINE.md#swifttuiandroidhost) | `SwiftTUIAndroidHost` | 16 | 44 |
 | [`SwiftTUICore`](PUBLIC_API_BASELINE.md#swifttuicore) | None (non-product support target) | 41 | 278 |
-| [`SwiftTUIPrimitives`](PUBLIC_API_BASELINE.md#swifttuiprimitives) | None (non-product support target) | 174 | 1543 |
-| [`SwiftTUIGraph`](PUBLIC_API_BASELINE.md#swifttuigraph) | None (non-product support target) | 77 | 511 |
+| [`SwiftTUIPrimitives`](PUBLIC_API_BASELINE.md#swifttuiprimitives) | None (non-product support target) | 175 | 1556 |
+| [`SwiftTUIGraph`](PUBLIC_API_BASELINE.md#swifttuigraph) | None (non-product support target) | 77 | 510 |
 | [`SwiftTUIPTYCPrimitives`](PUBLIC_API_BASELINE.md#swifttuiptycprimitives) | None (non-product support target) | 0 | 0 |
 | [`SwiftTUIPlatformIO`](PUBLIC_API_BASELINE.md#swifttuiplatformio) | None (non-product support target) | 1 | 19 |
 | [`SwiftTUITestSupport`](PUBLIC_API_BASELINE.md#swifttuitestsupport) | `SwiftTUITestSupport` | 0 | 0 |

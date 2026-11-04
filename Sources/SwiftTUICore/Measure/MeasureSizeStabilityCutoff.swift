@@ -113,7 +113,9 @@ extension LayoutEngine {
       return nil
     }
     var result = MeasureCutoffPrePassResult()
-    let byDepth = presentInPreviousFrame.sorted { $0.components.count < $1.components.count }
+    let byDepth = presentInPreviousFrame.sorted {
+      $0.typedComponents.count < $1.typedComponents.count
+    }
     var roots: [Identity] = []
     for candidate in byDepth
     where !roots.contains(where: { $0 == candidate || $0.isAncestor(of: candidate) }) {

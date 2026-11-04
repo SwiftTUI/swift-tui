@@ -84,7 +84,8 @@ package struct CollectionAccessibilityNavigation {
     }
     guard let current = state.current else { return nil }
     let epoch = state.epoch
-    let navigatorIdentity = context.identity.child("AccessibilityCollection\(epoch)")
+    let navigatorIdentity = context.identity.child(
+      .init(rawValue: "AccessibilityCollection\(epoch)"))
     let reviewIdentity = navigatorIdentity.child(.indexed("Row", index: current.index))
     metadata = .init(
       identity: navigatorIdentity, position: current.index + 1,

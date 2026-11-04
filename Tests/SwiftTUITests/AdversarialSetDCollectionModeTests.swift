@@ -731,7 +731,7 @@ struct Wave4FJListFocusTests {
   }
 
   private static func focusedRow<V: View>(_ h: SetDLiveHarness<V>) -> String? {
-    h.runLoop.focusTracker.currentFocusIdentity?.lastComponent
+    h.runLoop.focusTracker.currentFocusIdentity?.lastComponent?.rawValue
   }
 
   // wave4j10 (STUI-1290): initial focus enters the list at its selected row,
@@ -767,7 +767,8 @@ struct Wave4FJListFocusTests {
     try h.key(.tab)
     #expect(Self.focusedRow(h) == "ListRow[12]")
     try h.key(.tab)
-    try #require(h.runLoop.focusTracker.currentFocusIdentity?.lastComponent != "ListRow[12]")
+    try #require(
+      h.runLoop.focusTracker.currentFocusIdentity?.lastComponent?.rawValue != "ListRow[12]")
     #expect(
       h.runLoop.withRuntimeRegistrationScope {
         h.runLoop.handleKeyPress(KeyPress(.tab, modifiers: .shift))

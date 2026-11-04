@@ -111,7 +111,7 @@ extension TabView {
       ordinal: StateSlotOrdinals.tabAccessibilityTokens, value: semanticTokens)
     let semanticTabs = options.indices.map { index in
       AccessibilityTabMetadata(
-        identity: context.identity.child("AccessibilityTab\(tokens[index])"),
+        identity: context.identity.child(.init(rawValue: "AccessibilityTab\(tokens[index])")),
         visualIdentity: tabItemIdentity(for: context.identity, index: index),
         label: options[index].label.displayText, selected: selectedIndex == index)
     }

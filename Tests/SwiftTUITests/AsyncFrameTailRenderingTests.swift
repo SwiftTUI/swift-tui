@@ -4375,14 +4375,14 @@ private func makeAsyncRecursiveCustomLayoutNode(
   depth: Int
 ) -> ResolvedNode {
   var node = ResolvedNode(
-    identity: identity.child("leaf"),
+    identity: identity.child(.named("leaf")),
     kind: .view("Leaf"),
     intrinsicSize: .init(width: 1, height: 1)
   )
 
   for index in stride(from: depth - 1, through: 0, by: -1) {
     node = ResolvedNode(
-      identity: index == 0 ? identity : identity.child("recursive-\(index)"),
+      identity: index == 0 ? identity : identity.child(.init(rawValue: "recursive-\(index)")),
       kind: .view("AsyncRecursiveCustomLayout"),
       children: [node],
       layoutBehavior: .custom(CustomLayoutHandle(asyncRecursiveCustomLayoutProxy))

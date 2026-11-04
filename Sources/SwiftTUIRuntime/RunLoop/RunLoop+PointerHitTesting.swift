@@ -290,8 +290,8 @@ extension RunLoop {
           && localActionRegistry.hasActivationHandler(identity: candidate)
       }
       .min { lhs, rhs in
-        let lhsDepth = identityDepth(lhs)
-        let rhsDepth = identityDepth(rhs)
+        let lhsDepth = lhs.depth
+        let rhsDepth = rhs.depth
         if lhsDepth != rhsDepth {
           return lhsDepth < rhsDepth
         }
@@ -391,8 +391,8 @@ extension RunLoop {
           && handlerRegion(candidate, contains: location)
       }
       .min { lhs, rhs in
-        let lhsDepth = identityDepth(lhs)
-        let rhsDepth = identityDepth(rhs)
+        let lhsDepth = lhs.depth
+        let rhsDepth = rhs.depth
         if lhsDepth != rhsDepth {
           return lhsDepth < rhsDepth
         }
@@ -424,10 +424,6 @@ extension RunLoop {
       mintsRegion = true
     }
     return !mintsRegion
-  }
-
-  private func identityDepth(_ identity: Identity) -> Int {
-    identity.description.filter { $0 == "/" }.count
   }
 
   package func shouldCapturePointer(

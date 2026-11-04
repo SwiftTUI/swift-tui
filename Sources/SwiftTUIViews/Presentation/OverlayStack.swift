@@ -90,7 +90,7 @@ package func composeOverlayStackTreeWork(
   // state (slots key off their stable identities).
   let desiredEntryIdentities = sortedEntries.map { entry in
     overlayContext.identity.child(
-      PresentationOverlayEntryIdentityScheme.entryComponent(id: "\(entry.id)")
+      .init(rawValue: PresentationOverlayEntryIdentityScheme.entryComponent(id: "\(entry.id)"))
     )
   }
   // `forceEntryRefresh` covers the same-entry-list staleness the identity

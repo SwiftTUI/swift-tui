@@ -329,7 +329,7 @@ struct WebSurfaceWireTotalityTests {
                 hidden: true
               ),
               AccessibilityNode(
-                identity: identity.child("visible"),
+                identity: identity.child(.named("visible")),
                 rect: CellRect(origin: .zero, size: CellSize(width: 2, height: 1)),
                 role: .group
               ),

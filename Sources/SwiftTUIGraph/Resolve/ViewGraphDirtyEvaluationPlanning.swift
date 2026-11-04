@@ -157,10 +157,10 @@ enum ViewGraphDirtyEvaluationPlanner {
     }
 
     return frontier.sorted { lhs, rhs in
-      if lhs.identity.components.count == rhs.identity.components.count {
+      if lhs.identity.typedComponents.count == rhs.identity.typedComponents.count {
         return lhs.identity < rhs.identity
       }
-      return lhs.identity.components.count < rhs.identity.components.count
+      return lhs.identity.typedComponents.count < rhs.identity.typedComponents.count
     }
   }
 

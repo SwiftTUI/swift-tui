@@ -334,7 +334,7 @@ package final class LocalScrollPositionRegistry: Equatable {
       // cannot establish that the focused descendant still exists afterward.
       let lazyTarget = scrollTargets.filter {
         $0.role == .lazyElement && focusedRegion.identity.isDescendant(of: $0.identity)
-      }.max { $0.identity.components.count < $1.identity.components.count }
+      }.max { $0.identity.typedComponents.count < $1.identity.typedComponents.count }
       guard let lazyTarget,
         let previousAncestor = previousTargets.first(where: {
           $0.scrollIdentity == lazyTarget.scrollIdentity && $0.identity == lazyTarget.identity

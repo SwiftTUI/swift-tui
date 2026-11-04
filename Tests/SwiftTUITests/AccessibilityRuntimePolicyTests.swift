@@ -2164,8 +2164,8 @@ struct Wave4FJDuplicateRuntimeIdentityTests {
     func selector(_ row: Int) throws -> AccessibilityNode {
       try #require(nodes.first { $0.label == "Select row \(row)" })
     }
-    #expect(try selector(1).runtimeFocusIdentity.lastComponent == "ListRow[0]")
-    #expect(try selector(3).runtimeFocusIdentity.lastComponent == "ListRow[2]")
+    #expect(try selector(1).runtimeFocusIdentity.lastComponent?.rawValue == "ListRow[0]")
+    #expect(try selector(3).runtimeFocusIdentity.lastComponent?.rawValue == "ListRow[2]")
     let second = try selector(2)
     #expect(Self.carriesOccurrence(second.runtimeFocusIdentity), "\(second.runtimeFocusIdentity)")
     #expect(second.identity == (try selector(1)).identity, "reported identities stay equal")
@@ -2291,7 +2291,8 @@ extension Wave4FJDuplicateRuntimeIdentityTests {
       $0.label == "Select row 1"
     }
     try #require(selectors.count == 2)
-    #expect(selectors.allSatisfy { $0.runtimeFocusIdentity.lastComponent == "ListRow[0]" })
+    #expect(
+      selectors.allSatisfy { $0.runtimeFocusIdentity.lastComponent?.rawValue == "ListRow[0]" })
     #expect(!Self.carriesOccurrence(selectors[0].runtimeFocusIdentity))
     #expect(Self.carriesOccurrence(selectors[1].runtimeFocusIdentity))
   }

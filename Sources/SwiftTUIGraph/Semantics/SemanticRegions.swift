@@ -197,13 +197,13 @@ package struct ScrollTarget: Equatable, Sendable {
 
 package struct ScrollTargetQuery: Equatable, Sendable {
   package var identity: Identity?
-  package var explicitIDComponent: String?
+  package var explicitIDComponent: IdentityComponent?
   /// Recovery must not reveal a replacement item at a synthetic row index.
   package var expectedCollectionRowIndex: Int? = nil
 
   package init(
     identity: Identity? = nil,
-    explicitIDComponent: String? = nil
+    explicitIDComponent: IdentityComponent? = nil
   ) {
     self.identity = identity
     self.explicitIDComponent = explicitIDComponent

@@ -62,8 +62,8 @@ private func coalescedSubtreeRoots(
   _ identities: Set<Identity>
 ) -> [Identity] {
   let sortedIdentities = identities.sorted { lhs, rhs in
-    if lhs.components.count != rhs.components.count {
-      return lhs.components.count < rhs.components.count
+    if lhs.typedComponents.count != rhs.typedComponents.count {
+      return lhs.typedComponents.count < rhs.typedComponents.count
     }
     return lhs < rhs
   }

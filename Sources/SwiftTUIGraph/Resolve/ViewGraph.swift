@@ -1283,17 +1283,27 @@ package final class ViewGraph {
       }
     }
 
-    let identityPath = identity.path
     let overlayHostIdentity = presentationOverlayHostIdentity(
       portalRootIdentity: portalRootIdentity
     )
-    for entryIdentity in activeOverlayEntryIdentities.sorted() {
-      let entryPath = entryIdentity.path
-      guard identityPath == entryPath || identityPath.hasPrefix("\(entryPath)/") else {
-        continue
-      }
+    // Older invalidation producers split the entry component itself at slashes.
+    // Match a complete active entry below the same host. Prefer the structural
+    // form, then the longest matching legacy entry when owners share a prefix.
+    let entries = activeOverlayEntryIdentities.sorted()
+    let matchedEntry =
+      entries.first { $0.isAncestor(of: identity) }
+      ?? {
+        guard overlayHostIdentity.isAncestor(of: identity) else { return nil }
+        let suffix = identity.typedComponents.dropFirst(overlayHostIdentity.typedComponents.count)
+        return entries.filter { entry in
+          guard let key = entry.lastComponent?.rawValue, key.contains("/") else { return false }
+          let legacy = key.split(separator: "/")
+          return suffix.lazy.map(\.rawValue).starts(with: legacy, by: { $0 == $1 })
+        }.max { ($0.lastComponent?.rawValue.count ?? 0) < ($1.lastComponent?.rawValue.count ?? 0) }
+      }()
+    if let entryIdentity = matchedEntry {
       for target in [
-        entryIdentity.child("body"),
+        entryIdentity.child(.named("body")),
         entryIdentity,
         overlayHostIdentity,
       ] {
@@ -1302,7 +1312,7 @@ package final class ViewGraph {
         }
       }
     }
-    if identityPath.hasPrefix("\(overlayHostIdentity.path)/entry:"),
+    if isPresentationOverlayEntryIdentity(identity, portalRootIdentity: portalRootIdentity),
       nodeIfExists(for: overlayHostIdentity) != nil
     {
       return overlayHostIdentity

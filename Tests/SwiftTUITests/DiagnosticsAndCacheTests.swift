@@ -93,7 +93,7 @@ private struct ResolveProbeLeaf: PrimitiveView, IterativeResolvableView {
         isSelfInvalidated: context.isInvalidated(context.identity),
         subtreeAffected: context.invalidationAffectsSubtree(),
         unrelatedSubtreeAffected: context.invalidationAffectsSubtree(
-          at: (context.identity.parent ?? context.identity).child("Elsewhere")
+          at: (context.identity.parent ?? context.identity).child(.named("Elsewhere"))
         )
       )
     )
@@ -159,7 +159,7 @@ private struct ResolveProbeRoot: PrimitiveView, IterativeResolvableView {
         isSelfInvalidated: context.isInvalidated(context.identity),
         subtreeAffected: context.invalidationAffectsSubtree(),
         unrelatedSubtreeAffected: context.invalidationAffectsSubtree(
-          at: (context.identity.parent ?? context.identity).child("Elsewhere")
+          at: (context.identity.parent ?? context.identity).child(.named("Elsewhere"))
         )
       )
     )
@@ -1052,7 +1052,7 @@ struct DiagnosticsAndCacheTests {
   func resolveContextCarriesInvalidatedIdentitiesAndSubtreeChecks() throws {
     let recorder = ResolveProbeRecorder()
     let rootIdentity = testIdentity("Root")
-    let childIdentity = rootIdentity.child("ProbeRoot[0]")
+    let childIdentity = rootIdentity.child(.init(rawValue: "ProbeRoot[0]"))
 
     _ = DefaultRenderer().render(
       ResolveProbeRoot(recorder: recorder),

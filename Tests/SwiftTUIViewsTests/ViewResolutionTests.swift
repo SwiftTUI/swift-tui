@@ -18,8 +18,9 @@ struct ViewResolutionTests {
     #expect(resolved.identity == testIdentity("root"))
     #expect(resolved.kind == .view("AnyView"))
     #expect(payload.kind == .view("AnyViewPayload"))
-    #expect(payload.identity.lastComponent?.contains("Text") == true)
-    #expect(content.identity == testIdentity("root", payload.identity.lastComponent!, "Content"))
+    #expect(payload.identity.lastComponent?.rawValue.contains("Text") == true)
+    #expect(
+      content.identity == testIdentity("root", payload.identity.lastComponent!.rawValue, "Content"))
     #expect(content.kind == .view("Text"))
   }
 

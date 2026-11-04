@@ -189,6 +189,6 @@ private final class ScrollViewProxyBridge {
 
 private func explicitIDComponent<ID: Hashable>(
   for id: ID
-) -> String? {
-  Identity(components: [] as [IdentityComponent]).explicitID(id).lastComponent
+) -> IdentityComponent {
+  .explicitID(id)
 }

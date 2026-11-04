@@ -13,7 +13,7 @@ struct FocusArrivalLifetimeTests {
   func publicationPreservesArrivalButLifetimeRemovalDoesNot(ownerless: Bool) {
     let registry = LocalFocusBindingRegistry()
     let root = testIdentity("Arrival")
-    let target = root.child("Target")
+    let target = root.child(.named("Target"))
     let key = FocusBindingKey(owner: nil, suffix: .legacy("arrival"))
     func registerTarget() {
       registry.register(

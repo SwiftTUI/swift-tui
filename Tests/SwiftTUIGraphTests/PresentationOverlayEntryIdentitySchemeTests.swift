@@ -18,9 +18,9 @@ struct PresentationOverlayEntryIdentitySchemeTests {
     // stay byte-identical to the scheme; `.named` requires StaticString).
     let minted =
       portalRoot
-      .child("PortalHost")
-      .child("overlays")
-      .child(PresentationOverlayEntryIdentityScheme.entryComponent(id: "sheet-3"))
+      .child(.named("PortalHost"))
+      .child(.named("overlays"))
+      .child(.init(rawValue: PresentationOverlayEntryIdentityScheme.entryComponent(id: "sheet-3")))
 
     let derived = PresentationOverlayEntryIdentityScheme.entryIdentity(
       portalRootIdentity: portalRoot,
@@ -43,13 +43,15 @@ struct PresentationOverlayEntryIdentitySchemeTests {
     )
     #expect(
       PresentationOverlayEntryIdentityScheme.isEntryIdentity(
-        entry.child("VStack[0]"), portalRootIdentity: portalRoot, entryRootOnly: false
+        entry.child(.init(rawValue: "VStack[0]")), portalRootIdentity: portalRoot,
+        entryRootOnly: false
       )
     )
     // A descendant is NOT an entry root.
     #expect(
       !PresentationOverlayEntryIdentityScheme.isEntryIdentity(
-        entry.child("VStack[0]"), portalRootIdentity: portalRoot, entryRootOnly: true
+        entry.child(.init(rawValue: "VStack[0]")), portalRootIdentity: portalRoot,
+        entryRootOnly: true
       )
     )
     // The host itself is not an entry.
@@ -64,7 +66,8 @@ struct PresentationOverlayEntryIdentitySchemeTests {
     // not an overlay entry.
     #expect(
       !PresentationOverlayEntryIdentityScheme.isEntryIdentity(
-        portalRoot.child("Sidebar").child("overlays").child("entry:sheet-3"),
+        portalRoot.child(.named("Sidebar")).child(.named("overlays")).child(
+          .named("entry:sheet-3")),
         portalRootIdentity: portalRoot,
         entryRootOnly: true
       )

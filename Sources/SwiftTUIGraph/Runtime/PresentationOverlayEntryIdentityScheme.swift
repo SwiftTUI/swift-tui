@@ -20,8 +20,8 @@ package enum PresentationOverlayEntryIdentityScheme {
   /// The overlays host identity under a portal root.
   package static func hostIdentity(portalRootIdentity: Identity) -> Identity {
     portalRootIdentity
-      .child(hostComponent)
-      .child(overlaysComponent)
+      .child(.init(rawValue: hostComponent))
+      .child(.init(rawValue: overlaysComponent))
   }
 
   /// The full identity of one overlay entry under a portal root.
@@ -30,7 +30,7 @@ package enum PresentationOverlayEntryIdentityScheme {
     entryID: String
   ) -> Identity {
     hostIdentity(portalRootIdentity: portalRootIdentity)
-      .child(entryComponent(id: entryID))
+      .child(.init(rawValue: entryComponent(id: entryID)))
   }
 
   /// Whether `identity` names an overlay entry — or, with

@@ -204,11 +204,11 @@ struct HotReloadReplayTests {
 
   @Test func exactRebaseInitializesBeforeFirstReadWithoutAliasing() throws {
     let graph = ViewGraph()
-    let old = graph.prepareDynamicPropertyUpdate(identity: source.child("Root"))
+    let old = graph.prepareDynamicPropertyUpdate(identity: source.child(.named("Root")))
     withOwnedDormantStateSlot { old.setStateSlot(ordinal: 10, value: 42) }
     let snapshot = graph.captureHotReloadSnapshot(rootedAt: source)
     try graph.installHotReloadReplay(snapshot, at: destination, owners: [schema([10])])
-    let new = graph.prepareDynamicPropertyUpdate(identity: destination.child("Root"))
+    let new = graph.prepareDynamicPropertyUpdate(identity: destination.child(.named("Root")))
     #expect(new.stateSlot(ordinal: 10, seed: 0) == 42)
     #expect(new.ownerLifetimeID != old.ownerLifetimeID)
     new.setStateSlot(ordinal: 10, value: 99)
@@ -362,7 +362,7 @@ struct HotReloadReplayTests {
 
   @Test func applicationDecoderCanInspectGraphWithoutOverlappingMutableAccess() throws {
     let graph = ViewGraph()
-    let old = graph.prepareDynamicPropertyUpdate(identity: source.child("Root"))
+    let old = graph.prepareDynamicPropertyUpdate(identity: source.child(.named("Root")))
     withOwnedDormantStateSlot {
       old.setStateSlot(ordinal: 10, value: ReentrantReloadValue(count: 19))
     }
@@ -395,7 +395,7 @@ struct HotReloadReplayTests {
       let graph = ViewGraph()
       let model = ReloadModel(count: 73)
       released = model
-      let node = graph.prepareDynamicPropertyUpdate(identity: source.child("Root"))
+      let node = graph.prepareDynamicPropertyUpdate(identity: source.child(.named("Root")))
       withOwnedDormantStateSlot { node.setStateSlot(ordinal: 10, value: model) }
       snapshot = graph.captureHotReloadSnapshot(rootedAt: source)
     }
@@ -416,7 +416,7 @@ struct HotReloadReplayTests {
 
   @Test func unsupportedAndTransientSlotsAreReported() {
     let graph = ViewGraph()
-    let node = graph.prepareDynamicPropertyUpdate(identity: source.child("Root"))
+    let node = graph.prepareDynamicPropertyUpdate(identity: source.child(.named("Root")))
     withOwnedDormantStateSlot { node.setStateSlot(ordinal: 10, value: { 1 }) }
     node.setStateSlot(ordinal: -1, value: 99)
     let snapshot = graph.captureHotReloadSnapshot(rootedAt: source)
@@ -428,7 +428,7 @@ struct HotReloadReplayTests {
 
   @Test func optionalNilIsAReplayValueAndWrongGraphsCannotConsumeIt() throws {
     let graph = ViewGraph()
-    let old = graph.prepareDynamicPropertyUpdate(identity: source.child("Root"))
+    let old = graph.prepareDynamicPropertyUpdate(identity: source.child(.named("Root")))
     withOwnedDormantStateSlot { old.setStateSlot(ordinal: 10, value: Optional<Int>.none) }
     try graph.installHotReloadReplay(
       graph.captureHotReloadSnapshot(rootedAt: source),
@@ -467,7 +467,7 @@ struct HotReloadReplayTests {
     #expect(throws: (any Error).self) {
       try graph.installHotReloadReplay(snapshot, at: source, owners: [schema([10])])
     }
-    _ = graph.prepareDynamicPropertyUpdate(identity: destination.child("Root"))
+    _ = graph.prepareDynamicPropertyUpdate(identity: destination.child(.named("Root")))
     #expect(throws: (any Error).self) {
       try graph.installHotReloadReplay(snapshot, at: destination, owners: [schema([10])])
     }

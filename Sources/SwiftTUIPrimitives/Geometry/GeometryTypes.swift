@@ -673,8 +673,87 @@ public enum Phase: String, CaseIterable, Sendable {
 public struct IdentityComponent: Hashable, Sendable, Codable, CustomStringConvertible {
   public let rawValue: String
 
-  package init(rawValue: String) {
+  private enum Shape: Sendable {
+    case plain
+    case indexed(kind: String, index: Int)
+    case qualifiedID(base: String)
+  }
+  private let shape: Shape
+
+  private init(_ rawValue: String, shape: Shape) {
     self.rawValue = rawValue
+    self.shape = shape
+  }
+
+  /// Imports a component from an existing path or wire record.
+  public init(rawValue: String) {
+    guard rawValue.last == "]" else {
+      self.init(rawValue, shape: .plain)
+      return
+    }
+    let body = rawValue.dropLast()
+    if body.hasPrefix("ID["), let marker = body.lastIndex(of: "#") {
+      let suffix = body[body.index(after: marker)...]
+      if !suffix.isEmpty, suffix.allSatisfy(\.isNumber) {
+        self.init(rawValue, shape: .qualifiedID(base: body[..<marker] + "]"))
+        return
+      }
+    }
+    if let bracket = body.lastIndex(of: "["), let index = Int(body[body.index(after: bracket)...]) {
+      self.init(rawValue, shape: .indexed(kind: String(body[..<bracket]), index: index))
+    } else {
+      self.init(rawValue, shape: .plain)
+    }
+  }
+
+  public func index(ofKind kind: String) -> Int? {
+    guard kind != "ID", case .indexed(let actual, let index) = shape, actual == kind else {
+      return nil
+    }
+    return index
+  }
+
+  fileprivate var unqualifiedID: Self? {
+    guard case .qualifiedID(let base) = shape else { return nil }
+    return Self(rawValue: base)
+  }
+
+  package var hasEntityOccurrence: Bool {
+    if case .qualifiedID = shape { return true }
+    return false
+  }
+
+  public static func == (lhs: Self, rhs: Self) -> Bool { lhs.rawValue == rhs.rawValue }
+  public func hash(into hasher: inout Hasher) { hasher.combine(rawValue) }
+
+  private enum CodingKeys: String, CodingKey { case rawValue }
+
+  public init(from decoder: any Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    self.init(rawValue: try container.decode(String.self, forKey: .rawValue))
+  }
+
+  public static func explicitID<ID: Hashable>(_ id: ID, occurrence: Int = 0) -> Self {
+    let escaped = escapedExplicitIDComponent(String(reflecting: id))
+    let base = "ID[\(escaped)]"
+    guard occurrence > 0 else { return Self(base, shape: .plain) }
+    return Self("ID[\(escaped)#\(occurrence)]", shape: .qualifiedID(base: base))
+  }
+
+  private static func escapedExplicitIDComponent(_ component: String) -> String {
+    let escaped = component.reduce(into: "") { escaped, character in
+      switch character {
+      case "%":
+        escaped.append("%25")
+      case "/":
+        escaped.append("%2F")
+      case "#":
+        escaped.append("%23")
+      default:
+        escaped.append(character)
+      }
+    }
+    return escaped.isEmpty ? "<empty>" : escaped
   }
 
   public static func named(
@@ -706,15 +785,14 @@ extension IdentityComponent {
   /// with a dictionary hit. Interned components are byte-identical to the
   /// interpolated form — this is a cache, never a second identity space.
   ///
-  /// Memory is bounded by the largest index seen per kind (the same growth
-  /// contract as the lazy path's `ForEachSourceIdentityArtifacts`), and each
-  /// entry is a short string.
+  /// Cache dense, commonly reused indices. Sparse or extreme indices go
+  /// directly to the same component representation without growing storage.
   package static func interned(
     kindRawValue: String,
     index: Int
   ) -> IdentityComponent {
-    guard index >= 0 else {
-      return IdentityComponent(rawValue: "\(kindRawValue)[\(index)]")
+    guard (0..<4096).contains(index) else {
+      return Self("\(kindRawValue)[\(index)]", shape: .indexed(kind: kindRawValue, index: index))
     }
     return internedComponentsByKind.withLock { cache in
       if let components = cache[kindRawValue], index < components.count {
@@ -724,7 +802,9 @@ extension IdentityComponent {
       components.reserveCapacity(index + 1)
       while components.count <= index {
         components.append(
-          IdentityComponent(rawValue: "\(kindRawValue)[\(components.count)]")
+          Self(
+            "\(kindRawValue)[\(components.count)]",
+            shape: .indexed(kind: kindRawValue, index: components.count))
         )
       }
       cache[kindRawValue] = components
@@ -754,7 +834,9 @@ private func foldedPathHash(_ partial: Int, appending component: String) -> Int 
 private let emptyPathHashSeed = 0
 
 public struct Identity: Hashable, Comparable, Sendable, Codable, CustomStringConvertible {
-  public let components: [String]
+  public let typedComponents: [IdentityComponent]
+  public var components: [String] { typedComponents.map(\.rawValue) }
+  package var depth: Int { max(0, typedComponents.count - 1) }
   /// The components' left-fold hash (see `foldedPathHash`), computed once at
   /// mint. `Identity` is the reconciliation layer's hottest key type —
   /// invalidation sets, the graph's identity index, and the retained frame
@@ -768,25 +850,25 @@ public struct Identity: Hashable, Comparable, Sendable, Codable, CustomStringCon
   package let precomputedHash: Int
 
   public init(components: [String]) {
-    self.components = components
-    precomputedHash = Self.precomputedHash(for: components)
+    self.init(components: components.map(IdentityComponent.init(rawValue:)))
   }
 
   public init(components: [IdentityComponent]) {
-    self.init(components: components.map(\.rawValue))
+    self.typedComponents = components
+    precomputedHash = Self.precomputedHash(for: components)
   }
 
   /// Trusted-fold mint: `trustedPathHash` MUST equal the fold of
   /// `components` (the caller extends or transfers an already-cached fold).
   /// Package-only; the debug assert keeps the invariant honest.
-  package init(components: [String], trustedPathHash: Int) {
+  package init(components: [IdentityComponent], trustedPathHash: Int) {
     #if DEBUG
       assert(
         trustedPathHash == Self.precomputedHash(for: components),
         "trustedPathHash does not match the components' fold"
       )
     #endif
-    self.components = components
+    self.typedComponents = components
     precomputedHash = trustedPathHash
   }
 
@@ -805,16 +887,16 @@ public struct Identity: Hashable, Comparable, Sendable, Codable, CustomStringCon
   }
 
   public static func == (lhs: Self, rhs: Self) -> Bool {
-    lhs.precomputedHash == rhs.precomputedHash && lhs.components == rhs.components
+    lhs.precomputedHash == rhs.precomputedHash && lhs.typedComponents == rhs.typedComponents
   }
 
   public func hash(into hasher: inout Hasher) {
     hasher.combine(precomputedHash)
   }
 
-  private static func precomputedHash(for components: [String]) -> Int {
+  private static func precomputedHash(for components: [IdentityComponent]) -> Int {
     components.reduce(emptyPathHashSeed) { partial, component in
-      foldedPathHash(partial, appending: component)
+      foldedPathHash(partial, appending: component.rawValue)
     }
   }
 
@@ -827,88 +909,48 @@ public struct Identity: Hashable, Comparable, Sendable, Codable, CustomStringCon
   }
 
   public var parent: Self? {
-    guard !components.isEmpty else {
+    guard !typedComponents.isEmpty else {
       return nil
     }
-    return Self(components: Array(components.dropLast()))
+    return Self(components: Array(typedComponents.dropLast()))
   }
 
+  @available(*, deprecated, message: "Use child(_:) with an IdentityComponent.")
   public func child(_ component: String) -> Self {
+    child(IdentityComponent(rawValue: component))
+  }
+
+  public func child(_ component: IdentityComponent) -> Self {
     Self(
-      components: components + [component],
-      trustedPathHash: foldedPathHash(precomputedHash, appending: component)
-    )
+      components: typedComponents + [component],
+      trustedPathHash: foldedPathHash(precomputedHash, appending: component.rawValue))
   }
 
-  public func child(
-    _ component: IdentityComponent
-  ) -> Self {
-    Self(components: components + [component.rawValue])
-  }
-
-  public var lastComponent: String? {
-    components.last
-  }
+  public var lastComponent: IdentityComponent? { typedComponents.last }
 
   public func explicitID<ID: Hashable>(_ id: ID) -> Self {
-    child("ID[\(escapedExplicitIDComponent(String(reflecting: id)))]")
+    child(.explicitID(id))
   }
 
-  /// An explicit-ID child qualified by its duplicate-occurrence ordinal.
-  /// Occurrence 0 is byte-identical to `explicitID(_:)`, so unique ids (the
-  /// overwhelmingly common case) keep their identity paths unchanged; later
-  /// occurrences get a distinct identity so their whole subtrees — nodes,
-  /// state slots, and runtime registrations — stay independent lifetimes
-  /// instead of colliding on the primary occurrence's identity keys.
   package func explicitID<ID: Hashable>(_ id: ID, occurrence: Int) -> Self {
-    guard occurrence > 0 else {
-      return explicitID(id)
-    }
-    return child("ID[\(escapedExplicitIDComponent(String(reflecting: id)))#\(occurrence)]")
+    child(.explicitID(id, occurrence: occurrence))
   }
 
-  /// The identity with duplicate-occurrence qualifiers stripped from
-  /// explicit-ID components (`ID[x#2]` → `ID[x]`). Caller-facing semantic
-  /// surfaces (accessibility nodes) report this form so duplicate siblings
-  /// compare equal, as authored; runtime isolation rides the
-  /// occurrence-qualified node lifetimes, not the reported identity. A `#`
-  /// authored inside a user id is percent-escaped before the generated
-  /// suffix is added, including custom debug descriptions without quotes.
   package var strippingEntityOccurrences: Self {
-    var changed = false
-    let stripped = components.map { component -> String in
-      guard component.hasPrefix("ID["), component.hasSuffix("]") else {
-        return component
-      }
-      let interior = component.dropFirst(3).dropLast(1)
-      guard let hashIndex = interior.lastIndex(of: "#") else {
-        return component
-      }
-      let digits = interior[interior.index(after: hashIndex)...]
-      guard !digits.isEmpty, digits.allSatisfy(\.isNumber) else {
-        return component
-      }
-      changed = true
-      return "ID[\(interior[..<hashIndex])]"
-    }
-    return changed ? Self(components: stripped) : self
+    guard typedComponents.contains(where: \.hasEntityOccurrence) else { return self }
+    return Self(components: typedComponents.map { $0.unqualifiedID ?? $0 })
   }
 
-  /// The explicit-ID components that carry a duplicate-occurrence qualifier
-  /// (`ID[x#2]`), in order. Empty for every identity outside a later
-  /// duplicate, including the first occurrence.
-  package var entityOccurrenceComponents: [String] {
-    let stripped = strippingEntityOccurrences
-    guard stripped != self else { return [] }
-    return zip(components, stripped.components).compactMap { $0 == $1 ? nil : $0 }
+  package var entityOccurrenceComponents: [IdentityComponent] {
+    typedComponents.filter(\.hasEntityOccurrence)
   }
 
   public func isAncestor(of other: Self) -> Bool {
-    guard components.count <= other.components.count else {
+    guard typedComponents.count <= other.typedComponents.count else {
       return false
     }
 
-    return zip(components, other.components).allSatisfy(==)
+    return zip(typedComponents, other.typedComponents).allSatisfy(==)
   }
 
   public func isDescendant(of other: Self) -> Bool {
@@ -926,21 +968,6 @@ public struct Identity: Hashable, Comparable, Sendable, Codable, CustomStringCon
       : left < right
   }
 
-  private func escapedExplicitIDComponent(_ component: String) -> String {
-    let escaped = component.reduce(into: "") { escaped, character in
-      switch character {
-      case "%":
-        escaped.append("%25")
-      case "/":
-        escaped.append("%2F")
-      case "#":
-        escaped.append("%23")
-      default:
-        escaped.append(character)
-      }
-    }
-    return escaped.isEmpty ? "<empty>" : escaped
-  }
 }
 
 package struct StructuralPath: Hashable, Sendable, Codable, CustomStringConvertible {
@@ -969,13 +996,13 @@ package struct StructuralPath: Hashable, Sendable, Codable, CustomStringConverti
   package init(identity: Identity) {
     // Identity folds over the same strings, so its cached fold is this
     // path's fold verbatim.
-    components = identity.components.map { IdentityComponent(rawValue: $0) }
+    components = identity.typedComponents
     precomputedHash = identity.precomputedHash
   }
 
   package var identityProjection: Identity {
     Identity(
-      components: components.map(\.rawValue),
+      components: components,
       trustedPathHash: precomputedHash
     )
   }

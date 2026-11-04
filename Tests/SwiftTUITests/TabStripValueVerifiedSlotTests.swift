@@ -517,7 +517,7 @@ private final class ValueVerifiedSlotHarness<Root: View> {
       let payloadRoot = nodes.first(where: {
         let identity = $0.committed.identity
         return identity.path.contains("/TabContentPayload/TabContentValue[")
-          && identity.lastComponent?.hasPrefix("TabContentValue[") == true
+          && identity.lastComponent?.rawValue.hasPrefix("TabContentValue[") == true
       })
     else {
       return nil

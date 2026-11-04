@@ -247,7 +247,7 @@ struct AnyViewResilienceTests {
 
     let initialOuterPayloads = initial.resolvedTree.descendantIdentities { node in
       node.kind == .view("AnyViewPayload")
-        && node.identity.lastComponent?.contains("NestedAnyViewContainer") == true
+        && node.identity.lastComponent?.rawValue.contains("NestedAnyViewContainer") == true
     }
     let swapped = renderer.render(
       NestedAnyViewRoot(innerKind: .stack),
@@ -259,7 +259,7 @@ struct AnyViewResilienceTests {
     )
     let swappedOuterPayloads = swapped.resolvedTree.descendantIdentities { node in
       node.kind == .view("AnyViewPayload")
-        && node.identity.lastComponent?.contains("NestedAnyViewContainer") == true
+        && node.identity.lastComponent?.rawValue.contains("NestedAnyViewContainer") == true
     }
     let swappedInnerTextPayloads = swapped.resolvedTree.descendantIdentities { node in
       node.kind == .view("AnyViewPayload")

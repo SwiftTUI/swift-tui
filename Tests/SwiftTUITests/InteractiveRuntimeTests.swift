@@ -997,7 +997,7 @@ struct InteractiveRuntimeTests {
     let terminal = RecordingTerminalHost()
     let recorder = RunLoopInvalidationRecorder()
     let rootIdentity = testIdentity("RunLoopProbe")
-    let childIdentity = rootIdentity.child("ProbeRoot[0]")
+    let childIdentity = rootIdentity.child(.init(rawValue: "ProbeRoot[0]"))
     let stateContainer = StateContainer(
       initialState: 0,
       invalidationIdentities: [childIdentity]
@@ -1070,9 +1070,9 @@ struct InteractiveRuntimeTests {
   func postActionFollowUpSkippedWhenActionAlreadyInvalidated() throws {
     let recorder = RunLoopInvalidationRecorder()
     let rootIdentity = testIdentity("PostActionProbe")
-    let ownerIdentity = rootIdentity.child("Owner[0]")
-    let actionIdentity = ownerIdentity.child("Button[0]")
-    let readerIdentity = ownerIdentity.child("Reader[0]")
+    let ownerIdentity = rootIdentity.child(.init(rawValue: "Owner[0]"))
+    let actionIdentity = ownerIdentity.child(.init(rawValue: "Button[0]"))
+    let readerIdentity = ownerIdentity.child(.init(rawValue: "Reader[0]"))
 
     let runLoop = RunLoop(
       rootIdentity: rootIdentity,
@@ -3939,7 +3939,7 @@ struct InteractiveRuntimeTests {
     )
     let jumpRect = try #require(
       renderedInteractionRect(
-        matchingLastComponent: buttonIdentity.lastComponent ?? "",
+        matchingLastComponent: buttonIdentity.lastComponent?.rawValue ?? "",
         in: hostView(initialTab: .reader),
         rootIdentity: rootIdentity,
         terminalSize: terminalSize
@@ -6172,7 +6172,7 @@ private func renderedInteractionRect<V: View>(
   )
 
   return artifacts.semanticSnapshot.interactionRegions.first { region in
-    region.identity.lastComponent == lastComponent
+    region.identity.lastComponent?.rawValue == lastComponent
   }?.rect
 }
 

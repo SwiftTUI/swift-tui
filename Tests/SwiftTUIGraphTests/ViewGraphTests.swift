@@ -222,8 +222,8 @@ struct ViewGraphTests {
   func unmappedInvalidationRemapsToNearestLiveInteriorAncestor() {
     let graph = ViewGraph()
     let rootIdentity = testIdentity("Root")
-    let containerIdentity = rootIdentity.child("Container")
-    let removedIdentity = containerIdentity.child("RemovedRow").child("Leaf")
+    let containerIdentity = rootIdentity.child(.named("Container"))
+    let removedIdentity = containerIdentity.child(.named("RemovedRow")).child(.named("Leaf"))
     seedContainerGraph(
       graph: graph,
       rootIdentity: rootIdentity,
@@ -286,7 +286,7 @@ struct ViewGraphTests {
     // the root as those frames intend.
     let graph = ViewGraph()
     let rootIdentity = testIdentity("Root")
-    let containerIdentity = rootIdentity.child("Container")
+    let containerIdentity = rootIdentity.child(.named("Container"))
     seedContainerGraph(
       graph: graph,
       rootIdentity: rootIdentity,
@@ -312,7 +312,7 @@ struct ViewGraphTests {
   func selectivePlanReportsZeroReconciledNodesWhenRailsAgree() {
     let graph = ViewGraph()
     let rootIdentity = testIdentity("Root")
-    let containerIdentity = rootIdentity.child("Container")
+    let containerIdentity = rootIdentity.child(.named("Container"))
     seedContainerGraph(
       graph: graph,
       rootIdentity: rootIdentity,
@@ -371,7 +371,7 @@ struct ViewGraphTests {
     let bodyIdentity = testPresentationPortalBodyIdentity(
       portalRootIdentity: portalRootIdentity
     )
-    let staleBodyDescendant = bodyIdentity.child("StaleResolvedLeaf")
+    let staleBodyDescendant = bodyIdentity.child(.named("StaleResolvedLeaf"))
 
     seedPortalGraph(
       graph: graph,
@@ -407,11 +407,11 @@ struct ViewGraphTests {
       portalRootIdentity: portalRootIdentity,
       entryID: "sheet/source:Root/Layout[0]#sheet"
     )
-    let bodyIdentity = entryIdentity.child("body")
+    let bodyIdentity = entryIdentity.child(.named("body"))
     let staleFlattenedIdentity = Identity(
       components:
         bodyIdentity
-        .child("StaleResolvedLeaf")
+        .child(.named("StaleResolvedLeaf"))
         .path
         .split(separator: "/")
         .map(String.init)
@@ -452,7 +452,7 @@ struct ViewGraphTests {
     let unknownBodyDescendant = testPresentationPortalBodyIdentity(
       portalRootIdentity: inactivePortalRootIdentity,
       entryID: "missing-sheet"
-    ).child("StaleResolvedLeaf")
+    ).child(.named("StaleResolvedLeaf"))
 
     _ = graph.applySnapshot(
       ResolvedNode(
@@ -502,7 +502,7 @@ struct ViewGraphTests {
     let staleEntryDescendant = testPresentationPortalBodyIdentity(
       portalRootIdentity: portalRootIdentity,
       entryID: "missing-sheet"
-    ).child("StaleResolvedLeaf")
+    ).child(.named("StaleResolvedLeaf"))
 
     _ = graph.applySnapshot(
       ResolvedNode(
@@ -545,7 +545,7 @@ struct ViewGraphTests {
     let staleMissingEntryDescendant = testPresentationPortalBodyIdentity(
       portalRootIdentity: portalRootIdentity,
       entryID: "missing-sheet"
-    ).child("StaleResolvedLeaf")
+    ).child(.named("StaleResolvedLeaf"))
 
     seedPortalGraph(
       graph: graph,
@@ -579,7 +579,7 @@ struct ViewGraphTests {
     let bodyIdentity = testPresentationPortalBodyIdentity(
       portalRootIdentity: portalRootIdentity
     )
-    let staleBodyDescendant = bodyIdentity.child("StaleResolvedLeaf")
+    let staleBodyDescendant = bodyIdentity.child(.named("StaleResolvedLeaf"))
     let binding = KeyBinding(key: .character("p"), modifiers: .ctrl)
     let namespace = MatchedGeometryNamespace(0)
     let originalCommandCounter = RegistrationCounter()
@@ -1758,7 +1758,7 @@ private func testPresentationPortalBodyIdentity(
     portalRootIdentity: portalRootIdentity,
     entryID: entryID
   )
-  .child("body")
+  .child(.named("body"))
 }
 
 private func testPresentationPortalEntryIdentity(
@@ -1766,15 +1766,15 @@ private func testPresentationPortalEntryIdentity(
   entryID: String = "sheet"
 ) -> Identity {
   testPresentationOverlayHostIdentity(portalRootIdentity: portalRootIdentity)
-    .child("entry:\(entryID)")
+    .child(.init(rawValue: "entry:\(entryID)"))
 }
 
 private func testPresentationOverlayHostIdentity(
   portalRootIdentity: Identity
 ) -> Identity {
   portalRootIdentity
-    .child("PortalHost")
-    .child("overlays")
+    .child(.named("PortalHost"))
+    .child(.named("overlays"))
 }
 
 @MainActor
@@ -1783,8 +1783,8 @@ private func seedPortalGraph(
   portalRootIdentity: Identity,
   bodyIdentity: Identity
 ) {
-  let hostIdentity = portalRootIdentity.child("PortalHost")
-  let overlaysIdentity = hostIdentity.child("overlays")
+  let hostIdentity = portalRootIdentity.child(.named("PortalHost"))
+  let overlaysIdentity = hostIdentity.child(.named("overlays"))
   let entryIdentity = bodyIdentity.parent!
 
   graph.beginFrame()
@@ -2056,7 +2056,7 @@ private func seedDependencyGraph(
   let rootNode = graph.beginEvaluation(identity: rootIdentity, invalidator: nil)
   let childSnapshots = childIdentities.map { identity -> ResolvedNode in
     let childNode = graph.beginEvaluation(identity: identity, invalidator: nil)
-    let kindName = identity.lastComponent ?? "Child"
+    let kindName = identity.lastComponent?.rawValue ?? "Child"
     configureChild(identity, childNode)
     graph.finishEvaluation(
       childNode,

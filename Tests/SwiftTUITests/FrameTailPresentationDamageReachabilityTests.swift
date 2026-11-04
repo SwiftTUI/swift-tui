@@ -227,7 +227,7 @@ struct FrameTailPresentationDamageReachabilityTests {
         previousFrameIndex: RetainedFrameIndex(
           frame: damageFrameArtifacts(placed: previousPlaced)
         ),
-        invalidatedIdentities: [sceneIdentity.child("VStack[1]")]
+        invalidatedIdentities: [sceneIdentity.child(.init(rawValue: "VStack[1]"))]
       ),
       previousDraw: Self.drawTree(from: previousPlaced),
       previousSurfaceTopology: SurfaceTopologySignature(placedRoot: previousPlaced)

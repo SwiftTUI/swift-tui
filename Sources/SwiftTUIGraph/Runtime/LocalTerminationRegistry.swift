@@ -65,8 +65,8 @@ package final class LocalTerminationRegistry: Equatable {
     let remaining = store.values.keys
       .filter { !visited.contains($0) }
       .sorted { lhs, rhs in
-        if lhs.components.count != rhs.components.count {
-          return lhs.components.count > rhs.components.count
+        if lhs.typedComponents.count != rhs.typedComponents.count {
+          return lhs.typedComponents.count > rhs.typedComponents.count
         }
         return lhs < rhs
       }

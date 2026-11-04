@@ -273,7 +273,7 @@ public struct BooleanNavigationDestinationModifier<Destination: View>:
 
       let instance = activationOrdinal.map { ordinal in
         NavigationDestinationInstance(
-          identity: declarationIdentity.child("Activation[\(ordinal)]"),
+          identity: declarationIdentity.child(.init(rawValue: "Activation[\(ordinal)]")),
           payload: NavigationDestinationPayload(
             navigationDestinationAuthoringContext: destinationAuthoringContext,
             declarationIdentity: declarationIdentity
@@ -346,9 +346,9 @@ where Item.ID: Sendable {
           NavigationDestinationInstance(
             identity:
               declarationIdentity
-              .child("Item")
+              .child(.named("Item"))
               .explicitID(currentItem.id)
-              .child("Activation[\(activationOrdinal)]"),
+              .child(.init(rawValue: "Activation[\(activationOrdinal)]")),
             payload: NavigationDestinationPayload(
               navigationDestinationAuthoringContext: destinationAuthoringContext,
               declarationIdentity: declarationIdentity
@@ -551,7 +551,7 @@ private func resolveValuePath(
         accumulatedPreferences.merge(visibleNode.preferenceValues)
         let instanceIdentity =
           declaration.declarationIdentity
-          .child("Path[\(index)]")
+          .child(.init(rawValue: "Path[\(index)]"))
           .explicitID(value)
         let instance = NavigationDestinationInstance(
           identity: instanceIdentity,
@@ -825,7 +825,7 @@ private func navigationDestinationDeclarationIdentity(
     sourceEntity: sourceEntity,
     scope: scope
   )
-  .child("NavigationDestination[\(modifierOrdinal)]")
+  .child(.init(rawValue: "NavigationDestination[\(modifierOrdinal)]"))
   // A conditional can replace one declaration with another at the same
   // stable source and modifier ordinal without an intervening inactive frame.
   // Keep their destination storage separate while preserving same-binding
@@ -863,7 +863,7 @@ private func navigationDestinationDeclarationRoot(
   }
   return
     scope
-    .child("NavigationDestinationSource")
+    .child(.named("NavigationDestinationSource"))
     .explicitID(sourceEntity.description)
 }
 

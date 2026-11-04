@@ -56,7 +56,7 @@ struct AdversarialSetBHotReloadTests {
   // schema changes.
   @Test func setB302LargeArchivesAreCapturedForReplay() throws {
     let graph = ViewGraph()
-    let node = graph.prepareDynamicPropertyUpdate(identity: setBSourceRoot.child("Root"))
+    let node = graph.prepareDynamicPropertyUpdate(identity: setBSourceRoot.child(.named("Root")))
     withOwnedDormantStateSlot {
       node.setStateSlot(ordinal: 10, value: Array(0..<70_000))
       node.setStateSlot(ordinal: 11, value: String(repeating: "a", count: 4_194_305))

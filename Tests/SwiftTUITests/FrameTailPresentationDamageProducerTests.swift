@@ -163,8 +163,8 @@ struct FrameTailPresentationDamageProducerTests {
     arguments: [false, true])
   func negativeInsetDamagesExpandedPaint(clipChanges: Bool) throws {
     let root = testIdentity("InsetDamage")
-    let wrapper = root.child("Wrapper")
-    let content = wrapper.child("Shape")
+    let wrapper = root.child(.named("Wrapper"))
+    let content = wrapper.child(.named("Shape"))
     let placed = placedTree(
       rootIdentity: root, wrapperIdentity: wrapper,
       contentIdentity: content, contentRow: 10, contentWidth: 4)

@@ -156,8 +156,8 @@ struct RetainedReuseInvariantTests {
     // (`…/ForEachElement[n]`): the path names the SLOT, not the occupant, so
     // it is identical across the swap and cannot rescue the geometry gate.
     let slotPaths = [
-      StructuralPath(identity: parentIdentity.child("Slot[0]")),
-      StructuralPath(identity: parentIdentity.child("Slot[1]")),
+      StructuralPath(identity: parentIdentity.child(.init(rawValue: "Slot[0]"))),
+      StructuralPath(identity: parentIdentity.child(.init(rawValue: "Slot[1]"))),
     ]
     func row(_ identity: Identity, slot: Int) -> ResolvedNode {
       var row = makeResolvedNode(identity: identity, metadata: rowMetadata)

@@ -43,14 +43,14 @@ package struct InvalidationSummary: Equatable, Sendable {
   /// The invalidated identities' component paths, resolved once so the
   /// per-candidate ancestor query below prefix-compares against this (tiny)
   /// list instead of minting an `Identity` per ancestor level per call.
-  private let directlyInvalidatedComponents: [[String]]
+  private let directlyInvalidatedComponents: [[IdentityComponent]]
 
   package init(
     invalidatedIdentities: Set<Identity>
   ) {
     InvalidationSummaryConstructionCensus.recordConstruction()
     directlyInvalidated = invalidatedIdentities
-    directlyInvalidatedComponents = invalidatedIdentities.map(\.components)
+    directlyInvalidatedComponents = invalidatedIdentities.map(\.typedComponents)
 
     var identitiesWithInvalidatedDescendants: Set<Identity> = []
     for invalidatedIdentity in invalidatedIdentities {
@@ -107,7 +107,7 @@ package struct InvalidationSummary: Equatable, Sendable {
     guard !directlyInvalidatedComponents.isEmpty else {
       return false
     }
-    let components = identity.components
+    let components = identity.typedComponents
     for invalidatedComponents in directlyInvalidatedComponents {
       if invalidatedComponents.count < components.count,
         zip(invalidatedComponents, components).allSatisfy(==)

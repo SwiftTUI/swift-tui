@@ -14,20 +14,20 @@ struct ReuseCacheCascadeEvictionTests {
     store(
       graph,
       namespace: "owner-rooted",
-      owner: source.identity.child("Toolbar"),
+      owner: source.identity.child(.named("Toolbar")),
       nodeIdentity: unrelated
     )
     store(
       graph,
       namespace: "node-rooted",
       owner: unrelated,
-      nodeIdentity: source.identity.child("CachedBody")
+      nodeIdentity: source.identity.child(.named("CachedBody"))
     )
     store(
       graph,
       namespace: "unrelated",
       owner: unrelated,
-      nodeIdentity: unrelated.child("CachedBody")
+      nodeIdentity: unrelated.child(.named("CachedBody"))
     )
 
     graph.beginFrame()
@@ -51,14 +51,14 @@ struct ReuseCacheCascadeEvictionTests {
     store(
       graph,
       namespace: "detached-island",
-      owner: detached.identity.child("Toolbar"),
+      owner: detached.identity.child(.named("Toolbar")),
       nodeIdentity: unrelated
     )
     store(
       graph,
       namespace: "unrelated",
       owner: unrelated,
-      nodeIdentity: unrelated.child("CachedBody")
+      nodeIdentity: unrelated.child(.named("CachedBody"))
     )
 
     graph.beginFrame()

@@ -147,13 +147,15 @@ struct AdversarialSetAHotReloadBoundaryTests {
   @Test func setA662DescendantFocusRebasingUsesItsMostSpecificMatchedOwner() {
     // Hypothesis: focus rebasing stops at an unchanged ancestor and misses a wrapper inserted inside that owner.
     let parent = Identity(components: ["Outer"])
-    let child = parent.child("Inner")
-    let wrapped = parent.child("Wrapper").child("Inner")
+    let child = parent.child(.named("Inner"))
+    let wrapped = parent.child(.named("Wrapper")).child(.named("Inner"))
     let replay = replay(
       entries: [entry(parent, 10, 1), entry(child, 10, 2)],
       owners: [schema(parent, [10]), schema(wrapped, [10])])
     let oldFocus = Identity(components: sourceRoot.components + child.components + ["Button"])
-    #expect(replay.rebasedIdentity(oldFocus, from: sourceRoot) == absolute(wrapped.child("Button")))
+    #expect(
+      replay.rebasedIdentity(oldFocus, from: sourceRoot)
+        == absolute(wrapped.child(.named("Button"))))
     #expect(
       replay.rebasedIdentity(
         Identity(components: ["Generation-old-sibling", "Button"]), from: sourceRoot) == nil)
@@ -209,7 +211,7 @@ struct AdversarialSetAHotReloadBoundaryTests {
   @Test func setA666SnapshotRootFilteringUsesIdentityComponentsRatherThanTextPrefixes() {
     // Hypothesis: snapshot traversal captures a sibling generation whose string path merely starts with the requested root.
     let graph = ViewGraph()
-    let included = graph.prepareDynamicPropertyUpdate(identity: sourceRoot.child("Owner"))
+    let included = graph.prepareDynamicPropertyUpdate(identity: sourceRoot.child(.named("Owner")))
     let excluded = graph.prepareDynamicPropertyUpdate(
       identity: Identity(components: ["Generation-old-sibling", "Owner"]))
     withOwnedDormantStateSlot {

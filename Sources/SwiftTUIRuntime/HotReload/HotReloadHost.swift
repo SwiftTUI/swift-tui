@@ -59,7 +59,7 @@ package final class HotReloadSession {
       generation < UInt64.max, maximumAttempts > 0
     else { throw HotReloadSwapError.notMounted }
     let nextGeneration = generation + 1
-    let newRoot = hostIdentity.child("Generation[\(nextGeneration)]")
+    let newRoot = hostIdentity.child(.init(rawValue: "Generation[\(nextGeneration)]"))
     let snapshot = graph.captureHotReloadSnapshot(rootedAt: oldRoot)
     var schemas: [HotReloadOwnerSchema] = []
     var converged = false
@@ -141,7 +141,7 @@ package struct HotReloadHost: PrimitiveView, IterativeResolvableView {
   package func makeResolveWork(in context: ResolveContext) -> ResolveWork<[ResolvedNode]> {
     context.viewGraph?.hotReloadTypeAliases = session.replayTypeAliases
     context.viewGraph?.tracksHotReloadDeclarations = true
-    let root = context.identity.child("Generation[\(generation)]")
+    let root = context.identity.child(.init(rawValue: "Generation[\(generation)]"))
     session.attach(context: context, generationRoot: root)
     return withAuthoringContext(nil) {
       session.content.makeResolveWork(

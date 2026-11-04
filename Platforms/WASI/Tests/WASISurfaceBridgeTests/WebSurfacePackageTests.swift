@@ -48,7 +48,7 @@ struct WebSurfacePackageTests {
   @Test("package encoder emits version 2 when accessibility nodes are present")
   func packageEncoderEmitsVersionTwoWithAccessibilityNodes() throws {
     let root = Identity(components: ["root"])
-    let child = root.child("button")
+    let child = root.child(.named("button"))
     let frame = try decodedSurfaceFrame(
       WebSurfaceFrameEncoder.encode(
         SemanticHostFrame(

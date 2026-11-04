@@ -164,7 +164,7 @@ package struct FrameAnimationTransactionPlan: Equatable, Sendable {
     for segment in segments {
       for candidate in segment.identities
       where candidate == identity || candidate.isAncestor(of: identity) {
-        let depth = candidate.components.count
+        let depth = candidate.typedComponents.count
         if depth >= selectedDepth {
           selected = segment
           selectedDepth = depth

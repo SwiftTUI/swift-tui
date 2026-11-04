@@ -14,6 +14,7 @@ struct AdversarialSetAIdentityCurrencyTests {
     // Identity publicly promises Comparable; neither init(components:) nor child(String) restricts slashes.
     let left = Identity(components: ["workspace/files", "item"])
     let right = Identity(components: ["workspace", "files/item"])
+    #expect(left.depth == 1 && right.depth == 1)
     #expect(left.path == right.path)
     #expect(left != right)
     #expect(Set([left, right]).count == 2)
@@ -27,11 +28,11 @@ struct AdversarialSetAIdentityCurrencyTests {
     let root = testIdentity("SetA752")
     let slash = root.explicitID("a/b")
     let percent = root.explicitID("a%2Fb")
-    let nested = root.explicitID("a").child("b")
+    let nested = root.explicitID("a").child(.named("b"))
     #expect(Set([slash, percent, nested]).count == 3)
     #expect(slash.components.count == root.components.count + 1)
-    #expect(!slash.lastComponent!.contains("/"))
-    #expect(percent.lastComponent!.contains("%252F"))
+    #expect(!slash.lastComponent!.rawValue.contains("/"))
+    #expect(percent.lastComponent!.rawValue.contains("%252F"))
     #expect(slash.parent == root && percent.parent == root)
   }
 

@@ -107,5 +107,5 @@ package func inlineLinkIdentity(
   parent: Identity,
   identifier: String
 ) -> Identity {
-  parent.child(identifier)
+  parent.child(.init(rawValue: identifier))
 }

@@ -774,10 +774,10 @@
     @Test("encoder emits v2 accessibility tree with focus and live-region fields")
     func encoderEmitsAccessibilityTree() throws {
       let root = Identity(components: ["root"])
-      let group = root.child("group")
-      let button = group.child("button")
-      let live = group.child("live")
-      let mixed = group.child("mixed")
+      let group = root.child(.named("group"))
+      let button = group.child(.named("button"))
+      let live = group.child(.named("live"))
+      let mixed = group.child(.named("mixed"))
       let frame = try Self.decodedSurfaceFrame(
         WebSurfaceFrameEncoder.encode(
           SemanticHostFrame(
@@ -863,21 +863,23 @@
       let root = Identity(components: ["root"])
       let rect = CellRect(origin: .zero, size: .init(width: 2, height: 1))
       var disabledGroup = AccessibilityNode(
-        identity: root.child("group"), parentIdentity: root, rect: rect, role: .group,
+        identity: root.child(.named("group")), parentIdentity: root, rect: rect, role: .group,
         label: "Settings")
       disabledGroup.isEnabled = false
       var disabledHeading = AccessibilityNode(
-        identity: root.child("group").child("title"), parentIdentity: root.child("group"),
+        identity: root.child(.named("group")).child(.named("title")),
+        parentIdentity: root.child(.named("group")),
         rect: rect, role: .heading(level: 1), label: "Title")
       disabledHeading.isEnabled = false
       var disabledButton = AccessibilityNode(
-        identity: root.child("group").child("save"), parentIdentity: root.child("group"),
+        identity: root.child(.named("group")).child(.named("save")),
+        parentIdentity: root.child(.named("group")),
         rect: rect, role: .button, label: "Save")
       disabledButton.actionTarget = "save-token"
       disabledButton.control = .init(actions: [.focus, .activate])
       disabledButton.isEnabled = false
       let enabledStatus = AccessibilityNode(
-        identity: root.child("status"), parentIdentity: root, rect: rect, role: .status,
+        identity: root.child(.named("status")), parentIdentity: root, rect: rect, role: .status,
         label: "Ready")
       let record = WebSurfaceFrameEncoder.encode(
         SemanticHostFrame(
@@ -929,7 +931,7 @@
     @Test("encoder emits per-region scroll extents for scroll-chaining")
     func encoderEmitsScrollRegions() throws {
       let root = Identity(components: ["root"])
-      let list = root.child("list")
+      let list = root.child(.named("list"))
       let frame = try Self.decodedSurfaceFrame(
         WebSurfaceFrameEncoder.encode(
           SemanticHostFrame(

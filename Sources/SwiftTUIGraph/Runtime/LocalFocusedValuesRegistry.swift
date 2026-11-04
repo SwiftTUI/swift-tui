@@ -71,10 +71,10 @@ package final class LocalFocusedValuesRegistry: Equatable {
           || registration.identity.isAncestor(of: focusedIdentity)
       }
       .sorted {
-        if $0.identity.components.count == $1.identity.components.count {
+        if $0.identity.typedComponents.count == $1.identity.typedComponents.count {
           return $0.identity < $1.identity
         }
-        return $0.identity.components.count < $1.identity.components.count
+        return $0.identity.typedComponents.count < $1.identity.typedComponents.count
       }
 
     for registration in matchingRegistrations {

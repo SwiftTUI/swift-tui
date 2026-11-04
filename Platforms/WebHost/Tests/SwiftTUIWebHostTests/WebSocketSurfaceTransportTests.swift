@@ -284,7 +284,7 @@ struct WebSocketSurfaceTransportTests {
       sink: sink
     )
     let root = Identity(components: ["root"])
-    let button = root.child("button")
+    let button = root.child(.named("button"))
 
     let metrics = try transport.present(
       SemanticHostFrame(

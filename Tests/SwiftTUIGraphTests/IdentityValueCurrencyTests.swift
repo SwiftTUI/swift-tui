@@ -15,7 +15,7 @@ struct IdentityValueCurrencyTests {
     let direct = Identity(components: ["app", "stack[0]", "row"])
     let chained = Identity(components: ["app"])
       .child(IdentityComponent.indexed("stack", index: 0))
-      .child("row")
+      .child(.named("row"))
 
     #expect(direct == chained)
     #expect(direct.hashValue == chained.hashValue)
@@ -50,7 +50,7 @@ struct IdentityValueCurrencyTests {
   @Test("prefix-related identities stay unequal in both directions")
   func prefixRelationsStayUnequal() {
     let parent = Identity(components: ["app", "stack[0]"])
-    let child = parent.child("row")
+    let child = parent.child(.named("row"))
 
     #expect(parent != child)
     #expect(child.parent == parent)
