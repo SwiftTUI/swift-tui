@@ -498,8 +498,8 @@ extension DrawExtractor {
     }
 
     var clippedChildNodes = childNodes
-    if let clip = placed.hostedListVisibleLayout?.bodyClip
-      ?? placed.hostedTableVisibleLayout?.bodyClip
+    if let clip = projection.hostedListVisibleLayout?.bodyClip
+      ?? projection.hostedTableVisibleLayout?.bodyClip
     {
       for index in clippedChildNodes.indices {
         clippedChildNodes[index].clipBounds =

@@ -155,7 +155,7 @@ extension View {
   /// where it is drawn; a key with zero or several sources adopts nothing.
   /// A non-source that is the sole holder of its key receives the match
   /// when the key swaps to it between frames.
-  public func matchedGeometryEffect<ID: Hashable>(
+  public func matchedGeometryEffect<ID: Hashable & Sendable>(
     id: ID,
     in namespace: MatchedGeometryNamespace = .default,
     properties: MatchedGeometryProperties = .frame,

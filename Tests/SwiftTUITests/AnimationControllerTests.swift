@@ -9,6 +9,13 @@ import Testing
 @MainActor
 @Suite("AnimationController snapshot extraction")
 struct AnimationControllerSnapshotTests {
+  @Test("Matched geometry keeps equal descriptions of different types in separate slots")
+  func typedGeometryKeys() {
+    let slots = [MatchedGeometryKey(id: 1): "number", MatchedGeometryKey(id: "1"): "text"]
+    #expect(slots[MatchedGeometryKey(id: 1)] == "number")
+    #expect(slots[MatchedGeometryKey(id: "1")] == "text")
+  }
+
   @Test("extracts foregroundColor from local drawMetadata")
   func extractsLocalForegroundColor() throws {
     var drawMetadata = DrawMetadata()
@@ -478,7 +485,7 @@ struct AnimationPipelineIntegrationTests {
     _ node: PlacedNode,
     keyID: String
   ) -> CellRect? {
-    if let config = node.matchedGeometry, config.key.id == keyID {
+    if let config = node.matchedGeometry, config.key.id == AnyID(keyID) {
       return node.bounds
     }
     for child in node.children {

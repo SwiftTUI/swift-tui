@@ -1,3 +1,5 @@
+public import SwiftTUIPrimitives
+
 /// An opaque namespace used to scope matched-geometry IDs so the
 /// same string-or-hashable key can refer to unrelated views in
 /// different parts of the hierarchy.
@@ -11,24 +13,14 @@ public struct MatchedGeometryNamespace: Hashable, Sendable {
   public static let `default` = MatchedGeometryNamespace(0)
 }
 
-/// A fully-qualified matched-geometry identifier: the namespace
-/// plus the user-provided hashable ID, erased to a string for
-/// cross-frame lookup.
+/// A caller's typed identifier scoped to its matched-geometry namespace.
 public struct MatchedGeometryKey: Hashable, Sendable {
   public let namespace: MatchedGeometryNamespace
-  /// The erased string form of the caller ID.
-  /// Two `Hashable` values collide if their `String(describing:)` output is the same.
-  /// Use distinct namespaces if you require stronger uniqueness.
-  public let id: String
+  public let id: AnyID
 
-  public init(namespace: MatchedGeometryNamespace, id: String) {
+  public init<ID: Hashable & Sendable>(namespace: MatchedGeometryNamespace = .default, id: ID) {
     self.namespace = namespace
-    self.id = id
-  }
-
-  public init<ID: Hashable>(namespace: MatchedGeometryNamespace = .default, id: ID) {
-    self.namespace = namespace
-    self.id = String(describing: id)
+    self.id = AnyID(id)
   }
 }
 
