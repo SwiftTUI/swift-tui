@@ -7,8 +7,14 @@ package enum InteractiveHandlerResolutionFamily: String, CaseIterable, Sendable 
   case drop
   case gesture
 
-  package var traceKind: String {
-    "handler-resolution-\(rawValue)"
+  package var traceKind: SoundnessViolationKind {
+    switch self {
+    case .action: .handlerResolutionAction
+    case .key: .handlerResolutionKey
+    case .command: .handlerResolutionCommand
+    case .drop: .handlerResolutionDrop
+    case .gesture: .handlerResolutionGesture
+    }
   }
 }
 

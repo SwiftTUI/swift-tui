@@ -33,7 +33,7 @@ struct IncrementalRasterMismatchDetailTests {
       )
     )
 
-    let detail = SoundnessProbeConfiguration.lastViolationDetailByKind["raster-damage"] ?? ""
+    let detail = SoundnessProbeConfiguration.lastViolationDetailByKind[.rasterDamage] ?? ""
     #expect(detail.contains("rows [2] diverged from fresh raster"), "detail: \(detail)")
     #expect(detail.contains("trusted damage rows [1, 2]"), "detail: \(detail)")
     #expect(detail.contains("row 2 incremental=\" ● \" fresh=\"[●]\""), "detail: \(detail)")
@@ -63,7 +63,7 @@ struct IncrementalRasterMismatchDetailTests {
       .init(mismatchedRows: [])
     )
 
-    let detail = SoundnessProbeConfiguration.lastViolationDetailByKind["raster-damage"] ?? ""
+    let detail = SoundnessProbeConfiguration.lastViolationDetailByKind[.rasterDamage] ?? ""
     #expect(
       detail.hasPrefix(
         "incremental raster mismatch: non-cell surface state diverged from fresh raster (the frame"

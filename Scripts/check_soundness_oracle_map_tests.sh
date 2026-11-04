@@ -5,7 +5,7 @@ repo_root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 checker="$repo_root/Scripts/check_soundness_oracle_map.sh"
 canonical_map="$repo_root/docs/SOUNDNESS-ORACLES.md"
 configuration="$repo_root/Sources/SwiftTUIGraph/Resolve/SoundnessProbeConfiguration.swift"
-handler_oracle="$repo_root/Sources/SwiftTUIGraph/Resolve/CommittedHandlerResolutionOracle.swift"
+violation_kinds="$repo_root/Sources/SwiftTUIGraph/Resolve/SoundnessViolationKind.swift"
 
 scratch_root=$(mktemp -d "${TMPDIR:-/tmp}/swift-tui-oracle-map-tests.XXXXXX")
 trap 'rm -rf "$scratch_root"' EXIT HUP INT TERM
@@ -14,7 +14,7 @@ run_expect_success() {
   title=$1
   map_path=$2
 
-  if ! "$checker" "$map_path" "$configuration" "$handler_oracle" \
+  if ! "$checker" "$map_path" "$configuration" "$violation_kinds" \
     >"$scratch_root/stdout" 2>"$scratch_root/stderr"
   then
     >&2 echo "FAIL: $title unexpectedly failed"
@@ -30,7 +30,7 @@ run_expect_failure() {
   map_path=$2
   expected_fragment=$3
 
-  if "$checker" "$map_path" "$configuration" "$handler_oracle" \
+  if "$checker" "$map_path" "$configuration" "$violation_kinds" \
     >"$scratch_root/stdout" 2>"$scratch_root/stderr"
   then
     >&2 echo "FAIL: $title unexpectedly passed"

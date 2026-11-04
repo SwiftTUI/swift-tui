@@ -339,7 +339,7 @@ extension TickingBodyHost {
 private struct DiscardProbeState {
   let isTraceEnabled: Bool
   let discardedCount: Int
-  let lastViolationDetailByKind: [String: String]
+  let lastViolationDetailByKind: [SoundnessViolationKind: String]
 
   static func capture() -> Self {
     Self(

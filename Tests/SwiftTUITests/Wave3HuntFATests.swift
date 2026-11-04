@@ -287,7 +287,7 @@ struct Wave3HuntFATableClipBindingTests {
         #expect(reached, "\(h.frame)")
         #expect(
           SoundnessProbeConfiguration.layoutShadowDivergenceCount == before,
-          "\(SoundnessProbeConfiguration.lastViolationDetailByKind["layout-shadow-divergence"] ?? "")"
+          "\(SoundnessProbeConfiguration.lastViolationDetailByKind[.layoutShadowDivergence] ?? "")"
         )
       }
     }

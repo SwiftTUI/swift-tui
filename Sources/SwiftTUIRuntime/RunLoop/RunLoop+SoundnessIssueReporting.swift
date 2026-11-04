@@ -61,107 +61,107 @@ extension RunLoop {
     var counts = lastSeenSoundnessViolationCounts
     var issues: [RuntimeIssue] = []
     reportSoundnessViolationGrowth(
-      kind: "stampCoherence",
+      kind: .stampCoherence,
       total: snapshot.stampCoherenceViolationCount,
-      detail: snapshot.lastViolationDetailByKind["stamp-coherence"],
+      snapshot: snapshot,
       lastSeen: &counts.stampCoherence,
       issues: &issues
     )
     reportSoundnessViolationGrowth(
-      kind: "deltaCheckpoint",
+      kind: .deltaCheckpoint,
       total: snapshot.deltaCheckpointViolationCount,
-      detail: snapshot.lastViolationDetailByKind["delta-checkpoint"],
+      snapshot: snapshot,
       lastSeen: &counts.deltaCheckpoint,
       issues: &issues
     )
     reportSoundnessViolationGrowth(
-      kind: "checkpointStore",
+      kind: .checkpointStore,
       total: snapshot.checkpointStoreViolationCount,
-      detail: snapshot.lastViolationDetailByKind["checkpoint-store"],
+      snapshot: snapshot,
       lastSeen: &counts.checkpointStore,
       issues: &issues
     )
     reportSoundnessViolationGrowth(
-      kind: "rasterDamage",
+      kind: .rasterDamage,
       total: snapshot.rasterDamageMismatchCount,
-      detail: snapshot.lastViolationDetailByKind["raster-damage"],
+      snapshot: snapshot,
       lastSeen: &counts.rasterDamage,
       issues: &issues
     )
     reportSoundnessViolationGrowth(
-      kind: "teardownCoherence",
+      kind: .teardownCoherence,
       total: snapshot.teardownCoherenceViolationCount,
-      detail: snapshot.lastViolationDetailByKind["teardown-coherence"],
+      snapshot: snapshot,
       lastSeen: &counts.teardownCoherence,
       issues: &issues
     )
     reportSoundnessViolationGrowth(
-      kind: "registrationPublication",
+      kind: .registrationPublication,
       total: snapshot.registrationPublicationViolationCount,
-      detail: snapshot.lastViolationDetailByKind["registration-publication"],
+      snapshot: snapshot,
       lastSeen: &counts.registrationPublication,
       issues: &issues
     )
     reportSoundnessViolationGrowth(
-      kind: "memoUnsoundSkip",
+      kind: .memoUnsoundSkip,
       total: snapshot.memoUnsoundSkipCount,
-      detail: snapshot.lastViolationDetailByKind["memo-unsound-skip"],
+      snapshot: snapshot,
       lastSeen: &counts.memoUnsoundSkip,
       issues: &issues
     )
     reportSoundnessViolationGrowth(
-      kind: "handlerResolutionAction",
+      kind: .handlerResolutionAction,
       total: snapshot.actionResolutionViolationCount,
-      detail: snapshot.lastViolationDetailByKind["handler-resolution-action"],
+      snapshot: snapshot,
       lastSeen: &counts.handlerResolutionAction,
       issues: &issues
     )
     reportSoundnessViolationGrowth(
-      kind: "handlerResolutionKey",
+      kind: .handlerResolutionKey,
       total: snapshot.keyHandlerResolutionViolationCount,
-      detail: snapshot.lastViolationDetailByKind["handler-resolution-key"],
+      snapshot: snapshot,
       lastSeen: &counts.handlerResolutionKey,
       issues: &issues
     )
     reportSoundnessViolationGrowth(
-      kind: "handlerResolutionCommand",
+      kind: .handlerResolutionCommand,
       total: snapshot.commandScopeResolutionViolationCount,
-      detail: snapshot.lastViolationDetailByKind["handler-resolution-command"],
+      snapshot: snapshot,
       lastSeen: &counts.handlerResolutionCommand,
       issues: &issues
     )
     reportSoundnessViolationGrowth(
-      kind: "handlerResolutionDrop",
+      kind: .handlerResolutionDrop,
       total: snapshot.dropScopeResolutionViolationCount,
-      detail: snapshot.lastViolationDetailByKind["handler-resolution-drop"],
+      snapshot: snapshot,
       lastSeen: &counts.handlerResolutionDrop,
       issues: &issues
     )
     reportSoundnessViolationGrowth(
-      kind: "handlerResolutionGesture",
+      kind: .handlerResolutionGesture,
       total: snapshot.gestureRouteResolutionViolationCount,
-      detail: snapshot.lastViolationDetailByKind["handler-resolution-gesture"],
+      snapshot: snapshot,
       lastSeen: &counts.handlerResolutionGesture,
       issues: &issues
     )
     reportSoundnessViolationGrowth(
-      kind: "actionDispatchMiss",
+      kind: .actionDispatchMiss,
       total: snapshot.actionDispatchMissCount,
-      detail: snapshot.lastViolationDetailByKind["action-dispatch-miss"],
+      snapshot: snapshot,
       lastSeen: &counts.actionDispatchMiss,
       issues: &issues
     )
     reportSoundnessViolationGrowth(
-      kind: "strandedListing",
+      kind: .strandedListing,
       total: snapshot.strandedListingViolationCount,
-      detail: snapshot.lastViolationDetailByKind["stranded-listing"],
+      snapshot: snapshot,
       lastSeen: &counts.strandedListing,
       issues: &issues
     )
     reportSoundnessViolationGrowth(
-      kind: "layoutShadowDivergence",
+      kind: .layoutShadowDivergence,
       total: snapshot.layoutShadowDivergenceCount,
-      detail: snapshot.lastViolationDetailByKind["layout-shadow-divergence"],
+      snapshot: snapshot,
       lastSeen: &counts.layoutShadowDivergence,
       issues: &issues
     )
@@ -173,9 +173,9 @@ extension RunLoop {
 
   @MainActor
   private func reportSoundnessViolationGrowth(
-    kind: String,
+    kind: SoundnessViolationKind,
     total: Int,
-    detail: String?,
+    snapshot: SoundnessCounterSnapshot,
     lastSeen: inout Int,
     issues: inout [RuntimeIssue]
   ) {
@@ -191,10 +191,10 @@ extension RunLoop {
     issues.append(
       RuntimeIssue(
         severity: .warning,
-        code: "soundness.\(kind)",
+        code: "soundness.\(kind.issueName)",
         message:
           "\(newViolations) sampled soundness violation(s): "
-          + (detail ?? "no detail recorded"),
+          + (snapshot.lastViolationDetailByKind[kind] ?? "no detail recorded"),
         source: "SoundnessProbe"
       )
     )

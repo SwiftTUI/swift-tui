@@ -73,14 +73,14 @@ struct SoundnessAssertPromotionTests {
         == before.committedHandlerResolutionViolationCount + 1
     )
     #expect(after.rasterDamageMismatchCount == before.rasterDamageMismatchCount + 1)
-    #expect(after.lastViolationDetailByKind["raster-damage"]?.contains("rows [2]") == true)
+    #expect(after.lastViolationDetailByKind[.rasterDamage]?.contains("rows [2]") == true)
     #expect(after.layoutShadowDivergenceCount == before.layoutShadowDivergenceCount + 1)
     #expect(
       after.layoutShadowWindowedExclusionCount
         == before.layoutShadowWindowedExclusionCount + 2
     )
     #expect(
-      after.lastViolationDetailByKind["layout-shadow-divergence"]?
+      after.lastViolationDetailByKind[.layoutShadowDivergence]?
         .contains("injected measure divergence") == true
     )
   }

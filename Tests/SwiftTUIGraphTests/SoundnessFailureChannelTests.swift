@@ -343,7 +343,7 @@ private struct ProbeState {
   let layoutShadowWindowedExclusionCount: Int
   let layoutShadowDepthExclusionCount: Int
   let lastViolationDetail: String?
-  let lastViolationDetailByKind: [String: String]
+  let lastViolationDetailByKind: [SoundnessViolationKind: String]
 
   static func capture() -> Self {
     Self(

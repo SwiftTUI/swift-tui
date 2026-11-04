@@ -114,7 +114,7 @@ struct ToolbarStripPublicationTests {
       "the departed toolbar item's action is still published in the live registry"
     )
     let violationDetail =
-      SoundnessProbeConfiguration.lastViolationDetailByKind["registration-publication"] ?? ""
+      SoundnessProbeConfiguration.lastViolationDetailByKind[.registrationPublication] ?? ""
     #expect(
       SoundnessProbeConfiguration.registrationPublicationViolationCount == violationsBefore,
       "registration-publication oracle tripped: \(violationDetail)"

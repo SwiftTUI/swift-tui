@@ -4176,7 +4176,7 @@ struct InteractiveRuntimeTests {
         terminal.visibleFrames.count > framesBeforePresentedIdle
       }
       if let detail =
-        SoundnessProbeConfiguration.lastViolationDetailByKind["teardown-coherence-leak"],
+        SoundnessProbeConfiguration.lastViolationDetailByKind[.teardownCoherenceLeak],
         detail.contains("Nav-Push-Strand")
       {
         strandDetail = detail

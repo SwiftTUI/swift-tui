@@ -246,7 +246,7 @@ func runSegmentedRowJourney<Root: View>(
     mismatchGrowth: after.rasterDamageMismatchCount - before.rasterDamageMismatchCount,
     mismatchDetail: after.rasterDamageMismatchCount == before.rasterDamageMismatchCount
       ? nil
-      : after.lastViolationDetailByKind["raster-damage"]
+      : after.lastViolationDetailByKind[.rasterDamage]
   )
 }
 

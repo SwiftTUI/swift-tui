@@ -71,7 +71,7 @@ struct CommittedHandlerResolutionOracleTests {
         after.actionResolutionViolationCount
           == before.actionResolutionViolationCount + 1
       )
-      let detail = after.lastViolationDetailByKind["handler-resolution-action"]
+      let detail = after.lastViolationDetailByKind[.handlerResolutionAction]
       #expect(detail?.contains(rootAction.path) == true)
       #expect(detail?.contains(childAction.path) == true)
     }
@@ -103,7 +103,7 @@ struct CommittedHandlerResolutionOracleTests {
           == before.actionResolutionViolationCount + 1
       )
       #expect(
-        after.lastViolationDetailByKind["handler-resolution-action"]
+        after.lastViolationDetailByKind[.handlerResolutionAction]
           == resolutionDetail(family: .action, findings: [identity.path])
       )
       expectOnlyFamilyGrowth(.action, before: before, after: after)
@@ -139,7 +139,7 @@ struct CommittedHandlerResolutionOracleTests {
           == before.keyHandlerResolutionViolationCount + 1
       )
       #expect(
-        after.lastViolationDetailByKind["handler-resolution-key"]
+        after.lastViolationDetailByKind[.handlerResolutionKey]
           == resolutionDetail(family: .key, findings: [identity.path])
       )
       expectOnlyFamilyGrowth(.key, before: before, after: after)
@@ -178,7 +178,7 @@ struct CommittedHandlerResolutionOracleTests {
           == before.commandScopeResolutionViolationCount + 1
       )
       #expect(
-        after.lastViolationDetailByKind["handler-resolution-command"]
+        after.lastViolationDetailByKind[.handlerResolutionCommand]
           == resolutionDetail(family: .command, findings: [identity.path])
       )
       expectOnlyFamilyGrowth(.command, before: before, after: after)
@@ -211,7 +211,7 @@ struct CommittedHandlerResolutionOracleTests {
           == before.dropScopeResolutionViolationCount + 1
       )
       #expect(
-        after.lastViolationDetailByKind["handler-resolution-drop"]
+        after.lastViolationDetailByKind[.handlerResolutionDrop]
           == resolutionDetail(family: .drop, findings: [identity.path])
       )
       expectOnlyFamilyGrowth(.drop, before: before, after: after)
@@ -244,7 +244,7 @@ struct CommittedHandlerResolutionOracleTests {
           == before.gestureRouteResolutionViolationCount + 1
       )
       #expect(
-        after.lastViolationDetailByKind["handler-resolution-gesture"]
+        after.lastViolationDetailByKind[.handlerResolutionGesture]
           == resolutionDetail(
             family: .gesture,
             findings: ["\(identity.path)(missing=pointer)"]
@@ -280,7 +280,7 @@ struct CommittedHandlerResolutionOracleTests {
           == before.gestureRouteResolutionViolationCount + 1
       )
       #expect(
-        after.lastViolationDetailByKind["handler-resolution-gesture"]
+        after.lastViolationDetailByKind[.handlerResolutionGesture]
           == resolutionDetail(
             family: .gesture,
             findings: ["\(identity.path)(missing=recognizer)"]
@@ -430,7 +430,7 @@ struct CommittedHandlerResolutionOracleTests {
       let after = SoundnessCounterSnapshot.current()
       #expect(after.actionResolutionViolationCount == before.actionResolutionViolationCount + 1)
       #expect(
-        after.lastViolationDetailByKind["handler-resolution-action"]
+        after.lastViolationDetailByKind[.handlerResolutionAction]
           == resolutionDetail(family: .action, findings: actions.prefix(4).map(\.path))
       )
     }
@@ -459,7 +459,7 @@ struct CommittedHandlerResolutionOracleTests {
           == before.committedHandlerResolutionViolationCount + 1
       )
       #expect(
-        after.lastViolationDetailByKind["committed-handler-resolution"]
+        after.lastViolationDetailByKind[.committedHandlerResolution]
           == """
           committed handler resolution: committed tree names handlers absent \
           from the published lifecycle registry: appear:appear-leaf, disappear:disappear-leaf \
@@ -489,13 +489,13 @@ struct CommittedHandlerResolutionOracleTests {
       let after = SoundnessCounterSnapshot.current()
       #expect(after.actionDispatchMissCount == before.actionDispatchMissCount + 1)
       #expect(
-        after.lastViolationDetailByKind["action-dispatch-miss"]
+        after.lastViolationDetailByKind[.actionDispatchMiss]
           == "action dispatch: no published handler for \(identity.path)"
       )
       #expect(
         after.violationGrowth(since: before) == [
           SoundnessCounterGrowth(
-            kind: "action-dispatch-miss",
+            kind: .actionDispatchMiss,
             count: 1,
             detail: "action dispatch: no published handler for \(identity.path)"
           )
@@ -625,7 +625,7 @@ private struct OracleProbeState {
   let gestureRouteResolutionViolationCount: Int
   let actionDispatchMissCount: Int
   let lastViolationDetail: String?
-  let lastViolationDetailByKind: [String: String]
+  let lastViolationDetailByKind: [SoundnessViolationKind: String]
 
   static func capture() -> Self {
     Self(

@@ -4,12 +4,12 @@ set -eu
 repo_root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 map_path=${1:-"$repo_root/docs/SOUNDNESS-ORACLES.md"}
 configuration=${2:-"$repo_root/Sources/SwiftTUIGraph/Resolve/SoundnessProbeConfiguration.swift"}
-handler_oracle=${3:-"$repo_root/Sources/SwiftTUIGraph/Resolve/CommittedHandlerResolutionOracle.swift"}
+violation_kinds=${3:-"$repo_root/Sources/SwiftTUIGraph/Resolve/SoundnessViolationKind.swift"}
 
 scratch_root=$(mktemp -d "${TMPDIR:-/tmp}/swift-tui-oracle-map.XXXXXX")
 trap 'rm -rf "$scratch_root"' EXIT HUP INT TERM
 
-for required_path in "$map_path" "$configuration" "$handler_oracle"; do
+for required_path in "$map_path" "$configuration" "$violation_kinds"; do
   if [ ! -f "$required_path" ]; then
     >&2 echo "soundness oracle map check: missing input: $required_path"
     exit 1
@@ -24,10 +24,7 @@ map_kinds="$scratch_root/map-kinds"
 map_recorders="$scratch_root/map-recorders"
 map_counters="$scratch_root/map-counters"
 
-sed -n 's/.*emitTrace("\([^"]*\)").*/\1/p' "$configuration" >"$expected_kinds"
-sed -n \
-  '/package enum InteractiveHandlerResolutionFamily/,/^}/s/^[[:space:]]*case \([a-z][a-z]*\)$/handler-resolution-\1/p' \
-  "$handler_oracle" >>"$expected_kinds"
+sed -n 's/^[[:space:]]*case [[:alnum:]]* = "\([^"]*\)"$/\1/p' "$violation_kinds" >"$expected_kinds"
 if grep -F "func recordAutomaticLifetimeAnchor" "$configuration" >/dev/null; then
   echo "automatic-lifetime-anchor" >>"$expected_kinds"
 fi

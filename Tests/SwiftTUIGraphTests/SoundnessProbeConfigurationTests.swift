@@ -80,7 +80,7 @@ struct SoundnessProbeConfigurationTests {
       #expect(SoundnessProbeConfiguration.memoUnsoundSkipCount == before + 1)
       #expect(SoundnessProbeConfiguration.lastViolationDetail == "drawPayload diverged")
       #expect(
-        SoundnessProbeConfiguration.lastViolationDetailByKind["memo-unsound-skip"]
+        SoundnessProbeConfiguration.lastViolationDetailByKind[.memoUnsoundSkip]
           == "drawPayload diverged"
       )
     }
@@ -95,7 +95,7 @@ struct SoundnessProbeConfigurationTests {
       #expect(SoundnessProbeConfiguration.layoutShadowDivergenceCount == before + 1)
       #expect(SoundnessProbeConfiguration.lastViolationDetail == "measured size diverged")
       #expect(
-        SoundnessProbeConfiguration.lastViolationDetailByKind["layout-shadow-divergence"]
+        SoundnessProbeConfiguration.lastViolationDetailByKind[.layoutShadowDivergence]
           == "measured size diverged"
       )
     }
@@ -164,7 +164,7 @@ struct SoundnessProbeConfigurationTests {
       #expect(SoundnessProbeConfiguration.lastTeardownLeakUnreachableCount == 3)
       #expect(SoundnessProbeConfiguration.lastViolationDetail == "census orphan")
       #expect(
-        SoundnessProbeConfiguration.lastViolationDetailByKind["teardown-coherence-leak"]
+        SoundnessProbeConfiguration.lastViolationDetailByKind[.teardownCoherenceLeak]
           == "census orphan"
       )
     }

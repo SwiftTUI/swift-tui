@@ -104,7 +104,7 @@ struct LazyStackViewportCacheTests {
           }
           #expect(
             SoundnessProbeConfiguration.layoutShadowDivergenceCount == before,
-            "rows=\(rows) scrollHosted=\(scrollHosted): \(SoundnessProbeConfiguration.lastViolationDetailByKind["layout-shadow-divergence"] ?? "")"
+            "rows=\(rows) scrollHosted=\(scrollHosted): \(SoundnessProbeConfiguration.lastViolationDetailByKind[.layoutShadowDivergence] ?? "")"
           )
         }
       }
@@ -198,7 +198,7 @@ struct LazyStackViewportCacheTests {
         if SoundnessProbeConfiguration.layoutShadowDivergenceCount != before {
           failures.append(
             "\(name) \(width)x\(height): "
-              + (SoundnessProbeConfiguration.lastViolationDetailByKind["layout-shadow-divergence"]
+              + (SoundnessProbeConfiguration.lastViolationDetailByKind[.layoutShadowDivergence]
                 ?? ""))
         }
       }

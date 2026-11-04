@@ -70,7 +70,7 @@ package struct FailOnSoundnessViolationGrowth: TestTrait, SuiteTrait, TestScopin
     for growth in after.violationGrowth(since: before) {
       Issue.record(
         """
-        soundness counter '\(growth.kind)' grew by \(growth.count): \
+        soundness counter '\(growth.kind.rawValue)' grew by \(growth.count): \
         \(growth.detail ?? "no per-kind detail recorded")
         """
       )

@@ -7,8 +7,9 @@ function, counter, or trace kind in
 [`SoundnessProbeConfiguration.swift`](../Sources/SwiftTUIGraph/Resolve/SoundnessProbeConfiguration.swift)
 requires three additions: a row here, a counter snapshot entry, and an owning
 test.
-`Scripts/check_soundness_oracle_map.sh` derives those inventories from source
-and makes drift fail the repository policy phase.
+The policy check reads trace names from
+[the violation kind enum](../Sources/SwiftTUIGraph/Resolve/SoundnessViolationKind.swift)
+and reads recorders and counters from the probe configuration.
 
 ## Enforcement model
 

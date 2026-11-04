@@ -43,7 +43,7 @@ package struct SoundnessCounterSnapshot: Sendable, Equatable {
   package var layoutShadowDivergenceCount: Int
   package var layoutShadowWindowedExclusionCount: Int
   package var layoutShadowDepthExclusionCount: Int
-  package var lastViolationDetailByKind: [String: String]
+  package var lastViolationDetailByKind: [SoundnessViolationKind: String]
 
   @MainActor
   package static func current() -> Self {
@@ -106,25 +106,25 @@ package struct SoundnessCounterSnapshot: Sendable, Equatable {
   package func violationGrowth(since previous: Self) -> [SoundnessCounterGrowth] {
     var growth: [SoundnessCounterGrowth] = []
     appendGrowth(
-      kind: "stamp-coherence",
+      kind: .stampCoherence,
       previous: previous.stampCoherenceViolationCount,
       current: stampCoherenceViolationCount,
       to: &growth
     )
     appendGrowth(
-      kind: "delta-checkpoint",
+      kind: .deltaCheckpoint,
       previous: previous.deltaCheckpointViolationCount,
       current: deltaCheckpointViolationCount,
       to: &growth
     )
     appendGrowth(
-      kind: "checkpoint-store",
+      kind: .checkpointStore,
       previous: previous.checkpointStoreViolationCount,
       current: checkpointStoreViolationCount,
       to: &growth
     )
     appendGrowth(
-      kind: "raster-damage",
+      kind: .rasterDamage,
       previous: previous.rasterDamageMismatchCount,
       current: rasterDamageMismatchCount,
       to: &growth
@@ -133,18 +133,18 @@ package struct SoundnessCounterSnapshot: Sendable, Equatable {
       teardownCoherenceViolationCount - previous.teardownCoherenceViolationCount
     let leakGrowth = teardownCoherenceLeakCount - previous.teardownCoherenceLeakCount
     appendGrowth(
-      kind: "teardown-coherence",
+      kind: .teardownCoherence,
       count: max(0, teardownGrowth - leakGrowth),
       to: &growth
     )
     appendGrowth(
-      kind: "teardown-barrier-non-convergence",
+      kind: .teardownBarrierNonConvergence,
       previous: previous.barrierNonConvergenceCount,
       current: barrierNonConvergenceCount,
       to: &growth
     )
     appendGrowth(
-      kind: "resolve-lifetime-scope-unclassified",
+      kind: .resolveLifetimeScopeUnclassified,
       previous: previous.unclassifiedResolvedNodeCount,
       current: unclassifiedResolvedNodeCount,
       to: &growth
@@ -155,43 +155,43 @@ package struct SoundnessCounterSnapshot: Sendable, Equatable {
     // teardown growth still reports its zero-census over-removal direction
     // after subtracting leak growth above.
     appendGrowth(
-      kind: "memo-unsound-skip",
+      kind: .memoUnsoundSkip,
       previous: previous.memoUnsoundSkipCount,
       current: memoUnsoundSkipCount,
       to: &growth
     )
     appendGrowth(
-      kind: "duplicate-registration",
+      kind: .duplicateRegistration,
       previous: previous.duplicateRegistrationOverwriteCount,
       current: duplicateRegistrationOverwriteCount,
       to: &growth
     )
     appendGrowth(
-      kind: "state-slot-restoration-drop",
+      kind: .stateSlotRestorationDrop,
       previous: previous.stateSlotRestorationDropCount,
       current: stateSlotRestorationDropCount,
       to: &growth
     )
     appendGrowth(
-      kind: "planner-targetless-frontier",
+      kind: .plannerTargetlessFrontier,
       previous: previous.plannerTargetlessFrontierEscalationCount,
       current: plannerTargetlessFrontierEscalationCount,
       to: &growth
     )
     appendGrowth(
-      kind: "lifecycle-handler-skip",
+      kind: .lifecycleHandlerSkip,
       previous: previous.lifecycleHandlerSkipCount,
       current: lifecycleHandlerSkipCount,
       to: &growth
     )
     appendGrowth(
-      kind: "ambient-environment-fallback",
+      kind: .ambientEnvironmentFallback,
       previous: previous.ambientEnvironmentFallbackReadCount,
       current: ambientEnvironmentFallbackReadCount,
       to: &growth
     )
     appendGrowth(
-      kind: "committed-handler-resolution",
+      kind: .committedHandlerResolution,
       previous: previous.committedHandlerResolutionViolationCount,
       current: committedHandlerResolutionViolationCount,
       to: &growth
@@ -227,37 +227,37 @@ package struct SoundnessCounterSnapshot: Sendable, Equatable {
       to: &growth
     )
     appendGrowth(
-      kind: "action-dispatch-miss",
+      kind: .actionDispatchMiss,
       previous: previous.actionDispatchMissCount,
       current: actionDispatchMissCount,
       to: &growth
     )
     appendGrowth(
-      kind: "stranded-listing",
+      kind: .strandedListing,
       previous: previous.strandedListingViolationCount,
       current: strandedListingViolationCount,
       to: &growth
     )
     appendGrowth(
-      kind: "state-seed-fallback",
+      kind: .stateSeedFallback,
       previous: previous.stateSeedFallbackViolationCount,
       current: stateSeedFallbackViolationCount,
       to: &growth
     )
     appendGrowth(
-      kind: "state-capture-miss",
+      kind: .stateCaptureMiss,
       previous: previous.stateCaptureMissViolationCount,
       current: stateCaptureMissViolationCount,
       to: &growth
     )
     appendGrowth(
-      kind: "dynamic-property-mutation-discarded",
+      kind: .dynamicPropertyMutationDiscarded,
       previous: previous.dynamicPropertyMutationDiscardedCount,
       current: dynamicPropertyMutationDiscardedCount,
       to: &growth
     )
     appendGrowth(
-      kind: "layout-shadow-divergence",
+      kind: .layoutShadowDivergence,
       previous: previous.layoutShadowDivergenceCount,
       current: layoutShadowDivergenceCount,
       to: &growth
@@ -266,7 +266,7 @@ package struct SoundnessCounterSnapshot: Sendable, Equatable {
   }
 
   private func appendGrowth(
-    kind: String,
+    kind: SoundnessViolationKind,
     previous: Int,
     current: Int,
     to growth: inout [SoundnessCounterGrowth]
@@ -275,7 +275,7 @@ package struct SoundnessCounterSnapshot: Sendable, Equatable {
   }
 
   private func appendGrowth(
-    kind: String,
+    kind: SoundnessViolationKind,
     count: Int,
     to growth: inout [SoundnessCounterGrowth]
   ) {
@@ -293,7 +293,7 @@ package struct SoundnessCounterSnapshot: Sendable, Equatable {
 }
 
 package struct SoundnessCounterGrowth: Sendable, Equatable {
-  package var kind: String
+  package var kind: SoundnessViolationKind
   package var count: Int
   package var detail: String?
 }
@@ -404,7 +404,7 @@ package enum SoundnessProbeConfiguration {
   /// the 2026-08-11 mrkdwn false-alarm class. An exclusion is not a
   /// violation.
   package static var layoutShadowDepthExclusionCount = 0
-  package static var lastViolationDetailByKind: [String: String] = [:]
+  package static var lastViolationDetailByKind: [SoundnessViolationKind: String] = [:]
   private static var lastViolationDetailStorage: String?
   package static var lastViolationDetail: String? {
     get { lastViolationDetailStorage }
@@ -423,15 +423,15 @@ package enum SoundnessProbeConfiguration {
 
   package static func recordStampCoherenceViolation(_ detail: @autoclosure () -> String) {
     stampCoherenceViolationCount += 1
-    recordViolationDetail(detail(), for: "stamp-coherence")
-    emitTrace("stamp-coherence")
+    recordViolationDetail(detail(), for: .stampCoherence)
+    emitTrace(.stampCoherence)
   }
 
   package static func recordDeltaCheckpointViolation(_ detail: @autoclosure () -> String) {
     deltaCheckpointViolationCount += 1
     let detail = detail()
-    recordViolationDetail(detail, for: "delta-checkpoint")
-    emitTrace("delta-checkpoint")
+    recordViolationDetail(detail, for: .deltaCheckpoint)
+    emitTrace(.deltaCheckpoint)
     assertZeroCensusViolation(detail)
   }
 
@@ -441,8 +441,8 @@ package enum SoundnessProbeConfiguration {
   package static func recordCheckpointStoreViolation(_ detail: @autoclosure () -> String) {
     checkpointStoreViolationCount += 1
     let detail = detail()
-    recordViolationDetail(detail, for: "checkpoint-store")
-    emitTrace("checkpoint-store")
+    recordViolationDetail(detail, for: .checkpointStore)
+    emitTrace(.checkpointStore)
     assertZeroCensusViolation(detail)
   }
 
@@ -453,8 +453,8 @@ package enum SoundnessProbeConfiguration {
   /// coordinator, which records it here.
   package static func recordRasterDamageMismatch(_ detail: @autoclosure () -> String) {
     rasterDamageMismatchCount += 1
-    recordViolationDetail(detail(), for: "raster-damage")
-    emitTrace("raster-damage")
+    recordViolationDetail(detail(), for: .rasterDamage)
+    emitTrace(.rasterDamage)
   }
 
   /// Records one sampled layout-shadow divergence: production measure/place
@@ -466,8 +466,8 @@ package enum SoundnessProbeConfiguration {
   /// recording — the alarm, not a heal, is the deliverable.
   package static func recordLayoutShadowDivergence(_ detail: @autoclosure () -> String) {
     layoutShadowDivergenceCount += 1
-    recordViolationDetail(detail(), for: "layout-shadow-divergence")
-    emitTrace("layout-shadow-divergence")
+    recordViolationDetail(detail(), for: .layoutShadowDivergence)
+    emitTrace(.layoutShadowDivergence)
   }
 
   /// Accumulates the layout shadow oracle's windowed-exclusion currency
@@ -494,8 +494,8 @@ package enum SoundnessProbeConfiguration {
   /// fixture-enumerated stress shapes.
   package static func recordTeardownCoherenceViolation(_ detail: @autoclosure () -> String) {
     teardownCoherenceViolationCount += 1
-    recordViolationDetail(detail(), for: "teardown-coherence")
-    emitTrace("teardown-coherence")
+    recordViolationDetail(detail(), for: .teardownCoherence)
+    emitTrace(.teardownCoherence)
   }
 
   /// Records one caught under-removal (leak) census violation (F91): stored
@@ -511,17 +511,17 @@ package enum SoundnessProbeConfiguration {
     teardownCoherenceLeakCount += 1
     lastTeardownLeakUnreachableCount = unreachableCount
     let detail = detail()
-    recordViolationDetail(detail, for: "teardown-coherence")
-    recordViolationDetail(detail, for: "teardown-coherence-leak")
-    emitTrace("teardown-coherence-leak")
+    recordViolationDetail(detail, for: .teardownCoherence)
+    recordViolationDetail(detail, for: .teardownCoherenceLeak)
+    emitTrace(.teardownCoherenceLeak)
   }
 
   package static func recordBarrierNonConvergence(
     _ detail: @autoclosure () -> String
   ) {
     barrierNonConvergenceCount += 1
-    recordViolationDetail(detail(), for: "teardown-barrier-non-convergence")
-    emitTrace("teardown-barrier-non-convergence")
+    recordViolationDetail(detail(), for: .teardownBarrierNonConvergence)
+    emitTrace(.teardownBarrierNonConvergence)
   }
 
   package static func recordAutomaticLifetimeAnchor() {
@@ -532,8 +532,8 @@ package enum SoundnessProbeConfiguration {
     _ detail: @autoclosure () -> String
   ) {
     unclassifiedResolvedNodeCount += 1
-    recordViolationDetail(detail(), for: "resolve-lifetime-scope-unclassified")
-    emitTrace("resolve-lifetime-scope-unclassified")
+    recordViolationDetail(detail(), for: .resolveLifetimeScopeUnclassified)
+    emitTrace(.resolveLifetimeScopeUnclassified)
   }
 
   /// Records one caught registration-publication divergence (F04): after a
@@ -543,8 +543,8 @@ package enum SoundnessProbeConfiguration {
     _ detail: @autoclosure () -> String
   ) {
     registrationPublicationViolationCount += 1
-    recordViolationDetail(detail(), for: "registration-publication")
-    emitTrace("registration-publication")
+    recordViolationDetail(detail(), for: .registrationPublication)
+    emitTrace(.registrationPublication)
   }
 
   /// Records one caught memo-soundness violation (F90): the shadow oracle
@@ -559,8 +559,8 @@ package enum SoundnessProbeConfiguration {
   package static func recordMemoUnsoundSkip(_ detail: @autoclosure () -> String) {
     memoUnsoundSkipCount += 1
     let detail = detail()
-    recordViolationDetail(detail, for: "memo-unsound-skip")
-    emitTrace("memo-unsound-skip")
+    recordViolationDetail(detail, for: .memoUnsoundSkip)
+    emitTrace(.memoUnsoundSkip)
     assertZeroCensusViolation(detail)
   }
 
@@ -576,8 +576,8 @@ package enum SoundnessProbeConfiguration {
     _ detail: @autoclosure () -> String
   ) {
     duplicateRegistrationOverwriteCount += 1
-    recordViolationDetail(detail(), for: "duplicate-registration")
-    emitTrace("duplicate-registration")
+    recordViolationDetail(detail(), for: .duplicateRegistration)
+    emitTrace(.duplicateRegistration)
   }
 
   /// Records one dirty-plan escalation caused by a target-less frontier node
@@ -594,8 +594,8 @@ package enum SoundnessProbeConfiguration {
     _ detail: @autoclosure () -> String
   ) {
     plannerTargetlessFrontierEscalationCount += 1
-    recordViolationDetail(detail(), for: "planner-targetless-frontier")
-    emitTrace("planner-targetless-frontier")
+    recordViolationDetail(detail(), for: .plannerTargetlessFrontier)
+    emitTrace(.plannerTargetlessFrontier)
   }
 
   /// Records one committed lifecycle handler (appear/disappear/change) whose
@@ -608,8 +608,8 @@ package enum SoundnessProbeConfiguration {
     _ detail: @autoclosure () -> String
   ) {
     lifecycleHandlerSkipCount += 1
-    recordViolationDetail(detail(), for: "lifecycle-handler-skip")
-    emitTrace("lifecycle-handler-skip")
+    recordViolationDetail(detail(), for: .lifecycleHandlerSkip)
+    emitTrace(.lifecycleHandlerSkip)
   }
 
   /// Records one `@Environment` read that fell back to default values while
@@ -625,8 +625,8 @@ package enum SoundnessProbeConfiguration {
     _ detail: @autoclosure () -> String
   ) {
     ambientEnvironmentFallbackReadCount += 1
-    recordViolationDetail(detail(), for: "ambient-environment-fallback")
-    emitTrace("ambient-environment-fallback")
+    recordViolationDetail(detail(), for: .ambientEnvironmentFallback)
+    emitTrace(.ambientEnvironmentFallback)
   }
 
   /// Records one imperative `@State` access that bottomed out at the
@@ -641,8 +641,8 @@ package enum SoundnessProbeConfiguration {
     _ detail: @autoclosure () -> String
   ) {
     stateSeedFallbackViolationCount += 1
-    recordViolationDetail(detail(), for: "state-seed-fallback")
-    emitTrace("state-seed-fallback")
+    recordViolationDetail(detail(), for: .stateSeedFallback)
+    emitTrace(.stateSeedFallback)
   }
 
   /// Records one bound capture whose owner was dead and whose fire-time
@@ -661,16 +661,16 @@ package enum SoundnessProbeConfiguration {
     _ detail: @autoclosure () -> String
   ) {
     dynamicPropertyMutationDiscardedCount += 1
-    recordViolationDetail(detail(), for: "dynamic-property-mutation-discarded")
-    emitTrace("dynamic-property-mutation-discarded")
+    recordViolationDetail(detail(), for: .dynamicPropertyMutationDiscarded)
+    emitTrace(.dynamicPropertyMutationDiscarded)
   }
 
   package static func recordStateCaptureMissViolation(
     _ detail: @autoclosure () -> String
   ) {
     stateCaptureMissViolationCount += 1
-    recordViolationDetail(detail(), for: "state-capture-miss")
-    emitTrace("state-capture-miss")
+    recordViolationDetail(detail(), for: .stateCaptureMiss)
+    emitTrace(.stateCaptureMiss)
   }
 
   /// Records one dropped in-flight state-slot restoration (F93): a
@@ -682,8 +682,8 @@ package enum SoundnessProbeConfiguration {
   package static func recordStateSlotRestorationDrop(_ detail: @autoclosure () -> String) {
     stateSlotRestorationDropCount += 1
     let detail = detail()
-    recordViolationDetail(detail, for: "state-slot-restoration-drop")
-    emitTrace("state-slot-restoration-drop")
+    recordViolationDetail(detail, for: .stateSlotRestorationDrop)
+    emitTrace(.stateSlotRestorationDrop)
     assertZeroCensusViolation(detail)
   }
 
@@ -700,8 +700,8 @@ package enum SoundnessProbeConfiguration {
   ) {
     committedHandlerResolutionViolationCount += 1
     let detail = detail()
-    recordViolationDetail(detail, for: "committed-handler-resolution")
-    emitTrace("committed-handler-resolution")
+    recordViolationDetail(detail, for: .committedHandlerResolution)
+    emitTrace(.committedHandlerResolution)
     assertZeroCensusViolation(detail)
   }
 
@@ -738,8 +738,8 @@ package enum SoundnessProbeConfiguration {
   ) {
     actionDispatchMissCount += 1
     let detail = detail()
-    recordViolationDetail(detail, for: "action-dispatch-miss")
-    emitTrace("action-dispatch-miss")
+    recordViolationDetail(detail, for: .actionDispatchMiss)
+    emitTrace(.actionDispatchMiss)
   }
 
   /// Records one stranded listing (residual 2 of the reuse/freshness quirk
@@ -753,8 +753,8 @@ package enum SoundnessProbeConfiguration {
     _ detail: @autoclosure () -> String
   ) {
     strandedListingViolationCount += 1
-    recordViolationDetail(detail(), for: "stranded-listing")
-    emitTrace("stranded-listing")
+    recordViolationDetail(detail(), for: .strandedListing)
+    emitTrace(.strandedListing)
   }
 
   /// `SWIFTTUI_SOUNDNESS_PROBE_TRACE=1` emits one `[SOUNDNESS]` line per
@@ -769,12 +769,12 @@ package enum SoundnessProbeConfiguration {
     FeatureFlags.booleanValue(FeatureFlags.environmentValue(named: traceEnvironmentVariableName))
     ?? DebugTraceSelection.current.isArmed("soundness")
 
-  private static func emitTrace(_ kind: String) {
+  private static func emitTrace(_ kind: SoundnessViolationKind) {
     guard isTraceEnabled else {
       return
     }
     DebugLogRouter.emit(
-      "[SOUNDNESS] \(kind): \(lastViolationDetailByKind[kind] ?? "")\n",
+      "[SOUNDNESS] \(kind.rawValue): \(lastViolationDetailByKind[kind] ?? "")\n",
       toFileAt: DebugLogRouter.resolvedFilePath(
         override: FeatureFlags.environmentValue(named: traceFileEnvironmentVariableName),
         bundleFileName: "soundness.log"
@@ -782,7 +782,7 @@ package enum SoundnessProbeConfiguration {
     )
   }
 
-  private static func recordViolationDetail(_ detail: String, for kind: String) {
+  private static func recordViolationDetail(_ detail: String, for kind: SoundnessViolationKind) {
     lastViolationDetailByKind[kind] = detail
     lastViolationDetailStorage = detail
   }
