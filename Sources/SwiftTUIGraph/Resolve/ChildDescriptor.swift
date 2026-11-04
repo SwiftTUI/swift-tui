@@ -3,14 +3,14 @@ package struct ChildDescriptor: Hashable, Sendable {
   package var structuralPath: StructuralPath
   package var entityIdentity: EntityIdentity?
   package var entityStructuralPath: StructuralPath?
-  package var typeIdentity: String
-  /// Refines the String `typeIdentity` with a stable per-Swift-type
+  package var kind: NodeKind
+  /// Refines the node kind with a stable per-Swift-type
   /// discriminator when one is available.  Two descriptors with the same
-  /// `typeIdentity` but different non-nil discriminators are unequal:
+  /// kind but different non-nil discriminators are unequal:
   /// this catches accidental kind-name collisions that a String-only
   /// comparison would silently fuse.  When either side is `nil` (legacy
   /// call site or in-progress migration) the comparison falls back to
-  /// the String, so partial migrations don't produce structural churn.
+  /// the kind, so partial migrations don't produce structural churn.
   package var typeDiscriminator: ObjectIdentifier?
 
   package init(
@@ -18,14 +18,14 @@ package struct ChildDescriptor: Hashable, Sendable {
     structuralPath: StructuralPath? = nil,
     entityIdentity: EntityIdentity? = nil,
     entityStructuralPath: StructuralPath? = nil,
-    typeIdentity: String,
+    kind: NodeKind,
     typeDiscriminator: ObjectIdentifier? = nil
   ) {
     self.identity = identity
     self.structuralPath = structuralPath ?? StructuralPath(identity: identity)
     self.entityIdentity = entityIdentity
     self.entityStructuralPath = entityStructuralPath
-    self.typeIdentity = typeIdentity
+    self.kind = kind
     self.typeDiscriminator = typeDiscriminator
   }
 
@@ -34,22 +34,14 @@ package struct ChildDescriptor: Hashable, Sendable {
     structuralPath = resolvedNode.structuralPath
     entityIdentity = resolvedNode.entityIdentity
     entityStructuralPath = resolvedNode.entityStructuralPath
-    typeIdentity =
-      switch resolvedNode.kind {
-      case .root:
-        "root"
-      case .scene(let name):
-        "scene:\(name)"
-      case .view(let name):
-        "view:\(name)"
-      }
+    kind = resolvedNode.kind
     typeDiscriminator = resolvedNode.typeDiscriminator
   }
 
   package static func == (lhs: Self, rhs: Self) -> Bool {
     guard lhs.reconciliationStructuralPath == rhs.reconciliationStructuralPath,
       lhs.entityIdentity == rhs.entityIdentity,
-      lhs.typeIdentity == rhs.typeIdentity
+      lhs.kind == rhs.kind
     else {
       return false
     }
@@ -62,13 +54,13 @@ package struct ChildDescriptor: Hashable, Sendable {
   package func hash(into hasher: inout Hasher) {
     // `typeDiscriminator` is deliberately excluded.  A typed descriptor
     // (discriminator non-nil) must hash-equal a legacy descriptor
-    // (discriminator nil) with the same String name, because the
+    // (discriminator nil) with the same kind, because the
     // bridging equality rule treats them as equal.  Hash collisions
     // between genuine same-name different-type pairs are allowed —
     // equality is the source of truth, and the refined `==` will
     // correctly reject them.
     hasher.combine(reconciliationStructuralPath)
-    hasher.combine(typeIdentity)
+    hasher.combine(kind)
     hasher.combine(entityIdentity)
   }
 

@@ -11,11 +11,11 @@ struct ChildDescriptorTests {
   func legacyMatchingDescriptorsAreEqual() {
     let lhs = ChildDescriptor(
       identity: testIdentity("Root", "Child"),
-      typeIdentity: "view:Text"
+      kind: .view(.init("Text"))
     )
     let rhs = ChildDescriptor(
       identity: testIdentity("Root", "Child"),
-      typeIdentity: "view:Text"
+      kind: .view(.init("Text"))
     )
 
     #expect(lhs == rhs)
@@ -26,12 +26,12 @@ struct ChildDescriptorTests {
   func sameTypeDiscriminatorIsEqual() {
     let lhs = ChildDescriptor(
       identity: testIdentity("Root", "Child"),
-      typeIdentity: "view:TestViewA",
+      kind: .view(.init("TestViewA")),
       typeDiscriminator: ObjectIdentifier(TestViewA.self)
     )
     let rhs = ChildDescriptor(
       identity: testIdentity("Root", "Child"),
-      typeIdentity: "view:TestViewA",
+      kind: .view(.init("TestViewA")),
       typeDiscriminator: ObjectIdentifier(TestViewA.self)
     )
 
@@ -47,12 +47,12 @@ struct ChildDescriptorTests {
     // other, silently preserving stale state.
     let lhs = ChildDescriptor(
       identity: testIdentity("Root", "Child"),
-      typeIdentity: "view:Collision",
+      kind: .view(.init("Collision")),
       typeDiscriminator: ObjectIdentifier(TestViewA.self)
     )
     let rhs = ChildDescriptor(
       identity: testIdentity("Root", "Child"),
-      typeIdentity: "view:Collision",
+      kind: .view(.init("Collision")),
       typeDiscriminator: ObjectIdentifier(TestViewB.self)
     )
 
@@ -67,11 +67,11 @@ struct ChildDescriptorTests {
     // migrations from producing spurious inequality churn.
     let legacy = ChildDescriptor(
       identity: testIdentity("Root", "Child"),
-      typeIdentity: "view:TestViewA"
+      kind: .view(.init("TestViewA"))
     )
     let typed = ChildDescriptor(
       identity: testIdentity("Root", "Child"),
-      typeIdentity: "view:TestViewA",
+      kind: .view(.init("TestViewA")),
       typeDiscriminator: ObjectIdentifier(TestViewA.self)
     )
 
@@ -87,11 +87,11 @@ struct ChildDescriptorTests {
     // mean different identities regardless of discriminator state.
     let legacy = ChildDescriptor(
       identity: testIdentity("Root", "Child"),
-      typeIdentity: "view:Alpha"
+      kind: .view(.init("Alpha"))
     )
     let typed = ChildDescriptor(
       identity: testIdentity("Root", "Child"),
-      typeIdentity: "view:Beta",
+      kind: .view(.init("Beta")),
       typeDiscriminator: ObjectIdentifier(TestViewA.self)
     )
 
@@ -106,7 +106,7 @@ struct ChildDescriptorTests {
         .init(rawValue: "Root"),
         .init(rawValue: "ChildA"),
       ]),
-      typeIdentity: "view:TestViewA",
+      kind: .view(.init("TestViewA")),
       typeDiscriminator: ObjectIdentifier(TestViewA.self)
     )
     let rhs = ChildDescriptor(
@@ -115,7 +115,7 @@ struct ChildDescriptorTests {
         .init(rawValue: "Root"),
         .init(rawValue: "ChildB"),
       ]),
-      typeIdentity: "view:TestViewA",
+      kind: .view(.init("TestViewA")),
       typeDiscriminator: ObjectIdentifier(TestViewA.self)
     )
 
@@ -130,7 +130,7 @@ struct ChildDescriptorTests {
         .init(rawValue: "Root"),
         .init(rawValue: "ForEachElement[0]"),
       ]),
-      typeIdentity: "view:Row"
+      kind: .view(.init("Row"))
     )
     let rhs = ChildDescriptor(
       identity: testIdentity("Root", "ID[dup]"),
@@ -138,7 +138,7 @@ struct ChildDescriptorTests {
         .init(rawValue: "Root"),
         .init(rawValue: "ForEachElement[1]"),
       ]),
-      typeIdentity: "view:Row"
+      kind: .view(.init("Row"))
     )
 
     #expect(lhs != rhs)
@@ -160,14 +160,14 @@ struct ChildDescriptorTests {
       structuralPath: oldEntityPath,
       entityIdentity: entity,
       entityStructuralPath: oldEntityPath,
-      typeIdentity: "view:Row"
+      kind: .view(.init("Row"))
     )
     let rhs = ChildDescriptor(
       identity: testIdentity("Root", "ID[\"row-a\"]"),
       structuralPath: newEntityPath,
       entityIdentity: entity,
       entityStructuralPath: newEntityPath,
-      typeIdentity: "view:Row"
+      kind: .view(.init("Row"))
     )
 
     #expect(lhs == rhs)
@@ -190,14 +190,14 @@ struct ChildDescriptorTests {
       structuralPath: oldEntityPath.appending(.init(rawValue: "TupleView[0]")),
       entityIdentity: entity,
       entityStructuralPath: oldEntityPath,
-      typeIdentity: "view:Text"
+      kind: .view(.init("Text"))
     )
     let rhs = ChildDescriptor(
       identity: testIdentity("Root", "ID[\"row-a\"]", "TupleView[1]"),
       structuralPath: newEntityPath.appending(.init(rawValue: "TupleView[1]")),
       entityIdentity: entity,
       entityStructuralPath: newEntityPath,
-      typeIdentity: "view:Text"
+      kind: .view(.init("Text"))
     )
 
     #expect(lhs != rhs)
@@ -214,14 +214,14 @@ struct ChildDescriptorTests {
       structuralPath: entityPath,
       entityIdentity: EntityIdentity("dup", occurrence: 0),
       entityStructuralPath: entityPath,
-      typeIdentity: "view:Row"
+      kind: .view(.init("Row"))
     )
     let rhs = ChildDescriptor(
       identity: testIdentity("Root", "ID[\"dup\"]"),
       structuralPath: entityPath,
       entityIdentity: EntityIdentity("dup", occurrence: 1),
       entityStructuralPath: entityPath,
-      typeIdentity: "view:Row"
+      kind: .view(.init("Row"))
     )
 
     #expect(lhs != rhs)
@@ -236,12 +236,12 @@ struct ChildDescriptorTests {
     let lhs = ChildDescriptor(
       identity: testIdentity("Root", "Before"),
       structuralPath: structuralPath,
-      typeIdentity: "view:Text"
+      kind: .view(.init("Text"))
     )
     let rhs = ChildDescriptor(
       identity: testIdentity("Root", "After"),
       structuralPath: structuralPath,
-      typeIdentity: "view:Text"
+      kind: .view(.init("Text"))
     )
 
     #expect(lhs == rhs)
@@ -263,7 +263,7 @@ struct ChildDescriptorTests {
     let descriptor = ChildDescriptor(resolvedNode: resolved)
 
     #expect(descriptor.typeDiscriminator == ObjectIdentifier(TestViewA.self))
-    #expect(descriptor.typeIdentity == "view:TestViewA")
+    #expect(descriptor.kind == .view(.init("TestViewA")))
     #expect(descriptor.entityIdentity == EntityIdentity("entity"))
     #expect(descriptor.entityStructuralPath == resolved.structuralPath)
   }

@@ -551,7 +551,7 @@ private func planningDescriptor(
 ) -> ChildDescriptor {
   ChildDescriptor(
     identity: Identity(components: components),
-    typeIdentity: "view:PlanningChild"
+    kind: .view(.init("PlanningChild"))
   )
 }
 

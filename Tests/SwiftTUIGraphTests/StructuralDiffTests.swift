@@ -110,13 +110,13 @@ struct StructuralDiffTests {
   @Test("static unkeyed insertion shifts sibling identity")
   func staticUnkeyedInsertionShiftsSiblingIdentity() {
     let old: [ChildDescriptor] = [
-      unkeyed(type: "view:Row", slot: 0),
-      unkeyed(type: "view:Row", slot: 1),
+      unkeyed(type: .view(.init("Row")), slot: 0),
+      unkeyed(type: .view(.init("Row")), slot: 1),
     ]
     let new: [ChildDescriptor] = [
-      unkeyed(type: "view:Inserted", slot: 0),
-      unkeyed(type: "view:Row", slot: 1),
-      unkeyed(type: "view:Row", slot: 2),
+      unkeyed(type: .view(.init("Inserted")), slot: 0),
+      unkeyed(type: .view(.init("Row")), slot: 1),
+      unkeyed(type: .view(.init("Row")), slot: 2),
     ]
 
     let operations = diffChildren(old: old, new: new)
@@ -184,18 +184,18 @@ private func keyedRow<ID: Hashable & Sendable>(
     structuralPath: structuralPath,
     entityIdentity: EntityIdentity(id, occurrence: occurrence),
     entityStructuralPath: structuralPath,
-    typeIdentity: "view:Row"
+    kind: .view(.init("Row"))
   )
 }
 
 private func unkeyed(
-  type: String,
+  type: NodeKind,
   slot: Int
 ) -> ChildDescriptor {
   ChildDescriptor(
     identity: testIdentity("Root", "Child[\(slot)]"),
     structuralPath: structuralSlot(slot),
-    typeIdentity: type
+    kind: type
   )
 }
 
