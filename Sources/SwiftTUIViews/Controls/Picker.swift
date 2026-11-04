@@ -56,7 +56,7 @@ extension Picker {
     var accessibilityLabel: String
     var identity: Identity
     var isEnabled: Bool
-    var token: String = ""
+    var token: UInt64 = 0
   }
 
   private struct SelectionTokens: Sendable {
@@ -65,18 +65,18 @@ extension Picker {
       var tag: AnyID
     }
     var next: UInt64 = 0
-    var current: [Key: String] = [:]
+    var current: [Key: UInt64] = [:]
 
     mutating func assign(_ options: inout [Option]) {
-      var retained: [Key: String] = [:]
+      var retained: [Key: UInt64] = [:]
       for index in options.indices {
         let key = Key(identity: options[index].identity, tag: options[index].tag.identityValue)
-        let token: String
+        let token: UInt64
         if let existing = current[key] {
           token = existing
         } else {
           next += 1
-          token = String(next)
+          token = next
         }
         options[index].token = token
         retained[key] = token
@@ -227,7 +227,8 @@ extension Picker {
           identity: context.identity,
           accessibilityHandler: { action in
             guard case .setValue(.text(let token)) = action else { return .unsupported }
-            guard let option = currentOptions.first(where: { $0.token == token }),
+            guard let parsed = UInt64(token), String(parsed) == token,
+              let option = currentOptions.first(where: { $0.token == parsed }),
               option.isEnabled
             else { return .invalidValue }
             let before = binding.wrappedValue
@@ -296,12 +297,13 @@ extension Picker {
           ).namingControl(with: label).accessibilityControl(
             .init(
               actions: [.focus, .setValue],
-              value: .text(selectedIndex.map { options[$0].token } ?? ""),
+              value: .text(selectedIndex.map { String(options[$0].token) } ?? ""),
               selection: .init(
                 presentation: pickerStyle.accessibilityPresentation,
                 options: options.map {
                   .init(
-                    id: $0.token, label: $0.accessibilityLabel, isEnabled: isEnabled && $0.isEnabled
+                    id: String($0.token), label: $0.accessibilityLabel,
+                    isEnabled: isEnabled && $0.isEnabled
                   )
                 })))
         )
