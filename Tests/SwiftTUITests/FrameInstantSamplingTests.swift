@@ -36,7 +36,7 @@ struct FrameInstantSamplingTests {
       .init(
         artifacts: nil, runtimeIssues: [], renderGeneration: RenderGeneration(9),
         newestDesiredGeneration: RenderGeneration(10),
-        tailJobState: .cancelledBeforeStart, tailCancelReason: "stale_baseline",
+        tailJobState: .cancelledBeforeStart, tailCancelReason: .staleBaseline,
         completedFrameDropDecision: nil),
       scheduledFrame: scheduled, renderIntentDiagnostics: intent, renderedFrames: 1,
       convergence: .init())

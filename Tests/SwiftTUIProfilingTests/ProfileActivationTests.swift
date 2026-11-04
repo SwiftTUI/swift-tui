@@ -89,7 +89,7 @@ struct ProfileActivationTests {
         runtimeIssues: [],
         staleFramePolicy: "drop_completed_visual_only",
         tailJobState: "dropped_completed",
-        tailCancelReason: "-",
+        tailCancelReason: nil,
         newestDesiredAtTailResult: 1,
         animationControllerActiveAnimationCount: 0,
         animationControllerHasPendingWork: false,

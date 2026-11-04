@@ -30,7 +30,7 @@ extension RunLoop {
       // Only newer-intent cancels count toward the forward-progress bound: a
       // stale-baseline skip means a sibling frame committed (progress
       // happened), so it resets the run instead.
-      if renderOutcome.tailCancelReason == "newer_render_intent" {
+      if renderOutcome.tailCancelReason == .newerRenderIntent {
         consecutivePreStartCancelCount += 1
       } else {
         consecutivePreStartCancelCount = 0
@@ -46,7 +46,7 @@ extension RunLoop {
         renderGeneration: renderOutcome.renderGeneration,
         runtimeIssues: renderOutcome.runtimeIssues,
         tailJobState: renderOutcome.tailJobState,
-        tailCancelReason: renderOutcome.tailCancelReason ?? "-",
+        tailCancelReason: renderOutcome.tailCancelReason,
         newestDesiredGeneration: renderOutcome.newestDesiredGeneration
           ?? renderOutcome.renderGeneration,
         animationControllerActiveAnimationCount: renderer

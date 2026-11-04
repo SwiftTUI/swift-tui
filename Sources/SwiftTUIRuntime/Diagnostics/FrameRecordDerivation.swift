@@ -269,7 +269,7 @@ package enum FrameRecordDerivation {
       runtimeIssues: sample.runtimeIssues,
       staleFramePolicy: sample.staleFramePolicy,
       tailJobState: sample.tailJobState,
-      tailCancelReason: sample.tailCancelReason,
+      tailCancelReason: sample.tailCancelReason?.rawValue ?? "-",
       cancelledRenderCount: sample.cancelledRenderCount,
       newestDesiredAtTailStart: sample.desiredGeneration,
       newestDesiredAtTailResult: sample.newestDesiredAtTailResult,

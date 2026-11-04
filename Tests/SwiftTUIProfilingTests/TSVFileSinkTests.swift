@@ -118,7 +118,7 @@ struct TSVFileSinkTests {
       return
     }
     cancelled.tailJobState = "cancelled_before_start"
-    cancelled.tailCancelReason = "superseded"
+    cancelled.tailCancelReason = .newerRenderIntent
     cancelled.dropDecision = "-"
     let elided = ElidedFrameSample(
       frameNumber: 9,
@@ -249,7 +249,7 @@ struct TSVFileSinkTests {
         runtimeIssues: [],
         staleFramePolicy: "drop_completed_visual_only",
         tailJobState: "dropped_completed",
-        tailCancelReason: "-",
+        tailCancelReason: nil,
         newestDesiredAtTailResult: 6,
         animationControllerActiveAnimationCount: 0,
         animationControllerHasPendingWork: false,

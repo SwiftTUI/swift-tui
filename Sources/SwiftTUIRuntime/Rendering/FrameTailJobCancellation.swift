@@ -9,13 +9,18 @@ package enum FrameTailJobState: String, Sendable {
   case droppedCompleted = "dropped_completed"
 }
 
+package enum FrameTailCancelReason: String, Sendable {
+  case newerRenderIntent = "newer_render_intent"
+  case staleBaseline = "stale_baseline"
+}
+
 package struct CancellableRenderOutcome {
   package var artifacts: FrameArtifacts?
   package var runtimeIssues: [RuntimeIssue]
   package var renderGeneration: RenderGeneration
   package var newestDesiredGeneration: RenderGeneration?
   package var tailJobState: FrameTailJobState
-  package var tailCancelReason: String?
+  package var tailCancelReason: FrameTailCancelReason?
   package var completedFrameDropDecision: CompletedFrameDropDecision?
 }
 

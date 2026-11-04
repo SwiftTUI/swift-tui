@@ -128,7 +128,7 @@ import Synchronization
           drop: s.dropDecision,
           blockers: s.dropEligibilityBlockers.map(\.rawValue),
           extra:
-            "policy=\(s.staleFramePolicy);cancel=\(s.tailCancelReason);recon=\(s.dropReconciliationMode)"
+            "policy=\(s.staleFramePolicy);cancel=\(s.tailCancelReason?.rawValue ?? "-");recon=\(s.dropReconciliationMode)"
         ))
     case .elided(let s):
       writeLine(

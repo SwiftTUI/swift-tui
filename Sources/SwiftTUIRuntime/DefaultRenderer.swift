@@ -509,7 +509,7 @@ public struct DefaultRenderer {
                 renderGeneration: draft.renderGeneration,
                 newestDesiredGeneration: RenderGeneration(draft.renderGeneration.rawValue + 1),
                 tailJobState: .cancelledBeforeStart,
-                tailCancelReason: "newer_render_intent",
+                tailCancelReason: .newerRenderIntent,
                 completedFrameDropDecision: nil
               )
             )
@@ -569,7 +569,7 @@ public struct DefaultRenderer {
               renderGeneration: draft.renderGeneration,
               newestDesiredGeneration: newestGeneration,
               tailJobState: .cancelledBeforeStart,
-              tailCancelReason: "stale_baseline",
+              tailCancelReason: .staleBaseline,
               completedFrameDropDecision: nil
             )
           case .committed(let artifacts, let dropDecision):

@@ -184,7 +184,7 @@ import SwiftTUICore
   package var runtimeIssues: [RuntimeIssue]
   package var staleFramePolicy: String
   package var tailJobState: String
-  package var tailCancelReason: String
+  package var tailCancelReason: FrameTailCancelReason?
   package var newestDesiredAtTailResult: UInt64
   package var animationControllerActiveAnimationCount: Int
   package var animationControllerHasPendingWork: Bool
@@ -208,7 +208,7 @@ import SwiftTUICore
     runtimeIssues: [RuntimeIssue],
     staleFramePolicy: String,
     tailJobState: String,
-    tailCancelReason: String,
+    tailCancelReason: FrameTailCancelReason?,
     newestDesiredAtTailResult: UInt64,
     animationControllerActiveAnimationCount: Int,
     animationControllerHasPendingWork: Bool,

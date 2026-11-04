@@ -119,7 +119,7 @@ extension RunLoop {
     renderGeneration: RenderGeneration,
     runtimeIssues: [RuntimeIssue],
     tailJobState: FrameTailJobState,
-    tailCancelReason: String,
+    tailCancelReason: FrameTailCancelReason?,
     newestDesiredGeneration: RenderGeneration,
     animationControllerActiveAnimationCount: Int,
     animationControllerHasPendingWork: Bool
@@ -189,7 +189,7 @@ extension RunLoop {
       runtimeIssues: runtimeIssues,
       staleFramePolicy: "drop_completed_visual_only",
       tailJobState: FrameTailJobState.droppedCompleted.rawValue,
-      tailCancelReason: "-",
+      tailCancelReason: nil,
       newestDesiredAtTailResult: newestDesiredGeneration.rawValue,
       animationControllerActiveAnimationCount: animationControllerActiveAnimationCount,
       animationControllerHasPendingWork: animationControllerHasPendingWork,

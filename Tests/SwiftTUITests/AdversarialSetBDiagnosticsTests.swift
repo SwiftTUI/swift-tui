@@ -42,7 +42,7 @@ struct AdversarialSetBDiagnosticsTests {
           from: .zeroArtifact(
             SetBSamples.zeroArtifact(
               frameNumber: 2, tailJobState: "cancelled_before_start",
-              tailCancelReason: "superseded")))))
+              tailCancelReason: .newerRenderIntent)))))
     sink.emit(
       .frame(FrameRecordDerivation.record(from: .elided(SetBSamples.elided(frameNumber: 3)))))
     let report = sink.report()
@@ -371,7 +371,7 @@ private enum SetBSamples {
   static func zeroArtifact(
     frameNumber: Int,
     tailJobState: String = "dropped_completed",
-    tailCancelReason: String = "-"
+    tailCancelReason: FrameTailCancelReason? = nil
   ) -> ZeroArtifactFrameSample {
     ZeroArtifactFrameSample(
       frameNumber: frameNumber, scheduledFrame: scheduledFrame(), desiredGeneration: 2,
