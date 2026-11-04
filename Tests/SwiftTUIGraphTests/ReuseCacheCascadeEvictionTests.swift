@@ -98,15 +98,15 @@ struct ReuseCacheCascadeEvictionTests {
     nodeIdentity: Identity
   ) {
     graph.storeResolvedNodeReuseCache(
-      namespace: namespace,
+      namespace: .toolbarStrip,
       owner: owner,
-      signature: "signature",
+      signature: AnyID(namespace),
       node: ResolvedNode(identity: nodeIdentity, kind: .view(.init("Cached")))
     )
   }
 
   private func contains(_ graph: ViewGraph, namespace: String) -> Bool {
-    graph.resolvedNodeReuseCache.keys.contains { $0.namespace == namespace }
+    graph.resolvedNodeReuseCache.values.contains { $0.signature == AnyID(namespace) }
   }
 
   private func evaluateStoredNode(

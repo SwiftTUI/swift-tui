@@ -926,9 +926,9 @@ package final class ViewGraph {
   }
 
   package func cachedReusableResolvedNode(
-    namespace: String,
+    namespace: ReuseCacheNamespace,
     owner: Identity,
-    signature: String,
+    signature: AnyID,
     environment: EnvironmentSnapshot,
     transaction: TransactionSnapshot
   ) -> ResolvedNode? {
@@ -1002,17 +1002,17 @@ package final class ViewGraph {
   /// every frame, and treating that miss as a content change re-arms the
   /// toolbar host's follow-up frame forever.
   package func resolvedNodeReuseCacheSignature(
-    namespace: String,
+    namespace: ReuseCacheNamespace,
     owner: Identity
-  ) -> String? {
+  ) -> AnyID? {
     resolvedNodeReuseCache[ResolvedNodeReuseCacheKey(namespace: namespace, owner: owner)]?
       .signature
   }
 
   package func storeResolvedNodeReuseCache(
-    namespace: String,
+    namespace: ReuseCacheNamespace,
     owner: Identity,
-    signature: String,
+    signature: AnyID,
     node: ResolvedNode
   ) {
     let key = ResolvedNodeReuseCacheKey(namespace: namespace, owner: owner)

@@ -7,7 +7,7 @@ import SwiftTUICore
 /// until the nearest ancestor `ActionScope` with a `.toolbar()`
 /// modifier absorbs them and renders a toolbar strip.
 public struct ToolbarItemConfig: Sendable {
-  public enum Position: Sendable {
+  public enum Position: Hashable, Sendable {
     case top
     case bottom
     case automatic

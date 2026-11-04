@@ -55,12 +55,16 @@ package struct ChangeObservationValueKey: Hashable, Sendable {
   }
 }
 
+package enum ReuseCacheNamespace: Hashable, Sendable {
+  case toolbarStrip
+}
+
 package struct ResolvedNodeReuseCacheKey: Hashable, Sendable {
-  package var namespace: String
+  package var namespace: ReuseCacheNamespace
   package var owner: Identity
 
   package init(
-    namespace: String,
+    namespace: ReuseCacheNamespace,
     owner: Identity
   ) {
     self.namespace = namespace
@@ -69,12 +73,12 @@ package struct ResolvedNodeReuseCacheKey: Hashable, Sendable {
 }
 
 package struct ResolvedNodeReuseCacheEntry: Equatable, Sendable {
-  package var signature: String
+  package var signature: AnyID
   package var node: ResolvedNode
   package var frameID: UInt64
 
   package init(
-    signature: String,
+    signature: AnyID,
     node: ResolvedNode,
     frameID: UInt64
   ) {

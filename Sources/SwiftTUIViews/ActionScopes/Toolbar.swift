@@ -388,7 +388,7 @@ extension ResolvedNode {
   }
 }
 
-private let toolbarStripReuseCacheNamespace = "SwiftTUI.toolbar-strip"
+private enum EmptyToolbarStrip: Hashable { case empty }
 
 /// The strip subtree plus whether its item-set/style signature differs from
 /// the one the reuse cache last stored for this strip — i.e. a committed
@@ -408,12 +408,12 @@ private func resolvedToolbarItemsStripWork(
 ) -> ResolveWork<ResolvedToolbarStrip> {
   if items.isEmpty {
     let previous = context.viewGraph?.resolvedNodeReuseCacheSignature(
-      namespace: toolbarStripReuseCacheNamespace, owner: context.identity)
-    let emptySignature = "empty-toolbar-strip"
+      namespace: .toolbarStrip, owner: context.identity)
+    let emptySignature = AnyID(EmptyToolbarStrip.empty)
     // Store only the absence signature. No view, handlers or paint is mounted
     // for an empty edge; the marker is never restored as a resolved subtree.
     context.viewGraph?.storeResolvedNodeReuseCache(
-      namespace: toolbarStripReuseCacheNamespace, owner: context.identity,
+      namespace: .toolbarStrip, owner: context.identity,
       signature: emptySignature,
       node: ResolvedNode(identity: context.identity, kind: .view(.emptyToolbarStrip)))
     return .value(
@@ -429,17 +429,18 @@ private func resolvedToolbarItemsStripWork(
     }
   }
 
+  let cacheSignature = AnyID(signature)
   let previousSignature = context.viewGraph?.resolvedNodeReuseCacheSignature(
-    namespace: toolbarStripReuseCacheNamespace,
+    namespace: .toolbarStrip,
     owner: context.identity
   )
   let itemSetChanged =
-    previousSignature != nil && previousSignature != signature.cacheSignature
+    previousSignature != nil && previousSignature != cacheSignature
   if !context.effectiveSuppressesRetainedReuse(at: context.identity),
     let reused = context.viewGraph?.cachedReusableResolvedNode(
-      namespace: toolbarStripReuseCacheNamespace,
+      namespace: .toolbarStrip,
       owner: context.identity,
-      signature: signature.cacheSignature,
+      signature: cacheSignature,
       environment: context.environment,
       transaction: context.transaction
     )
@@ -478,9 +479,9 @@ private func resolvedToolbarItemsStripWork(
 
   return ToolbarItemsStrip(items: items, style: style).resolveWork(in: context).map { resolved in
     context.viewGraph?.storeResolvedNodeReuseCache(
-      namespace: toolbarStripReuseCacheNamespace,
+      namespace: .toolbarStrip,
       owner: context.identity,
-      signature: signature.cacheSignature,
+      signature: cacheSignature,
       node: resolved
     )
     return ResolvedToolbarStrip(node: resolved, itemSetChanged: itemSetChanged)
@@ -510,7 +511,7 @@ private func refreshToolbarItemActionRegistrations(
 
 private struct ToolbarStripSignature: Hashable {
   var styleType: String
-  var placement: String
+  var placement: ToolbarPlacement
   var layout: String
   var items: [ToolbarStripItemSignature]
 
@@ -524,27 +525,24 @@ private struct ToolbarStripSignature: Hashable {
       return nil
     }
     styleType = style.snapshotLabel
-    placement = toolbarPlacementSignature(style.placement)
+    placement = style.placement
     self.layout = layout
     self.items = items.map(ToolbarStripItemSignature.init(item:))
   }
 
-  var cacheSignature: String {
-    String(reflecting: self)
-  }
 }
 
 private struct ToolbarStripItemSignature: Hashable {
   var title: String
   var icon: ToolbarStripIconSignature?
-  var position: String
+  var position: ToolbarItemConfig.Position
   var isEnabled: Bool
   var systemHint: String?
 
   init(item: ToolbarItemConfig) {
     title = item.title
     icon = item.icon.map(ToolbarStripIconSignature.init(icon:))
-    position = toolbarItemPositionSignature(item.position)
+    position = item.position
     isEnabled = item.isEnabled
     systemHint = item.systemHint
   }
@@ -553,12 +551,12 @@ private struct ToolbarStripItemSignature: Hashable {
 private struct ToolbarStripIconSignature: Hashable {
   var source: ImageSource
   var isResizable: Bool
-  var scalingMode: String
+  var scalingMode: ImageScalingMode
 
   init(icon: Image) {
     source = icon.source
     isResizable = icon.isResizable
-    scalingMode = icon.scalingMode.rawValue
+    scalingMode = icon.scalingMode
   }
 }
 
@@ -578,25 +576,6 @@ func toolbarLayoutSignature<L: Layout>(
 
   return "signed:\(layoutType):measure:\(measurementSignature):"
     + "place:\(placementSignature)"
-}
-
-private func toolbarPlacementSignature(
-  _ placement: ToolbarPlacement
-) -> String {
-  switch placement {
-  case .top: "top"
-  case .bottom: "bottom"
-  }
-}
-
-private func toolbarItemPositionSignature(
-  _ position: ToolbarItemConfig.Position
-) -> String {
-  switch position {
-  case .top: "top"
-  case .bottom: "bottom"
-  case .automatic: "automatic"
-  }
 }
 
 private struct ToolbarScopeNode: PrimitiveView, ResolvableView {

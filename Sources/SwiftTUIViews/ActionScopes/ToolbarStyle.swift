@@ -16,7 +16,7 @@ import SwiftTUICore
 
 /// Declares where a toolbar strip is placed relative to its scope's
 /// content.
-public enum ToolbarPlacement: Sendable {
+public enum ToolbarPlacement: Hashable, Sendable {
   /// The strip is composed above the scope's content.
   case top
   /// The strip is composed below the scope's content.

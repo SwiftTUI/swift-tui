@@ -27,9 +27,9 @@ struct ResolvedNodeReuseCacheTraceTests {
     signature: String = "sig"
   ) -> ResolvedNode? {
     graph.cachedReusableResolvedNode(
-      namespace: "test",
+      namespace: .toolbarStrip,
       owner: owner,
-      signature: signature,
+      signature: AnyID(signature),
       environment: .init(),
       transaction: .init()
     )
@@ -51,9 +51,9 @@ struct ResolvedNodeReuseCacheTraceTests {
     graph.beginFrame()
     let owner = testIdentity("Root", "Strip")
     graph.storeResolvedNodeReuseCache(
-      namespace: "test",
+      namespace: .toolbarStrip,
       owner: owner,
-      signature: "old",
+      signature: AnyID("old"),
       node: ResolvedNode(identity: owner, kind: .view(.init("Strip")))
     )
     withTracingEnabled {
@@ -69,9 +69,9 @@ struct ResolvedNodeReuseCacheTraceTests {
     let owner = testIdentity("Root", "Strip")
     // The cached snapshot names an identity with no live node behind it.
     graph.storeResolvedNodeReuseCache(
-      namespace: "test",
+      namespace: .toolbarStrip,
       owner: owner,
-      signature: "sig",
+      signature: AnyID("sig"),
       node: ResolvedNode(identity: testIdentity("Root", "Departed"), kind: .view(.init("Strip")))
     )
     withTracingEnabled {
