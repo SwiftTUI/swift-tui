@@ -1,7 +1,7 @@
 import SwiftTUICore
 
 package struct TerminalReaderEditor {
-  var target: String
+  var target: AccessibilityActionTarget
   var text: String
   var anchor: Int
   var head: Int
@@ -16,7 +16,7 @@ package struct TerminalReaderEditor {
 extension TerminalReaderCommands {
   package mutating func beginEdit() -> TerminalReaderCommandResult {
     guard let node = model.currentChunk?.node, let control = node.control,
-      let target = node.actionTarget,
+      let target = node.typedActionTarget,
       control.actions.contains(.setValue) || control.actions.contains(.editText)
         || control.actions.contains(.selectText)
     else { return .init(output: "This chunk has no text editor.") }
@@ -57,7 +57,7 @@ extension TerminalReaderCommands {
 
   package mutating func editCommand(_ verb: String, value: String) -> TerminalReaderCommandResult {
     guard var draft = editor else { return .init() }
-    guard let node = model.currentChunk?.node, node.actionTarget == draft.target else {
+    guard let node = model.currentChunk?.node, node.typedActionTarget == draft.target else {
       editor = nil
       return .init(output: "The edited control was removed or review moved. Draft discarded.")
     }

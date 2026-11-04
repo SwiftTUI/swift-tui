@@ -11,7 +11,7 @@ extension RunLoop {
   ) -> AccessibilityActionResult {
     guard
       let node = publishedAccessibilitySnapshot.accessibilityNodes.first(where: {
-        $0.actionTarget == request.target
+        $0.typedActionTarget == request.actionTarget
       }), let control = node.control
     else {
       return .staleTarget
@@ -108,7 +108,7 @@ extension RunLoop {
 /// owner's lifetime. Candidate/focus-convergence frames never advance this map.
 package struct AccessibilityTargetLifetimes {
   private struct Key: Hashable {
-    var target: String
+    var target: AccessibilityActionTarget
     var role: AccessibilityRole?
   }
   private var active: [Key: UInt64] = [:]
@@ -117,8 +117,8 @@ package struct AccessibilityTargetLifetimes {
   package mutating func stamp(_ snapshot: inout SemanticSnapshot) {
     var present: [Key: UInt64] = [:]
     for index in snapshot.accessibilityNodes.indices {
-      guard let raw = snapshot.accessibilityNodes[index].actionTarget else { continue }
-      let key = Key(target: raw, role: snapshot.accessibilityNodes[index].role)
+      guard let target = snapshot.accessibilityNodes[index].typedActionTarget else { continue }
+      let key = Key(target: target, role: snapshot.accessibilityNodes[index].role)
       let lifetime: UInt64
       if let existing = active[key] ?? present[key] {
         lifetime = existing
@@ -128,7 +128,7 @@ package struct AccessibilityTargetLifetimes {
         lifetime = next
       }
       present[key] = lifetime
-      snapshot.accessibilityNodes[index].actionTarget = "\(raw)#\(lifetime)"
+      snapshot.accessibilityNodes[index].typedActionTarget = target.stamped(lifetime: lifetime)
     }
     active = present
   }

@@ -106,11 +106,11 @@ package enum HostWireSchema {
     ],
     "AccessibilityFocusPresentation": [
       .init("generation", wire: .key("generation")),
-      .init("target", wire: .key("target")),
+      .init("actionTarget", wire: .key("target")),
     ],
     "AccessibilityActionResponse": [
       .init("requestID", wire: .key("requestID")),
-      .init("target", wire: .key("target")),
+      .init("actionTarget", wire: .key("target")),
       .init("result", wire: .key("result")),
     ],
     "TerminalRenderStyle": [
@@ -250,7 +250,7 @@ package enum HostWireSchema {
     ],
     "AccessibilityNode": [
       .init("properties", wire: .key("properties")),
-      .init("actionTarget", wire: .key("actionTarget")),
+      .init("typedActionTarget", wire: .key("actionTarget")),
       .init(
         "control",
         wire: .derived(

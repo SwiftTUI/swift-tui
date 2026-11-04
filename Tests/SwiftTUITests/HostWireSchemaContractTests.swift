@@ -131,8 +131,8 @@ struct HostWireSchemaContractTests {
     }
     // These nested records are emitted independently of the top-level model.
     let nestedSources: [String: Set<String>] = [
-      "AccessibilityFocusPresentation": ["generation", "target"],
-      "AccessibilityActionResponse": ["requestID", "target", "result"],
+      "AccessibilityFocusPresentation": ["generation", "actionTarget"],
+      "AccessibilityActionResponse": ["requestID", "actionTarget", "result"],
       "TerminalRenderStyle": ["appearance"],
       "TerminalAppearance": HostWireSchema.WebWire.terminalStyleKeys,
     ]

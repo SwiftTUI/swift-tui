@@ -217,9 +217,14 @@ public struct SemanticSnapshot: Equatable, Sendable {
 /// Generation is scoped to one live app session and serialized losslessly.
 public struct AccessibilityFocusPresentation: Equatable, Sendable {
   public let generation: UInt64
-  public let target: String?
+  public let actionTarget: AccessibilityActionTarget?
+  public var target: String? { actionTarget?.rawValue }
   public init(generation: UInt64, target: String?) {
+    self.init(
+      generation: generation, actionTarget: target.map(AccessibilityActionTarget.init(rawValue:)))
+  }
+  public init(generation: UInt64, actionTarget: AccessibilityActionTarget?) {
     self.generation = generation
-    self.target = target
+    self.actionTarget = actionTarget
   }
 }

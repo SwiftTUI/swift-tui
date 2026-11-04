@@ -41,7 +41,7 @@ extension SemanticExtractor {
       item.isEnabled = node.environmentSnapshot.style.isEnabled
       item.actionIdentity = tab.identity
       if let owner = node.viewNodeID {
-        item.actionTarget = "\(owner.rawValue):\(tab.identity.path)"
+        item.typedActionTarget = .node(owner: owner, identity: tab.identity)
       }
       result.append(item)
     }

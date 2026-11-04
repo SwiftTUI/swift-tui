@@ -103,7 +103,7 @@ package final class TerminalReaderSurface: HostGeometryPresentationSurface,
   @discardableResult
   package func receiveReaderResponse(_ response: AccessibilityActionResponse) -> Bool {
     guard commands.pendingRequest?.requestID == response.requestID,
-      commands.pendingRequest?.target == response.target
+      commands.pendingRequest?.actionTarget == response.actionTarget
     else { return false }
     self.response = response
     return true

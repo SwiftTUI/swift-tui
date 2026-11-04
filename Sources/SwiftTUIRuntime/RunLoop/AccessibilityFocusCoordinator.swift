@@ -125,7 +125,8 @@ package final class AccessibilityFocusCoordinator {
     if requestGeneration > 0 {
       snapshot.accessibilityFocusRequest = .init(
         generation: requestGeneration,
-        target: snapshot.accessibilityNodes.first(where: \.isAccessibilityFocused)?.actionTarget)
+        actionTarget: snapshot.accessibilityNodes.first(where: \.isAccessibilityFocused)?
+          .typedActionTarget)
     }
   }
 

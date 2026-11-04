@@ -21,7 +21,7 @@ package struct TerminalReaderCommands {
 
   package mutating func acknowledge(_ response: AccessibilityActionResponse) -> String? {
     guard let pendingRequest, response.requestID == pendingRequest.requestID,
-      response.target == pendingRequest.target
+      response.actionTarget == pendingRequest.actionTarget
     else { return nil }
     self.pendingRequest = nil
     return "Action \(response.result.rawValue). Use read for current state."
@@ -170,7 +170,9 @@ package struct TerminalReaderCommands {
       + (end < options.count ? " Use options \(end + 1) for more." : "")
   }
 
-  package mutating func request(_ action: AccessibilityAction, target: String? = nil)
+  package mutating func request(
+    _ action: AccessibilityAction, target: AccessibilityActionTarget? = nil
+  )
     -> TerminalReaderCommandResult
   {
     guard pendingRequest == nil else {
@@ -179,7 +181,7 @@ package struct TerminalReaderCommands {
           "An action is awaiting acknowledgement. Review current state before issuing another mutation."
       )
     }
-    guard let node = model.currentChunk?.node, let liveTarget = node.actionTarget,
+    guard let node = model.currentChunk?.node, let liveTarget = node.typedActionTarget,
       target == nil || liveTarget == target
     else {
       return .init(output: "The original control is no longer current. Read the current chunk.")
@@ -192,10 +194,10 @@ package struct TerminalReaderCommands {
       return .init(output: "Session request limit reached. Exit and restart.")
     }
     let request = AccessibilityActionRequest(
-      target: liveTarget, action: action, requestID: nextRequest)
+      actionTarget: liveTarget, action: action, requestID: nextRequest)
     nextRequest += 1
     // Retain only correlation metadata: secure values must not enter review or pending state.
-    pendingRequest = .init(target: liveTarget, action: .focus, requestID: request.requestID)
+    pendingRequest = .init(actionTarget: liveTarget, action: .focus, requestID: request.requestID)
     return .init(output: "Action submitted.", request: request)
   }
 

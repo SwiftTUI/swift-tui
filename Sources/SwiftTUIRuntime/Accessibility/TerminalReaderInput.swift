@@ -108,9 +108,9 @@ package final class TerminalReaderInput: @preconcurrency TerminalInputReading,
         if current != surface.commands.model.current,
           let node = surface.commands.model.currentChunk?.node,
           node.control?.actions.contains(.accessibilityFocus) == true,
-          let target = node.actionTarget
+          let target = node.typedActionTarget
         {
-          requests.append(.accessibility(.init(target: target, action: .accessibilityFocus)))
+          requests.append(.accessibility(.init(actionTarget: target, action: .accessibilityFocus)))
         }
         return (sceneHub?.route(requests) ?? requests, false)
       case .escape:

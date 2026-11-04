@@ -89,6 +89,24 @@ public enum AccessibilityAction: Equatable, Sendable {
   }
 }
 
+/// Opaque action token published by a live accessibility node.
+public struct AccessibilityActionTarget: RawRepresentable, Hashable, Sendable {
+  public let rawValue: String
+  public init(rawValue: String) { self.rawValue = rawValue }
+
+  package static func node(owner: ViewNodeID, identity: Identity) -> Self {
+    Self(rawValue: "\(owner.rawValue):\(identity.path)")
+  }
+
+  package static func combined(host: Identity, signature: String) -> Self {
+    Self(rawValue: "combined:\(host.path):\(signature)")
+  }
+
+  package func stamped(lifetime: UInt64) -> Self {
+    Self(rawValue: "\(rawValue)#\(lifetime)")
+  }
+}
+
 /// A request targeting the opaque token from a published accessibility node.
 /// Tokens belong to one live scene; hosts must discard them when it closes.
 public struct AccessibilityActionRequest: Equatable, Sendable {
@@ -96,12 +114,22 @@ public struct AccessibilityActionRequest: Equatable, Sendable {
   public var requestID: UInt64?
   /// In-process ingress provenance; never supplied by the browser wire payload.
   package var hostSession: UInt64?
-  public var target: String
+  public var actionTarget: AccessibilityActionTarget
+  public var target: String {
+    get { actionTarget.rawValue }
+    set { actionTarget = .init(rawValue: newValue) }
+  }
   public var action: AccessibilityAction
 
   public init(target: String, action: AccessibilityAction, requestID: UInt64? = nil) {
+    self.init(actionTarget: .init(rawValue: target), action: action, requestID: requestID)
+  }
+
+  public init(
+    actionTarget: AccessibilityActionTarget, action: AccessibilityAction, requestID: UInt64? = nil
+  ) {
     self.requestID = requestID
-    self.target = target
+    self.actionTarget = actionTarget
     self.action = action
   }
 }
@@ -157,12 +185,19 @@ package enum AccessibilityActionOutcome {
 /// It contains no submitted values, so secure input cannot leak into responses.
 public struct AccessibilityActionResponse: Equatable, Sendable {
   public let requestID: UInt64
-  public let target: String
+  public let actionTarget: AccessibilityActionTarget
+  public var target: String { actionTarget.rawValue }
   public let result: AccessibilityActionResult
 
   public init(requestID: UInt64, target: String, result: AccessibilityActionResult) {
+    self.init(requestID: requestID, actionTarget: .init(rawValue: target), result: result)
+  }
+
+  public init(
+    requestID: UInt64, actionTarget: AccessibilityActionTarget, result: AccessibilityActionResult
+  ) {
     self.requestID = requestID
-    self.target = target
+    self.actionTarget = actionTarget
     self.result = result
   }
 }

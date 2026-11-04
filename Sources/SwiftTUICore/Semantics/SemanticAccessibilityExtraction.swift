@@ -543,7 +543,7 @@ extension SemanticExtractor {
           actions: [.focus, .activate], value: .text(destination.rawValue),
           opensLink: segment.opensLink)
         if let owner = node.viewNodeID {
-          child.actionTarget = "\(owner.rawValue):\(identity.path)"
+          child.typedActionTarget = .node(owner: owner, identity: identity)
           child.actionIdentity = identity
         }
       }
@@ -722,7 +722,7 @@ extension SemanticExtractor {
     }
     result.isEnabled = node.environmentSnapshot.style.isEnabled
     if let owner = node.viewNodeID, result.control != nil {
-      result.actionTarget = "\(owner.rawValue):\(node.identity.path)"
+      result.typedActionTarget = .node(owner: owner, identity: node.identity)
       result.actionIdentity = node.identity
     }
     return result

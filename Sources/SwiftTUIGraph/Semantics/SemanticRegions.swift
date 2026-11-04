@@ -218,7 +218,11 @@ package struct ScrollTargetQuery: Equatable, Sendable {
 /// visible-field equality.
 public struct AccessibilityNode: Equatable, Sendable {
   /// Opaque live-node token. Never synthesize this from the authored identity.
-  public var actionTarget: String? = nil
+  public var typedActionTarget: AccessibilityActionTarget?
+  public var actionTarget: String? {
+    get { typedActionTarget?.rawValue }
+    set { typedActionTarget = newValue.map(AccessibilityActionTarget.init(rawValue:)) }
+  }
   public var properties: AccessibilityProperties? = nil
   public var control: AccessibilityControlState? = nil
   /// Placed option routes, keyed by the control's opaque selection tokens.

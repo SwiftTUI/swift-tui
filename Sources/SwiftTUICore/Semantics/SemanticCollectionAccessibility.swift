@@ -28,7 +28,9 @@ extension SemanticExtractor {
     // are enabled. The realized row controls retain their disabled state.
     item.isEnabled = true
     item.actionIdentity = navigation.identity
-    if let owner = node.viewNodeID { item.actionTarget = "\(owner.rawValue):\(identity.path)" }
+    if let owner = node.viewNodeID {
+      item.typedActionTarget = .node(owner: owner, identity: identity)
+    }
     return [item]
   }
 
@@ -38,7 +40,7 @@ extension SemanticExtractor {
     item.actionIdentity = review.identity
     item.control = .init(actions: [.accessibilityFocus, .accessibilityBlur])
     if let owner = review.ownerNodeID {
-      item.actionTarget = "\(owner.rawValue):\(item.identity.path)"
+      item.typedActionTarget = .node(owner: owner, identity: item.identity)
     }
   }
 
@@ -92,7 +94,7 @@ extension SemanticExtractor {
       && node.semanticMetadata.interactionAvailability.isEnabled
     button.actionIdentity = selection.actionIdentity
     if let owner = selection.ownerNodeID {
-      button.actionTarget = "\(owner.rawValue):\(ownIdentity.path)"
+      button.typedActionTarget = .node(owner: owner, identity: ownIdentity)
     }
     result.append(button)
     return result

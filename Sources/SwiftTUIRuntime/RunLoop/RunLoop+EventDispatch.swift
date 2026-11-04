@@ -100,7 +100,7 @@ extension RunLoop {
         let result = handleAccessibilityAction(request)
         if let requestID = request.requestID {
           let response = AccessibilityActionResponse(
-            requestID: requestID, target: request.target, result: result)
+            requestID: requestID, actionTarget: request.actionTarget, result: result)
           let consumedByReader =
             InputDispatchContext.origin != .browser
             && (presentationSurface as? any TerminalReaderResponseReceiving)?.receiveReaderResponse(

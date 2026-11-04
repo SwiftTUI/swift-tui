@@ -112,7 +112,7 @@ extension SemanticExtractor {
             guard let route = routes[name] else { return nil }
             return "\(route.owner.rawValue):\(route.identity.path):\(name)"
           }.joined(separator: "|")
-          nodes[index].actionTarget = "combined:\(source.identity.path):\(signature)"
+          nodes[index].typedActionTarget = .combined(host: source.identity, signature: signature)
         }
         for child in childIndices where retained.contains(nodes[child].identity) {
           nodes[child].parentIdentity = source.identity
