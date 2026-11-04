@@ -409,12 +409,12 @@ package final class LifecycleCoordinator {
 
   private struct SupersededTaskKey: Hashable {
     var identity: Identity
-    var descriptorID: String
+    var descriptorID: TaskDescriptor.ID
     var priority: TaskPriority
 
     init(identity: Identity, descriptor: TaskDescriptor) {
       self.identity = identity
-      descriptorID = descriptor.id
+      descriptorID = descriptor.typedID
       priority = descriptor.priority
     }
   }

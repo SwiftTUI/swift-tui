@@ -3,13 +3,14 @@ import SwiftTUICore
 @MainActor
 final class TaskRunner {
   private struct ActiveTaskKey: Hashable {
+    var identity: Identity?
     var viewNodeID: ViewNodeID
-    var descriptorID: String
+    var descriptorID: TaskDescriptor.ID
   }
 
   private struct LogicalTaskKey: Hashable {
     var identity: Identity
-    var descriptorID: String
+    var descriptorID: TaskDescriptor.ID
   }
 
   private struct ActiveTask {
@@ -67,7 +68,8 @@ final class TaskRunner {
   ) -> Task<Void, Never>? {
     guard !refuseStartIfShuttingDown() else { return nil }
     let descriptor = registration.descriptor
-    let key = ActiveTaskKey(viewNodeID: viewNodeID, descriptorID: descriptor.id)
+    let key = ActiveTaskKey(
+      identity: descriptor.owner, viewNodeID: viewNodeID, descriptorID: descriptor.typedID)
     cancel(key: key)
 
     // A node's viewNodeID can churn — a fresh id for the *same* identity on
@@ -75,7 +77,7 @@ final class TaskRunner {
     // Without this lookup, the old id's task is left running, and the lifecycle
     // diff can miss the transient disappearance. Keep the lookup per descriptor
     // so sibling task modifiers on the same identity do not cancel each other.
-    let logicalKey = LogicalTaskKey(identity: identity, descriptorID: descriptor.id)
+    let logicalKey = LogicalTaskKey(identity: identity, descriptorID: descriptor.typedID)
     if let staleKey = keyByLogicalTask[logicalKey] {
       cancel(key: staleKey)
     }
@@ -110,8 +112,10 @@ final class TaskRunner {
     matching descriptor: TaskDescriptor
   ) {
     guard !isShuttingDown, source != destination else { return }
-    let sourceKey = ActiveTaskKey(viewNodeID: source, descriptorID: descriptor.id)
-    let destinationKey = ActiveTaskKey(viewNodeID: destination, descriptorID: descriptor.id)
+    let sourceKey = ActiveTaskKey(
+      identity: descriptor.owner, viewNodeID: source, descriptorID: descriptor.typedID)
+    let destinationKey = ActiveTaskKey(
+      identity: descriptor.owner, viewNodeID: destination, descriptorID: descriptor.typedID)
     guard let activeTask = activeTasks[sourceKey],
       activeTask.identity == identity, activeTask.descriptor == descriptor
     else { return }
@@ -125,7 +129,7 @@ final class TaskRunner {
     activeTask.ownership.key = destinationKey
     activeTasks[destinationKey] = activeTask
     keysByNode[destination, default: []].insert(destinationKey)
-    keyByLogicalTask[LogicalTaskKey(identity: identity, descriptorID: descriptor.id)] =
+    keyByLogicalTask[LogicalTaskKey(identity: identity, descriptorID: descriptor.typedID)] =
       destinationKey
   }
 
@@ -135,7 +139,8 @@ final class TaskRunner {
   ) {
     guard !isShuttingDown else { return }
     if let descriptor {
-      let key = ActiveTaskKey(viewNodeID: viewNodeID, descriptorID: descriptor.id)
+      let key = ActiveTaskKey(
+        identity: descriptor.owner, viewNodeID: viewNodeID, descriptorID: descriptor.typedID)
       if activeTasks[key]?.descriptor == descriptor { cancel(key: key) }
       return
     }

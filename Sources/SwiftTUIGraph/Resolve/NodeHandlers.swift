@@ -511,8 +511,8 @@ package struct TaskNodeRecord: RuntimeNodeRecord {
     // both records name the same task slot, matching LocalTaskRegistry.restore.
     for (identity, adopted) in departing.registrations {
       var current = registrations[identity] ?? []
-      let currentIDs = Set(current.map { $0.descriptor.id })
-      current.append(contentsOf: adopted.filter { !currentIDs.contains($0.descriptor.id) })
+      let currentIDs = Set(current.map { $0.descriptor.typedID })
+      current.append(contentsOf: adopted.filter { !currentIDs.contains($0.descriptor.typedID) })
       registrations[identity] = current
     }
     owners.merge(departing.owners, uniquingKeysWith: mergeKeepingCurrent)
@@ -533,7 +533,7 @@ package struct TaskNodeRecord: RuntimeNodeRecord {
     owners[identity] = .current(identity: identity)
     var identityRegistrations = registrations[identity] ?? []
     if let index = identityRegistrations.firstIndex(where: {
-      $0.descriptor.id == registration.descriptor.id
+      $0.descriptor.typedID == registration.descriptor.typedID
     }) {
       identityRegistrations[index] = registration
     } else {

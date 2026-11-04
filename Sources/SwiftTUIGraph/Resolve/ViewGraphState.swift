@@ -205,14 +205,14 @@ package struct TaskDescriptorSlotKey: Hashable {
 /// `ID: Equatable` value without requiring `ID: Sendable` or deriving identity
 /// from the value's textual representation.
 package struct TaskDescriptorIdentitySlot {
-  package let label: String
+  package let token: UInt64
   private let isEqual: (Any) -> Bool
 
   package init<ID: Equatable>(
-    label: String,
+    token: UInt64,
     value: ID
   ) {
-    self.label = label
+    self.token = token
     isEqual = { candidate in
       guard let candidate = candidate as? ID else {
         return false

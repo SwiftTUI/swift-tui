@@ -234,8 +234,8 @@ struct TaskDescriptorIdentitySlotTests {
     graph.beginFrame()
     let node = graph.beginEvaluation(identity: testIdentity("Root", "Tasker"), invalidator: nil)
 
-    let first = graph.taskDescriptorIdentityLabel(for: node.viewNodeID, ordinal: 0, value: 42)
-    let second = graph.taskDescriptorIdentityLabel(for: node.viewNodeID, ordinal: 0, value: 42)
+    let first = graph.taskDescriptorIdentityToken(for: node.viewNodeID, ordinal: 0, value: 42)
+    let second = graph.taskDescriptorIdentityToken(for: node.viewNodeID, ordinal: 0, value: 42)
     #expect(first == second, "an unchanged id must not plan a cancel + restart")
   }
 
@@ -245,8 +245,8 @@ struct TaskDescriptorIdentitySlotTests {
     graph.beginFrame()
     let node = graph.beginEvaluation(identity: testIdentity("Root", "Tasker"), invalidator: nil)
 
-    let first = graph.taskDescriptorIdentityLabel(for: node.viewNodeID, ordinal: 0, value: 1)
-    let second = graph.taskDescriptorIdentityLabel(for: node.viewNodeID, ordinal: 0, value: 2)
+    let first = graph.taskDescriptorIdentityToken(for: node.viewNodeID, ordinal: 0, value: 1)
+    let second = graph.taskDescriptorIdentityToken(for: node.viewNodeID, ordinal: 0, value: 2)
     #expect(first != second)
   }
 
@@ -256,8 +256,8 @@ struct TaskDescriptorIdentitySlotTests {
     graph.beginFrame()
     let node = graph.beginEvaluation(identity: testIdentity("Root", "Tasker"), invalidator: nil)
 
-    let intLabel = graph.taskDescriptorIdentityLabel(for: node.viewNodeID, ordinal: 0, value: 1)
-    let stringLabel = graph.taskDescriptorIdentityLabel(
+    let intLabel = graph.taskDescriptorIdentityToken(for: node.viewNodeID, ordinal: 0, value: 1)
+    let stringLabel = graph.taskDescriptorIdentityToken(
       for: node.viewNodeID, ordinal: 0, value: "1"
     )
     #expect(intLabel != stringLabel, "the slot's type-erased equality must not cross types")
@@ -269,12 +269,12 @@ struct TaskDescriptorIdentitySlotTests {
     graph.beginFrame()
     let node = graph.beginEvaluation(identity: testIdentity("Root", "Tasker"), invalidator: nil)
 
-    let zero = graph.taskDescriptorIdentityLabel(for: node.viewNodeID, ordinal: 0, value: 7)
-    let one = graph.taskDescriptorIdentityLabel(for: node.viewNodeID, ordinal: 1, value: 7)
+    let zero = graph.taskDescriptorIdentityToken(for: node.viewNodeID, ordinal: 0, value: 7)
+    let one = graph.taskDescriptorIdentityToken(for: node.viewNodeID, ordinal: 1, value: 7)
     #expect(zero != one, "two .task(id:) modifiers on one node must not share a slot")
     // Both remain stable on re-query.
-    #expect(graph.taskDescriptorIdentityLabel(for: node.viewNodeID, ordinal: 0, value: 7) == zero)
-    #expect(graph.taskDescriptorIdentityLabel(for: node.viewNodeID, ordinal: 1, value: 7) == one)
+    #expect(graph.taskDescriptorIdentityToken(for: node.viewNodeID, ordinal: 0, value: 7) == zero)
+    #expect(graph.taskDescriptorIdentityToken(for: node.viewNodeID, ordinal: 1, value: 7) == one)
   }
 
   @Test("checkpoint restore preserves nested owner and ordinal buckets")
@@ -282,30 +282,30 @@ struct TaskDescriptorIdentitySlotTests {
     let graph = ViewGraph()
     let firstOwner = ViewNodeID(rawValue: 101)
     let secondOwner = ViewNodeID(rawValue: 202)
-    let firstZero = graph.taskDescriptorIdentityLabel(
+    let firstZero = graph.taskDescriptorIdentityToken(
       for: firstOwner, ordinal: 0, value: "first-zero"
     )
-    let firstOne = graph.taskDescriptorIdentityLabel(
+    let firstOne = graph.taskDescriptorIdentityToken(
       for: firstOwner, ordinal: 1, value: "first-one"
     )
-    let secondZero = graph.taskDescriptorIdentityLabel(
+    let secondZero = graph.taskDescriptorIdentityToken(
       for: secondOwner, ordinal: 0, value: "second-zero"
     )
     let checkpoint = graph.makeCheckpoint()
 
     #expect(
-      graph.taskDescriptorIdentityLabel(
+      graph.taskDescriptorIdentityToken(
         for: firstOwner, ordinal: 0, value: "mutated-first-zero"
       ) != firstZero
     )
     #expect(
-      graph.taskDescriptorIdentityLabel(
+      graph.taskDescriptorIdentityToken(
         for: firstOwner, ordinal: 1, value: "mutated-first-one"
       ) != firstOne
     )
     graph.removeTaskDescriptorSlots(ownedBy: secondOwner)
     #expect(
-      graph.taskDescriptorIdentityLabel(
+      graph.taskDescriptorIdentityToken(
         for: secondOwner, ordinal: 0, value: "replacement-second-zero"
       ) != secondZero
     )
@@ -313,17 +313,17 @@ struct TaskDescriptorIdentitySlotTests {
     graph.restoreCheckpoint(checkpoint)
 
     #expect(
-      graph.taskDescriptorIdentityLabel(
+      graph.taskDescriptorIdentityToken(
         for: firstOwner, ordinal: 0, value: "first-zero"
       ) == firstZero
     )
     #expect(
-      graph.taskDescriptorIdentityLabel(
+      graph.taskDescriptorIdentityToken(
         for: firstOwner, ordinal: 1, value: "first-one"
       ) == firstOne
     )
     #expect(
-      graph.taskDescriptorIdentityLabel(
+      graph.taskDescriptorIdentityToken(
         for: secondOwner, ordinal: 0, value: "second-zero"
       ) == secondZero
     )

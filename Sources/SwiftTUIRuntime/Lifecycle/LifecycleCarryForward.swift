@@ -6,7 +6,7 @@ import SwiftTUICore
 enum LifecycleCarryForward {
   private struct TaskKey: Hashable {
     var identity: Identity
-    var descriptorID: String
+    var descriptorID: TaskDescriptor.ID
   }
 
   static func append(
@@ -18,7 +18,7 @@ enum LifecycleCarryForward {
     var transferred: Set<TaskKey> = []
     for entry in previous + entries {
       if case .taskTransfer(_, let descriptor) = entry.operation {
-        transferred.insert(.init(identity: entry.identity, descriptorID: descriptor.id))
+        transferred.insert(.init(identity: entry.identity, descriptorID: descriptor.typedID))
       }
     }
     for entry in entries {
@@ -29,7 +29,7 @@ enum LifecycleCarryForward {
       case .taskStart(let descriptor), .taskCancel(let descriptor):
         keepsOrder = transferred.contains(
           .init(
-            identity: entry.identity, descriptorID: descriptor.id))
+            identity: entry.identity, descriptorID: descriptor.typedID))
       default:
         keepsOrder = false
       }

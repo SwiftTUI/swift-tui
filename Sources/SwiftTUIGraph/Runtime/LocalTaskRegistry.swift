@@ -35,7 +35,7 @@ package final class LocalTaskRegistry: Equatable {
   ) {
     var identityRegistrations = store[identity] ?? []
     if let index = identityRegistrations.firstIndex(where: {
-      $0.descriptor.id == registration.descriptor.id
+      $0.descriptor.typedID == registration.descriptor.typedID
     }) {
       identityRegistrations[index] = registration
     } else {
@@ -52,7 +52,9 @@ package final class LocalTaskRegistry: Equatable {
     for identity: Identity,
     descriptor: TaskDescriptor
   ) -> TaskRegistration? {
-    store[identity]?.first { $0.descriptor == descriptor }
+    store[identity]?.first {
+      $0.descriptor.typedID == descriptor.typedID && $0.descriptor.priority == descriptor.priority
+    }
   }
 
   package func registration(
@@ -112,7 +114,7 @@ package final class LocalTaskRegistry: Equatable {
       var merged = store[identity] ?? []
       for registration in restored {
         if let index = merged.firstIndex(where: {
-          $0.descriptor.id == registration.descriptor.id
+          $0.descriptor.typedID == registration.descriptor.typedID
         }) {
           merged[index] = registration
         } else {

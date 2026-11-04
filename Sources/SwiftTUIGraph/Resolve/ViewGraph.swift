@@ -893,7 +893,7 @@ package final class ViewGraph {
       taskDescriptorNodeSlots: Dictionary(
         uniqueKeysWithValues: taskDescriptors.slotsByNode.flatMap { nodeID, slots in
           slots.map { ordinal, slot in
-            ("\(nodeID.rawValue)#\(ordinal)", slot.label)
+            ("\(nodeID.rawValue)#\(ordinal)", "id:\(slot.token)")
           }
         }
       ),
@@ -1828,42 +1828,42 @@ package final class ViewGraph {
     }
   }
 
-  package func taskDescriptorIdentityLabel<ID: Equatable>(
+  package func taskDescriptorIdentityToken<ID: Equatable>(
     for identity: Identity,
     ordinal: Int,
     value: ID
-  ) -> String {
+  ) -> UInt64 {
     let viewNodeID = nodeForIdentity(for: identity).viewNodeID
-    return taskDescriptorIdentityLabel(
+    return taskDescriptorIdentityToken(
       for: viewNodeID,
       ordinal: ordinal,
       value: value
     )
   }
 
-  package func taskDescriptorIdentityLabel<ID: Equatable>(
+  package func taskDescriptorIdentityToken<ID: Equatable>(
     for viewNodeID: ViewNodeID,
     ordinal: Int,
     value: ID
-  ) -> String {
+  ) -> UInt64 {
     let key = TaskDescriptorSlotKey(node: viewNodeID, ordinal: ordinal)
     if let slot = taskDescriptorSlot(for: key),
       slot.matches(value)
     {
-      return slot.label
+      return slot.token
     }
 
     // 64-bit wraparound is deliberately unguarded (F122): unreachable in practice, and the generation-equality oracles assume no value reuse — do not narrow the width.
     nextTaskDescriptorIdentityToken &+= 1
-    let label = "id:\(nextTaskDescriptorIdentityToken)"
+    let token = nextTaskDescriptorIdentityToken
     setTaskDescriptorSlot(
       TaskDescriptorIdentitySlot(
-        label: label,
+        token: token,
         value: value
       ),
       for: key
     )
-    return label
+    return token
   }
 
   package func selectiveDirtyEvaluationPlan() -> DirtyEvaluationPlan? {

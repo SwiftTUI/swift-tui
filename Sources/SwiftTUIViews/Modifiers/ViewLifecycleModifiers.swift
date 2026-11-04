@@ -286,36 +286,18 @@ public struct ChangeLifecycleModifier<Value: Equatable>: IterativePrimitiveViewM
 }
 
 private struct TaskLifecycleDescriptorIdentity {
-  private let label: @MainActor (ResolveContext, Identity, Int) -> String
+  let valueType: Any.Type
+  let token: @MainActor (ViewGraph, Identity, Int) -> UInt64
 
   @MainActor
   init<ID: Equatable>(_ value: ID) {
-    label = { context, identity, ordinal in
-      if let viewGraph = context.viewGraph {
-        if let viewNodeID = ViewNodeContext.current?.viewNodeID {
-          return viewGraph.taskDescriptorIdentityLabel(
-            for: viewNodeID,
-            ordinal: ordinal,
-            value: value
-          )
-        }
-        return viewGraph.taskDescriptorIdentityLabel(
-          for: identity,
-          ordinal: ordinal,
-          value: value
-        )
+    valueType = ID.self
+    token = { graph, identity, ordinal in
+      if let node = ViewNodeContext.current?.viewNodeID {
+        return graph.taskDescriptorIdentityToken(for: node, ordinal: ordinal, value: value)
       }
-      return "id:\(String(reflecting: ID.self))"
+      return graph.taskDescriptorIdentityToken(for: identity, ordinal: ordinal, value: value)
     }
-  }
-
-  @MainActor
-  func descriptorLabel(
-    in context: ResolveContext,
-    identity: Identity,
-    ordinal: Int
-  ) -> String {
-    label(context, identity, ordinal)
   }
 }
 
@@ -355,22 +337,13 @@ public struct TaskLifecycleModifier: IterativePrimitiveViewModifier {
       )
       let ownerNode = context.viewGraph?.nodeForIdentity(lifecycleIdentity)
       let taskOrdinal = ownerNode?.claimTaskModifierOrdinal() ?? 0
-      let descriptorIdentityLabel = descriptorIdentity?.descriptorLabel(
-        in: context,
-        identity: lifecycleIdentity,
-        ordinal: taskOrdinal
-      )
-      let descriptorID =
-        if let label = descriptorIdentityLabel {
-          taskOrdinal == 0
-            ? "\(lifecycleIdentity)#task[\(label)]"
-            : "\(lifecycleIdentity)#task[\(taskOrdinal):\(label)]"
-        } else {
-          taskOrdinal == 0
-            ? "\(lifecycleIdentity)#task"
-            : "\(lifecycleIdentity)#task[\(taskOrdinal)]"
-        }
-      let descriptor = TaskDescriptor(id: descriptorID, priority: priority)
+      let token = context.viewGraph.flatMap { graph in
+        descriptorIdentity?.token(graph, lifecycleIdentity, taskOrdinal)
+      }
+      let descriptor = TaskDescriptor(
+        owner: lifecycleIdentity, ordinal: taskOrdinal, token: token,
+        detachedType: context.viewGraph == nil ? descriptorIdentity?.valueType : nil,
+        priority: priority)
       intake.registerTask(
         identity: lifecycleIdentity,
         descriptor: descriptor,

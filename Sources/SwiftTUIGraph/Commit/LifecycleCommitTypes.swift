@@ -9,14 +9,65 @@ public enum TaskPriority: String, Equatable, Sendable {
 
 /// Identifies a lifecycle-owned task.
 public struct TaskDescriptor: Equatable, Sendable {
-  public var id: String
+  /// A task site within its owning identity, including the generation of a changing task ID.
+  public struct ID: Hashable, Sendable {
+    package enum Site: Hashable, Sendable {
+      case authored(String)
+      case modifier(ordinal: Int, token: UInt64?)
+      case detached(ordinal: Int, type: ObjectIdentifier)
+    }
+    package let site: Site
+  }
+
+  public private(set) var typedID: ID
+  package private(set) var owner: Identity?
+  private var detachedTypeName: String?
   public var priority: TaskPriority
 
-  /// Creates a task descriptor.
+  public var id: String {
+    get {
+      switch typedID.site {
+      case .authored(let value): return value
+      case .modifier(let ordinal, let token):
+        return label(ordinal: ordinal, token: token.map(String.init))
+      case .detached(let ordinal, _):
+        return label(ordinal: ordinal, token: detachedTypeName)
+      }
+    }
+    set { self = Self(id: newValue, priority: priority) }
+  }
+
+  private func label(ordinal: Int, token: String?) -> String {
+    let parts = [ordinal == 0 ? nil : String(ordinal), token.map { "id:\($0)" }].compactMap { $0 }
+    let suffix = parts.isEmpty ? "" : "[\(parts.joined(separator: ":"))]"
+    return "\(owner?.path ?? "")#task\(suffix)"
+  }
+
   public init(id: String, priority: TaskPriority) {
-    self.id = id
+    typedID = ID(site: .authored(id))
     self.priority = priority
   }
+
+  package init(
+    owner: Identity, ordinal: Int, token: UInt64?, detachedType: Any.Type?, priority: TaskPriority
+  ) {
+    self.owner = owner
+    self.priority = priority
+    if let detachedType {
+      typedID = ID(site: .detached(ordinal: ordinal, type: ObjectIdentifier(detachedType)))
+      detachedTypeName = String(reflecting: detachedType)
+    } else {
+      typedID = ID(site: .modifier(ordinal: ordinal, token: token))
+    }
+  }
+
+  public static func == (lhs: Self, rhs: Self) -> Bool {
+    guard lhs.priority == rhs.priority else { return false }
+    // The public string initializer can reconstruct a descriptor from its projection.
+    if lhs.owner == rhs.owner && lhs.typedID == rhs.typedID { return true }
+    return lhs.id == rhs.id
+  }
+
 }
 
 /// A lifecycle operation emitted during commit planning.
