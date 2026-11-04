@@ -31,6 +31,17 @@ private struct Wedge: Shape {
 
 @MainActor
 struct ShapeClippingTests {
+  @Test("same-named shapes have distinct kinds and wrappers preserve the base kind")
+  func sameNamedShapes() {
+    enum First { struct Mark: Shape { var geometry: ShapeGeometry { .rectangle } } }
+    enum Second { struct Mark: Shape { var geometry: ShapeGeometry { .rectangle } } }
+    let first = First.Mark()
+    let second = Second.Mark()
+    #expect(first.resolvedShapeKind.name == second.resolvedShapeKind.name)
+    #expect(first.resolvedShapeKind != second.resolvedShapeKind)
+    #expect(first.trim(from: 0, to: 0.5).resolvedShapeKind == first.resolvedShapeKind)
+  }
+
   @Test("nested masks intersect, wide glyphs stay atomic and cell damage remains incremental")
   func nestedAndIncremental() {
     let snapshot = DefaultRenderer().render(

@@ -9,7 +9,7 @@
 /// A primitive that implements only `geometry` gets a generated `path(in:)` value.
 /// Implement at least one. If you implement neither, the defaults recurse.
 ///
-/// ``kindName``, ``insetAmount``, ``trimStart`` and ``trimEnd`` are rendering
+/// ``insetAmount``, ``trimStart`` and ``trimEnd`` are rendering
 /// plumbing with defaults, so a conforming type normally never touches them. They are plain (defaulted)
 /// requirements rather than SPI. Thus, types *outside* this module can conform.
 /// An `@_spi` requirement has no visible default witness across a module boundary.
@@ -23,7 +23,6 @@
 public protocol Shape: View {
   var geometry: ShapeGeometry { get }
   func path(in rect: Rect) -> Path
-  var kindName: String { get }
   var insetAmount: Int { get }
   /// The fraction of the outline where the shape starts, from `0` to `1`.
   /// ``trim(from:to:)`` sets it. An untrimmed shape starts at `0`.
@@ -58,8 +57,9 @@ extension Shape {
     geometry.path(in: rect)
   }
 
-  public var kindName: String {
-    String(describing: Self.self)
+  package var resolvedShapeKind: ViewKind {
+    (self as? any WrappedShapeKind)?.baseShapeKind
+      ?? ViewKind(shapeType: Self.self)
   }
 
   public var insetAmount: Int {
@@ -96,7 +96,7 @@ extension Shape {
   package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
     [
       resolveLeafNode(
-        kindName: .init(kindName, custom: true),
+        kindName: resolvedShapeKind,
         drawPayload: .shape(
           .init(
             geometry: fillGeometry,
@@ -109,3 +109,5 @@ extension Shape {
     ]
   }
 }
+
+@MainActor package protocol WrappedShapeKind { var baseShapeKind: ViewKind { get } }

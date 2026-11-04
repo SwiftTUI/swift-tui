@@ -17,10 +17,6 @@ public struct InsetShape<Base: InsettableShape>: InsettableShape, ResolvableView
     base.geometry
   }
 
-  public var kindName: String {
-    base.kindName
-  }
-
   public var insetAmount: Int {
     let (total, overflow) = base.insetAmount.addingReportingOverflow(amount)
     return overflow ? (amount > 0 ? Int.max : Int.min) : total
@@ -39,7 +35,7 @@ public struct InsetShape<Base: InsettableShape>: InsettableShape, ResolvableView
   package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
     [
       resolveLeafNode(
-        kindName: .init(kindName, custom: true),
+        kindName: resolvedShapeKind,
         drawPayload: .shape(
           .init(
             geometry: geometry,
@@ -60,4 +56,8 @@ extension InsettableShape {
       amount: amount
     )
   }
+}
+
+extension InsetShape: WrappedShapeKind {
+  package var baseShapeKind: ViewKind { base.resolvedShapeKind }
 }

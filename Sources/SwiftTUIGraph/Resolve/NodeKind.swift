@@ -9,11 +9,20 @@ package enum NodeKind: Hashable, Sendable {
 /// A user layout with the same display name remains a different kind.
 package struct ViewKind: Hashable, Sendable, CustomStringConvertible, CustomDebugStringConvertible {
   package let name: String
-  private let custom: Bool
+  private enum Origin: Hashable, Sendable {
+    case framework, customLayout
+    case shape(ObjectIdentifier)
+  }
+  private let origin: Origin
 
   package init(_ name: String, custom: Bool = false) {
     self.name = name
-    self.custom = custom
+    self.origin = custom ? .customLayout : .framework
+  }
+
+  package init(shapeType: Any.Type) {
+    self.name = String(describing: shapeType)
+    self.origin = .shape(ObjectIdentifier(shapeType))
   }
 
   package var description: String { name }

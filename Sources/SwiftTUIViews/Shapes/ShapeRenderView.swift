@@ -4,7 +4,7 @@
 /// (fill or stroke) into the resolve pipeline. Shared by every shape
 /// modifier in ``ShapeModifiers``.
 struct ShapeRenderView: PrimitiveView, ResolvableView {
-  var kindName: String
+  var kindName: ViewKind
   var geometry: ShapeGeometry
   var insetAmount: Int
   var operation: ShapeOperation
@@ -12,7 +12,7 @@ struct ShapeRenderView: PrimitiveView, ResolvableView {
   func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
     [
       resolveLeafNode(
-        kindName: .init(kindName, custom: true),
+        kindName: kindName,
         drawPayload: .shape(
           .init(
             geometry: geometry,

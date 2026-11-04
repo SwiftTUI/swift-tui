@@ -6,7 +6,7 @@ extension Shape {
   /// Fills the shape with an explicit shape style.
   public func fill<S: ShapeStyle>(_ style: S) -> some View {
     ShapeRenderView(
-      kindName: kindName,
+      kindName: resolvedShapeKind,
       geometry: fillGeometry,
       insetAmount: insetAmount,
       operation: .fill(style: AnyShapeStyle(style), mode: .full)
@@ -20,7 +20,7 @@ extension Shape {
   /// semantic `SemanticStyleRole.foreground` role).
   public func fill() -> some View {
     ShapeRenderView(
-      kindName: kindName,
+      kindName: resolvedShapeKind,
       geometry: fillGeometry,
       insetAmount: insetAmount,
       operation: .fill(style: nil, mode: .full)
@@ -87,7 +87,7 @@ extension Shape {
     background backgroundStyle: BorderBackgroundStyle?
   ) -> some View {
     ShapeRenderView(
-      kindName: kindName,
+      kindName: resolvedShapeKind,
       geometry: geometry,
       insetAmount: insetAmount,
       operation: .stroke(
@@ -104,7 +104,7 @@ extension Shape {
     background backgroundStyle: BorderBackgroundStyle?
   ) -> some View {
     ShapeRenderView(
-      kindName: kindName,
+      kindName: resolvedShapeKind,
       geometry: geometry,
       insetAmount: insetAmount,
       operation: .stroke(
@@ -180,7 +180,7 @@ extension InsettableShape {
     background backgroundStyle: BorderBackgroundStyle?
   ) -> some View {
     ShapeRenderView(
-      kindName: kindName,
+      kindName: resolvedShapeKind,
       geometry: geometry,
       insetAmount: insetAmount,
       operation: .stroke(
@@ -197,7 +197,7 @@ extension InsettableShape {
     background backgroundStyle: BorderBackgroundStyle?
   ) -> some View {
     ShapeRenderView(
-      kindName: kindName,
+      kindName: resolvedShapeKind,
       geometry: geometry,
       insetAmount: insetAmount,
       operation: .stroke(

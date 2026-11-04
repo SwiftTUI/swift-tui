@@ -74,10 +74,6 @@ public struct TrimmedShape<Base: Shape>: Shape, ResolvableView {
         width: max(0, rect.size.width - 2 * inset), height: max(0, rect.size.height - 2 * inset)))
   }
 
-  public var kindName: String {
-    base.kindName
-  }
-
   public var insetAmount: Int {
     base.insetAmount
   }
@@ -113,4 +109,8 @@ extension Shape {
   public func trim(from startFraction: Double = 0, to endFraction: Double = 1) -> some Shape {
     TrimmedShape(base: self, from: startFraction, to: endFraction)
   }
+}
+
+extension TrimmedShape: WrappedShapeKind {
+  package var baseShapeKind: ViewKind { base.resolvedShapeKind }
 }
