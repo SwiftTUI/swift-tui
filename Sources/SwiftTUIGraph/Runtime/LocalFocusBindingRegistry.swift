@@ -11,7 +11,7 @@ package enum FocusBindingKeySuffix: Hashable, Sendable, CustomStringConvertible 
   /// wrapper register distinct focus bindings.
   case pathQualifiedStateSlot(StateSlotIdentifier)
   case local(ObjectIdentifier)
-  case legacy(String)
+  case navigator(Identity)
 
   package var description: String {
     switch self {
@@ -21,15 +21,15 @@ package enum FocusBindingKeySuffix: Hashable, Sendable, CustomStringConvertible 
       "FocusState[\(slot)]"
     case .local(let identifier):
       "FocusState.local[\(identifier)]"
-    case .legacy(let bindingID):
-      bindingID
+    case .navigator(let identity):
+      identity.path
     }
   }
 }
 
 /// Stable focus-storage registration identity. A raw `ViewNodeID` can be
 /// rewound by checkpoint rollback, so focus bindings use the same graph +
-/// owner-lifetime address as State storage. Local/legacy bindings stay
+/// owner-lifetime address as State storage. Local/navigator bindings stay
 /// owner-less and carry their identity entirely in the suffix.
 package struct FocusBindingKey: Hashable, Sendable, CustomStringConvertible {
   package var owner: StateOwnerHandle?
@@ -358,7 +358,6 @@ package struct FocusBindingRegistrationSnapshot: Sendable {
   package var requestGeneration: UInt64
   package var identity: Identity
   package var bindingKey: FocusBindingKey
-  package var bindingID: String
   package var hasPendingRequest: Bool
   package var requestsClear: Bool
   package var isCurrentRequest: (@MainActor @Sendable () -> Bool)?
@@ -370,7 +369,6 @@ package struct FocusBindingRegistrationSnapshot: Sendable {
   package init(
     identity: Identity,
     bindingKey: FocusBindingKey,
-    bindingID: String,
     hasPendingRequest: Bool,
     isSelected: Bool,
     ownerIdentity: Identity? = nil,
@@ -388,7 +386,6 @@ package struct FocusBindingRegistrationSnapshot: Sendable {
     self.requestGeneration = requestGeneration
     self.identity = identity
     self.bindingKey = bindingKey
-    self.bindingID = bindingID
     self.hasPendingRequest = hasPendingRequest
     self.requestsClear = requestsClear ?? !isSelected
     self.isCurrentRequest = isCurrentRequest
@@ -397,25 +394,6 @@ package struct FocusBindingRegistrationSnapshot: Sendable {
     self.applyRuntimeFocus = applyRuntimeFocus
   }
 
-  package init(
-    identity: Identity,
-    bindingID: String,
-    hasPendingRequest: Bool,
-    isSelected: Bool,
-    applyRuntimeFocus: @escaping @MainActor @Sendable (Bool) -> Bool
-  ) {
-    self.init(
-      identity: identity,
-      bindingKey: FocusBindingKey(
-        owner: nil,
-        suffix: .legacy(bindingID)
-      ),
-      bindingID: bindingID,
-      hasPendingRequest: hasPendingRequest,
-      isSelected: isSelected,
-      applyRuntimeFocus: applyRuntimeFocus
-    )
-  }
 }
 
 @MainActor
@@ -450,7 +428,6 @@ package final class LocalFocusBindingRegistry: Equatable {
   package func register(
     identity: Identity,
     bindingKey: FocusBindingKey,
-    bindingID: String,
     hasPendingRequest: Bool,
     isSelected: Bool,
     domain: FocusBindingDomain = .keyboard,
@@ -464,7 +441,6 @@ package final class LocalFocusBindingRegistry: Equatable {
     let registration = FocusBindingRegistrationSnapshot(
       identity: identity,
       bindingKey: bindingKey,
-      bindingID: bindingID,
       hasPendingRequest: hasPendingRequest,
       isSelected: isSelected,
       domain: domain,
@@ -477,26 +453,6 @@ package final class LocalFocusBindingRegistry: Equatable {
     )
     registrations.append(registration)
     ViewNodeContext.current?.recordFocusBindingRegistration(registration)
-  }
-
-  package func register(
-    identity: Identity,
-    bindingID: String,
-    hasPendingRequest: Bool,
-    isSelected: Bool,
-    applyRuntimeFocus: @escaping @MainActor @Sendable (Bool) -> Bool
-  ) {
-    register(
-      identity: identity,
-      bindingKey: FocusBindingKey(
-        owner: nil,
-        suffix: .legacy(bindingID)
-      ),
-      bindingID: bindingID,
-      hasPendingRequest: hasPendingRequest,
-      isSelected: isSelected,
-      applyRuntimeFocus: applyRuntimeFocus
-    )
   }
 
   package func desiredFocusRequest(

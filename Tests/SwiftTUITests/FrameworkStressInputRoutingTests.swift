@@ -539,14 +539,14 @@ extension FrameworkStressInputRoutingTests {
     let registry = harness.runLoop.localFocusBindingRegistry
     registry.register(
       identity: stale,
-      bindingID: "stale",
+      bindingKey: .init(owner: nil, suffix: .navigator(testIdentity("stale"))),
       hasPendingRequest: true,
       isSelected: true,
       applyRuntimeFocus: { _ in false }
     )
     registry.register(
       identity: live,
-      bindingID: "live",
+      bindingKey: .init(owner: nil, suffix: .navigator(testIdentity("live"))),
       hasPendingRequest: true,
       isSelected: true,
       applyRuntimeFocus: { _ in false }

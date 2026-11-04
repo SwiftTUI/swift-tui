@@ -144,7 +144,6 @@ private final class FocusStateStorageCell<Value: Equatable> {
 @MainActor
 private struct FocusStateLocation<Value: Equatable> {
   var bindingKey: FocusBindingKey
-  var bindingID: String
   /// Ensures the backing slot storage exists (seeded from the local box)
   /// WITHOUT recording a read: merely mentioning `$focus` in a body hosts
   /// the storage but presents nothing derived from it, so the touch must not
@@ -428,9 +427,6 @@ public struct FocusState<Value: Equatable> {
         ? .stateSlot(ordinal: slotIdentifier.ordinal)
         : .pathQualifiedStateSlot(slotIdentifier)
     )
-    let bindingID =
-      "graph:\(owner.graphScope.rawValue)/owner:\(owner.ownerLifetime.rawValue)"
-      + "#FocusState[\(slotIdentifier)]"
     let readKey = StateSlotKey(owner: owner.ownerLifetime, slot: slotIdentifier)
     let fallbackStorage = box.fallbackStorageCell(
       for: owner,
@@ -475,7 +471,6 @@ public struct FocusState<Value: Equatable> {
 
     return FocusStateLocation(
       bindingKey: bindingKey,
-      bindingID: bindingID,
       prime: {
         if liveStorage() == nil {
           _ = fallbackStorage.currentSnapshot()
@@ -538,7 +533,6 @@ public struct FocusState<Value: Equatable> {
         owner: nil,
         suffix: .local(ObjectIdentifier(localStorage))
       ),
-      bindingID: "FocusState.local[\(ObjectIdentifier(localStorage))]",
       prime: {},
       snapshot: {
         localStorage.currentSnapshot()
@@ -563,10 +557,6 @@ public struct FocusState<Value: Equatable> {
 extension FocusState.Binding {
   package var bindingKey: FocusBindingKey {
     location.bindingKey
-  }
-
-  package var bindingID: String {
-    location.bindingID
   }
 
   /// Registry bookkeeping (attribution-free): what the `.focused()`
@@ -694,7 +684,6 @@ public struct BoolFocusBindingModifier: IterativePrimitiveViewModifier {
       context.localFocusBindingRegistry?.register(
         identity: registrationIdentity,
         bindingKey: binding.bindingKey,
-        bindingID: binding.bindingID,
         hasPendingRequest: binding.hasPendingRequest,
         isSelected: binding.registrationValue,
         requestGeneration: observedRequestGeneration,
@@ -732,7 +721,6 @@ public struct OptionalFocusBindingModifier<Value: Hashable>: IterativePrimitiveV
       context.localFocusBindingRegistry?.register(
         identity: registrationIdentity,
         bindingKey: binding.bindingKey,
-        bindingID: binding.bindingID,
         hasPendingRequest: binding.hasPendingRequest,
         isSelected: binding.registrationValue == value,
         requestGeneration: observedRequestGeneration,

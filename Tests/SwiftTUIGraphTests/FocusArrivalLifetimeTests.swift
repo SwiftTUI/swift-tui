@@ -14,10 +14,10 @@ struct FocusArrivalLifetimeTests {
     let registry = LocalFocusBindingRegistry()
     let root = testIdentity("Arrival")
     let target = root.child(.named("Target"))
-    let key = FocusBindingKey(owner: nil, suffix: .legacy("arrival"))
+    let key = FocusBindingKey(owner: nil, suffix: .navigator(target))
     func registerTarget() {
       registry.register(
-        identity: target, bindingKey: key, bindingID: "arrival",
+        identity: target, bindingKey: key,
         hasPendingRequest: false, isSelected: false, applyRuntimeFocus: { _ in false })
     }
     func arrival(_ lifetime: Lifetime) -> DefaultFocusArrivalSnapshot {

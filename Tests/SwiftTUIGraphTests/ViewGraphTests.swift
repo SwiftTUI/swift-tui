@@ -1945,7 +1945,6 @@ private func recordPortalRuntimeRegistrations(
         owner: node.stateOwnerHandle,
         suffix: .stateSlot(ordinal: 0)
       ),
-      bindingID: "binding-\(identity.path)",
       hasPendingRequest: false,
       isSelected: false,
       applyRuntimeFocus: { _ in false }

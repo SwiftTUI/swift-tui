@@ -1811,7 +1811,6 @@ struct RuntimeRegistrationRestoreScopingTests {
     let preservedIdentity = Identity(components: ["Root", "A/B"])
     let removedRoot = Identity(components: ["Root", "A"])
     let removedIdentity = Identity(components: ["Root", "A", "B"])
-    let bindingID = "\(preservedIdentity)#FocusState[0]"
     let registry = LocalFocusBindingRegistry()
 
     registry.register(
@@ -1823,7 +1822,6 @@ struct RuntimeRegistrationRestoreScopingTests {
         ),
         suffix: .stateSlot(ordinal: 0)
       ),
-      bindingID: bindingID,
       hasPendingRequest: false,
       isSelected: true,
       applyRuntimeFocus: { _ in false }
@@ -1837,13 +1835,11 @@ struct RuntimeRegistrationRestoreScopingTests {
         ),
         suffix: .stateSlot(ordinal: 0)
       ),
-      bindingID: bindingID,
       hasPendingRequest: true,
       isSelected: false,
       applyRuntimeFocus: { _ in false }
     )
 
-    #expect(Set(registry.snapshot().map(\.bindingID)).count == 1)
     #expect(Set(registry.snapshot().map(\.bindingKey)).count == 2)
     #expect(
       registry.desiredFocusRequest(allowedIdentities: [preservedIdentity]) == .clear
@@ -1909,7 +1905,7 @@ struct RuntimeRegistrationRestoreScopingTests {
     node.recordFocusBindingRegistration(
       FocusBindingRegistrationSnapshot(
         identity: identity,
-        bindingID: "binding-\(identity.path)",
+        bindingKey: .init(owner: nil, suffix: .navigator(identity)),
         hasPendingRequest: false,
         isSelected: false,
         applyRuntimeFocus: { _ in false }

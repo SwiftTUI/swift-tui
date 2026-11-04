@@ -82,7 +82,7 @@ enum RegistrationKindDriver {
       node.recordFocusBindingRegistration(
         FocusBindingRegistrationSnapshot(
           identity: identity,
-          bindingID: "binding-\(identity.path)",
+          bindingKey: .init(owner: nil, suffix: .navigator(identity)),
           hasPendingRequest: false,
           isSelected: false,
           applyRuntimeFocus: { _ in false }

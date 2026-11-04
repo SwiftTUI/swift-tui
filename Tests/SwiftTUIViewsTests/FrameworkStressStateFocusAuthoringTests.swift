@@ -141,7 +141,7 @@ struct FrameworkStressStateFocusAuthoringTests {
     let first = FocusState<Bool>()
     let second = FocusState<Bool>()
     #expect(first.projectedValue.bindingKey != second.projectedValue.bindingKey)
-    #expect(first.projectedValue.bindingID != second.projectedValue.bindingID)
+    #expect(first.projectedValue.bindingKey != second.projectedValue.bindingKey)
   }
 
   @Test("stress state focus 013 two graph focus declarations occupy distinct slots")

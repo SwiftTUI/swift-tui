@@ -147,8 +147,8 @@ package struct CollectionAccessibilityNavigation {
     let requestGeneration = state.requestGeneration
     context.localFocusBindingRegistry?.register(
       identity: reviewIdentity,
-      bindingKey: .init(owner: owner?.stateOwnerHandle, suffix: .stateSlot(ordinal: ordinal)),
-      bindingID: navigatorIdentity.path, hasPendingRequest: state.requestPending,
+      bindingKey: .init(owner: owner?.stateOwnerHandle, suffix: .navigator(navigatorIdentity)),
+      hasPendingRequest: state.requestPending,
       isSelected: true, domain: .accessibility, requestGeneration: requestGeneration,
       prepareFocus: { reveal(current.index) },
       preparationIdentity: navigatorIdentity,

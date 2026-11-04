@@ -76,7 +76,7 @@ private struct AccessibilityFocusBindingModifier<Value: Hashable>: IterativePrim
       let generation = base.requestGeneration
       let identity = node.identity
       context.localFocusBindingRegistry?.register(
-        identity: identity, bindingKey: base.bindingKey, bindingID: base.bindingID,
+        identity: identity, bindingKey: base.bindingKey,
         hasPendingRequest: base.hasPendingRequest,
         isSelected: base.registrationValue == selectedValue,
         domain: .accessibility, requestGeneration: generation,
