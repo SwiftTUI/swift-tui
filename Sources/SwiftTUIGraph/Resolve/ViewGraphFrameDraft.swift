@@ -354,7 +354,7 @@ package final class ViewGraphFrameDraft {
           .filter { key in
             !(excusableKeys.contains(key) && rebuilt[key] == nil)
           }
-          .sorted()
+          .sorted { $0.description < $1.description }
         if !divergedKeys.isEmpty {
           let diverged =
             divergedKeys
@@ -617,7 +617,7 @@ package final class ViewGraphFrameDraft {
   /// from the LIVE registries so only keys that actually survived a spare
   /// can be excused — and only in the live-extra direction (the caller
   /// additionally requires the rebuilt side to lack the key entirely).
-  private func excusableActiveInteractionKeys() -> Set<String> {
+  private func excusableActiveInteractionKeys() -> Set<RegistrationFingerprintKey> {
     guard let gestureRegistry = liveRegistrations.gestureRegistry else {
       return []
     }
@@ -629,23 +629,23 @@ package final class ViewGraphFrameDraft {
     guard !activeIdentities.isEmpty else {
       return []
     }
-    var keys: Set<String> = []
+    var keys: Set<RegistrationFingerprintKey> = []
     for identity in activeIdentities {
-      keys.insert("gesture|\(identity.path)")
-      keys.insert("gestureState|\(identity.path)")
+      keys.insert(.init(family: .gesture, subject: .identity(identity)))
+      keys.insert(.init(family: .gestureState, subject: .identity(identity)))
     }
     if let pointerRegistry = liveRegistrations.pointerHandlerRegistry {
       for routeID in pointerRegistry.snapshot().keys
       where activeIdentities.contains(routeID.identity) {
-        keys.insert("pointer|\(routeID)")
+        keys.insert(.init(family: .pointer, subject: .route(routeID.pairingKey)))
       }
       for routeID in pointerRegistry.snapshotHover().keys
       where activeIdentities.contains(routeID.identity) {
-        keys.insert("hover|\(routeID)")
+        keys.insert(.init(family: .hover, subject: .route(routeID.pairingKey)))
       }
       for routeID in pointerRegistry.snapshotWheel().keys
       where activeIdentities.contains(routeID.identity) {
-        keys.insert("wheel|\(routeID)")
+        keys.insert(.init(family: .wheel, subject: .route(routeID.pairingKey)))
       }
     }
     return keys

@@ -38,7 +38,7 @@ extension LocalActionRegistry: RuntimeRegistry {
 
   package func fingerprint(into builder: inout RuntimeRegistrationFingerprintBuilder) {
     for identity in snapshot().keys {
-      builder.add("action", identity.path)
+      builder.add(.action, .identity(identity))
     }
   }
 }
@@ -87,10 +87,10 @@ extension LocalKeyHandlerRegistry: RuntimeRegistry {
 
   package func fingerprint(into builder: inout RuntimeRegistrationFingerprintBuilder) {
     for (identity, handlers) in snapshotKeyPressHandlers() {
-      builder.add("keyPress", identity.path, count: handlers.count)
+      builder.add(.keyPress, .identity(identity), count: handlers.count)
     }
     for (identity, handlers) in snapshotPasteHandlers() {
-      builder.add("paste", identity.path, count: handlers.count)
+      builder.add(.paste, .identity(identity), count: handlers.count)
     }
   }
 }
@@ -125,7 +125,7 @@ extension LocalTerminationRegistry: RuntimeRegistry {
 
   package func fingerprint(into builder: inout RuntimeRegistrationFingerprintBuilder) {
     for (identity, handlers) in snapshot() {
-      builder.add("termination", identity.path, count: handlers.count)
+      builder.add(.termination, .identity(identity), count: handlers.count)
     }
   }
 }
@@ -184,13 +184,13 @@ extension LocalPointerHandlerRegistry: RuntimeRegistry {
 
   package func fingerprint(into builder: inout RuntimeRegistrationFingerprintBuilder) {
     for routeID in snapshot().keys {
-      builder.add("pointer", String(describing: routeID))
+      builder.add(.pointer, .route(routeID.pairingKey))
     }
     for routeID in snapshotHover().keys {
-      builder.add("hover", String(describing: routeID))
+      builder.add(.hover, .route(routeID.pairingKey))
     }
     for routeID in snapshotWheel().keys {
-      builder.add("wheel", String(describing: routeID))
+      builder.add(.wheel, .route(routeID.pairingKey))
     }
   }
 }
@@ -228,7 +228,7 @@ extension LocalGestureRegistry: RuntimeRegistry {
 
   package func fingerprint(into builder: inout RuntimeRegistrationFingerprintBuilder) {
     for identity in snapshot().keys {
-      builder.add("gesture", identity.path)
+      builder.add(.gesture, .identity(identity))
     }
   }
 }
@@ -266,7 +266,7 @@ extension LocalGestureStateRegistry: RuntimeRegistry {
 
   package func fingerprint(into builder: inout RuntimeRegistrationFingerprintBuilder) {
     for (identity, bindings) in snapshot() {
-      builder.add("gestureState", identity.path, count: bindings.count)
+      builder.add(.gestureState, .identity(identity), count: bindings.count)
     }
   }
 }
@@ -299,10 +299,10 @@ extension LocalDefaultFocusRegistry: RuntimeRegistry {
   package func fingerprint(into builder: inout RuntimeRegistrationFingerprintBuilder) {
     let snapshot = snapshot()
     for scope in snapshot.scopes {
-      builder.add("defaultFocusScope", scope.identity.path)
+      builder.add(.defaultFocusScope, .identity(scope.identity))
     }
     for candidate in snapshot.candidates {
-      builder.add("defaultFocusCandidate", candidate.identity.path)
+      builder.add(.defaultFocusCandidate, .identity(candidate.identity))
     }
   }
 }
@@ -336,12 +336,11 @@ extension LocalFocusBindingRegistry: RuntimeRegistry {
   package func fingerprint(into builder: inout RuntimeRegistrationFingerprintBuilder) {
     for source in sourceSnapshot() {
       builder.add(
-        "focusBindingSource", "\(source.domain):\(source.identity.path)#\(source.bindingKey)")
+        .focusBindingSource, .focus(source.domain, source.identity, source.bindingKey))
     }
     for registration in snapshot() {
       builder.add(
-        "focusBinding",
-        "\(registration.domain):\(registration.identity.path)#\(registration.bindingKey)"
+        .focusBinding, .focus(registration.domain, registration.identity, registration.bindingKey)
       )
     }
   }
@@ -374,7 +373,7 @@ extension LocalFocusedValuesRegistry: RuntimeRegistry {
 
   package func fingerprint(into builder: inout RuntimeRegistrationFingerprintBuilder) {
     for registration in snapshot() {
-      builder.add("focusedValues", registration.identity.path)
+      builder.add(.focusedValues, .identity(registration.identity))
     }
   }
 }
@@ -406,10 +405,10 @@ extension LocalScrollPositionRegistry: RuntimeRegistry {
 
   package func fingerprint(into builder: inout RuntimeRegistrationFingerprintBuilder) {
     for registration in snapshot() {
-      builder.add("scrollPosition", registration.identity.path)
-      builder.add("scrollPositionAxes", "\(registration.axes.rawValue)")
+      builder.add(.scrollPosition, .identity(registration.identity))
+      builder.add(.scrollPositionAxes, .axes(registration.axes))
       builder.add(
-        "scrollPositionResolvedOffset", "\(String(describing: registration.resolvedOffset))")
+        .scrollPositionResolvedOffset, .offset(registration.resolvedOffset))
     }
   }
 }
@@ -446,13 +445,13 @@ extension LocalLifecycleRegistry: RuntimeRegistry {
   package func fingerprint(into builder: inout RuntimeRegistrationFingerprintBuilder) {
     let snapshot = snapshot()
     for handlerID in snapshot.appearRegistrations.keys {
-      builder.add("lifecycleAppear", handlerID.description)
+      builder.add(.lifecycleAppear, .lifecycle(handlerID))
     }
     for handlerID in snapshot.disappearRegistrations.keys {
-      builder.add("lifecycleDisappear", handlerID.description)
+      builder.add(.lifecycleDisappear, .lifecycle(handlerID))
     }
     for handlerID in snapshot.changeRegistrations.keys {
-      builder.add("lifecycleChange", handlerID.description)
+      builder.add(.lifecycleChange, .lifecycle(handlerID))
     }
   }
 }
@@ -491,7 +490,7 @@ extension LocalTaskRegistry: RuntimeRegistry {
 
   package func fingerprint(into builder: inout RuntimeRegistrationFingerprintBuilder) {
     for (identity, registrations) in snapshot() {
-      builder.add("task", identity.path, count: registrations.count)
+      builder.add(.task, .identity(identity), count: registrations.count)
     }
   }
 }
@@ -528,8 +527,7 @@ extension LocalPreferenceObservationRegistry: RuntimeRegistry {
   package func fingerprint(into builder: inout RuntimeRegistrationFingerprintBuilder) {
     for registration in snapshot() {
       builder.add(
-        "preferenceObservation",
-        "\(registration.identity.path)#\(registration.handlerID)"
+        .preferenceObservation, .preference(registration.identity, registration.key)
       )
     }
   }
@@ -562,7 +560,7 @@ extension CommandRegistry: RuntimeRegistry {
 
   package func fingerprint(into builder: inout RuntimeRegistrationFingerprintBuilder) {
     for (identity, bindings) in snapshot().keyCommandsByScope {
-      builder.add("command", identity.path, count: bindings.count)
+      builder.add(.command, .identity(identity), count: bindings.count)
     }
   }
 }
@@ -594,7 +592,7 @@ extension DropDestinationRegistry: RuntimeRegistry {
 
   package func fingerprint(into builder: inout RuntimeRegistrationFingerprintBuilder) {
     for identity in snapshot().handlersByScope.keys {
-      builder.add("dropDestination", identity.path)
+      builder.add(.dropDestination, .identity(identity))
     }
   }
 }

@@ -1,4 +1,4 @@
-package struct ScrollOffset: Equatable, Sendable {
+package struct ScrollOffset: Hashable, Sendable {
   package var x: Int
   package var y: Int
 

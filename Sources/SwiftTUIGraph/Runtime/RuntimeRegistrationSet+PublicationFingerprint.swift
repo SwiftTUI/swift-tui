@@ -7,7 +7,7 @@ extension RuntimeRegistrationSet {
   /// republication). Used by the sampled publication oracle to compare a
   /// scoped restore against a scratch full rebuild — see
   /// ``ViewGraphFrameDraft/commitRuntimeRegistrations(from:)``.
-  package func publicationOracleFingerprint() -> [String: Int] {
+  package func publicationOracleFingerprint() -> [RegistrationFingerprintKey: Int] {
     var builder = RuntimeRegistrationFingerprintBuilder()
     for registry in allRegistries {
       registry.fingerprint(into: &builder)

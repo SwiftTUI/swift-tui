@@ -13,6 +13,19 @@ import Testing
 @MainActor
 @Suite("Registry lifecycle per kind")
 struct RuntimeRegistryLifecycleParameterizedTests {
+  @Test("pointer fingerprints pair across owner replacements and distinguish structural paths")
+  func pointerRoutePairing() {
+    let original = RouteID(identity: testIdentity("a/b"), ownerNodeID: .init(rawValue: 1))
+    let replaced = RouteID(identity: original.identity, ownerNodeID: .init(rawValue: 2))
+    let nested = RouteID(identity: testIdentity("a", "b"))
+    #expect(original != replaced)
+    #expect(original.pairsIgnoringOwner(with: replaced))
+    var builder = RuntimeRegistrationFingerprintBuilder()
+    for route in [original, replaced, nested] { builder.add(.pointer, .route(route.pairingKey)) }
+    #expect(builder.fingerprint.count == 2)
+    #expect(builder.fingerprint[.init(family: .pointer, subject: .route(original.pairingKey))] == 2)
+  }
+
   private func populatedSet(
     _ kind: RuntimeRegistrationKind,
     identity: Identity
@@ -73,7 +86,7 @@ struct RuntimeRegistryLifecycleParameterizedTests {
     let populated = set.publicationOracleFingerprint()
     #expect(!populated.isEmpty)
     #expect(
-      populated.keys.contains { $0.contains(child.path) },
+      populated.keys.contains { $0.description.contains(child.path) },
       "\(kind): the child's registration must be present before removal for this test to mean anything"
     )
 
@@ -83,12 +96,12 @@ struct RuntimeRegistryLifecycleParameterizedTests {
     #expect(remaining != populated, "removing \(kind)'s subtree changed nothing")
     for key in remaining.keys {
       #expect(
-        !key.contains(child.path),
+        !key.description.contains(child.path),
         "\(kind): subtree-owned fingerprint bucket survived removeSubtrees: \(key)"
       )
     }
     #expect(
-      remaining.keys.contains { $0.contains(sibling.path) },
+      remaining.keys.contains { $0.description.contains(sibling.path) },
       "\(kind): the sibling's registration should survive subtree removal"
     )
   }
@@ -141,10 +154,10 @@ struct RuntimeRegistryLifecycleParameterizedTests {
         "\(kind): state owned by a departed node must be dropped by prune"
       )
     } else if kind == .pointerHandler {
-      #expect(before.keys.contains { $0.hasPrefix("hover|") })
-      #expect(before.keys.contains { $0.hasPrefix("wheel|") })
+      #expect(before.keys.contains { $0.family == .hover })
+      #expect(before.keys.contains { $0.family == .wheel })
       #expect(!after.isEmpty)
-      #expect(after == before.filter { $0.key.hasPrefix("pointer|") })
+      #expect(after == before.filter { $0.key.family == .pointer })
     } else {
       #expect(
         after == before,

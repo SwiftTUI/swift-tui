@@ -18,7 +18,7 @@ public struct VerticalEdgeSet: OptionSet, Equatable, Sendable {
 }
 
 /// Option set describing horizontal and vertical participation.
-public struct AxisSet: OptionSet, Equatable, Sendable {
+public struct AxisSet: OptionSet, Hashable, Sendable {
   public let rawValue: UInt8
 
   public init(rawValue: UInt8) {

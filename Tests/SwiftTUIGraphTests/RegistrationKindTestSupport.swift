@@ -177,11 +177,9 @@ enum RegistrationKindDriver {
     )
   }
 
-  static func fingerprintNamespaces(_ fingerprint: [String: Int]) -> Set<String> {
-    Set(
-      fingerprint.keys.map { key in
-        String(key.prefix(while: { $0 != "|" }))
-      })
+  static func fingerprintNamespaces(_ fingerprint: [RegistrationFingerprintKey: Int]) -> Set<String>
+  {
+    Set(fingerprint.keys.map { $0.family.rawValue })
   }
 }
 

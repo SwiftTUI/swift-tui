@@ -65,7 +65,7 @@ struct AdversarialSetEControlLifetimeTests {
 func setECensus<Content: View>(_ h: StressRuntimeHarness<Content>) -> [String: Int] {
   var counts: [String: Int] = [:]
   for (key, count) in h.runLoop.runtimeRegistrations.publicationOracleFingerprint() {
-    counts[String(key.prefix { $0 != "|" }), default: 0] += count
+    counts[key.family.rawValue, default: 0] += count
   }
   // Count every stacked wheel contribution independently of the publication oracle.
   counts["wheel"] = h.runLoop.localPointerHandlerRegistry.snapshotWheel().values.reduce(0) {

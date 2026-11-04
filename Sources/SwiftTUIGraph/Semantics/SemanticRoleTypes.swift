@@ -218,9 +218,17 @@ public struct RouteID: Hashable, Sendable, CustomStringConvertible {
     self.ownerNodeID = ownerNodeID
   }
 
-  public var description: String {
-    "\(identity.path)#\(kind)"
+  /// A route's identity across owner-node replacements during an interaction.
+  package struct PairingKey: Hashable, Sendable, CustomStringConvertible {
+    package let identity: Identity
+    package let kind: RouteKind
+
+    package var description: String { "\(identity.path)#\(kind)" }
   }
+
+  package var pairingKey: PairingKey { PairingKey(identity: identity, kind: kind) }
+
+  public var description: String { pairingKey.description }
 
   /// Whether `other` addresses the same logical route regardless of which
   /// node minted it. A control whose chrome re-mints (e.g. under owner `.id`
@@ -230,6 +238,6 @@ public struct RouteID: Hashable, Sendable, CustomStringConvertible {
   /// safe to use as an explicit query while `==` stays strict for dictionary
   /// keys.
   package func pairsIgnoringOwner(with other: RouteID) -> Bool {
-    identity == other.identity && kind == other.kind
+    pairingKey == other.pairingKey
   }
 }

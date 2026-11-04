@@ -63,16 +63,73 @@ package struct RuntimeRegistrationRestoreContext: Sendable {
 /// and per-key counts are exactly the surface the scoped-restore bug class
 /// corrupts (missing, stale, or duplicated registrations after a partial
 /// republication).
+package struct RegistrationFingerprintKey: Hashable, Sendable, CustomStringConvertible {
+  package enum Family: String, CaseIterable, Sendable {
+    case action
+    case command
+    case defaultFocusCandidate
+    case defaultFocusScope
+    case dropDestination
+    case focusBinding
+    case focusBindingSource
+    case focusedValues
+    case gesture
+    case gestureState
+    case hover
+    case keyPress
+    case lifecycleAppear
+    case lifecycleChange
+    case lifecycleDisappear
+    case paste
+    case pointer
+    case preferenceObservation
+    case scrollPosition
+    case scrollPositionAxes
+    case scrollPositionResolvedOffset
+    case task
+    case termination
+    case wheel
+  }
+  package enum Subject: Hashable, Sendable {
+    case identity(Identity)
+    case route(RouteID.PairingKey)
+    case lifecycle(LifecycleHandlerID)
+    case focus(FocusBindingDomain, Identity, FocusBindingKey)
+    case preference(Identity, PreferenceObservationKey)
+    case axes(AxisSet)
+    case offset(ScrollOffset?)
+  }
+  package let family: Family
+  package let subject: Subject
+
+  package var description: String {
+    let label: String
+    switch subject {
+    case .identity(let id): label = id.path
+    case .route(let route): label = route.description
+    case .lifecycle(let id): label = id.description
+    case .focus(let domain, let id, let key): label = "\(domain):\(id.path)#\(key)"
+    case .preference(let id, let key): label = "\(id.path)#\(key)"
+    case .axes(let axes): label = String(axes.rawValue)
+    case .offset(let offset): label = String(describing: offset)
+    }
+    return "\(family.rawValue)|\(label)"
+  }
+}
+
 package struct RuntimeRegistrationFingerprintBuilder {
-  package private(set) var fingerprint: [String: Int] = [:]
+  package private(set) var fingerprint: [RegistrationFingerprintKey: Int] = [:]
 
   package init() {}
 
-  package mutating func add(_ registry: String, _ key: String, count: Int = 1) {
+  package mutating func add(
+    _ family: RegistrationFingerprintKey.Family, _ subject: RegistrationFingerprintKey.Subject,
+    count: Int = 1
+  ) {
     guard count > 0 else {
       return
     }
-    fingerprint["\(registry)|\(key)", default: 0] += count
+    fingerprint[.init(family: family, subject: subject), default: 0] += count
   }
 }
 
