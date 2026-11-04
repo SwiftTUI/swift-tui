@@ -265,7 +265,7 @@ package final class LifecycleCoordinator {
         // absorbed the planning pass's publication at that pass's commit
         // (`absorbPublishedRegistrations`). Run that closure against the state
         // the pass committed, before the view's disappear (STUI-1298).
-        if isCarried, let handler = previousLifecycleHandlers.appearHandlers[handlerID] {
+        if isCarried, let handler = previousLifecycleHandlers.appearHandler(for: handlerID) {
           CommittedOwnerHandlerScope.run(handler)
           continue
         }
@@ -273,7 +273,7 @@ package final class LifecycleCoordinator {
       }
     case .disappear(let handlerIDs):
       for handlerID in handlerIDs {
-        guard let handler = previousLifecycleHandlers.disappearHandlers[handlerID] else {
+        guard let handler = previousLifecycleHandlers.disappearHandler(for: handlerID) else {
           recordHandlerSkip(.disappear, entry: entry, handlerID: handlerID, into: &skipIssues)
           continue
         }
@@ -289,14 +289,14 @@ package final class LifecycleCoordinator {
         // removed resolves like a carried appear (STUI-1298). It is the
         // planning pass's own registration, not the reuse-adoption fallback
         // below.
-        if isCarried, let handler = previousLifecycleHandlers.changeHandlers[handlerID] {
+        if isCarried, let handler = previousLifecycleHandlers.changeHandler(for: handlerID) {
           CommittedOwnerHandlerScope.run(handler)
           continue
         }
         // Mirror the disappear path's previous-snapshot dispatch: content
         // that did not re-register this frame still owes its committed
         // callback (see changeHandlerSnapshotFallbackCount).
-        if let handler = previousLifecycleHandlers.changeHandlers[handlerID] {
+        if let handler = previousLifecycleHandlers.changeHandler(for: handlerID) {
           changeHandlerSnapshotFallbackCount += 1
           handler()
           continue
@@ -436,7 +436,7 @@ package final class LifecycleCoordinator {
   private func recordHandlerSkip(
     _ kind: LifecycleHandlerSkipKind,
     entry: LifecycleCommitEntry,
-    handlerID: String,
+    handlerID: LifecycleHandlerID,
     into skipIssues: inout [RuntimeIssue]
   ) {
     switch kind {

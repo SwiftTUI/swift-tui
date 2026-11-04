@@ -397,7 +397,7 @@ package struct HandlerDescriptorIntake {
     identity: Identity,
     ordinal: Int,
     handler: @escaping @MainActor @Sendable () -> Void
-  ) -> String? {
+  ) -> LifecycleHandlerID? {
     let scope = dispatchScope
     return context.localLifecycleRegistry?.registerAppear(
       identity: identity,
@@ -414,7 +414,7 @@ package struct HandlerDescriptorIntake {
     identity: Identity,
     ordinal: Int,
     handler: @escaping @MainActor @Sendable () -> Void
-  ) -> String? {
+  ) -> LifecycleHandlerID? {
     let scope = dispatchScope
     return context.localLifecycleRegistry?.registerDisappear(
       identity: identity,
@@ -431,7 +431,7 @@ package struct HandlerDescriptorIntake {
     identity: Identity,
     ordinal: Int,
     handler: @escaping @MainActor @Sendable () -> Void
-  ) -> String? {
+  ) -> LifecycleHandlerID? {
     let scope = dispatchScope
     return context.localLifecycleRegistry?.registerChange(
       identity: identity,

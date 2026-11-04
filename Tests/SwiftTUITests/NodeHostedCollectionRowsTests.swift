@@ -543,10 +543,10 @@ struct NodeHostedCollectionRowsTests {
 
     #expect(lifecycleNodes.count == 2)
     for node in lifecycleNodes {
-      for handlerID in node.lifecycleMetadata.appearHandlerIDs {
+      for handlerID in node.lifecycleMetadata.appearIDs {
         lifecycle.appearHandler(for: handlerID)?()
       }
-      for handlerID in node.lifecycleMetadata.disappearHandlerIDs {
+      for handlerID in node.lifecycleMetadata.disappearIDs {
         lifecycle.disappearHandler(for: handlerID)?()
       }
     }

@@ -4978,9 +4978,9 @@ final class StressRuntimeHarness<Content: View> {
 
   var lifecycleRegistrationCount: Int {
     let snapshot = runLoop.localLifecycleRegistry.snapshot()
-    return snapshot.appearHandlers.count
-      + snapshot.disappearHandlers.count
-      + snapshot.changeHandlers.count
+    return snapshot.appearRegistrations.count
+      + snapshot.disappearRegistrations.count
+      + snapshot.changeRegistrations.count
   }
 
   var actionRegistrationCount: Int {

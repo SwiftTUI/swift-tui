@@ -624,7 +624,7 @@ struct SwiftUISurfaceTests {
     #expect(box.events.isEmpty)
     #expect(initialArtifacts.commitPlan.lifecycle.map(\.identity) == [testIdentity("Root")])
     #expect(
-      initialArtifacts.commitPlan.lifecycle.map(\.operation) == [
+      initialArtifacts.commitPlan.lifecycle.map(\.operation.handlerLabels) == [
         .change(handlerIDs: ["Root#change[0]"])
       ]
     )
@@ -647,7 +647,7 @@ struct SwiftUISurfaceTests {
 
     #expect(updatedArtifacts.commitPlan.lifecycle.map(\.identity) == [testIdentity("Root")])
     #expect(
-      updatedArtifacts.commitPlan.lifecycle.map(\.operation) == [
+      updatedArtifacts.commitPlan.lifecycle.map(\.operation.handlerLabels) == [
         .change(handlerIDs: ["Root#change[0]"])
       ]
     )
@@ -721,7 +721,8 @@ struct SwiftUISurfaceTests {
           applyEnvironmentValues: true
         )
       )
-      let changeEvents = artifacts.commitPlan.lifecycle.compactMap { entry -> [String]? in
+      let changeEvents = artifacts.commitPlan.lifecycle.compactMap {
+        entry -> [LifecycleHandlerID]? in
         guard case .change(let handlerIDs) = entry.operation else {
           return nil
         }
@@ -804,7 +805,7 @@ struct SwiftUISurfaceTests {
 
     #expect(artifacts.commitPlan.lifecycle.map(\.identity) == [testIdentity("Root")])
     #expect(
-      artifacts.commitPlan.lifecycle.map(\.operation) == [
+      artifacts.commitPlan.lifecycle.map(\.operation.handlerLabels) == [
         .change(handlerIDs: ["Root#change[0]"])
       ]
     )
@@ -897,7 +898,7 @@ struct SwiftUISurfaceTests {
     let rowIdentity = testIdentity("Root", "VStack[0]", "true", "VStack[0]")
     #expect(shownArtifacts.commitPlan.lifecycle.map(\.identity) == [rowIdentity, rowIdentity])
     #expect(
-      shownArtifacts.commitPlan.lifecycle.map(\.operation) == [
+      shownArtifacts.commitPlan.lifecycle.map(\.operation.handlerLabels) == [
         .appear(handlerIDs: ["Root/VStack[0]/true/VStack[0]#appear[0]"]),
         .taskStart(
           .init(id: "Root/VStack[0]/true/VStack[0]#task[id:1]", priority: .userInitiated)),
@@ -917,7 +918,7 @@ struct SwiftUISurfaceTests {
     #expect(updatedTaskArtifacts.commitPlan.lifecycle.map { $0.viewNodeID != nil } == [true, true])
     #expect(removedArtifacts.commitPlan.lifecycle.map(\.identity) == [rowIdentity, rowIdentity])
     #expect(
-      removedArtifacts.commitPlan.lifecycle.map(\.operation) == [
+      removedArtifacts.commitPlan.lifecycle.map(\.operation.handlerLabels) == [
         .taskCancel(
           .init(id: "Root/VStack[0]/true/VStack[0]#task[id:2]", priority: .userInitiated)),
         .disappear(handlerIDs: ["Root/VStack[0]/true/VStack[0]#disappear[0]"]),
@@ -7417,8 +7418,8 @@ struct SwiftUISurfaceTests {
       context: .init(identity: testIdentity("Vertical"))
     )
 
-    #expect(horizontalResolved.kind == .view(.init("HStackLayout")))
-    #expect(verticalResolved.kind == .view(.init("VStackLayout")))
+    #expect(horizontalResolved.kind == .view(.init("HStackLayout", custom: true)))
+    #expect(verticalResolved.kind == .view(.init("VStackLayout", custom: true)))
     #expect(
       horizontalResolved.children.map(\.identity) == [
         testIdentity("Root", "Layout[0]"),
@@ -7459,7 +7460,7 @@ struct SwiftUISurfaceTests {
       context: .init(identity: testIdentity("Root"))
     )
 
-    #expect(resolved.kind == .view(.init("HStackLayout")))
+    #expect(resolved.kind == .view(.init("HStackLayout", custom: true)))
     #expect(resolved.children.map(resolvedNodeLabelText(from:)) == ["A", "B", "C"])
     #expect(
       artifacts.placedTree.children.map(\.bounds.origin) == [
@@ -7480,7 +7481,7 @@ struct SwiftUISurfaceTests {
       context: .init(identity: testIdentity("Root"))
     )
 
-    #expect(artifacts.resolvedTree.kind == .view(.init("GappedRowLayout")))
+    #expect(artifacts.resolvedTree.kind == .view(.init("GappedRowLayout", custom: true)))
     #expect(
       artifacts.resolvedTree.children[0].layoutMetadata.layoutValues == [
         String(reflecting: GapAfterKey.self): "2"

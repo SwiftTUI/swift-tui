@@ -122,7 +122,7 @@ extension ViewNode {
     package var dependencies: DependencySet = .init()
     package var lifecycleState: NodeLifecycleState = .alive
     package var registeredHandlers: NodeHandlers = .init()
-    package var pendingChangeHandlerIDs: [String] = []
+    package var pendingChangeHandlerIDs: [LifecycleHandlerID] = []
     /// The most recent entity this node homed (recorded by every
     /// `bindEntityRoute`), deliberately NOT cleared when the frame barrier
     /// releases an inactive route. A collapsed `.id` chain folds its state

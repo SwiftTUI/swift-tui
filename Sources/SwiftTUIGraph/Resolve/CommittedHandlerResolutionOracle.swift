@@ -91,7 +91,7 @@ package enum CommittedHandlerResolutionOracle {
     guard let registry else {
       return
     }
-    for handlerID in node.lifecycleMetadata.appearHandlerIDs {
+    for handlerID in node.lifecycleMetadata.appearIDs {
       guard findings.count < maximumFindingsPerFamily else {
         return
       }
@@ -99,7 +99,7 @@ package enum CommittedHandlerResolutionOracle {
         findings.append("appear:\(handlerID)")
       }
     }
-    for handlerID in node.lifecycleMetadata.disappearHandlerIDs {
+    for handlerID in node.lifecycleMetadata.disappearIDs {
       guard findings.count < maximumFindingsPerFamily else {
         return
       }

@@ -17,52 +17,57 @@ package enum LifecycleHandlerKeySuffix: Hashable, Sendable, CustomStringConverti
 
 package typealias LifecycleHandlerKey = ViewNodeRuntimeKey<LifecycleHandlerKeySuffix>
 
+package enum LifecycleHandlerID: Hashable, Sendable, CustomStringConvertible,
+  ExpressibleByStringLiteral
+{
+  case registered(identity: Identity, key: LifecycleHandlerKey)
+  case legacy(String)
+
+  package init(stringLiteral value: String) { self = .legacy(value) }
+
+  @MainActor package static func current(_ identity: Identity, _ suffix: LifecycleHandlerKeySuffix)
+    -> Self
+  {
+    .registered(
+      identity: identity,
+      key: .init(ownerNodeID: ViewNodeContext.current?.viewNodeID, suffix: suffix))
+  }
+
+  package var description: String {
+    switch self {
+    case .registered(let identity, let key): "\(identity)#\(key.suffix)"
+    case .legacy(let label): label
+    }
+  }
+}
+
 package struct LifecycleHandlerRegistration: Sendable {
-  package var identity: Identity
-  package var key: LifecycleHandlerKey
-  package var handlerID: String
-  package var handler: LocalLifecycleRegistry.Handler
-  /// Monotonic registration order within one registry, stamped at record
-  /// time. Two owners minting the same handlerID string (one identity +
-  /// ordinal registered by two nodes) collapse deterministically to the
-  /// LATEST registration wherever a string-keyed view is built (F130) —
-  /// the previous dictionary-order collapse was nondeterministic.
-  package var recency: UInt64
+  package let identity: Identity
+  package let handlerID: LifecycleHandlerID
+  package let handler: LocalLifecycleRegistry.Handler
 
   package init(
-    identity: Identity,
-    key: LifecycleHandlerKey,
-    handlerID: String? = nil,
-    recency: UInt64 = 0,
-    handler: @escaping LocalLifecycleRegistry.Handler
+    identity: Identity, key: LifecycleHandlerKey, handler: @escaping LocalLifecycleRegistry.Handler
   ) {
     self.identity = identity
-    self.key = key
-    self.handlerID = handlerID ?? "\(identity)#\(key.suffix)"
-    self.recency = recency
+    self.handlerID = .registered(identity: identity, key: key)
     self.handler = handler
   }
 }
 
 package struct LifecycleHandlerSnapshot: Sendable {
-  package var appearHandlers: [String: LocalLifecycleRegistry.Handler]
-  package var disappearHandlers: [String: LocalLifecycleRegistry.Handler]
-  package var changeHandlers: [String: LocalLifecycleRegistry.Handler]
-  package var appearRegistrations: [LifecycleHandlerKey: LifecycleHandlerRegistration]
-  package var disappearRegistrations: [LifecycleHandlerKey: LifecycleHandlerRegistration]
-  package var changeRegistrations: [LifecycleHandlerKey: LifecycleHandlerRegistration]
+  package var appearRegistrations: [LifecycleHandlerID: LifecycleHandlerRegistration]
+  package var disappearRegistrations: [LifecycleHandlerID: LifecycleHandlerRegistration]
+  package var changeRegistrations: [LifecycleHandlerID: LifecycleHandlerRegistration]
 
   package init(
-    appearRegistrations: [LifecycleHandlerKey: LifecycleHandlerRegistration] = [:],
-    disappearRegistrations: [LifecycleHandlerKey: LifecycleHandlerRegistration] = [:],
-    changeRegistrations: [LifecycleHandlerKey: LifecycleHandlerRegistration] = [:]
+    appearRegistrations: [LifecycleHandlerID: LifecycleHandlerRegistration] = [:],
+    disappearRegistrations: [LifecycleHandlerID: LifecycleHandlerRegistration] = [:],
+    changeRegistrations: [LifecycleHandlerID: LifecycleHandlerRegistration] = [:]
   ) {
     self.appearRegistrations = appearRegistrations
     self.disappearRegistrations = disappearRegistrations
     self.changeRegistrations = changeRegistrations
-    self.appearHandlers = Self.handlersByID(self.appearRegistrations)
-    self.disappearHandlers = Self.handlersByID(self.disappearRegistrations)
-    self.changeHandlers = Self.handlersByID(self.changeRegistrations)
   }
 
   package var isEmpty: Bool {
@@ -74,22 +79,19 @@ package struct LifecycleHandlerSnapshot: Sendable {
   package mutating func recordAppear(
     _ registration: LifecycleHandlerRegistration
   ) {
-    appearRegistrations[registration.key] = registration
-    appearHandlers[registration.handlerID] = registration.handler
+    appearRegistrations[registration.handlerID] = registration
   }
 
   package mutating func recordDisappear(
     _ registration: LifecycleHandlerRegistration
   ) {
-    disappearRegistrations[registration.key] = registration
-    disappearHandlers[registration.handlerID] = registration.handler
+    disappearRegistrations[registration.handlerID] = registration
   }
 
   package mutating func recordChange(
     _ registration: LifecycleHandlerRegistration
   ) {
-    changeRegistrations[registration.key] = registration
-    changeHandlers[registration.handlerID] = registration.handler
+    changeRegistrations[registration.handlerID] = registration
   }
 
   /// Overlays `newer`'s registrations onto this snapshot, letting the newer
@@ -103,9 +105,6 @@ package struct LifecycleHandlerSnapshot: Sendable {
     appearRegistrations.merge(newer.appearRegistrations) { _, newer in newer }
     disappearRegistrations.merge(newer.disappearRegistrations) { _, newer in newer }
     changeRegistrations.merge(newer.changeRegistrations) { _, newer in newer }
-    appearHandlers = Self.handlersByID(appearRegistrations)
-    disappearHandlers = Self.handlersByID(disappearRegistrations)
-    changeHandlers = Self.handlersByID(changeRegistrations)
   }
 
   /// Drops every registration whose identity sits at or below one of
@@ -124,9 +123,6 @@ package struct LifecycleHandlerSnapshot: Sendable {
     appearRegistrations = appearRegistrations.filter { !matches($0.value) }
     disappearRegistrations = disappearRegistrations.filter { !matches($0.value) }
     changeRegistrations = changeRegistrations.filter { !matches($0.value) }
-    appearHandlers = Self.handlersByID(appearRegistrations)
-    disappearHandlers = Self.handlersByID(disappearRegistrations)
-    changeHandlers = Self.handlersByID(changeRegistrations)
   }
 
   /// Merges a departing node's lifecycle registrations into this snapshot,
@@ -137,46 +133,42 @@ package struct LifecycleHandlerSnapshot: Sendable {
     appearRegistrations.merge(departing.appearRegistrations) { current, _ in current }
     disappearRegistrations.merge(departing.disappearRegistrations) { current, _ in current }
     changeRegistrations.merge(departing.changeRegistrations) { current, _ in current }
-    appearHandlers.merge(departing.appearHandlers) { current, _ in current }
-    disappearHandlers.merge(departing.disappearHandlers) { current, _ in current }
-    changeHandlers.merge(departing.changeHandlers) { current, _ in current }
   }
 
-  private static func handlersByID(
-    _ registrations: [LifecycleHandlerKey: LifecycleHandlerRegistration]
-  ) -> [String: LocalLifecycleRegistry.Handler] {
-    // Two owners at one identity+ordinal share a handlerID string; the
-    // LATEST registration wins deterministically (dictionary-order
-    // uniquing was nondeterministic — F130).
-    var winners: [String: LifecycleHandlerRegistration] = [:]
-    for registration in registrations.values {
-      if let current = winners[registration.handlerID],
-        current.recency >= registration.recency
-      {
-        continue
-      }
-      winners[registration.handlerID] = registration
+  /// Public metadata created with the older string initializer can still name a
+  /// unique registration. A label shared by two owners cannot identify either one.
+  fileprivate static func handler(
+    for id: LifecycleHandlerID,
+    in registrations: [LifecycleHandlerID: LifecycleHandlerRegistration]
+  ) -> LocalLifecycleRegistry.Handler? {
+    if case .legacy(let label) = id {
+      var matches = registrations.values.lazy.filter { $0.handlerID.description == label }
+        .makeIterator()
+      guard let match = matches.next(), matches.next() == nil else { return nil }
+      return match.handler
     }
-    return winners.mapValues(\.handler)
+    return registrations[id]?.handler
   }
+
+  package func appearHandler(for id: LifecycleHandlerID) -> LocalLifecycleRegistry.Handler? {
+    Self.handler(for: id, in: appearRegistrations)
+  }
+  package func disappearHandler(for id: LifecycleHandlerID) -> LocalLifecycleRegistry.Handler? {
+    Self.handler(for: id, in: disappearRegistrations)
+  }
+  package func changeHandler(for id: LifecycleHandlerID) -> LocalLifecycleRegistry.Handler? {
+    Self.handler(for: id, in: changeRegistrations)
+  }
+
 }
 
 @MainActor
 package final class LocalLifecycleRegistry: Equatable {
   package typealias Handler = @MainActor @Sendable () -> Void
 
-  private var appearRegistrations: [LifecycleHandlerKey: LifecycleHandlerRegistration] = [:]
-  private var disappearRegistrations: [LifecycleHandlerKey: LifecycleHandlerRegistration] = [:]
-  private var changeRegistrations: [LifecycleHandlerKey: LifecycleHandlerRegistration] = [:]
-  /// String handlerID → the LATEST registration's typed key, maintained at
-  /// every mutation so dispatch is a dictionary lookup instead of an O(n)
-  /// value scan (F130). Shared across the three kinds: handlerIDs embed
-  /// their suffix, so the namespaces cannot collide.
-  private var handlerKeysByID: [String: LifecycleHandlerKey] = [:]
-  /// Monotonic registration order, stamped onto each registration so
-  /// same-handlerID collisions collapse deterministically to the latest.
-  private var nextRegistrationRecency: UInt64 = 0
-
+  private var appearRegistrations: [LifecycleHandlerID: LifecycleHandlerRegistration] = [:]
+  private var disappearRegistrations: [LifecycleHandlerID: LifecycleHandlerRegistration] = [:]
+  private var changeRegistrations: [LifecycleHandlerID: LifecycleHandlerRegistration] = [:]
   package init() {}
 
   nonisolated package static func == (
@@ -191,7 +183,7 @@ package final class LocalLifecycleRegistry: Equatable {
     identity: Identity,
     ordinal: Int,
     handler: @escaping Handler
-  ) -> String {
+  ) -> LifecycleHandlerID {
     let registration = registration(
       identity: identity,
       suffix: .appear(ordinal: ordinal),
@@ -206,7 +198,7 @@ package final class LocalLifecycleRegistry: Equatable {
     identity: Identity,
     ordinal: Int,
     handler: @escaping Handler
-  ) -> String {
+  ) -> LifecycleHandlerID {
     let registration = registration(
       identity: identity,
       suffix: .disappear(ordinal: ordinal),
@@ -221,7 +213,7 @@ package final class LocalLifecycleRegistry: Equatable {
     identity: Identity,
     ordinal: Int,
     handler: @escaping Handler
-  ) -> String {
+  ) -> LifecycleHandlerID {
     let registration = registration(
       identity: identity,
       suffix: .change(ordinal: ordinal),
@@ -232,28 +224,27 @@ package final class LocalLifecycleRegistry: Equatable {
   }
 
   package func appearHandler(
-    for handlerID: String
+    for handlerID: LifecycleHandlerID
   ) -> Handler? {
-    handlerKeysByID[handlerID].flatMap { appearRegistrations[$0]?.handler }
+    LifecycleHandlerSnapshot.handler(for: handlerID, in: appearRegistrations)
   }
 
   package func disappearHandler(
-    for handlerID: String
+    for handlerID: LifecycleHandlerID
   ) -> Handler? {
-    handlerKeysByID[handlerID].flatMap { disappearRegistrations[$0]?.handler }
+    LifecycleHandlerSnapshot.handler(for: handlerID, in: disappearRegistrations)
   }
 
   package func changeHandler(
-    for handlerID: String
+    for handlerID: LifecycleHandlerID
   ) -> Handler? {
-    handlerKeysByID[handlerID].flatMap { changeRegistrations[$0]?.handler }
+    LifecycleHandlerSnapshot.handler(for: handlerID, in: changeRegistrations)
   }
 
   package func reset() {
     appearRegistrations.removeAll(keepingCapacity: true)
     disappearRegistrations.removeAll(keepingCapacity: true)
     changeRegistrations.removeAll(keepingCapacity: true)
-    handlerKeysByID.removeAll(keepingCapacity: true)
   }
 
   package func removeSubtrees(
@@ -266,7 +257,6 @@ package final class LocalLifecycleRegistry: Equatable {
     removeSubtrees(rootedAt: roots, from: &appearRegistrations)
     removeSubtrees(rootedAt: roots, from: &disappearRegistrations)
     removeSubtrees(rootedAt: roots, from: &changeRegistrations)
-    rebuildHandlerIDIndex()
   }
 
   package func snapshot() -> LifecycleHandlerSnapshot {
@@ -280,66 +270,37 @@ package final class LocalLifecycleRegistry: Equatable {
   package func restore(
     _ snapshot: LifecycleHandlerSnapshot
   ) {
-    guard
-      !snapshot.appearHandlers.isEmpty
-        || !snapshot.disappearHandlers.isEmpty
-        || !snapshot.changeHandlers.isEmpty
-    else {
-      return
-    }
+    guard !snapshot.isEmpty else { return }
 
     for registration in snapshot.appearRegistrations.values {
-      appearRegistrations[registration.key] = registration
+      appearRegistrations[registration.handlerID] = registration
     }
     for registration in snapshot.disappearRegistrations.values {
-      disappearRegistrations[registration.key] = registration
+      disappearRegistrations[registration.handlerID] = registration
     }
     for registration in snapshot.changeRegistrations.values {
-      changeRegistrations[registration.key] = registration
-    }
-    rebuildHandlerIDIndex()
-  }
-
-  /// Rebuilds the string index from every surviving registration, latest
-  /// recency winning. Runs on the non-hot mutation paths (teardown,
-  /// restore); per-record maintenance covers the hot registration path.
-  private func rebuildHandlerIDIndex() {
-    handlerKeysByID.removeAll(keepingCapacity: true)
-    var winners: [String: UInt64] = [:]
-    for registrations in [appearRegistrations, disappearRegistrations, changeRegistrations] {
-      for registration in registrations.values {
-        if let current = winners[registration.handlerID],
-          current >= registration.recency
-        {
-          continue
-        }
-        winners[registration.handlerID] = registration.recency
-        handlerKeysByID[registration.handlerID] = registration.key
-      }
+      changeRegistrations[registration.handlerID] = registration
     }
   }
 
   private func recordAppear(
     _ registration: LifecycleHandlerRegistration
   ) {
-    appearRegistrations[registration.key] = registration
-    handlerKeysByID[registration.handlerID] = registration.key
+    appearRegistrations[registration.handlerID] = registration
     ViewNodeContext.current?.recordLifecycleAppearRegistration(registration)
   }
 
   private func recordDisappear(
     _ registration: LifecycleHandlerRegistration
   ) {
-    disappearRegistrations[registration.key] = registration
-    handlerKeysByID[registration.handlerID] = registration.key
+    disappearRegistrations[registration.handlerID] = registration
     ViewNodeContext.current?.recordLifecycleDisappearRegistration(registration)
   }
 
   private func recordChange(
     _ registration: LifecycleHandlerRegistration
   ) {
-    changeRegistrations[registration.key] = registration
-    handlerKeysByID[registration.handlerID] = registration.key
+    changeRegistrations[registration.handlerID] = registration
     ViewNodeContext.current?.recordLifecycleChangeRegistration(registration)
   }
 
@@ -352,19 +313,16 @@ package final class LocalLifecycleRegistry: Equatable {
       ownerNodeID: ViewNodeContext.current?.viewNodeID,
       suffix: suffix
     )
-    // 64-bit wraparound is deliberately unguarded (F122): unreachable in practice, and the recency comparisons assume no value reuse.
-    nextRegistrationRecency &+= 1
     return LifecycleHandlerRegistration(
       identity: identity,
       key: key,
-      recency: nextRegistrationRecency,
       handler: handler
     )
   }
 
   private func removeSubtrees(
     rootedAt roots: [Identity],
-    from registrations: inout [LifecycleHandlerKey: LifecycleHandlerRegistration]
+    from registrations: inout [LifecycleHandlerID: LifecycleHandlerRegistration]
   ) {
     registrations = registrations.filter { _, registration in
       !identityMatchesAnySubtreeRoot(

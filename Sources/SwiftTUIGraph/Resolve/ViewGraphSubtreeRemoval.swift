@@ -472,7 +472,7 @@ extension ViewGraph {
       }
     }
     if emitsOwnLifecycleEvents,
-      !lifecycleMetadata.disappearHandlerIDs.isEmpty
+      !lifecycleMetadata.disappearIDs.isEmpty
     {
       // Keyed by the handler IDs, mirroring `appendStructuralAppearEvent`: a
       // single-child flattening absorber and the lone `ForEach` element it
@@ -481,7 +481,7 @@ extension ViewGraph {
       // edge). Whichever the cascade reaches first publishes; the second is
       // the same registration (org task T171).
       let operation = LifecycleCommitOperation.disappear(
-        handlerIDs: lifecycleMetadata.disappearHandlerIDs
+        handlerIDs: lifecycleMetadata.disappearIDs
       )
       if !structuralDisappearEvents.contains(where: { $0.operation == operation }) {
         structuralDisappearEvents.append(

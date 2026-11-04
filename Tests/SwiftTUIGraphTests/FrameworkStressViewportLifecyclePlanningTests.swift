@@ -752,8 +752,8 @@ private func lifecycleStateNode(
   LifecycleStateNode(
     viewNodeID: nodeID,
     identity: identity,
-    appearHandlerIDs: appear,
-    disappearHandlerIDs: disappear,
+    appearHandlerIDs: appear.map(LifecycleHandlerID.legacy),
+    disappearHandlerIDs: disappear.map(LifecycleHandlerID.legacy),
     tasks: tasks
   )
 }

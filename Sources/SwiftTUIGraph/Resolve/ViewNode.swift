@@ -186,7 +186,7 @@ package final class ViewNode {
     get { frameState.currentBodyStateSlotCount }
     set { frameState.currentBodyStateSlotCount = newValue }
   }
-  package private(set) var pendingChangeHandlerIDs: [String] {
+  package private(set) var pendingChangeHandlerIDs: [LifecycleHandlerID] {
     get { persistentState.pendingChangeHandlerIDs }
     set { persistentState.pendingChangeHandlerIDs = newValue }
   }
@@ -1083,7 +1083,7 @@ package final class ViewNode {
   }
 
   package func queueChangeHandler(
-    _ handlerID: String
+    _ handlerID: LifecycleHandlerID
   ) {
     guard !pendingChangeHandlerIDs.contains(handlerID) else {
       return

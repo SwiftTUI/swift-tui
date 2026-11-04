@@ -27,7 +27,7 @@ struct CustomLayoutContainerContractRenderTests {
     )
 
     let ribbon = artifacts.resolvedTree.children[0]
-    #expect(ribbon.kind == .view(.init("RibbonLayout")))
+    #expect(ribbon.kind == .view(.init("RibbonLayout", custom: true)))
     #expect(ribbon.children.count == 4)
     let spacer = ribbon.children[1]
     let divider = ribbon.children[2]

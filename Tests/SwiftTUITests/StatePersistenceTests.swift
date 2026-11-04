@@ -91,7 +91,7 @@ struct StatePersistenceTests {
         testIdentity("StatefulOnChangeInitial")
       ])
     #expect(
-      artifacts.commitPlan.lifecycle.map(\.operation) == [
+      artifacts.commitPlan.lifecycle.map(\.operation.handlerLabels) == [
         .change(handlerIDs: ["StatefulOnChangeInitial#change[0]"])
       ])
     #expect(artifacts.commitPlan.lifecycle.map { $0.viewNodeID != nil } == [true])
@@ -146,7 +146,7 @@ struct StatePersistenceTests {
         testIdentity("StatefulOnChangeRerender")
       ])
     #expect(
-      updated.commitPlan.lifecycle.map(\.operation) == [
+      updated.commitPlan.lifecycle.map(\.operation.handlerLabels) == [
         .change(handlerIDs: ["StatefulOnChangeRerender#change[0]"])
       ])
     #expect(updated.commitPlan.lifecycle.map { $0.viewNodeID != nil } == [true])

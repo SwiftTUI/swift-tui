@@ -244,8 +244,8 @@ enum ViewGraphLifecyclePlanner {
       var currentNode = LifecycleStateNode(
         viewNodeID: nodeIDByIdentity[node.identity],
         identity: node.identity,
-        appearHandlerIDs: node.lifecycleMetadata.appearHandlerIDs,
-        disappearHandlerIDs: node.lifecycleMetadata.disappearHandlerIDs,
+        appearHandlerIDs: node.lifecycleMetadata.appearIDs,
+        disappearHandlerIDs: node.lifecycleMetadata.disappearIDs,
         tasks: node.lifecycleMetadata.tasks
       )
       let previousNode: LifecycleStateNode?

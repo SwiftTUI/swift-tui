@@ -118,13 +118,13 @@ public struct AppearLifecycleModifier: IterativePrimitiveViewModifier {
       let handlerID =
         intake.registerAppearHandler(
           identity: node.identity,
-          ordinal: node.lifecycleMetadata.appearHandlerIDs.count,
+          ordinal: node.lifecycleMetadata.appearIDs.count,
           handler: {
             lifecycleAction()
           }
-        ) ?? "\(node.identity)#appear[\(node.lifecycleMetadata.appearHandlerIDs.count)]"
+        ) ?? .current(node.identity, .appear(ordinal: node.lifecycleMetadata.appearIDs.count))
       node.lifecycleMetadata = node.lifecycleMetadata.merging(
-        .init(appearHandlerIDs: [handlerID])
+        .init(appearIDs: [handlerID], disappearIDs: [])
       )
       return [node]
 
@@ -154,13 +154,13 @@ public struct DisappearLifecycleModifier: IterativePrimitiveViewModifier {
       let handlerID =
         intake.registerDisappearHandler(
           identity: node.identity,
-          ordinal: node.lifecycleMetadata.disappearHandlerIDs.count,
+          ordinal: node.lifecycleMetadata.disappearIDs.count,
           handler: {
             lifecycleAction()
           }
-        ) ?? "\(node.identity)#disappear[\(node.lifecycleMetadata.disappearHandlerIDs.count)]"
+        ) ?? .current(node.identity, .disappear(ordinal: node.lifecycleMetadata.disappearIDs.count))
       node.lifecycleMetadata = node.lifecycleMetadata.merging(
-        .init(disappearHandlerIDs: [handlerID])
+        .init(appearIDs: [], disappearIDs: [handlerID])
       )
       return [node]
 
@@ -277,7 +277,7 @@ public struct ChangeLifecycleModifier<Value: Equatable>: IterativePrimitiveViewM
           handler: {
             lifecycleAction(oldValue, value)
           }
-        ) ?? "\(node.identity)#change[\(modifierOrdinal)]"
+        ) ?? .current(node.identity, .change(ordinal: modifierOrdinal))
       eventOwnerNode?.queueChangeHandler(handlerID)
       return [node]
 

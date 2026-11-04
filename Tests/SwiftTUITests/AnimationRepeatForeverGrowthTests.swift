@@ -288,8 +288,8 @@ struct AnimationRepeatForeverGrowthTests {
       let controller = runLoop.renderer.internalAnimationController
       let initialActive = controller.activeAnimationCount
       let initialLifecycleSnapshot = runLoop.localLifecycleRegistry.snapshot()
-      let initialAppearHandlers = initialLifecycleSnapshot.appearHandlers.count
-      let initialDisappearHandlers = initialLifecycleSnapshot.disappearHandlers.count
+      let initialAppearHandlers = initialLifecycleSnapshot.appearRegistrations.count
+      let initialDisappearHandlers = initialLifecycleSnapshot.disappearRegistrations.count
 
       #expect(
         initialActive > 0,
@@ -331,8 +331,8 @@ struct AnimationRepeatForeverGrowthTests {
         measuredNodeCounts.append(artifacts.diagnostics.work.measuredNodesComputed)
         activeCounts.append(controller.activeAnimationCount)
         let lifecycleSnapshot = runLoop.localLifecycleRegistry.snapshot()
-        appearHandlerCounts.append(lifecycleSnapshot.appearHandlers.count)
-        disappearHandlerCounts.append(lifecycleSnapshot.disappearHandlers.count)
+        appearHandlerCounts.append(lifecycleSnapshot.appearRegistrations.count)
+        disappearHandlerCounts.append(lifecycleSnapshot.disappearRegistrations.count)
       }
 
       #expect(
@@ -439,8 +439,8 @@ struct AnimationRepeatForeverGrowthTests {
       )
 
       var activeCounts: [Int] = [initialActive]
-      var appearHandlerCounts: [Int] = [initialLifecycleSnapshot.appearHandlers.count]
-      var disappearHandlerCounts: [Int] = [initialLifecycleSnapshot.disappearHandlers.count]
+      var appearHandlerCounts: [Int] = [initialLifecycleSnapshot.appearRegistrations.count]
+      var disappearHandlerCounts: [Int] = [initialLifecycleSnapshot.disappearRegistrations.count]
       var resolvedNodeTotals: [Int] = []
       var placedNodeTotals: [Int] = []
       var resolvedNodeCounts: [Int] = []
@@ -475,8 +475,8 @@ struct AnimationRepeatForeverGrowthTests {
         measuredNodeCounts.append(artifacts.diagnostics.work.measuredNodesComputed)
         activeCounts.append(controller.activeAnimationCount)
         let lifecycleSnapshot = runLoop.localLifecycleRegistry.snapshot()
-        appearHandlerCounts.append(lifecycleSnapshot.appearHandlers.count)
-        disappearHandlerCounts.append(lifecycleSnapshot.disappearHandlers.count)
+        appearHandlerCounts.append(lifecycleSnapshot.appearRegistrations.count)
+        disappearHandlerCounts.append(lifecycleSnapshot.disappearRegistrations.count)
       }
 
       #expect(

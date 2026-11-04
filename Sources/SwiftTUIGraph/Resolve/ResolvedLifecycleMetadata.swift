@@ -3,8 +3,17 @@
 /// `tasks` accumulates in modifier-chain order so multiple `.task` modifiers on
 /// one view node coexist like multiple appear/disappear handlers.
 public struct LifecycleMetadata: Equatable, Sendable {
-  public var appearHandlerIDs: [String]
-  public var disappearHandlerIDs: [String]
+  package var appearIDs: [LifecycleHandlerID]
+  package var disappearIDs: [LifecycleHandlerID]
+
+  public var appearHandlerIDs: [String] {
+    get { appearIDs.map(\.description) }
+    set { appearIDs = newValue.map(LifecycleHandlerID.legacy) }
+  }
+  public var disappearHandlerIDs: [String] {
+    get { disappearIDs.map(\.description) }
+    set { disappearIDs = newValue.map(LifecycleHandlerID.legacy) }
+  }
   public var tasks: [TaskDescriptor]
   /// Observers accumulated on this resolved element, in inner-first order.
   /// Graph identity aliases can change while a modifier chain unwinds.
@@ -15,21 +24,30 @@ public struct LifecycleMetadata: Equatable, Sendable {
     disappearHandlerIDs: [String] = [],
     tasks: [TaskDescriptor] = []
   ) {
-    self.appearHandlerIDs = appearHandlerIDs
-    self.disappearHandlerIDs = disappearHandlerIDs
+    self.init(
+      appearIDs: appearHandlerIDs.map(LifecycleHandlerID.legacy),
+      disappearIDs: disappearHandlerIDs.map(LifecycleHandlerID.legacy), tasks: tasks)
+  }
+
+  package init(
+    appearIDs: [LifecycleHandlerID], disappearIDs: [LifecycleHandlerID],
+    tasks: [TaskDescriptor] = []
+  ) {
+    self.appearIDs = appearIDs
+    self.disappearIDs = disappearIDs
     self.tasks = tasks
   }
 
   public var isEmpty: Bool {
-    appearHandlerIDs.isEmpty
-      && disappearHandlerIDs.isEmpty
+    appearIDs.isEmpty
+      && disappearIDs.isEmpty
       && tasks.isEmpty
   }
 
   public func merging(_ other: Self) -> Self {
     var merged = Self(
-      appearHandlerIDs: appearHandlerIDs + other.appearHandlerIDs,
-      disappearHandlerIDs: disappearHandlerIDs + other.disappearHandlerIDs,
+      appearIDs: appearIDs + other.appearIDs,
+      disappearIDs: disappearIDs + other.disappearIDs,
       tasks: tasks + other.tasks
     )
     merged.changeObservationCount = changeObservationCount + other.changeObservationCount

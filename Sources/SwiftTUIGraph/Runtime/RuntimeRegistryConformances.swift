@@ -445,14 +445,14 @@ extension LocalLifecycleRegistry: RuntimeRegistry {
 
   package func fingerprint(into builder: inout RuntimeRegistrationFingerprintBuilder) {
     let snapshot = snapshot()
-    for handlerID in snapshot.appearHandlers.keys {
-      builder.add("lifecycleAppear", handlerID)
+    for handlerID in snapshot.appearRegistrations.keys {
+      builder.add("lifecycleAppear", handlerID.description)
     }
-    for handlerID in snapshot.disappearHandlers.keys {
-      builder.add("lifecycleDisappear", handlerID)
+    for handlerID in snapshot.disappearRegistrations.keys {
+      builder.add("lifecycleDisappear", handlerID.description)
     }
-    for handlerID in snapshot.changeHandlers.keys {
-      builder.add("lifecycleChange", handlerID)
+    for handlerID in snapshot.changeRegistrations.keys {
+      builder.add("lifecycleChange", handlerID.description)
     }
   }
 }

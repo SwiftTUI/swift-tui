@@ -173,7 +173,6 @@ enum RegistrationKindDriver {
     LifecycleHandlerRegistration(
       identity: identity,
       key: LifecycleHandlerKey(ownerNodeID: node.viewNodeID, suffix: suffix),
-      handlerID: "\(identity.path)#\(suffix)",
       handler: {}
     )
   }

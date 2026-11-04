@@ -229,7 +229,7 @@ struct LayoutAndRenderingPipelineTests {
         testIdentity("Root"),
       ])
     #expect(
-      artifacts.commitPlan.lifecycle.map(\.operation) == [
+      artifacts.commitPlan.lifecycle.map(\.operation.handlerLabels) == [
         .appear(handlerIDs: ["Root#appear[0]"]),
         .taskStart(.init(id: "Root#task", priority: .userInitiated)),
       ]
@@ -320,4 +320,16 @@ private func isPaintedCell(
   _ cell: RasterCell
 ) -> Bool {
   cell.character != " " || cell.style != nil
+}
+
+extension LifecycleCommitOperation {
+  /// Compare public spellings in rendering fixtures. The registry tests exercise owner identity.
+  var handlerLabels: Self {
+    switch self {
+    case .appear(let ids): .appear(handlerIDs: ids.map { .legacy($0.description) })
+    case .disappear(let ids): .disappear(handlerIDs: ids.map { .legacy($0.description) })
+    case .change(let ids): .change(handlerIDs: ids.map { .legacy($0.description) })
+    default: self
+    }
+  }
 }

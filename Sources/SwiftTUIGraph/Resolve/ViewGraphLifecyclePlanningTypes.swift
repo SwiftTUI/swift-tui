@@ -25,7 +25,7 @@ struct ViewGraphLifecyclePlanningInput {
   var viewportLifecycleNodesByKey: [ViewportLifecycleKey: LifecycleStateNode]
   var viewportLifecycleOrder: [ViewportLifecycleKey]
   var nodeIDByIdentity: [Identity: ViewNodeID]
-  var changeHandlerIDsByIdentity: [(identity: Identity, handlerIDs: [String])]
+  var changeHandlerIDsByIdentity: [(identity: Identity, handlerIDs: [LifecycleHandlerID])]
   var stableTaskCancelEvents: [LifecycleEvent]
   var stableTaskStartEvents: [LifecycleEvent]
   var structuralAppearEvents: [LifecycleEvent]

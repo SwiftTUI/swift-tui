@@ -2373,11 +2373,11 @@ package final class ViewGraph {
       node.setLifecycleState(.alive)
     } else {
       if emitsOwnLifecycleEvents,
-        !node.lifecycleMetadata.appearHandlerIDs.isEmpty
+        !node.lifecycleMetadata.appearIDs.isEmpty
       {
         appendStructuralAppearEvent(
           identity: node.identity,
-          handlerIDs: node.lifecycleMetadata.appearHandlerIDs
+          handlerIDs: node.lifecycleMetadata.appearIDs
         )
       }
       if emitsOwnLifecycleEvents {
@@ -2405,7 +2405,7 @@ package final class ViewGraph {
   /// is always the same handler and never a second appearance.
   private func appendStructuralAppearEvent(
     identity: Identity,
-    handlerIDs: [String]
+    handlerIDs: [LifecycleHandlerID]
   ) {
     let operation = LifecycleCommitOperation.appear(handlerIDs: handlerIDs)
     guard !structuralAppearEvents.contains(where: { $0.operation == operation }) else {
@@ -2829,11 +2829,11 @@ package final class ViewGraph {
 
     if !node.wasPresentAtFrameStart {
       if emitsOwnLifecycleEvents,
-        !node.lifecycleMetadata.appearHandlerIDs.isEmpty
+        !node.lifecycleMetadata.appearIDs.isEmpty
       {
         appendStructuralAppearEvent(
           identity: node.identity,
-          handlerIDs: node.lifecycleMetadata.appearHandlerIDs
+          handlerIDs: node.lifecycleMetadata.appearIDs
         )
       }
       if emitsOwnLifecycleEvents {

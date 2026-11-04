@@ -58,7 +58,7 @@ extension ViewNode {
     package var previousLifecycleMetadata: LifecycleMetadata
     package var bodyStateSlotCount: Int?
     package var currentBodyStateSlotCount: Int
-    package var pendingChangeHandlerIDs: [String]
+    package var pendingChangeHandlerIDs: [LifecycleHandlerID]
     package var dynamicPropertyLeaseKeysSeenThisUpdate: Set<DynamicPropertyLeaseRegistrationKey>
     package var nextDynamicPropertyLeaseOccurrenceOrdinal: Int
     package var dynamicPropertyLeaseTokens: [DynamicPropertyLeaseRegistrationKey: UInt64]

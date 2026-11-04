@@ -513,8 +513,8 @@ package struct PlacedNode: Equatable, Sendable {
         nodes.append(
           LifecycleStateNode(
             identity: node.identity,
-            appearHandlerIDs: node.lifecycleMetadata.appearHandlerIDs,
-            disappearHandlerIDs: node.lifecycleMetadata.disappearHandlerIDs,
+            appearHandlerIDs: node.lifecycleMetadata.appearIDs,
+            disappearHandlerIDs: node.lifecycleMetadata.disappearIDs,
             tasks: node.lifecycleMetadata.tasks
           )
         )

@@ -72,9 +72,9 @@ public struct TaskDescriptor: Equatable, Sendable {
 
 /// A lifecycle operation emitted during commit planning.
 package enum LifecycleCommitOperation: Equatable, Sendable {
-  case appear(handlerIDs: [String])
-  case disappear(handlerIDs: [String])
-  case change(handlerIDs: [String])
+  case appear(handlerIDs: [LifecycleHandlerID])
+  case disappear(handlerIDs: [LifecycleHandlerID])
+  case change(handlerIDs: [LifecycleHandlerID])
   case taskStart(TaskDescriptor)
   case taskCancel(TaskDescriptor)
   /// Retains a running task when a visible identity acquires a new backing node.

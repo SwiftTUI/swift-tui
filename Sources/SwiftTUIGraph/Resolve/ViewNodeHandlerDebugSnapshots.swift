@@ -25,9 +25,9 @@ extension NodeHandlers {
       scrollPositionIdentities: sortedIdentityStrings(
         scrollPosition.registrations.map(\.identity)
       ),
-      lifecycleHandlerIDs: (Array(lifecycle.appearHandlers.keys)
-        + Array(lifecycle.disappearHandlers.keys)
-        + Array(lifecycle.changeHandlers.keys)).sorted(),
+      lifecycleHandlerIDs: (Array(lifecycle.appearRegistrations.keys)
+        + Array(lifecycle.disappearRegistrations.keys)
+        + Array(lifecycle.changeRegistrations.keys)).map(\.description).sorted(),
       taskRegistrationIdentities: sortedIdentityStrings(task.registrations.keys),
       preferenceObservationHandlerIDs:
         preferenceObservation.registrations

@@ -1,15 +1,15 @@
 package struct LifecycleStateNode: Equatable, Sendable {
   var viewNodeID: ViewNodeID?
   var identity: Identity
-  var appearHandlerIDs: [String]
-  var disappearHandlerIDs: [String]
+  var appearHandlerIDs: [LifecycleHandlerID]
+  var disappearHandlerIDs: [LifecycleHandlerID]
   var tasks: [TaskDescriptor]
 
   package init(
     viewNodeID: ViewNodeID? = nil,
     identity: Identity,
-    appearHandlerIDs: [String],
-    disappearHandlerIDs: [String],
+    appearHandlerIDs: [LifecycleHandlerID],
+    disappearHandlerIDs: [LifecycleHandlerID],
     tasks: [TaskDescriptor]
   ) {
     self.viewNodeID = viewNodeID

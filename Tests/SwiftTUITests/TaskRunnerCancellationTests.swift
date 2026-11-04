@@ -61,7 +61,7 @@ struct TaskRunnerCancellationTests {
     coordinator.shutdown()
     #expect(runner.isShuttingDown)
     #expect(runner.activeTaskCount == 0)
-    #expect(coordinator.previousLifecycleHandlers.disappearHandlers.isEmpty)
+    #expect(coordinator.previousLifecycleHandlers.disappearRegistrations.isEmpty)
   }
 
   @Test("releasing the owner before actor entry skips the user operation")

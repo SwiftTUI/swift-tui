@@ -1763,7 +1763,6 @@ struct RuntimeRegistrationRestoreScopingTests {
       registry.registerAppear(identity: removedIdentity, ordinal: 0) {}
     }
 
-    #expect(Set(registry.snapshot().appearHandlers.keys).count == 1)
     #expect(registry.snapshot().appearRegistrations.count == 2)
 
     registry.removeSubtrees(rootedAt: [removedRoot])
@@ -2684,9 +2683,9 @@ struct RuntimeRegistrationRestoreScopingTests {
     _ snapshot: LifecycleHandlerSnapshot
   ) -> [String: Set<String>] {
     [
-      "appear": Set(snapshot.appearRegistrations.values.map(\.handlerID)),
-      "disappear": Set(snapshot.disappearRegistrations.values.map(\.handlerID)),
-      "change": Set(snapshot.changeRegistrations.values.map(\.handlerID)),
+      "appear": Set(snapshot.appearRegistrations.keys.map(\.description)),
+      "disappear": Set(snapshot.disappearRegistrations.keys.map(\.description)),
+      "change": Set(snapshot.changeRegistrations.keys.map(\.description)),
     ]
   }
 
@@ -2773,7 +2772,6 @@ private enum RuntimeRegistrationProbeValues {
     LifecycleHandlerRegistration(
       identity: identity,
       key: LifecycleHandlerKey(ownerNodeID: nodeID, suffix: suffix),
-      handlerID: "\(identity.path)#\(suffix)-\(marker)",
       handler: { probe.record("lifecycle:\(marker):\(suffix)") }
     )
   }

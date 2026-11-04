@@ -228,7 +228,7 @@ private struct OverlayStackEntryHost: PrimitiveView, IterativeResolvableView {
         entryNode.layoutMetadata = entryNode.layoutMetadata.anchoringFocusOrder(after: source)
       }
       if let onDismiss = entry.onDismiss {
-        let ordinal = entryNode.lifecycleMetadata.disappearHandlerIDs.count
+        let ordinal = entryNode.lifecycleMetadata.disappearIDs.count
         let handlerID =
           HandlerDescriptorIntake(
             context: bodyContext,
@@ -237,9 +237,9 @@ private struct OverlayStackEntryHost: PrimitiveView, IterativeResolvableView {
             identity: entryNode.identity,
             ordinal: ordinal,
             handler: onDismiss
-          ) ?? "\(entryNode.identity)#disappear[\(ordinal)]"
+          ) ?? .current(entryNode.identity, .disappear(ordinal: ordinal))
         entryNode.lifecycleMetadata = entryNode.lifecycleMetadata.merging(
-          .init(disappearHandlerIDs: [handlerID])
+          .init(appearIDs: [], disappearIDs: [handlerID])
         )
         context.viewGraph?.recordLifecycleEvaluationOwner(
           target: entryNode.identity,

@@ -5672,8 +5672,8 @@ private struct LifecycleRuntimeProbe: PrimitiveView, IterativeResolvableView {
 
     var node = interactiveProbeTextNode("Lifecycle probe", in: context)
     node.lifecycleMetadata = .init(
-      appearHandlerIDs: [appearHandlerID],
-      disappearHandlerIDs: [disappearHandlerID],
+      appearIDs: [appearHandlerID],
+      disappearIDs: [disappearHandlerID],
       tasks: [descriptor]
     )
     if focusable {
@@ -5722,8 +5722,8 @@ private struct ScrollLifecycleRuntimeProbe: PrimitiveView, IterativeResolvableVi
 
     var node = interactiveProbeTextNode(text, in: context)
     node.lifecycleMetadata = .init(
-      appearHandlerIDs: [appearHandlerID],
-      disappearHandlerIDs: [disappearHandlerID],
+      appearIDs: [appearHandlerID],
+      disappearIDs: [disappearHandlerID],
       tasks: [descriptor]
     )
     return [node]
