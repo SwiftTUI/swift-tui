@@ -141,7 +141,7 @@ extension RunLoop {
 
       #if os(Android)
         if let directSignalReader {
-          directSignalReader.installDirectHandler { signalName in
+          directSignalReader.installRuntimeSignalHandler { signalName in
             if buffer.enqueue(.signal(signalName)) {
               directWake?()
               continuation.yield()
@@ -151,7 +151,7 @@ extension RunLoop {
           }
         } else {
           let signalEvents =
-            signalReader?.events()
+            signalReader?.runtimeSignals()
             ?? AsyncStream { continuation in
               continuation.finish()
             }
@@ -166,7 +166,7 @@ extension RunLoop {
         }
       #else
         let signalEvents =
-          signalReader?.events()
+          signalReader?.runtimeSignals()
           ?? AsyncStream { continuation in
             continuation.finish()
           }

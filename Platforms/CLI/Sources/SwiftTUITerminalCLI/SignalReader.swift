@@ -25,25 +25,52 @@
       self.signals = signals ?? defaults
     }
 
-    public func events() -> AsyncStream<String> {
-      let armed = armedSequence.withLock { sequence -> UnixSignalsSequence? in
+    public func events() -> AsyncStream<String> { stream { $0.description } }
+    public func runtimeSignals() -> AsyncStream<RuntimeSignal> { stream { $0.runtimeSignal } }
+
+    private func stream<Element: Sendable>(
+      _ transform: @escaping @Sendable (TerminalSignal) -> Element
+    ) -> AsyncStream<Element> {
+      let armed = armedSequence.withLock { sequence in
         let taken = sequence
         sequence = nil
         return taken
       }
-      guard let armed else {
-        return UnixSignalsSequence.stream(for: signals)
+      let signals = self.signals
+      return makeTaskBackedAsyncStream { continuation in
+        let sequence: UnixSignalsSequence
+        if let armed {
+          sequence = armed
+        } else {
+          sequence = await UnixSignalsSequence(trapping: signals)
+        }
+        for await signal in sequence { continuation.yield(transform(signal)) }
+        continuation.finish()
       }
-      return AsyncStream { continuation in
-        let task = Task {
-          for await signal in armed {
-            continuation.yield(signal.description)
-          }
-          continuation.finish()
-        }
-        continuation.onTermination = { _ in
-          task.cancel()
-        }
+    }
+
+  }
+
+  extension TerminalSignal {
+    fileprivate var runtimeSignal: RuntimeSignal {
+      switch self {
+      case .sigabrt: .abort
+      case .sighup: .hangup
+      case .sigill: .illegalInstruction
+      case .sigint: .interrupt
+      case .sigsegv: .segmentationFault
+      case .sigterm: .terminate
+      case .sigusr1: .user1
+      case .sigusr2: .user2
+      case .sigalrm: .alarm
+      case .sigquit: .quit
+      case .sigwinch: .windowChange
+      case .sigbus: .busError
+      case .sigfpe: .floatingPointException
+      case .sigtrap: .trap
+      case .sigcont: .resume
+      case .sigpipe: .brokenPipe
+      default: .other(description)
       }
     }
   }

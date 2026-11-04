@@ -288,7 +288,7 @@ struct AdversarialSetDRuntimeIssueModeTests {
     for size in [CellSize(width: 32, height: 12), CellSize(width: 30, height: 10)] {
       h.surface.surfaceSize = size
       #expect(
-        h.runLoop.withRuntimeRegistrationScope { h.runLoop.handle(.signal("SIGWINCH")) } == nil)
+        h.runLoop.withRuntimeRegistrationScope { h.runLoop.handle(.signal(.windowChange)) } == nil)
       try h.render()
     }
     let distinct = h.runLoop.reportedRuntimeIssues.filter {

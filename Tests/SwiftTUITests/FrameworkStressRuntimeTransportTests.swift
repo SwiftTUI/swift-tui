@@ -549,7 +549,7 @@ extension FrameworkStressRuntimeTransportTests {
     let buffer = EventPumpBuffer()
     _ = buffer.enqueue(.input(.mouse(.init(kind: .moved, location: .init(x: 1, y: 1)))))
     _ = buffer.enqueue(.input(.mouse(.init(kind: .moved, location: .init(x: 2, y: 1)))))
-    _ = buffer.enqueue(.signal("SIGWINCH"))
+    _ = buffer.enqueue(.signal(.windowChange))
     _ = buffer.enqueue(.input(.mouse(.init(kind: .moved, location: .init(x: 8, y: 1)))))
     _ = buffer.enqueue(.input(.mouse(.init(kind: .moved, location: .init(x: 9, y: 1)))))
 
@@ -565,7 +565,7 @@ extension FrameworkStressRuntimeTransportTests {
       return
     }
     #expect(beforeMouse.location.cell == CellPoint(x: 2, y: 1))
-    #expect(name == "SIGWINCH")
+    #expect(name == .windowChange)
     #expect(afterMouse.location.cell == CellPoint(x: 9, y: 1))
     #expect(buffer.drain().isEmpty)
   }

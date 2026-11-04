@@ -6,6 +6,7 @@ public enum TerminationRequest: Equatable, Sendable {
   case userExit(KeyPress)
   /// A host signal requested termination.
   case signal(String)
+  public static func signal(_ signal: RuntimeSignal) -> Self { .signal(signal.name) }
   /// The terminal input stream ended.
   ///
   /// Handlers are notified for this request, but cancellation cannot keep a

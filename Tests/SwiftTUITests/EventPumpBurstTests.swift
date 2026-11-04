@@ -12,7 +12,7 @@ struct EventPumpBurstTests {
   func signalBurstPreservesOrder() throws {
     let buffer = EventPumpBuffer()
     for index in 0..<10_000 {
-      #expect(buffer.enqueue(.signal("signal-\(index)")))
+      #expect(buffer.enqueue(.signal(.other("signal-\(index)"))))
     }
     for index in 0..<10_000 {
       let batch = buffer.drain()
@@ -22,7 +22,7 @@ struct EventPumpBurstTests {
         Issue.record("expected a queued signal")
         return
       }
-      #expect(name == "signal-\(index)")
+      #expect(name == .other("signal-\(index)"))
       #expect(event.arrival.id == UInt64(index))
       #expect(event.arrival.count == 1)
     }

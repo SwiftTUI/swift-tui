@@ -486,7 +486,7 @@ struct PipelineContractTests {
     let frame = ScheduledFrame(
       causes: [.invalidation],
       invalidatedIdentities: [childIdentity],
-      signalNames: [],
+      signals: [],
       externalReasons: [],
       triggeredDeadline: nil,
       nextDeadline: nil,

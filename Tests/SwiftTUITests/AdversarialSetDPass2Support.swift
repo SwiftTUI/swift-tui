@@ -113,7 +113,7 @@ final class SetDLiveHarness<Content: View> {
 
   func resize(_ size: CellSize) throws {
     surface.surfaceSize = size
-    #expect(runLoop.withRuntimeRegistrationScope { runLoop.handle(.signal("SIGWINCH")) } == nil)
+    #expect(runLoop.withRuntimeRegistrationScope { runLoop.handle(.signal(.windowChange)) } == nil)
     try render()
     #expect(surface.raster?.size == size)
   }

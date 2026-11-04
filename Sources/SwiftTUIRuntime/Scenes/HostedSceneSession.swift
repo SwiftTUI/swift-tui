@@ -238,7 +238,7 @@ public final class HostedSceneSession {
   }
 
   public func requestSurfaceRefresh() {
-    signalReader.send("SIGWINCH")
+    signalReader.send(.windowChange)
   }
 
   public func stop() {
@@ -278,7 +278,7 @@ extension HostedSceneSession {
       case .resize(let size): surface.updateSurfaceSize(size)
       case .style(let style): surface.updateStyle(style)
       }
-      signalReader.send("SIGWINCH")
+      signalReader.send(.windowChange)
     }
   }
 

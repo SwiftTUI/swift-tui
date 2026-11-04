@@ -175,13 +175,13 @@ public enum WASIRunner {
       let inputReader = WebSurfaceInputReader(wireCapabilities: host.wireCapabilities) { message in
         switch message {
         case .geometry(let request):
-          if host.updateGeometry(request) { signalReader.send("SIGWINCH") }
+          if host.updateGeometry(request) { signalReader.send(.windowChange) }
         case .resize(let size, let cellPixelSize):
           host.updateSurfaceSize(size, cellPixelSize: cellPixelSize)
-          signalReader.send("SIGWINCH")
+          signalReader.send(.windowChange)
         case .style(let style):
           host.updateStyle(style)
-          signalReader.send("SIGWINCH")
+          signalReader.send(.windowChange)
         case .pointerCapabilities(let supportsScrollPanning):
           // Live on this transport, unlike `caps:` below: the pointer
           // paradigm is a property of the browsing device, not of the WASI
@@ -190,7 +190,7 @@ public enum WASIRunner {
           host.updatePointerCapabilities(
             supportsScrollPanning: supportsScrollPanning
           )
-          signalReader.send("SIGWINCH")
+          signalReader.send(.windowChange)
         case .capabilities:
           // The WASI ingress is environment-owned (resolved above at
           // transport construction); a stray caps record on stdin is not a
@@ -238,10 +238,10 @@ public enum WASIRunner {
         switch message {
         case .resize(let size):
           host.updateSurfaceSize(size)
-          signalReader.send("SIGWINCH")
+          signalReader.send(.windowChange)
         case .style(let style):
           host.updateStyle(style)
-          signalReader.send("SIGWINCH")
+          signalReader.send(.windowChange)
         }
       }
 

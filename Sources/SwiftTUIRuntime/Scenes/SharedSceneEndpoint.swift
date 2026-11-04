@@ -33,7 +33,7 @@ package final class SharedSceneEndpoint {
     try surface.setTerminalAttached(attached)
     input.updateInputCapabilities(surface.resolvedInputCapabilities)
     input.setTerminalAttached(attached)
-    browserSignals.send("SIGWINCH")
+    browserSignals.send(.windowChange)
   }
 
   package func stop() {

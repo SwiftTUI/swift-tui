@@ -55,7 +55,7 @@ extension RunLoop {
     case .inputEnded:
       return .inputEnded
     case .signal(let name):
-      scheduler.requestSignal(named: name)
+      scheduler.requestSignal(name)
       switch signalDisposition(for: name) {
       case .continueFrame:
         return nil
@@ -485,16 +485,16 @@ extension RunLoop {
     return region?.focusInteractions == .edit
   }
 
-  package func signalDisposition(for name: String) -> RuntimeSignalDisposition {
+  package func signalDisposition(for name: RuntimeSignal) -> RuntimeSignalDisposition {
     #if DEBUG && (os(macOS) || os(Linux))
-      if name == "SIGUSR1", hotReloadLoader != nil {
+      if name == .user1, hotReloadLoader != nil {
         hotReloadLoadRequested = true
         scheduler.requestInput()
         return .continueFrame
       }
     #endif
     switch name {
-    case "SIGWINCH":
+    case .windowChange:
       return .continueFrame
     default:
       return .exit(.signal(name))

@@ -98,7 +98,7 @@ final class SceneRuntime {
         // dispatch serves both platforms.
         let windowsSignalReader = InProcessSignalReader()
         inputReader.setWindowsResizeObserver { [windowsSignalReader] in
-          windowsSignalReader.send("SIGWINCH")
+          windowsSignalReader.send(.windowChange)
         }
         let sessionSignalReader: (any SignalReading)? = windowsSignalReader
       #else

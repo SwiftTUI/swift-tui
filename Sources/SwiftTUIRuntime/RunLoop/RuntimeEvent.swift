@@ -9,7 +9,7 @@ package enum RuntimeEvent: Sendable {
   case input(InputEvent)
   case scopedInput(ScopedInputEvent)
   case inputEnded
-  case signal(String)
+  case signal(RuntimeSignal)
 }
 
 extension RuntimeEvent {

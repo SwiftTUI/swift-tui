@@ -179,11 +179,11 @@ package final class WebSocketInputReader: ScopedInputReading, Sendable {
       lifecycle: .init(
         connectionOpened: {
           transport.beginGeometrySession($0)
-          if sharedViewportRequired { signalReader?.send("SIGWINCH") }
+          if sharedViewportRequired { signalReader?.send(.windowChange) }
         },
         connectionClosed: {
           transport.endGeometrySession($0)
-          if sharedViewportRequired { signalReader?.send("SIGWINCH") }
+          if sharedViewportRequired { signalReader?.send(.windowChange) }
         },
         inputAllowed: {
           !sharedViewportRequired
@@ -193,19 +193,19 @@ package final class WebSocketInputReader: ScopedInputReading, Sendable {
       switch message {
       case .geometry(let request):
         if transport.updateGeometry(request, connectionToken: token) {
-          signalReader?.send("SIGWINCH")
+          signalReader?.send(.windowChange)
         }
       case .resize(let size, let cellPixelSize):
         transport.updateSurfaceSize(size, cellPixelSize: cellPixelSize)
-        signalReader?.send("SIGWINCH")
+        signalReader?.send(.windowChange)
       case .style(let style):
         transport.updateStyle(style)
-        signalReader?.send("SIGWINCH")
+        signalReader?.send(.windowChange)
       case .pointerCapabilities(let supportsScrollPanning):
         transport.updatePointerCapabilities(
           supportsScrollPanning: supportsScrollPanning
         )
-        signalReader?.send("SIGWINCH")
+        signalReader?.send(.windowChange)
       case .capabilities(let capabilities):
         guard
           !sharedViewportRequired
@@ -225,7 +225,7 @@ package final class WebSocketInputReader: ScopedInputReading, Sendable {
           reanchor: { transport.declareCapabilities(capabilities, connectionToken: token) },
           requestRefresh: {
             transport.requestSurfaceRefresh()
-            if sharedViewportRequired { signalReader?.send("SIGWINCH") }
+            if sharedViewportRequired { signalReader?.send(.windowChange) }
           }
         )
       case .resync(let request):

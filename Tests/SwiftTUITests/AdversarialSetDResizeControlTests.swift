@@ -46,7 +46,7 @@ struct AdversarialSetDResizeControlTests {
       }
       let before = model.snapshot
       surface.surfaceSize = size
-      #expect(loop.withRuntimeRegistrationScope { loop.handle(.signal("SIGWINCH")) } == nil)
+      #expect(loop.withRuntimeRegistrationScope { loop.handle(.signal(.windowChange)) } == nil)
       try loop.renderPendingFrames(renderedFrames: &rendered)
       #expect(surface.raster?.size == size)
       #expect(focus.currentFocusIdentity == identity)

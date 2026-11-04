@@ -100,7 +100,7 @@ struct TerminationRequestTests {
       return
     }
     let buffer = EventPumpBuffer()
-    _ = buffer.enqueue(.signal("SIGTERM"))
+    _ = buffer.enqueue(.signal(.terminate))
     var frames = 0
     let exit = try runLoop.processPendingEventsSynchronously(
       from: .init(

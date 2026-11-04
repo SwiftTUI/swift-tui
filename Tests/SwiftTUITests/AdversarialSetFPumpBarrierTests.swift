@@ -120,8 +120,8 @@ struct AdversarialSetFPumpBarrierTests {
   @Test("setF032 signals never coalesce and keep their order")
   func setF032SignalsNeverCoalesce() throws {
     let pump = buffer(at: MonotonicInstant(offset: .seconds(7)))
-    #expect(pump.enqueue(.signal("SIGWINCH")))
-    #expect(pump.enqueue(.signal("SIGTERM")))
+    #expect(pump.enqueue(.signal(.windowChange)))
+    #expect(pump.enqueue(.signal(.terminate)))
     #expect(pump.pendingBatchCount() == 2)
     let first = pump.drain()
     let second = pump.drain()
@@ -131,8 +131,8 @@ struct AdversarialSetFPumpBarrierTests {
       Issue.record("expected two queued signals")
       return
     }
-    #expect(a == "SIGWINCH")
-    #expect(b == "SIGTERM")
+    #expect(a == .windowChange)
+    #expect(b == .terminate)
   }
 
   @Test("setF033 input-end is a barrier after a coalescible pointer batch")

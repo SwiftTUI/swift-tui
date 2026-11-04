@@ -1808,7 +1808,7 @@ final class W3FAResizeHarness<Content: View> {
 
   func resize(width: Int, height: Int) throws {
     surface.surfaceSize = .init(width: width, height: height)
-    try send(.signal("SIGWINCH"))
+    try send(.signal(.windowChange))
   }
 
   func focusText(_ text: String) throws {

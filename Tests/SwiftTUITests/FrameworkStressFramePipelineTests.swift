@@ -1343,7 +1343,7 @@ private func framePipelineScheduledFrame(
   return ScheduledFrame(
     causes: causes,
     invalidatedIdentities: identities,
-    signalNames: [],
+    signals: [],
     externalReasons: [],
     triggeredDeadline: nil,
     nextDeadline: nil,

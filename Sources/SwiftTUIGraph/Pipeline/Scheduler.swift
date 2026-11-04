@@ -11,7 +11,11 @@ public enum WakeCause: String, Hashable, Sendable {
 public struct ScheduledFrame: Equatable, Sendable {
   public var causes: Set<WakeCause>
   public var invalidatedIdentities: Set<Identity>
-  public var signalNames: [String]
+  public var signals: [RuntimeSignal]
+  public var signalNames: [String] {
+    get { signals.map(\.name) }
+    set { signals = newValue.map(RuntimeSignal.init(name:)) }
+  }
   public var externalReasons: [String]
   public var triggeredDeadline: MonotonicInstant?
   public var nextDeadline: MonotonicInstant?
@@ -40,7 +44,7 @@ public struct ScheduledFrame: Equatable, Sendable {
   ) {
     self.causes = causes
     self.invalidatedIdentities = invalidatedIdentities
-    self.signalNames = signalNames
+    self.signals = signalNames.map(RuntimeSignal.init(name:))
     self.externalReasons = externalReasons
     self.triggeredDeadline = triggeredDeadline
     self.nextDeadline = nextDeadline
@@ -53,7 +57,7 @@ public struct ScheduledFrame: Equatable, Sendable {
   package init(
     causes: Set<WakeCause>,
     invalidatedIdentities: Set<Identity>,
-    signalNames: [String],
+    signals: [RuntimeSignal],
     externalReasons: [String],
     triggeredDeadline: MonotonicInstant?,
     nextDeadline: MonotonicInstant?,
@@ -64,7 +68,7 @@ public struct ScheduledFrame: Equatable, Sendable {
   ) {
     self.causes = causes
     self.invalidatedIdentities = invalidatedIdentities
-    self.signalNames = signalNames
+    self.signals = signals
     self.externalReasons = externalReasons
     self.triggeredDeadline = triggeredDeadline
     self.nextDeadline = nextDeadline
@@ -228,12 +232,17 @@ public protocol DrainPassDeadlineCutting: AnyObject {
 public protocol FrameScheduling: Invalidating, DrainPassDeadlineCutting {
   func requestInput()
   func requestSignal(named name: String)
+  func requestSignal(_ signal: RuntimeSignal)
   func requestExternalWake(reason: String)
   func requestDeadline(_ deadline: MonotonicInstant)
   func hasPendingFrame(at now: MonotonicInstant) -> Bool
   func nextWakeInstant(after now: MonotonicInstant) -> MonotonicInstant?
   func consumeReadyFrame(at now: MonotonicInstant) -> ScheduledFrame?
   func reset()
+}
+
+extension FrameScheduling {
+  public func requestSignal(_ signal: RuntimeSignal) { requestSignal(named: signal.name) }
 }
 
 /// Coalesces invalidations, input, signals, and deadlines into frame work.
@@ -267,7 +276,7 @@ public final class FrameScheduler: FrameScheduling, ThreadSafeInvalidating, Inte
     var pacingEngaged = false
     var pendingCauses: Set<WakeCause> = []
     var invalidatedIdentities: Set<Identity> = []
-    var signalNames: Set<String> = []
+    var signals: Set<RuntimeSignal> = []
     var externalReasons: Set<String> = []
     /// Every armed wake deadline, sorted ascending by instant and deduplicated
     /// by instant. This was a single min-coalesced slot, which silently
@@ -404,10 +413,12 @@ public final class FrameScheduler: FrameScheduling, ThreadSafeInvalidating, Inte
     wakeHandlerLock.withLockUnchecked { $0 }?()
   }
 
-  public func requestSignal(named name: String) {
+  public func requestSignal(named name: String) { requestSignal(RuntimeSignal(name: name)) }
+
+  public func requestSignal(_ signal: RuntimeSignal) {
     coalescingLock.withLock { state in
       state.pendingCauses.insert(.signal)
-      state.signalNames.insert(name)
+      state.signals.insert(signal)
       state.pendingIntentRequestCount += 1
     }
     notifyPendingFrameRequestWaiters()
@@ -529,7 +540,7 @@ public final class FrameScheduler: FrameScheduling, ThreadSafeInvalidating, Inte
       var scheduled = ScheduledFrame(
         causes: causes,
         invalidatedIdentities: state.invalidatedIdentities,
-        signalNames: state.signalNames.sorted(),
+        signals: state.signals.sorted { $0.name < $1.name },
         externalReasons: state.externalReasons.sorted(),
         triggeredDeadline: triggeredDeadline,
         nextDeadline: state.pendingDeadlines.first?.instant,
@@ -546,7 +557,7 @@ public final class FrameScheduler: FrameScheduling, ThreadSafeInvalidating, Inte
 
       state.pendingCauses.removeAll(keepingCapacity: true)
       state.invalidatedIdentities.removeAll(keepingCapacity: true)
-      state.signalNames.removeAll(keepingCapacity: true)
+      state.signals.removeAll(keepingCapacity: true)
       state.externalReasons.removeAll(keepingCapacity: true)
       state.pendingAnimationSegments.removeAll(keepingCapacity: true)
       state.pendingObservedAnimationBatchIDs.removeAll(keepingCapacity: true)
@@ -565,7 +576,7 @@ public final class FrameScheduler: FrameScheduling, ThreadSafeInvalidating, Inte
       state.pacingEngaged = false
       state.pendingCauses.removeAll(keepingCapacity: true)
       state.invalidatedIdentities.removeAll(keepingCapacity: true)
-      state.signalNames.removeAll(keepingCapacity: true)
+      state.signals.removeAll(keepingCapacity: true)
       state.externalReasons.removeAll(keepingCapacity: true)
       state.pendingAnimationSegments.removeAll(keepingCapacity: true)
       state.pendingObservedAnimationBatchIDs.removeAll(keepingCapacity: true)

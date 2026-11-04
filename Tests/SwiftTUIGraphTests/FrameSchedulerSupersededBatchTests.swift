@@ -142,7 +142,7 @@ struct FrameSchedulerSupersededBatchTests {
     let cancelled = ScheduledFrame(
       causes: [.invalidation],
       invalidatedIdentities: [contestedIdentity],
-      signalNames: [],
+      signals: [],
       externalReasons: [],
       triggeredDeadline: nil,
       nextDeadline: nil,
@@ -177,7 +177,7 @@ struct FrameSchedulerSupersededBatchTests {
     var frame = ScheduledFrame(
       causes: [.invalidation],
       invalidatedIdentities: [departing, landing, inertTrigger, ordinary],
-      signalNames: [],
+      signals: [],
       externalReasons: [],
       triggeredDeadline: nil,
       nextDeadline: nil,

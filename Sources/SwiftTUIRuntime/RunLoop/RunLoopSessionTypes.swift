@@ -35,6 +35,7 @@ public enum RunLoopExitReason: Equatable, Sendable {
   case programmatic
   case userExit(KeyPress)
   case signal(String)
+  public static func signal(_ signal: RuntimeSignal) -> Self { .signal(signal.name) }
   case inputEnded
 }
 
@@ -58,6 +59,17 @@ public struct RunLoopResult<State: Equatable & Sendable>: Equatable, Sendable {
 /// Produces an asynchronous stream of terminal signal names.
 public protocol SignalReading: AnyObject {
   func events() -> AsyncStream<String>
+  func runtimeSignals() -> AsyncStream<RuntimeSignal>
+}
+
+extension SignalReading {
+  public func runtimeSignals() -> AsyncStream<RuntimeSignal> {
+    let names = events()
+    return makeTaskBackedAsyncStream { continuation in
+      for await name in names { continuation.yield(RuntimeSignal(name: name)) }
+      continuation.finish()
+    }
+  }
 }
 
 /// A signal reader whose OS signal sources can be installed ahead of
@@ -75,10 +87,14 @@ package protocol SignalSourceArming: SignalReading {
 
 /// Emits runtime signals from an in-process source.
 public final class InProcessSignalReader: SignalReading, Sendable {
+  private struct Sink: Sendable {
+    var yield: @Sendable (RuntimeSignal) -> Void
+    var finish: @Sendable () -> Void
+  }
   private struct State: Sendable {
-    var continuation: AsyncStream<String>.Continuation?
+    var continuation: Sink?
     var continuationGeneration: UInt64 = 0
-    var directHandler: (@Sendable (String) -> Void)?
+    var directHandler: (@Sendable (RuntimeSignal) -> Void)?
     var directFinishHandler: (@Sendable () -> Void)?
     /// Advances on every install and clear, so a pending flush can tell that
     /// the handler it started for is no longer the installed one.
@@ -86,7 +102,7 @@ public final class InProcessSignalReader: SignalReading, Sendable {
     // Hosted transports can publish their initial resize while the run loop
     // is still installing its event streams. Preserve that wake instead of
     // leaving the first frame at the fallback grid until unrelated input.
-    var pendingSignals: [String] = []
+    var pendingSignals: [RuntimeSignal] = []
     var isFinished = false
   }
 
@@ -94,7 +110,12 @@ public final class InProcessSignalReader: SignalReading, Sendable {
 
   public init() {}
 
-  public func events() -> AsyncStream<String> {
+  public func events() -> AsyncStream<String> { stream { $0.name } }
+  public func runtimeSignals() -> AsyncStream<RuntimeSignal> { stream { $0 } }
+
+  private func stream<Element: Sendable>(
+    _ transform: @escaping @Sendable (RuntimeSignal) -> Element
+  ) -> AsyncStream<Element> {
     makeManagedAsyncStream { continuation in
       let generation = self.state.withLock { state in
         state.continuationGeneration &+= 1
@@ -102,9 +123,10 @@ public final class InProcessSignalReader: SignalReading, Sendable {
           continuation.finish()
           return state.continuationGeneration
         }
-        state.continuation = continuation
-        for signalName in state.pendingSignals {
-          continuation.yield(signalName)
+        state.continuation = Sink(
+          yield: { continuation.yield(transform($0)) }, finish: { continuation.finish() })
+        for signal in state.pendingSignals {
+          continuation.yield(transform(signal))
         }
         state.pendingSignals.removeAll(keepingCapacity: true)
         return state.continuationGeneration
@@ -121,7 +143,9 @@ public final class InProcessSignalReader: SignalReading, Sendable {
     }
   }
 
-  public func send(_ signalName: String) {
+  public func send(_ name: String) { send(RuntimeSignal(name: name)) }
+
+  public func send(_ signalName: RuntimeSignal) {
     // The direct handler is arbitrary code: the Android direct pump
     // dispatches run-loop event processing synchronously from it, and that
     // processing can re-enter send() (a host callback requesting a surface
@@ -131,7 +155,7 @@ public final class InProcessSignalReader: SignalReading, Sendable {
     // invocation that races clearDirectHandler()/finish() can still deliver
     // one in-flight signal after the clear, matching the pre-buffering
     // behavior of this type.
-    let directHandler = state.withLock { state -> (@Sendable (String) -> Void)? in
+    let directHandler = state.withLock { state -> (@Sendable (RuntimeSignal) -> Void)? in
       guard !state.isFinished else {
         return nil
       }
@@ -174,6 +198,13 @@ public final class InProcessSignalReader: SignalReading, Sendable {
     _ handler: @escaping @Sendable (String) -> Void,
     onFinish: @escaping @Sendable () -> Void
   ) {
+    installRuntimeSignalHandler({ handler($0.name) }, onFinish: onFinish)
+  }
+
+  package func installRuntimeSignalHandler(
+    _ handler: @escaping @Sendable (RuntimeSignal) -> Void,
+    onFinish: @escaping @Sendable () -> Void
+  ) {
     let generation = state.withLock { state -> UInt64? in
       guard !state.isFinished else {
         return nil
@@ -195,7 +226,7 @@ public final class InProcessSignalReader: SignalReading, Sendable {
     // before reporting end, so no buffered signal follows the end
     // notification; a clear keeps the remainder for the next consumer; a
     // replacement's own install flushes it (the STUI-1054 ordering shape).
-    while let signalName = state.withLock({ state -> String? in
+    while let signalName = state.withLock({ state -> RuntimeSignal? in
       guard !state.isFinished,
         state.directHandlerGeneration == generation,
         !state.pendingSignals.isEmpty

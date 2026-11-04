@@ -757,7 +757,7 @@ private final class DepthHarness<Content: View> {
   }
   func resize(width: Int, height: Int) throws {
     surface.surfaceSize = .init(width: width, height: height)
-    try send(.signal("SIGWINCH"))
+    try send(.signal(.windowChange))
   }
   func point(_ text: String) throws -> Point {
     let rows = try #require(surface.surface).lines
