@@ -14,9 +14,12 @@ public struct MatchedGeometryNamespace: Hashable, Sendable {
 }
 
 /// A caller's typed identifier scoped to its matched-geometry namespace.
-public struct MatchedGeometryKey: Hashable, Sendable {
+public struct MatchedGeometryKey: Hashable, Sendable, CustomStringConvertible {
   public let namespace: MatchedGeometryNamespace
   public let id: AnyID
+
+  /// The namespace, concrete ID type, and value for diagnostics.
+  public var description: String { "\(namespace.rawValue):\(id.typedComponentText)" }
 
   public init<ID: Hashable & Sendable>(namespace: MatchedGeometryNamespace = .default, id: ID) {
     self.namespace = namespace

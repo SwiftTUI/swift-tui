@@ -757,19 +757,25 @@ public struct IdentityComponent: Hashable, Sendable, Codable, CustomStringConver
   }
 
   private static func escapedExplicitIDComponent(_ component: String) -> String {
-    let escaped = component.reduce(into: "") { escaped, character in
+    let escaped = escapedPayload(component, delimiters: "#")
+    return escaped.isEmpty ? "<empty>" : escaped
+  }
+
+  /// Percent and slash are reserved in every path. Each subgrammar supplies
+  /// the additional delimiters it uses inside its own component.
+  package static func escapedPayload(_ text: String, delimiters: String) -> String {
+    text.reduce(into: "") { escaped, character in
       switch character {
-      case "%":
-        escaped.append("%25")
-      case "/":
-        escaped.append("%2F")
-      case "#":
-        escaped.append("%23")
+      case "%": escaped += "%25"
+      case "/": escaped += "%2F"
       default:
-        escaped.append(character)
+        if delimiters.contains(character), let ascii = character.asciiValue {
+          escaped += "%" + String(ascii, radix: 16, uppercase: true)
+        } else {
+          escaped.append(character)
+        }
       }
     }
-    return escaped.isEmpty ? "<empty>" : escaped
   }
 
   public static func named(

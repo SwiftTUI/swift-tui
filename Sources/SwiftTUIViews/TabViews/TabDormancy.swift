@@ -43,7 +43,7 @@ private struct TabDormantEntityKey: Hashable, Sendable {
 /// distinguish typed tags, optional matching, duplicates, and replacement
 /// generations within that owner without depending on a graph-node lifetime.
 package struct TabDormantPayloadStructuralIdentity: Hashable, Sendable {
-  package var typedTagComponent: String
+  package var tagValue: AnyID
   package var includeOptional: Bool
   package var occurrence: Int
   package var generation: UInt64
@@ -355,8 +355,7 @@ enum TabDormancy {
 
   static func prepare(
     in context: ResolveContext, ownerNode: SwiftTUICore.ViewNode?,
-    declaredDormantKeys: [TabDormantKey], selectedDormantKey: TabDormantKey?,
-    selectedTagComponent: String?
+    declaredDormantKeys: [TabDormantKey], selectedDormantKey: TabDormantKey?
   ) -> Selection {
     var selectedContentEntityIdentity: EntityIdentity?
     var selectedContentStructuralIdentity: TabDormantPayloadStructuralIdentity?
@@ -374,7 +373,6 @@ enum TabDormancy {
       var locatorState = loadTabDormantLocatorState(from: ownerNode)
       dormantRegistry.updateDeclaredKeys(declaredDormantKeys)
       if let selectedDormantKey,
-        let selectedTagComponent,
         let generation = dormantRegistry.lifetimeGeneration(for: selectedDormantKey)
       {
         selectedContentEntityIdentity = EntityIdentity(
@@ -387,7 +385,7 @@ enum TabDormancy {
           occurrence: selectedDormantKey.occurrence
         )
         selectedContentStructuralIdentity = TabDormantPayloadStructuralIdentity(
-          typedTagComponent: selectedTagComponent,
+          tagValue: selectedDormantKey.value,
           includeOptional: selectedDormantKey.includeOptional,
           occurrence: selectedDormantKey.occurrence,
           generation: generation

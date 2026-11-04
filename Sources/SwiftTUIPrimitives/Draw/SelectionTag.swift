@@ -1,7 +1,6 @@
 private protocol SelectionTagValueBox: Sendable {
   var baseValue: Any { get }
   var identityValue: AnyID { get }
-  var identityComponent: String { get }
 
   func isEqual(
     to other: any SelectionTagValueBox
@@ -17,10 +16,6 @@ private struct TypedSelectionTagValueBox<Value: Hashable & Sendable>: SelectionT
 
   var identityValue: AnyID {
     AnyID(value)
-  }
-
-  var identityComponent: String {
-    "\(String(reflecting: Value.self)):\(String(reflecting: value))"
   }
 
   func isEqual(
@@ -66,7 +61,7 @@ public struct SelectionTag: Equatable, Sendable {
   /// Runtime lifetime equality still uses ``identityValue``; this text only
   /// keeps diagnostics and resolved identity paths comprehensible.
   package var identityComponent: String {
-    valueBox.identityComponent
+    identityValue.typedComponentText
   }
 
   public static func == (lhs: Self, rhs: Self) -> Bool {

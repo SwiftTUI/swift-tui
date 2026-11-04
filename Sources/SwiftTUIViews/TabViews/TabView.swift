@@ -100,8 +100,7 @@ extension TabView {
     let selectedDormantKey = selectedIndex.map { options[$0].dormantKey }
     let dormantSelection = TabDormancy.prepare(
       in: context, ownerNode: ownerNode,
-      declaredDormantKeys: options.map(\.dormantKey), selectedDormantKey: selectedDormantKey,
-      selectedTagComponent: selectedIndex.map { options[$0].tag.identityComponent })
+      declaredDormantKeys: options.map(\.dormantKey), selectedDormantKey: selectedDormantKey)
     var semanticTokens =
       ownerNode?.stateSlot(
         ordinal: StateSlotOrdinals.tabAccessibilityTokens, seed: AccessibilityTokens())

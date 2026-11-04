@@ -163,16 +163,8 @@ private func tabContentValueComponent(
   guard let identity else {
     return .named("TabContentValue")
   }
-  let tag = identity.typedTagComponent.reduce(into: "") { result, character in
-    switch character {
-    case "%": result.append("%25")
-    case "/": result.append("%2F")
-    case "]": result.append("%5D")
-    case ";": result.append("%3B")
-    case "=": result.append("%3D")
-    default: result.append(character)
-    }
-  }
+  let tag = IdentityComponent.escapedPayload(
+    identity.tagValue.typedComponentText, delimiters: "];=")
   return IdentityComponent(
     rawValue:
       "TabContentValue[tag=\(tag);optional=\(identity.includeOptional);occurrence=\(identity.occurrence);generation=\(identity.generation)]"
