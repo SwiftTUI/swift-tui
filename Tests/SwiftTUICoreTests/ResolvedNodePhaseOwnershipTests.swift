@@ -42,7 +42,7 @@ private let resolvedNodePhaseOwnershipManifest:
     ("structuralEdgeRole", .structure),
     ("entityIdentity", .identity),
     ("entityStructuralPath", .structure),
-    ("declarationOwnerEdge", .structure),
+    ("_boxedDeclarationOwnerEdge", .structure),
     ("kind", .structure),
     ("typeDiscriminator", .structure),
     ("_storedChildren", .structure),

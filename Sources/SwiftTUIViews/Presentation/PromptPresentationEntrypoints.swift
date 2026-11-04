@@ -1,7 +1,7 @@
 import SwiftTUICore
 
 package struct PromptPresentationSpec: Sendable {
-  package var token: String
+  package var token: PresentationToken.Family
   package var defaultDismissTitle: String
   package var enablementPolicy: PresentationEnablementPolicy
   package var prepareSurface: @MainActor @Sendable (ResolveContext) -> PreparedPortalSurface
@@ -11,7 +11,7 @@ package struct PromptPresentationSpec: Sendable {
 
 package func alertPromptPresentationSpec() -> PromptPresentationSpec {
   promptPresentationSpec(
-    token: "alert", alignment: .center, accessibilityRole: .alert,
+    token: .alert, alignment: .center, accessibilityRole: .alert,
     defaultDismissTitle: "Dismiss", baseline: .init(),
     reconcile: { registry, identity, item in
       registry.alert.sync(sourceIdentity: identity, items: [item])
@@ -20,7 +20,7 @@ package func alertPromptPresentationSpec() -> PromptPresentationSpec {
 
 package func confirmationDialogPromptPresentationSpec() -> PromptPresentationSpec {
   promptPresentationSpec(
-    token: "confirmationDialog", alignment: .bottomLeading, accessibilityRole: .confirmationDialog,
+    token: .confirmationDialog, alignment: .bottomLeading, accessibilityRole: .confirmationDialog,
     defaultDismissTitle: "Cancel",
     baseline: .init(
       headerTone: .accent, minimumWidth: 20, maximumWidth: nil,
@@ -31,7 +31,7 @@ package func confirmationDialogPromptPresentationSpec() -> PromptPresentationSpe
 }
 
 private func promptPresentationSpec(
-  token: String,
+  token: PresentationToken.Family,
   alignment: Alignment,
   accessibilityRole: AccessibilityRole,
   defaultDismissTitle: String,
@@ -64,7 +64,7 @@ package func menuPromptPresentationSpec(
   presentation: AnchoredSurfaceStylePresentation = .init()
 ) -> PromptPresentationSpec {
   .init(
-    token: "menu", defaultDismissTitle: "Close",
+    token: .menu, defaultDismissTitle: "Close",
     enablementPolicy: .inheritsPresenter,
     prepareSurface: { _ in
       PreparedPortalSurface { _, _ in
@@ -86,7 +86,7 @@ package func sheetPromptPresentationSpec(
     container: container, backdropOpacity: backdropOpacity,
     minimumWidth: container == .dropdown ? 0 : 20)
   return .init(
-    token: "sheet", defaultDismissTitle: "Close",
+    token: .sheet, defaultDismissTitle: "Close",
     enablementPolicy: .independent,
     prepareSurface: { context in
       let style = context.environmentValues.sheetStyle
@@ -104,7 +104,7 @@ package func sheetPromptPresentationSpec(
 /// data-driven style supplies its presentation; SheetStyle does not govern them.
 package func palettePromptPresentationSpec() -> PromptPresentationSpec {
   .init(
-    token: "sheet", defaultDismissTitle: "Close",
+    token: .sheet, defaultDismissTitle: "Close",
     enablementPolicy: .independent,
     prepareSurface: { _ in
       PreparedPortalSurface { _, _ in
@@ -139,7 +139,7 @@ private func sheetSurfacePresentation(_ presentation: SheetSurfaceStylePresentat
 
 package func fullScreenCoverPromptPresentationSpec() -> PromptPresentationSpec {
   .init(
-    token: "fullScreenCover", defaultDismissTitle: "Close",
+    token: .fullScreenCover, defaultDismissTitle: "Close",
     enablementPolicy: .independent,
     prepareSurface: { context in
       let style = context.environmentValues.fullScreenCoverStyle

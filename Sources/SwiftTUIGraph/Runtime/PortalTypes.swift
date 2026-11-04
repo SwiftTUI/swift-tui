@@ -1,20 +1,76 @@
+/// The modifier or item that owns a portal attachment.
+package enum PresentationToken: Hashable, Sendable, CustomStringConvertible {
+  package enum Family: String, Sendable {
+    case alert, confirmationDialog, menu, sheet, fullScreenCover, popover, popoverTip
+  }
+  case family(Family)
+  case item(Family, AnyID)
+  case toast(ordinal: Int)
+  case imperative(String)
+
+  package var description: String {
+    switch self {
+    case .family(let family): family.rawValue
+    case .item(let family, let value): "\(family.rawValue):\(value.reflectedValue)"
+    case .toast(let ordinal): ordinal == 0 ? "toast" : "toast[\(ordinal)]"
+    case .imperative(let name): name
+    }
+  }
+}
+
 /// Stable identity for content declared in one subtree and hosted by a portal root.
-package struct PortalEntryID: Hashable, Sendable, CustomStringConvertible {
+package struct PortalEntryID: Hashable, Sendable, CustomStringConvertible,
+  CustomDebugStringConvertible, ExpressibleByStringLiteral
+{
+  package init(stringLiteral value: String) { self = .imperative(value) }
+
+  package static func imperative(_ id: String) -> Self {
+    Self(
+      sourceIdentity: Identity(components: ["__ImperativePresentation", id]), token: .imperative(id)
+    )
+  }
+
+  /// Structural IDs historically reflected the caller's string when minting ForEach paths.
+  package var debugDescription: String {
+    if case .imperative(let name) = token { return String(reflecting: name) }
+    return String(reflecting: description)
+  }
+
   package var sourceIdentity: Identity
   package var sourceStructuralPath: StructuralPath
   package var sourceEntityIdentity: EntityIdentity?
-  package var token: String
+  package var token: PresentationToken
 
   package init(
     sourceIdentity: Identity,
     sourceStructuralPath: StructuralPath? = nil,
     sourceEntityIdentity: EntityIdentity? = nil,
-    token: String
+    token: PresentationToken
   ) {
     self.sourceIdentity = sourceIdentity
     self.sourceStructuralPath = sourceStructuralPath ?? StructuralPath(identity: sourceIdentity)
     self.sourceEntityIdentity = sourceEntityIdentity
     self.token = token
+  }
+
+  /// A declaration keeps its activation when its entity moves to another slot.
+  /// Without an entity, the declaring node's identity is the lifetime boundary.
+  package static func == (lhs: Self, rhs: Self) -> Bool {
+    guard lhs.token == rhs.token, lhs.sourceEntityIdentity == rhs.sourceEntityIdentity else {
+      return false
+    }
+    return lhs.sourceEntityIdentity != nil || lhs.sourceIdentity == rhs.sourceIdentity
+  }
+
+  package func hash(into hasher: inout Hasher) {
+    hasher.combine(token)
+    hasher.combine(sourceEntityIdentity)
+    if sourceEntityIdentity == nil { hasher.combine(sourceIdentity) }
+  }
+
+  package func hasSameAttachment(as other: Self) -> Bool {
+    self == other && sourceIdentity == other.sourceIdentity
+      && sourceStructuralPath == other.sourceStructuralPath
   }
 
   package var description: String {
@@ -25,8 +81,8 @@ package struct PortalEntryID: Hashable, Sendable, CustomStringConvertible {
   }
 
   package enum OwnerKey: Hashable, Sendable, CustomStringConvertible {
-    case entity(EntityIdentity, token: String)
-    case source(StructuralPath, token: String)
+    case entity(EntityIdentity, token: PresentationToken)
+    case source(StructuralPath, token: PresentationToken)
 
     package var description: String {
       switch self {
@@ -64,14 +120,14 @@ package struct DeclarationOwnerEdge: Hashable, Sendable {
   package var sourceStructuralPath: StructuralPath
   package var sourceEntityIdentity: EntityIdentity?
   package var placementRoot: StructuralPath
-  package var token: String
+  package var token: PresentationToken
 
   package init(
     sourceIdentity: Identity,
     sourceStructuralPath: StructuralPath,
     sourceEntityIdentity: EntityIdentity?,
     placementRoot: StructuralPath,
-    token: String
+    token: PresentationToken
   ) {
     self.sourceIdentity = sourceIdentity
     self.sourceStructuralPath = sourceStructuralPath

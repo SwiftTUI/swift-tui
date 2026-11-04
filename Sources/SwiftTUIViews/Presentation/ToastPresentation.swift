@@ -710,7 +710,7 @@ public struct ToastModifier<ToastContent: View>: IterativePrimitiveViewModifier 
       guard active else { return [node] }
       // Count declarations, including inactive ones, in their authored chain.
       // Visibility cannot rename a sibling's attachment or restart its lifetime.
-      let token = attachmentOrdinal == 0 ? "toast" : "toast[\(attachmentOrdinal)]"
+      let token = PresentationToken.toast(ordinal: attachmentOrdinal)
       let portalEntryID = presentationAttachment(for: node, token: token)
       let dismissInvalidator = context.invalidationProxy?.invalidator
       let onDismiss = presentationDismissObserver(
@@ -718,8 +718,7 @@ public struct ToastModifier<ToastContent: View>: IterativePrimitiveViewModifier 
         authoringContext: onDismissAuthoringContext
       )
       let item = ToastPresentationItem(
-        id: portalEntryID.description,
-        portalEntryID: portalEntryID,
+        id: portalEntryID,
         contentPayloads: portalAttachmentDeclaredBuilderChildren(
           from: toastContent,
           portalEntryID: portalEntryID,

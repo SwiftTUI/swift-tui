@@ -69,6 +69,12 @@ package struct PortalAttachmentEdge: Sendable, Equatable {
   package var modalPolicy: PortalModalPolicy?
   package var lifecycleActiveWhileHidden: Bool
 
+  package static func == (lhs: Self, rhs: Self) -> Bool {
+    lhs.portalEntryID.hasSameAttachment(as: rhs.portalEntryID)
+      && lhs.modalPolicy == rhs.modalPolicy
+      && lhs.lifecycleActiveWhileHidden == rhs.lifecycleActiveWhileHidden
+  }
+
   package init(
     portalEntryID: PortalEntryID,
     modalPolicy: PortalModalPolicy? = nil,

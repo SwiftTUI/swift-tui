@@ -58,7 +58,7 @@ struct OverlayStackTests {
       sourceIdentity: testIdentity("Scene", "Owner"),
       sourceStructuralPath: sourceStructuralPath,
       sourceEntityIdentity: sourceEntity,
-      token: "sheet"
+      token: .family(.sheet)
     )
 
     let stack = composeOverlayStackTree(
@@ -89,7 +89,7 @@ struct OverlayStackTests {
     #expect(ownerEdge.sourceStructuralPath == sourceStructuralPath)
     #expect(ownerEdge.sourceEntityIdentity == sourceEntity)
     #expect(ownerEdge.placementRoot == entry.structuralPath)
-    #expect(ownerEdge.token == "sheet")
+    #expect(ownerEdge.token == .family(.sheet))
   }
 
   @Test("portal attachment payloads carry source edge metadata")
@@ -98,7 +98,7 @@ struct OverlayStackTests {
       sourceIdentity: testIdentity("Scene", "Owner"),
       sourceStructuralPath: StructuralPath(identity: testIdentity("Scene", "Owner")),
       sourceEntityIdentity: EntityIdentity("owner"),
-      token: "popover"
+      token: .family(.popover)
     )
 
     let payloads = portalAttachmentDeclaredBuilderChildren(

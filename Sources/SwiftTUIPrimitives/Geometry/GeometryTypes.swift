@@ -750,7 +750,8 @@ public struct IdentityComponent: Hashable, Sendable, Codable, CustomStringConver
   }
 
   public static func explicitID<ID: Hashable>(_ id: ID, occurrence: Int = 0) -> Self {
-    let escaped = escapedExplicitIDComponent(String(reflecting: id))
+    let value = (id as? AnyID)?.reflectedValue ?? String(reflecting: id)
+    let escaped = escapedExplicitIDComponent(value)
     let base = "ID[\(escaped)]"
     guard occurrence > 0 else { return Self(base, shape: .plain) }
     return Self("ID[\(escaped)#\(occurrence)]", shape: .qualifiedID(base: base))

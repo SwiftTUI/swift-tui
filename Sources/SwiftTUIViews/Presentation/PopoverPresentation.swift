@@ -112,11 +112,9 @@ package struct BuiltinPopoverPresentationModifier<PopoverContent: View>:
     ) { background, triggerIdentity in
       let presentation = styleInputs.resolvedPopoverPresentation(style: popoverStyle)
       let sourceIdentity = background.identity
-      let portalEntryID = presentationAttachment(for: background, token: "popover")
-      let itemID = portalEntryID.description
+      let portalEntryID = presentationAttachment(for: background, token: .family(.popover))
       let item = popoverPresentationItem(
-        id: itemID,
-        portalEntryID: portalEntryID,
+        id: portalEntryID,
         sourceIdentity: sourceIdentity,
         attachmentAnchor: attachmentAnchor,
         arrowEdge: arrowEdge,

@@ -39,12 +39,10 @@ package struct BuiltinItemPopoverPresentationModifier<
       let sourceIdentity = background.identity
       let portalEntryID = presentationAttachment(
         for: background,
-        token: "popover:\(String(reflecting: currentItem.id))"
+        token: .item(.popover, AnyID(currentItem.id))
       )
-      let itemID = portalEntryID.description
       let item = popoverPresentationItem(
-        id: itemID,
-        portalEntryID: portalEntryID,
+        id: portalEntryID,
         sourceIdentity: sourceIdentity,
         attachmentAnchor: attachmentAnchor,
         arrowEdge: arrowEdge,
@@ -106,12 +104,9 @@ package struct PopoverTipModifier<Tip: PopoverTip>: IterativePrimitiveViewModifi
     // same tip ID returns.
     let tip = tip
     let suppressed: Bool
-    let tipID: String
     if let tip, tip.isEligible {
-      tipID = String(reflecting: tip.id)
       suppressed = isPresented == nil && dismissedTipIDs.contains(tip.id)
     } else {
-      tipID = ""
       suppressed = true
     }
 
@@ -151,9 +146,8 @@ package struct PopoverTipModifier<Tip: PopoverTip>: IterativePrimitiveViewModifi
       let sourceIdentity = background.identity
       let portalEntryID = presentationAttachment(
         for: background,
-        token: "popoverTip:\(tipID)"
+        token: .item(.popoverTip, AnyID(tip.id))
       )
-      let itemID = portalEntryID.description
       let dismiss: @MainActor @Sendable () -> Void = {
         [
           isPresented, dismissAuthoringContext, dismissInvalidator, triggerIdentity,
@@ -178,8 +172,7 @@ package struct PopoverTipModifier<Tip: PopoverTip>: IterativePrimitiveViewModifi
       }
       let tipActions = tip.actions
       var item = popoverPresentationItem(
-        id: itemID,
-        portalEntryID: portalEntryID,
+        id: portalEntryID,
         sourceIdentity: sourceIdentity,
         attachmentAnchor: attachmentAnchor,
         arrowEdge: arrowEdge,
@@ -325,8 +318,7 @@ private struct PopoverPlacementLayout: Layout {
 
 @MainActor
 func popoverPresentationItem(
-  id: String,
-  portalEntryID: PortalEntryID,
+  id: PortalEntryID,
   sourceIdentity: Identity,
   attachmentAnchor: PopoverAttachmentAnchor,
   arrowEdge: Edge?,
@@ -338,7 +330,6 @@ func popoverPresentationItem(
 ) -> PopoverPresentationItem {
   let surfaceItem = PromptPresentationItem(
     id: id,
-    portalEntryID: portalEntryID,
     title: "",
     surface: PreparedPortalSurface { _, _ in
       anchoredSurfacePresentation(
@@ -353,7 +344,6 @@ func popoverPresentationItem(
   )
   return PopoverPresentationItem(
     id: id,
-    portalEntryID: portalEntryID,
     sourceIdentity: sourceIdentity,
     attachmentAnchor: attachmentAnchor,
     arrowEdge: arrowEdge,

@@ -30,7 +30,7 @@ package final class AlertPresentationCoordinator:
   }
 
   package func dismiss(
-    id: String
+    id: PortalEntryID
   ) {
     super.dismiss(
       id: id,
@@ -74,7 +74,7 @@ package final class ConfirmationDialogPresentationCoordinator:
   }
 
   package func dismiss(
-    id: String
+    id: PortalEntryID
   ) {
     super.dismiss(
       id: id,
@@ -116,7 +116,7 @@ package final class SheetPresentationCoordinator:
   }
 
   package func dismiss(
-    id: String
+    id: PortalEntryID
   ) {
     super.dismiss(
       id: id,
@@ -157,7 +157,7 @@ package final class PopoverPresentationCoordinator:
   }
 
   package func dismiss(
-    id: String
+    id: PortalEntryID
   ) {
     super.dismiss(
       id: id,
@@ -204,7 +204,7 @@ package final class MenuPresentationCoordinator:
   }
 
   package func dismiss(
-    id: String
+    id: PortalEntryID
   ) {
     super.dismiss(
       id: id,
@@ -249,7 +249,7 @@ package final class ToastPresentationCoordinator:
   }
 
   package func dismiss(
-    id: String
+    id: PortalEntryID
   ) {
     super.dismiss(
       id: id,

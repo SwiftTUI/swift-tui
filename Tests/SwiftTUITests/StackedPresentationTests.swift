@@ -28,9 +28,9 @@ struct StackedPresentationTests {
     let first = try #require(entries.first)
     let last = try #require(entries.last)
 
-    #expect(entries.map { $0.portalEntryID?.token } == ["sheet-a", "cover-b"])
+    #expect(entries.map { $0.portalEntryID?.token.description } == ["sheet-a", "cover-b"])
     #expect(first.ordering.activationOrdinal < last.ordering.activationOrdinal)
-    #expect(edges.map(\.token) == ["sheet-a", "cover-b"])
+    #expect(edges.map(\.token.description) == ["sheet-a", "cover-b"])
   }
 
   @Test("popover coordinator emits every active item")
@@ -41,7 +41,7 @@ struct StackedPresentationTests {
 
     let entries = registry.overlayEntries().filter { $0.kindName == "PopoverPresentation" }
 
-    #expect(entries.map { $0.portalEntryID?.token } == ["popover-a", "popover-b"])
+    #expect(entries.map { $0.portalEntryID?.token.description } == ["popover-a", "popover-b"])
   }
 
   @Test("menu coordinator emits every active item")
@@ -56,7 +56,7 @@ struct StackedPresentationTests {
 
     let entries = registry.overlayEntries().filter { $0.kindName == "MenuPresentation" }
 
-    #expect(entries.map { $0.portalEntryID?.token } == ["menu-a", "menu-b"])
+    #expect(entries.map { $0.portalEntryID?.token.description } == ["menu-a", "menu-b"])
   }
 
   @Test("alert coordinator exposes the oldest active item as a FIFO queue head")
@@ -71,7 +71,7 @@ struct StackedPresentationTests {
 
     let entries = registry.overlayEntries().filter { $0.kindName == "AlertPresentation" }
 
-    #expect(entries.map { $0.portalEntryID?.token } == ["alert-a"])
+    #expect(entries.map { $0.portalEntryID?.token.description } == ["alert-a"])
   }
 
   @Test("queue promotion and same-head refresh preserve checkpointed visible ordering")
@@ -87,14 +87,14 @@ struct StackedPresentationTests {
     let checkpoint = registry.makeCheckpoint()
     registry.alert.dismiss(id: first.id)
     let promoted = registry.overlayEntries()
-    #expect(promoted.last?.portalEntryID?.token == "b")
+    #expect(promoted.last?.portalEntryID?.token.description == "b")
     let promotedOrder = promoted.map(\.ordering)
     registry.alert.present(second)
     #expect(registry.overlayEntries().map(\.ordering) == promotedOrder)
     registry.restoreCheckpoint(checkpoint)
     #expect(registry.overlayEntries().map(\.ordering) == before)
     registry.alert.dismiss(id: first.id)
-    #expect(registry.overlayEntries().last?.portalEntryID?.token == "b")
+    #expect(registry.overlayEntries().last?.portalEntryID?.token.description == "b")
   }
 
   @Test("confirmation coordinator exposes the oldest active item as a FIFO queue head")
@@ -117,7 +117,7 @@ struct StackedPresentationTests {
       $0.kindName == "ConfirmationDialogPresentation"
     }
 
-    #expect(entries.map { $0.portalEntryID?.token } == ["confirmation-a"])
+    #expect(entries.map { $0.portalEntryID?.token.description } == ["confirmation-a"])
   }
 
   @Test("toast coordinator keeps one aggregate overlay entry")
@@ -160,7 +160,10 @@ struct StackedPresentationTests {
     registry.dismissStack().topmostEscapeDismissAction()?()
 
     #expect(dismissals == ["sheet-b"])
-    #expect(registry.overlayEntries().map { $0.portalEntryID?.token } == ["alert-a", "sheet-b"])
+    #expect(
+      registry.overlayEntries().map { $0.portalEntryID?.token.description } == [
+        "alert-a", "sheet-b",
+      ])
   }
 
   @Test("simultaneous families use priority and preserve order through refresh and rollback")
@@ -204,7 +207,7 @@ struct StackedPresentationTests {
     registry.reconcile(declarations)
     #expect(registry.overlayEntries().map(\.ordering) == order)
     registry.menu.present(stackedPromptItem(id: "later-menu", spec: menuPromptPresentationSpec()))
-    #expect(registry.overlayEntries().last?.portalEntryID?.token == "later-menu")
+    #expect(registry.overlayEntries().last?.portalEntryID?.token.description == "later-menu")
     registry.restoreCheckpoint(checkpoint)
     #expect(registry.overlayEntries().map(\.ordering) == order)
   }
@@ -423,7 +426,7 @@ private func stackedPromptItem(
   dismiss: @escaping @MainActor @Sendable () -> Void = {}
 ) -> PromptPresentationItem {
   PromptPresentationItem(
-    id: id,
+    id: .imperative(id),
     enablementPolicy: spec.enablementPolicy,
     title: id,
     surface: spec.prepareSurface(.init(identity: testIdentity("StackedImperative", id))),
@@ -443,7 +446,7 @@ private func stackedPopoverItem(
     spec: sheetPromptPresentationSpec()
   )
   return PopoverPresentationItem(
-    id: id,
+    id: .imperative(id),
     sourceIdentity: testIdentity("StackedPopover", id),
     attachmentAnchor: .rect(.bounds),
     arrowEdge: .top,
@@ -457,7 +460,7 @@ private func stackedToastItem(
   id: String
 ) -> ToastPresentationItem {
   ToastPresentationItem(
-    id: id,
+    id: .imperative(id),
     contentPayloads: [],
     style: .info,
     duration: nil,

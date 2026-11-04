@@ -21,6 +21,7 @@ public struct AnyID: Hashable, Sendable {
   }
 
   package var typedComponentText: String { box.typedComponentText }
+  package var reflectedValue: String { box.reflectedValue }
 
   public static func == (lhs: AnyID, rhs: AnyID) -> Bool {
     lhs.box.isEqual(to: rhs.box)
@@ -53,6 +54,7 @@ extension AnyID {
 
 private protocol AnyIDBox: Sendable {
   var typedComponentText: String { get }
+  var reflectedValue: String { get }
   func hash(into hasher: inout Hasher)
   func isEqual(to other: any AnyIDBox) -> Bool
   var derivationBase: AnyID? { get }
@@ -60,6 +62,7 @@ private protocol AnyIDBox: Sendable {
 
 private struct AnyIDConcreteBox<Value: Hashable & Sendable>: AnyIDBox {
   let value: Value
+  var reflectedValue: String { String(reflecting: value) }
   var typedComponentText: String {
     "\(String(reflecting: Value.self)):\(String(reflecting: value))"
   }

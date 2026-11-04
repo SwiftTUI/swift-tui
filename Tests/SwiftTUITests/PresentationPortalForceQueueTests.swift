@@ -376,15 +376,14 @@ extension PresentationPortalForceQueueTests {
 
     let portalEntryID = PortalEntryID(
       sourceIdentity: Identity(components: ["__ImperativePresentation", "unit-toast"]),
-      token: "unit-toast"
+      token: .imperative("unit-toast")
     )
     // Present while a draft is in flight: the publish must replay the
     // operation instead of wiping it.
     let draft = state.makeDraft()
     environment.toastPresentationCoordinator.present(
       ToastPresentationItem(
-        id: "unit-toast",
-        portalEntryID: portalEntryID,
+        id: portalEntryID,
         contentPayloads: portalAttachmentDeclaredBuilderChildren(
           from: Text("UnitToast"),
           portalEntryID: portalEntryID,
@@ -660,12 +659,11 @@ private struct ImperativeToastForceQueueButton: View {
         presses += 1
         let portalEntryID = PortalEntryID(
           sourceIdentity: Identity(components: ["__ImperativePresentation", "imperative-toast"]),
-          token: "imperative-toast"
+          token: .imperative("imperative-toast")
         )
         coordinator.present(
           ToastPresentationItem(
-            id: "imperative-toast",
-            portalEntryID: portalEntryID,
+            id: portalEntryID,
             contentPayloads: portalAttachmentDeclaredBuilderChildren(
               from: Text("ImpToastUp"),
               portalEntryID: portalEntryID,

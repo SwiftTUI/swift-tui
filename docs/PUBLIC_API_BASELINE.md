@@ -19,22 +19,22 @@ For products, supported imports, and re-export reachability, see [PUBLIC_MODULE_
 | Module | Top-level | All public |
 |---|---:|---:|
 | `SwiftTUI` | 1 | 4 |
-| `SwiftTUIRuntime` | 60 | 525 |
+| `SwiftTUIRuntime` | 60 | 530 |
 | `SwiftTUIProfiling` | 9 | 52 |
-| `SwiftTUIViews` | 418 | 2585 |
+| `SwiftTUIViews` | 419 | 2585 |
 | `SwiftTUIAnimatedImage` | 5 | 36 |
 | `SwiftTUIArguments` | 5 | 61 |
 | `SwiftTUIPTYPrimitives` | 7 | 40 |
-| `SwiftTUITerminalCLI` | 6 | 24 |
+| `SwiftTUITerminalCLI` | 6 | 25 |
 | `SwiftTUICLIAttach` | 1 | 6 |
 | `SwiftTUICLI` | 0 | 0 |
 | `SwiftTUIWASI` | 3 | 8 |
 | `SwiftTUIWebHost` | 3 | 17 |
 | `SwiftTUIWebHostCLI` | 2 | 8 |
 | `SwiftTUIAndroidHost` | 16 | 44 |
-| `SwiftTUICore` | 41 | 278 |
-| `SwiftTUIPrimitives` | 175 | 1556 |
-| `SwiftTUIGraph` | 77 | 510 |
+| `SwiftTUICore` | 43 | 296 |
+| `SwiftTUIPrimitives` | 176 | 1576 |
+| `SwiftTUIGraph` | 78 | 592 |
 | `SwiftTUIPTYCPrimitives` | 0 | 0 |
 | `SwiftTUIPlatformIO` | 1 | 19 |
 | `SwiftTUITestSupport` | 0 | 0 |
@@ -66,7 +66,7 @@ For products, supported imports, and re-export reachability, see [PUBLIC_MODULE_
 - `HostedSurfaceSizeNegotiator` — struct — 9 members
 - `HostLengthSize` — struct — 3 members
 - `HotReloadExport` — enum — 1 member
-- `InProcessSignalReader` — class — 4 members
+- `InProcessSignalReader` — class — 6 members
 - `InputEvent` — enum — 6 members
 - `InputReader` — class — 3 members
 - `InputReading` — protocol — 1 member
@@ -82,7 +82,7 @@ For products, supported imports, and re-export reachability, see [PUBLIC_MODULE_
 - `RasterPresentationSurface` — protocol — 1 member
 - `RenderSnapshot` — struct — 6 members
 - `RunLoop` — class — 11 members
-- `RunLoopExitReason` — enum — 4 members
+- `RunLoopExitReason` — enum — 5 members
 - `RunLoopResult` — struct — 4 members
 - `RuntimeConfiguration` — struct — 60 members
 - `RuntimeIssueSink` — extension — 1 member
@@ -93,7 +93,7 @@ For products, supported imports, and re-export reachability, see [PUBLIC_MODULE_
 - `SceneManifest` — struct — 5 members
 - `SemanticHostFrame` — struct — 7 members
 - `SemanticHostFrameCapabilities` — struct — 8 members
-- `SignalReading` — protocol — 1 member
+- `SignalReading` — protocol — 3 members
 - `StateKeyHandler` — typealias
 - `TerminalCapabilityProfile` — struct — 24 members
 - `TerminalCommandPresentationSurface` — protocol — 7 members
@@ -126,7 +126,7 @@ For products, supported imports, and re-export reachability, see [PUBLIC_MODULE_
 
 ## SwiftTUIViews
 
-### Canonical surface (418)
+### Canonical surface (419)
 
 - `AccessibilityAdjustmentDirection` — enum — 2 members
 - `AccessibilityAnnouncer` — enum — 1 member
@@ -140,7 +140,8 @@ For products, supported imports, and re-export reachability, see [PUBLIC_MODULE_
 - `AnimationCompletionCriteria` — struct — 2 members
 - `AnimationContext` — struct — 3 members
 - `AnimationEnvironmentSnapshot` — struct — 1 member
-- `AnimationState` — struct — 2 members
+- `AnimationState` — struct — 3 members
+- `AnimationStateKey` — protocol — 2 members
 - `AnimationTimelineSchedule` — struct — 7 members
 - `AnyButtonStyle` — struct — 8 members
 - `AnyControlGroupStyle` — struct — 7 members
@@ -302,7 +303,7 @@ For products, supported imports, and re-export reachability, see [PUBLIC_MODULE_
 - `InlineMenuStyle` — struct — 3 members
 - `InlinePickerStyle` — struct — 4 members
 - `InsetGroupedListStyle` — struct — 3 members
-- `InsetShape` — struct — 7 members
+- `InsetShape` — struct — 6 members
 - `InsettableShape` — protocol — 5 members
 - `InsetTableStyle` — struct — 3 members
 - `ItemNavigationDestinationModifier` — struct
@@ -442,7 +443,7 @@ For products, supported imports, and re-export reachability, see [PUBLIC_MODULE_
 - `SegmentedPickerStyle` — struct — 5 members
 - `SemanticMetadataModifier` — struct
 - `SequenceGesture` — struct — 8 members
-- `Shape` — protocol — 20 members
+- `Shape` — protocol — 18 members
 - `ShapeStyle` — extension — 8 members
 - `SheetStyle` — protocol — 6 members
 - `SheetStyleConfiguration` — struct — 4 members
@@ -520,7 +521,7 @@ For products, supported imports, and re-export reachability, see [PUBLIC_MODULE_
 - `TransactionKey` — protocol — 2 members
 - `TransactionModifier` — struct
 - `TransitionRegistrationModifier` — struct
-- `TrimmedShape` — struct — 10 members
+- `TrimmedShape` — struct — 9 members
 - `TupleView` — struct — 1 member
 - `UnderlinedLinkStyle` — struct — 3 members
 - `UnderlineTabViewStyle` — struct — 4 members
@@ -589,7 +590,7 @@ For products, supported imports, and re-export reachability, see [PUBLIC_MODULE_
 
 - `App` — extension — 2 members
 - `RenderOnce` — enum — 4 members
-- `SignalReader` — class — 2 members
+- `SignalReader` — class — 3 members
 - `SwiftTUILauncher` — enum — 4 members
 - `TerminalRunner` — enum — 4 members
 - `TerminalRunnerError` — enum — 2 members
@@ -659,7 +660,7 @@ For products, supported imports, and re-export reachability, see [PUBLIC_MODULE_
 ### Canonical surface (40)
 
 - `AccessibilityAnnouncement` — struct — 3 members
-- `AccessibilityFocusPresentation` — struct — 3 members
+- `AccessibilityFocusPresentation` — struct — 5 members
 - `CanvasPixelGridDrawing` — struct — 6 members
 - `CanvasPixelGridMode` — enum — 3 members
 - `DrawCommand` — enum — 14 members
@@ -699,8 +700,10 @@ For products, supported imports, and re-export reachability, see [PUBLIC_MODULE_
 - `TextLayoutOptions` — struct — 5 members
 - `TextLayoutResult` — struct — 4 members
 
-### Package-only seams (1)
+### Package-only seams (3)
 
+- `FrameTailRasterReuseBarrier` — enum — 9 members
+- `RasterPath` — enum — 5 members
 - `RasterReuseDiagnostics` — struct — 3 members
 
 ## SwiftTUIPrimitives
@@ -709,7 +712,7 @@ For products, supported imports, and re-export reachability, see [PUBLIC_MODULE_
 > carry `public` access but do not establish a supported direct import.
 > See the module map for re-export paths and symbol classifications below.
 
-### Canonical surface (172)
+### Canonical surface (174)
 
 - `AccessibilityColorProfile` — enum — 6 members
 - `AccessibilityPreferences` — struct — 8 members
@@ -828,6 +831,7 @@ For products, supported imports, and re-export reachability, see [PUBLIC_MODULE_
 - `RGBPrimaries` — struct — 5 members
 - `RichTextPayload` — struct — 3 members
 - `RichTextRun` — struct — 4 members
+- `RuntimeSignal` — enum — 19 members
 - `ScrollIndicatorVisibility` — struct — 4 members
 - `SelectionTag` — struct — 3 members
 - `SemanticShapeStyle` — struct — 3 members
@@ -882,13 +886,13 @@ For products, supported imports, and re-export reachability, see [PUBLIC_MODULE_
 - `VerticalEdgeSet` — struct — 5 members
 - `ViewDimensions` — struct — 5 members
 - `Visibility` — enum — 4 members
+- `WindowIdentifier` — struct — 6 members
 - `XYZColor` — struct — 6 members
 
-### Package-only seams (3)
+### Package-only seams (2)
 
 - `BorderPlacement` — enum — 2 members
 - `BoxedPath` — struct
-- `WindowIdentifier` — struct — 6 members
 
 ## SwiftTUIGraph
 
@@ -899,7 +903,7 @@ For products, supported imports, and re-export reachability, see [PUBLIC_MODULE_
 ### Canonical surface (64)
 
 - `AccessibilityChildBehavior` — enum — 3 members
-- `AccessibilityNode` — struct — 17 members
+- `AccessibilityNode` — struct — 18 members
 - `AccessibilityPoliteness` — enum — 4 members
 - `AccessibilityPopup` — enum — 6 members
 - `AccessibilityProperties` — class — 34 members
@@ -925,8 +929,8 @@ For products, supported imports, and re-export reachability, see [PUBLIC_MODULE_
 - `FocusedValueKey` — protocol — 1 member
 - `FocusedValues` — struct — 3 members
 - `FocusRegion` — struct — 4 members
-- `FrameScheduler` — class — 12 members
-- `FrameScheduling` — protocol — 8 members
+- `FrameScheduler` — class — 13 members
+- `FrameScheduling` — protocol — 10 members
 - `GestureRecognizerBuildContext` — struct — 2 members
 - `GestureRecognizerEventDisposition` — enum — 3 members
 - `GestureRecognizerPhase` — enum — 7 members
@@ -936,7 +940,7 @@ For products, supported imports, and re-export reachability, see [PUBLIC_MODULE_
 - `KeyPressResult` — enum — 2 members
 - `LifecycleMetadata` — struct — 6 members
 - `MatchedGeometryConfig` — struct — 5 members
-- `MatchedGeometryKey` — struct — 3 members
+- `MatchedGeometryKey` — struct — 4 members
 - `MatchedGeometryNamespace` — struct — 3 members
 - `MatchedGeometryProperties` — struct — 5 members
 - `NodeLifecycleInfo` — struct — 3 members
@@ -944,32 +948,33 @@ For products, supported imports, and re-export reachability, see [PUBLIC_MODULE_
 - `PreferenceKey` — protocol — 3 members
 - `RouteID` — struct — 4 members
 - `RouteKind` — enum — 2 members
-- `RuntimeIssue` — struct — 7 members
+- `RuntimeIssue` — struct — 72 members
 - `RuntimeIssueSeverity` — enum — 3 members
 - `RuntimeIssueSink` — struct — 2 members
 - `RuntimeRegistrationDiagnostics` — struct — 5 members
-- `ScheduledFrame` — struct — 8 members
+- `ScheduledFrame` — struct — 9 members
 - `ScrollRole` — enum — 4 members
 - `ScrollRoute` — struct — 5 members
 - `SectionRole` — enum — 5 members
 - `SemanticMetadata` — struct — 20 members
 - `StateContainer` — class — 6 members
 - `TabItemLabel` — struct — 6 members
-- `TaskDescriptor` — struct — 3 members
+- `TaskDescriptor` — struct — 6 members
 - `TaskPriority` — enum — 6 members
 - `TerminationDisposition` — enum — 2 members
-- `TerminationRequest` — enum — 4 members
+- `TerminationRequest` — enum — 5 members
 - `ThreadSafeInvalidating` — protocol
 - `TransactionSnapshot` — struct — 2 members
 - `WakeCause` — enum — 6 members
 
-### Package-only seams (13)
+### Package-only seams (14)
 
 - `AccessibilityAction` — enum — 11 members
 - `AccessibilityActionKind` — enum — 11 members
-- `AccessibilityActionRequest` — struct — 4 members
-- `AccessibilityActionResponse` — struct — 4 members
+- `AccessibilityActionRequest` — struct — 6 members
+- `AccessibilityActionResponse` — struct — 6 members
 - `AccessibilityActionResult` — enum — 7 members
+- `AccessibilityActionTarget` — struct — 2 members
 - `AccessibilityControlState` — class — 10 members
 - `AccessibilitySelection` — struct — 3 members
 - `AccessibilitySelectionOption` — struct — 4 members

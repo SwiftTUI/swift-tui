@@ -31,7 +31,7 @@ public struct BuiltinPromptPresentationModifier<Actions: View, Message: View>:
       in: context
     ) { background, triggerIdentity in
       let sourceIdentity = background.identity
-      let portalEntryID = presentationAttachment(for: background, token: spec.token)
+      let portalEntryID = presentationAttachment(for: background, token: .family(spec.token))
       let dismiss: @MainActor @Sendable () -> Void = {
         [isPresented, dismissAuthoringContext, dismissInvalidator, triggerIdentity] in
         withAuthoringContext(dismissAuthoringContext) {
@@ -43,8 +43,7 @@ public struct BuiltinPromptPresentationModifier<Actions: View, Message: View>:
         )
       }
       let item = PromptPresentationItem(
-        id: portalEntryID.description,
-        portalEntryID: portalEntryID,
+        id: portalEntryID,
         enablementPolicy: spec.enablementPolicy,
         title: title,
         surface: surface,
@@ -109,10 +108,9 @@ public struct BuiltinSheetPresentationModifier<SheetContent: View>: IterativePri
       in: context
     ) { background, triggerIdentity in
       let sourceIdentity = background.identity
-      let portalEntryID = presentationAttachment(for: background, token: spec.token)
+      let portalEntryID = presentationAttachment(for: background, token: .family(spec.token))
       let item = PromptPresentationItem(
-        id: portalEntryID.description,
-        portalEntryID: portalEntryID,
+        id: portalEntryID,
         enablementPolicy: spec.enablementPolicy,
         title: title,
         surface: surface,
@@ -186,7 +184,7 @@ package struct BuiltinItemPromptPresentationModifier<
       let sourceIdentity = background.identity
       let portalEntryID = presentationAttachment(
         for: background,
-        token: "\(spec.token):\(String(reflecting: currentItem.id))"
+        token: .item(spec.token, AnyID(currentItem.id))
       )
       let dismiss: @MainActor @Sendable () -> Void = {
         [itemBinding, dismissAuthoringContext, dismissInvalidator, triggerIdentity] in
@@ -199,8 +197,7 @@ package struct BuiltinItemPromptPresentationModifier<
         )
       }
       let presentationItem = PromptPresentationItem(
-        id: portalEntryID.description,
-        portalEntryID: portalEntryID,
+        id: portalEntryID,
         enablementPolicy: spec.enablementPolicy,
         title: title,
         surface: surface,
@@ -266,11 +263,10 @@ package struct BuiltinItemSheetPresentationModifier<
       let sourceIdentity = background.identity
       let portalEntryID = presentationAttachment(
         for: background,
-        token: "\(spec.token):\(String(reflecting: currentItem.id))"
+        token: .item(spec.token, AnyID(currentItem.id))
       )
       let presentationItem = PromptPresentationItem(
-        id: portalEntryID.description,
-        portalEntryID: portalEntryID,
+        id: portalEntryID,
         enablementPolicy: spec.enablementPolicy,
         title: title,
         surface: surface,
@@ -325,10 +321,9 @@ package struct MenuStylePresentationModifier<MenuContent: View>: IterativePrimit
       in: context
     ) { background, triggerIdentity in
       let sourceIdentity = background.identity
-      let portalEntryID = presentationAttachment(for: background, token: spec.token)
+      let portalEntryID = presentationAttachment(for: background, token: .family(spec.token))
       let item = PromptPresentationItem(
-        id: portalEntryID.description,
-        portalEntryID: portalEntryID,
+        id: portalEntryID,
         enablementPolicy: spec.enablementPolicy,
         title: "",
         surface: surface,
@@ -427,7 +422,7 @@ public struct BuiltinPaletteSheetPresentationModifier: IterativePrimitiveViewMod
       }
     ) { background, triggerIdentity in
       let sourceIdentity = background.identity
-      let portalEntryID = presentationAttachment(for: background, token: spec.token)
+      let portalEntryID = presentationAttachment(for: background, token: .family(spec.token))
       let dismiss: @MainActor @Sendable () -> Void = {
         [isPresented, dismissAuthoringContext, dismissInvalidator, triggerIdentity] in
         withAuthoringContext(dismissAuthoringContext) {
@@ -436,8 +431,7 @@ public struct BuiltinPaletteSheetPresentationModifier: IterativePrimitiveViewMod
         requestPresentationDismissReconcile(dismissInvalidator, triggerIdentity: triggerIdentity)
       }
       let item = PromptPresentationItem(
-        id: portalEntryID.description,
-        portalEntryID: portalEntryID,
+        id: portalEntryID,
         enablementPolicy: spec.enablementPolicy,
         title: title,
         surface: surface,

@@ -64,19 +64,19 @@ package enum PresentationEnablementPolicy: Sendable {
   case independent
 }
 
-package protocol PortalPresentationItem: Identifiable, Sendable where ID == String {
+package protocol PortalPresentationItem: Identifiable, Sendable where ID == PortalEntryID {
   var portalEntryID: PortalEntryID { get }
   var enablementPolicy: PresentationEnablementPolicy { get }
   var entryDismissObserver: (@MainActor @Sendable () -> Void)? { get }
 }
 
 extension PortalPresentationItem {
+  package var id: PortalEntryID { portalEntryID }
   package var enablementPolicy: PresentationEnablementPolicy { .inheritsPresenter }
 }
 
 package struct PromptPresentationItem: PortalPresentationItem {
   package var enablementPolicy: PresentationEnablementPolicy
-  package var id: String
   package var portalEntryID: PortalEntryID
   package var title: String
   package var surface: PortalSurfacePresentation
@@ -101,8 +101,7 @@ package struct PromptPresentationItem: PortalPresentationItem {
 
   @MainActor
   package init(
-    id: String,
-    portalEntryID: PortalEntryID? = nil,
+    id: PortalEntryID,
     enablementPolicy: PresentationEnablementPolicy = .inheritsPresenter,
     title: String,
     surface: PreparedPortalSurface,
@@ -113,9 +112,8 @@ package struct PromptPresentationItem: PortalPresentationItem {
     onDismiss: (@MainActor @Sendable () -> Void)? = nil,
     actionDismissal: PromptActionDismissal? = nil
   ) {
-    let portalEntryID = portalEntryID ?? fallbackPortalEntryID(for: id)
+    let portalEntryID = id
     let edge = PortalAttachmentEdge(portalEntryID: portalEntryID)
-    self.id = id
     self.portalEntryID = portalEntryID
     self.enablementPolicy = enablementPolicy
     self.title = title
@@ -145,7 +143,7 @@ package struct PromptActionDismissal: Sendable, Equatable {
   private struct Source {
     /// The presented activation: `"presented"` for a Boolean prompt, the
     /// item's ID for an item prompt, `nil` when nothing is presented.
-    var activation: String?
+    var activation: AnyID?
     /// The binding's write identity, when its storage reports one.
     var writeIdentity: StateValueIdentity?
   }
@@ -163,7 +161,7 @@ package struct PromptActionDismissal: Sendable, Equatable {
     self.portalEntryID = portalEntryID
     source = {
       Source(
-        activation: isPresented.wrappedValue ? "presented" : nil,
+        activation: isPresented.wrappedValue ? AnyID(true) : nil,
         writeIdentity: isPresented.valueIdentity?())
     }
     self.dismiss = dismiss
@@ -174,11 +172,11 @@ package struct PromptActionDismissal: Sendable, Equatable {
     item: Binding<Item?>,
     portalEntryID: PortalEntryID,
     dismiss: @escaping @MainActor @Sendable () -> Void
-  ) {
+  ) where Item.ID: Sendable {
     self.portalEntryID = portalEntryID
     source = {
       Source(
-        activation: item.wrappedValue.map { String(reflecting: $0.id) },
+        activation: item.wrappedValue.map { AnyID($0.id) },
         writeIdentity: item.valueIdentity?())
     }
     self.dismiss = dismiss
@@ -207,7 +205,7 @@ package struct PromptActionDismissal: Sendable, Equatable {
   }
 
   package static func == (lhs: Self, rhs: Self) -> Bool {
-    lhs.portalEntryID == rhs.portalEntryID
+    lhs.portalEntryID.hasSameAttachment(as: rhs.portalEntryID)
   }
 }
 
@@ -225,7 +223,6 @@ extension EnvironmentValues {
 }
 
 package struct PopoverPresentationItem: PortalPresentationItem {
-  package var id: String
   package var portalEntryID: PortalEntryID
   package var sourceIdentity: Identity
   package var attachmentAnchor: PopoverAttachmentAnchor
@@ -239,16 +236,14 @@ package struct PopoverPresentationItem: PortalPresentationItem {
   }
 
   package init(
-    id: String,
-    portalEntryID: PortalEntryID? = nil,
+    id: PortalEntryID,
     sourceIdentity: Identity,
     attachmentAnchor: PopoverAttachmentAnchor,
     arrowEdge: Edge?,
     modalPolicy: PortalModalPolicy,
     surfaceItem: PromptPresentationItem
   ) {
-    self.id = id
-    self.portalEntryID = portalEntryID ?? surfaceItem.portalEntryID
+    self.portalEntryID = id
     self.sourceIdentity = sourceIdentity
     self.attachmentAnchor = attachmentAnchor
     self.arrowEdge = arrowEdge
@@ -258,7 +253,6 @@ package struct PopoverPresentationItem: PortalPresentationItem {
 }
 
 package struct ToastPresentationItem: PortalPresentationItem {
-  package var id: String
   package var portalEntryID: PortalEntryID
   package var contentPayloads: [PortalAttachmentPayload]
   /// The declaration's style, resolved at composition time — a toast's
@@ -279,8 +273,7 @@ package struct ToastPresentationItem: PortalPresentationItem {
 
   @MainActor
   package init(
-    id: String,
-    portalEntryID: PortalEntryID? = nil,
+    id: PortalEntryID,
     contentPayloads: [PortalAttachmentPayload],
     style: AnyToastStyle,
     duration: Double?,
@@ -288,12 +281,11 @@ package struct ToastPresentationItem: PortalPresentationItem {
     dismiss: @escaping @MainActor @Sendable () -> Void,
     onDismiss: (@MainActor @Sendable () -> Void)? = nil
   ) {
-    let portalEntryID = portalEntryID ?? fallbackPortalEntryID(for: id)
+    let portalEntryID = id
     let edge = PortalAttachmentEdge(
       portalEntryID: portalEntryID,
       modalPolicy: .nonModal
     )
-    self.id = id
     self.portalEntryID = portalEntryID
     self.contentPayloads = contentPayloads.map { $0.attachingEdgeIfMissing(edge) }
     self.style = style
@@ -321,7 +313,7 @@ package func presentationDismissObserver(
 
 package func presentationAttachment(
   for node: ResolvedNode,
-  token: String
+  token: PresentationToken
 ) -> PortalEntryID {
   PortalEntryID(
     sourceIdentity: node.identity,
@@ -331,18 +323,8 @@ package func presentationAttachment(
   )
 }
 
-package func presentationAttachmentID(
-  for sourceIdentity: Identity,
-  token: String
-) -> String {
-  "\(sourceIdentity.path)#\(token)"
-}
-
-private func fallbackPortalEntryID(
-  for id: String
-) -> PortalEntryID {
-  PortalEntryID(
-    sourceIdentity: Identity(components: ["__ImperativePresentation", id]),
-    token: id
-  )
+package func presentationAttachmentID(for sourceIdentity: Identity, token: PresentationToken.Family)
+  -> PortalEntryID
+{
+  PortalEntryID(sourceIdentity: sourceIdentity, token: .family(token))
 }

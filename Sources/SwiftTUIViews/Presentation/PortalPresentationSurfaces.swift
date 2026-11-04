@@ -26,7 +26,7 @@ package struct HostedPromptPresentation: View {
 /// Keeps the presentation's action scope independent of its visual surface.
 package struct PortalSurfaceRoot: View, ActionScope {
   package var item: PromptPresentationItem
-  package nonisolated var id: String { item.id }
+  package nonisolated var id: PortalEntryID { item.id }
   package var body: some View { PortalSurfaceContents(item: item) }
 }
 

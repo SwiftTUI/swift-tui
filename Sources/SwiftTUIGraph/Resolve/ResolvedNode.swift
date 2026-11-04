@@ -23,7 +23,13 @@ package struct ResolvedNode: Equatable, Sendable {
   package var structuralEdgeRole: StructuralEdgeRole
   package var entityIdentity: EntityIdentity?
   package var entityStructuralPath: StructuralPath?
-  package var declarationOwnerEdge: DeclarationOwnerEdge?
+  // Only portal entries have a declaration owner. Keep the typed token and
+  // its source paths out of the inline storage of every ordinary node.
+  package var declarationOwnerEdge: DeclarationOwnerEdge? {
+    get { _boxedDeclarationOwnerEdge?.value }
+    set { _boxedDeclarationOwnerEdge = newValue.map(Boxed.init) }
+  }
+  private var _boxedDeclarationOwnerEdge: Boxed<DeclarationOwnerEdge>?
   package var kind: NodeKind
   /// Stable per-Swift-type discriminator carried alongside `kind`.
   ///
@@ -170,7 +176,7 @@ package struct ResolvedNode: Equatable, Sendable {
   /// the translation (and, per `properties`, the size) under
   /// `withAnimation`.
   ///
-  /// Boxed and optional on purpose: the config carries a key string, a
+  /// Boxed and optional on purpose: the config carries a typed key, a
   /// `UnitPoint`, and flags, and storing it inline pushed `ResolvedNode`
   /// past its teardown size budget (`DeepTreeTeardownTests`). `nil` is the
   /// common case; only matched nodes populate it.
@@ -219,7 +225,7 @@ package struct ResolvedNode: Equatable, Sendable {
     self.structuralEdgeRole = structuralEdgeRole ?? surfaceComposition.role
     self.entityIdentity = nil
     self.entityStructuralPath = nil
-    self.declarationOwnerEdge = nil
+    self._boxedDeclarationOwnerEdge = nil
     self.kind = kind
     self.typeDiscriminator = nil
     // Assign the backing stores directly — the computed setters would
@@ -285,7 +291,7 @@ package struct ResolvedNode: Equatable, Sendable {
       structuralEdgeRole ?? (indexedChildSource == nil ? surfaceComposition.role : .viewportBarrier)
     self.entityIdentity = nil
     self.entityStructuralPath = nil
-    self.declarationOwnerEdge = nil
+    self._boxedDeclarationOwnerEdge = nil
     self.kind = kind
     self.typeDiscriminator = typeDiscriminator
     self._storedChildren = children
