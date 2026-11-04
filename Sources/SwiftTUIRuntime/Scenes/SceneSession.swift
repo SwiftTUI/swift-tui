@@ -4,12 +4,30 @@ import SwiftTUIViews
   @_spi(Runners) public init() {}
 }
 
+/// The host that owns a scene session.
+@_spi(Runners) public enum SceneSurface: Hashable, Sendable {
+  case terminal, web, webSurface, ghosttyWeb
+  case hosted(WindowIdentifier)
+  case custom(String)
+
+  public var name: String {
+    switch self {
+    case .terminal: "terminal"
+    case .web: "web"
+    case .webSurface: "web-surface"
+    case .ghosttyWeb: "ghostty-web"
+    case .hosted(let id): "hosted-\(id.rawValue)"
+    case .custom(let name): name
+    }
+  }
+}
+
 @_spi(Runners) public final class SceneSessionResources {
   @_spi(Runners) public let presentationSurface: any PresentationSurfaceMetricsProvider
   @_spi(Runners) public let terminalInputReader: any TerminalInputReading
   @_spi(Runners) public let signalReader: (any SignalReading)?
   @_spi(Runners) public let scheduler: any FrameScheduling
-  @_spi(Runners) public let surfaceName: String
+  @_spi(Runners) public let sceneSurface: SceneSurface
   @_spi(Runners) public let environmentValues: [String: String]
   @_spi(Runners) public let frameSink: (any FrameDiagnosticSink)?
   @_spi(Runners) public let progressProbe: RunLoopProgressProbe?
@@ -24,7 +42,7 @@ import SwiftTUIViews
     terminalInputReader: any TerminalInputReading,
     signalReader: (any SignalReading)? = nil,
     scheduler: any FrameScheduling = FrameScheduler(),
-    surfaceName: String = "terminal",
+    sceneSurface: SceneSurface = .terminal,
     environmentValues: [String: String] = [:],
     frameSink: (any FrameDiagnosticSink)? = nil,
     progressProbe: RunLoopProgressProbe?,
@@ -36,7 +54,7 @@ import SwiftTUIViews
     self.terminalInputReader = terminalInputReader
     self.signalReader = signalReader
     self.scheduler = scheduler
-    self.surfaceName = surfaceName
+    self.sceneSurface = sceneSurface
     self.environmentValues = environmentValues
     self.frameSink = frameSink
     self.progressProbe = progressProbe
@@ -51,7 +69,7 @@ import SwiftTUIViews
     terminalInputReader: any TerminalInputReading,
     signalReader: (any SignalReading)? = nil,
     scheduler: any FrameScheduling = FrameScheduler(),
-    surfaceName: String = "terminal",
+    sceneSurface: SceneSurface = .terminal,
     environmentValues: [String: String] = [:],
     frameSink: (any FrameDiagnosticSink)? = nil,
     progressProbe: RunLoopProgressProbe?,
@@ -63,7 +81,7 @@ import SwiftTUIViews
       terminalInputReader: terminalInputReader,
       signalReader: signalReader,
       scheduler: scheduler,
-      surfaceName: surfaceName,
+      sceneSurface: sceneSurface,
       environmentValues: environmentValues,
       frameSink: frameSink,
       progressProbe: progressProbe,
@@ -78,7 +96,7 @@ import SwiftTUIViews
     terminalInputReader: any TerminalInputReading,
     signalReader: (any SignalReading)? = nil,
     scheduler: any FrameScheduling = FrameScheduler(),
-    surfaceName: String = "terminal",
+    sceneSurface: SceneSurface = .terminal,
     environmentValues: [String: String] = [:],
     frameSink: (any FrameDiagnosticSink)? = nil,
     runtimeConfiguration: RuntimeConfiguration = .default,
@@ -90,7 +108,7 @@ import SwiftTUIViews
       terminalInputReader: terminalInputReader,
       signalReader: signalReader,
       scheduler: scheduler,
-      surfaceName: surfaceName,
+      sceneSurface: sceneSurface,
       environmentValues: environmentValues,
       frameSink: frameSink,
       progressProbe: nil,
@@ -105,7 +123,7 @@ import SwiftTUIViews
     terminalInputReader: any TerminalInputReading,
     signalReader: (any SignalReading)? = nil,
     scheduler: any FrameScheduling = FrameScheduler(),
-    surfaceName: String = "terminal",
+    sceneSurface: SceneSurface = .terminal,
     environmentValues: [String: String] = [:],
     frameSink: (any FrameDiagnosticSink)? = nil,
     runtimeConfiguration: RuntimeConfiguration = .default,
@@ -116,7 +134,7 @@ import SwiftTUIViews
       terminalInputReader: terminalInputReader,
       signalReader: signalReader,
       scheduler: scheduler,
-      surfaceName: surfaceName,
+      sceneSurface: sceneSurface,
       environmentValues: environmentValues,
       frameSink: frameSink,
       progressProbe: nil,
@@ -131,7 +149,7 @@ import SwiftTUIViews
     terminalInputReader: any TerminalInputReading,
     signalReader: (any SignalReading)? = nil,
     scheduler: any FrameScheduling = FrameScheduler(),
-    surfaceName: String = "terminal",
+    sceneSurface: SceneSurface = .terminal,
     environmentValues: [String: String] = [:],
     frameSink: (any FrameDiagnosticSink)? = nil,
     progressProbe: RunLoopProgressProbe?,
@@ -145,7 +163,7 @@ import SwiftTUIViews
       terminalInputReader: terminalInputReader,
       signalReader: signalReader,
       scheduler: scheduler,
-      surfaceName: surfaceName,
+      sceneSurface: sceneSurface,
       environmentValues: environmentValues,
       frameSink: frameSink,
       progressProbe: progressProbe,
@@ -160,7 +178,7 @@ import SwiftTUIViews
     terminalInputReader: any TerminalInputReading,
     signalReader: (any SignalReading)? = nil,
     scheduler: any FrameScheduling = FrameScheduler(),
-    surfaceName: String = "terminal",
+    sceneSurface: SceneSurface = .terminal,
     environmentValues: [String: String] = [:],
     frameSink: (any FrameDiagnosticSink)? = nil,
     progressProbe: RunLoopProgressProbe?,
@@ -173,7 +191,7 @@ import SwiftTUIViews
       terminalInputReader: terminalInputReader,
       signalReader: signalReader,
       scheduler: scheduler,
-      surfaceName: surfaceName,
+      sceneSurface: sceneSurface,
       environmentValues: environmentValues,
       frameSink: frameSink,
       progressProbe: progressProbe,
@@ -188,7 +206,7 @@ import SwiftTUIViews
     terminalInputReader: any TerminalInputReading,
     signalReader: (any SignalReading)? = nil,
     scheduler: any FrameScheduling = FrameScheduler(),
-    surfaceName: String = "terminal",
+    sceneSurface: SceneSurface = .terminal,
     environmentValues: [String: String] = [:],
     frameSink: (any FrameDiagnosticSink)? = nil,
     runtimeConfiguration: RuntimeConfiguration = .default,
@@ -201,7 +219,7 @@ import SwiftTUIViews
       terminalInputReader: terminalInputReader,
       signalReader: signalReader,
       scheduler: scheduler,
-      surfaceName: surfaceName,
+      sceneSurface: sceneSurface,
       environmentValues: environmentValues,
       frameSink: frameSink,
       progressProbe: nil,
@@ -216,7 +234,7 @@ import SwiftTUIViews
     terminalInputReader: any TerminalInputReading,
     signalReader: (any SignalReading)? = nil,
     scheduler: any FrameScheduling = FrameScheduler(),
-    surfaceName: String = "terminal",
+    sceneSurface: SceneSurface = .terminal,
     environmentValues: [String: String] = [:],
     frameSink: (any FrameDiagnosticSink)? = nil,
     runtimeConfiguration: RuntimeConfiguration = .default,
@@ -228,7 +246,7 @@ import SwiftTUIViews
       terminalInputReader: terminalInputReader,
       signalReader: signalReader,
       scheduler: scheduler,
-      surfaceName: surfaceName,
+      sceneSurface: sceneSurface,
       environmentValues: environmentValues,
       frameSink: frameSink,
       progressProbe: nil,
@@ -249,7 +267,7 @@ import SwiftTUIViews
     resources: SceneSessionResources
   ) async throws -> RunLoopResult<SceneSessionState> {
     #if DEBUG && (os(macOS) || os(Linux))
-      if resources.surfaceName == "terminal",
+      if resources.sceneSurface == .terminal,
         let spool = FeatureFlags.environmentValue(.hotReloadSpool),
         !spool.isEmpty
       {
@@ -293,7 +311,7 @@ import SwiftTUIViews
       debugSignature: sessionName,
       values: resources.environmentValues
     )
-    environmentSnapshot.values["surface"] = resources.surfaceName
+    environmentSnapshot.values["surface"] = resources.sceneSurface.name
     environmentSnapshot.values["session"] = sessionName
     environmentSnapshot.values["scene"] = configuration.identifier.rawValue
     if let title = configuration.title {

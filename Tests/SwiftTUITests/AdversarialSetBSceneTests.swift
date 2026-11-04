@@ -217,7 +217,7 @@ struct AdversarialSetBSceneTests {
       descriptor: .init(id: "shared", title: "Shared", isDefault: true),
       resources: SceneSessionResources(
         presentationSurface: terminal as any PresentationSurfaceMetricsProvider,
-        terminalInputReader: reader, surfaceName: "setb-scenes"),
+        terminalInputReader: reader, sceneSurface: .custom("setb-scenes")),
       isPrimary: true)
     let received = SetBEventLog()
     let stream = endpoint.input.scopedInputEvents()
@@ -269,7 +269,7 @@ struct AdversarialSetBSceneTests {
       sessionName: "SetBScenes.DoubleRequest",
       resources: SceneSessionResources(
         presentationSurface: terminal as any PresentationSurfaceMetricsProvider,
-        terminalInputReader: input, surfaceName: "setb-scenes"),
+        terminalInputReader: input, sceneSurface: .custom("setb-scenes")),
       stateContainer: StateContainer(
         initialState: SceneSessionState(), invalidationIdentities: [selection.rootIdentity]),
       focusTracker: FocusTracker(invalidationIdentities: [selection.rootIdentity]))

@@ -194,7 +194,7 @@ extension SceneSessionResources {
     let resources = SceneSessionResources(
       presentationSurface: surface,
       terminalInputReader: TerminalReaderInput(source: terminalInputReader, surface: surface),
-      signalReader: signalReader, scheduler: scheduler, surfaceName: surfaceName,
+      signalReader: signalReader, scheduler: scheduler, sceneSurface: sceneSurface,
       environmentValues: environmentValues, frameSink: frameSink, progressProbe: progressProbe,
       runtimeConfiguration: runtimeConfiguration, renderMode: renderMode,
       focusPresentationHandler: focusPresentationHandler)

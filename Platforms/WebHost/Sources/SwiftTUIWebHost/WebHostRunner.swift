@@ -111,7 +111,7 @@ public enum WebHostRunner {
           channel: channel, transport: transport, signalReader: signalReader)
         let resources = SceneSessionResources(
           presentationSurface: transport, terminalInputReader: inputReader,
-          signalReader: signalReader, surfaceName: "web", runtimeConfiguration: configuration)
+          signalReader: signalReader, sceneSurface: .web, runtimeConfiguration: configuration)
         resources.runtimeIssueSink = RuntimeIssueSink { issue in
           try? transport.notifyRuntimeIssue(issue)
         }

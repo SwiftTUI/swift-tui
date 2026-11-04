@@ -399,7 +399,7 @@ struct AdversarialSetASceneBoundaryTests {
     let original = SceneSessionResources(
       presentationSurface: SceneBoundaryTerminal(),
       terminalInputReader: SceneBoundaryInput(keys: []),
-      surfaceName: "owner", environmentValues: ["marker": "retained"],
+      sceneSurface: .custom("owner"), environmentValues: ["marker": "retained"],
       runtimeConfiguration: .init(debug: true), renderMode: .sync,
       focusPresentationHandler: { _ in probe.first += 1 })
     original.runtimeIssueSink = .init { issue in probe.issueCodes.append(issue.code) }
@@ -407,7 +407,7 @@ struct AdversarialSetASceneBoundaryTests {
       descriptor: .init(id: "secondary", title: nil, isDefault: false),
       resources: original, isPrimary: false)
     defer { endpoint.stop() }
-    #expect(endpoint.resources.surfaceName == "owner")
+    #expect(endpoint.resources.sceneSurface == .custom("owner"))
     #expect(endpoint.resources.environmentValues["marker"] == "retained")
     #expect(endpoint.resources.runtimeConfiguration.debug)
     #expect(endpoint.resources.renderMode == .sync)

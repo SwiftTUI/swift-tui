@@ -168,7 +168,7 @@ public final class HostedSceneSession {
       terminalInputReader: inputReader,
       signalReader: signalReader,
       scheduler: scheduler,
-      surfaceName: "hosted-\(descriptor.id.rawValue)",
+      sceneSurface: .hosted(descriptor.id),
       renderMode: renderMode,
       focusPresentationHandler: { [weak self] presentation in
         guard let self, self.acceptsFocusPresentation, self.runGeneration == generation else {

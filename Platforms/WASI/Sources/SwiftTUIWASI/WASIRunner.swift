@@ -209,7 +209,7 @@ public enum WASIRunner {
         presentationSurface: host,
         terminalInputReader: inputReader,
         signalReader: signalReader,
-        surfaceName: "web-surface",
+        sceneSurface: .webSurface,
         frameSink: wasiFrameDiagnosticsEnabled { name in
           environmentValue(named: name)
         }
@@ -249,7 +249,7 @@ public enum WASIRunner {
         presentationSurface: host,
         terminalInputReader: inputReader,
         signalReader: signalReader,
-        surfaceName: "ghostty-web"
+        sceneSurface: .ghosttyWeb
       )
       resources.runtimeIssueSink = RuntimeIssueSink { issue in
         try? host.write(WebSurfaceFrameEncoder.encodeRuntimeIssue(issue))

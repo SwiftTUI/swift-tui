@@ -21,7 +21,7 @@ package final class SharedSceneEndpoint {
       presentationSurface: surface, terminalInputReader: input,
       signalReader: SharedSceneSignalReader(
         terminal: resources.signalReader, browser: browserSignals),
-      scheduler: resources.scheduler, surfaceName: resources.surfaceName,
+      scheduler: resources.scheduler, sceneSurface: resources.sceneSurface,
       environmentValues: resources.environmentValues, frameSink: resources.frameSink,
       progressProbe: resources.progressProbe, runtimeConfiguration: resources.runtimeConfiguration,
       renderMode: resources.renderMode, focusPresentationHandler: resources.focusPresentationHandler
