@@ -57,7 +57,7 @@ import Testing
       try #require(unsafe pipe(&pipes) == 0)
       defer { for fd in pipes { _ = close(fd) } }
       DebugLogRouter.installDefaultDebugDirectory(dir)
-      let record = BodyChangeRecord(typeName: "Counter", kind: "view", causes: [.init("identity")])
+      let record = BodyChangeRecord(typeName: "Counter", kind: .view, causes: [.init(.identity)])
       BodyChangeOutput.emitPortable(record, format: .text, descriptor: pipes[1])
       BodyChangeOutput.emitPortable(record, format: .json, descriptor: pipes[1])
       #expect(readAvailable(pipes[0]).isEmpty)
@@ -79,7 +79,7 @@ import Testing
       var pipes: [Int32] = [-1, -1]
       try #require(unsafe pipe(&pipes) == 0)
       defer { _ = close(pipes[1]) }
-      let record = BodyChangeRecord(typeName: "Counter", kind: "view", causes: [.init("identity")])
+      let record = BodyChangeRecord(typeName: "Counter", kind: .view, causes: [.init(.identity)])
       DiagnosticScreenOwnership.acquire()
       BodyChangeOutput.emitPortable(record, format: .json, descriptor: pipes[1])
       BodyChangeOutput.flushSuppressed(to: pipes[1])

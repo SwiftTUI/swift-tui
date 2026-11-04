@@ -36,7 +36,7 @@ struct AdversarialSetCDiagnosticTests {
     if id == 94 {
       #expect(
         !log.records.contains {
-          $0.causes.contains { $0.category == "state" && $0.precision == "exact" }
+          $0.causes.contains { $0.category == .state && $0.precision == .exact }
         })
       #expect(unread.wrappedValue == 7)
       return
@@ -54,7 +54,7 @@ struct AdversarialSetCDiagnosticTests {
         #expect(
           records.contains { record in
             record.causes.contains {
-              $0.category == "state" && $0.precision == "exact" && $0.property == "_value"
+              $0.category == .state && $0.precision == .exact && $0.property == "_value"
             }
           })
       }
@@ -83,7 +83,7 @@ struct AdversarialSetCDiagnosticTests {
     #expect(h.frame.contains("7 1"), "\(h.frame)")
     #if DEBUG
       let causes = log.records.filter { $0.typeName.contains("SetCPairedDiagnosticReader") }
-        .flatMap(\.causes).filter { $0.category == "state" && $0.precision == "exact" }
+        .flatMap(\.causes).filter { $0.category == .state && $0.precision == .exact }
       #expect(causes.map(\.property) == ["_projected"], "\(causes)")
     #else
       #expect(log.records.isEmpty)
@@ -97,10 +97,10 @@ struct AdversarialSetCDiagnosticTests {
   }
 
   @Test func setC097RepeatedCausesHaveDeterministicEncoding() throws {
-    let a = BodyChangeRecord.Cause("state", precision: "exact", property: "_a")
-    let b = BodyChangeRecord.Cause("environment", precision: "exact", property: "_b")
-    let first = BodyChangeRecord(typeName: "Fixture", kind: "view", causes: [b, a, b])
-    let second = BodyChangeRecord(typeName: "Fixture", kind: "view", causes: [a, b])
+    let a = BodyChangeRecord.Cause(.state, precision: .exact, property: "_a")
+    let b = BodyChangeRecord.Cause(.environment, precision: .exact, property: "_b")
+    let first = BodyChangeRecord(typeName: "Fixture", kind: .view, causes: [b, a, b])
+    let second = BodyChangeRecord(typeName: "Fixture", kind: .view, causes: [a, b])
     #expect(first.formatted(.json) == second.formatted(.json))
     let object = try #require(
       JSONSerialization.jsonObject(with: Data(first.formatted(.json).utf8)) as? [String: Any])
@@ -109,10 +109,10 @@ struct AdversarialSetCDiagnosticTests {
 
   @Test func setC098UnicodeDiagnosticBudgetKeepsValidCompleteRecord() throws {
     let record = BodyChangeRecord(
-      typeName: "Fixture", kind: "view",
+      typeName: "Fixture", kind: .view,
       causes: (0..<80).map {
         .init(
-          "state", precision: "exact", property: "field\($0)" + String(repeating: "界", count: 90))
+          .state, precision: .exact, property: "field\($0)" + String(repeating: "界", count: 90))
       })
     let encoded = record.formatted(.json)
     #expect(encoded.utf8.count <= BodyChangeRecord.maximumEncodedBytes)
@@ -127,7 +127,7 @@ struct AdversarialSetCDiagnosticTests {
     let outer = SetCDiagnosticLog()
     let inner = SetCDiagnosticLog()
     func record(_ name: String) {
-      BodyChangeOutput.emit(.init(typeName: name, kind: "view", causes: []), format: .json)
+      BodyChangeOutput.emit(.init(typeName: name, kind: .view, causes: []), format: .json)
     }
     BodyChangeOutput.$sink.withValue(outer.sink) {
       record("a")

@@ -357,7 +357,7 @@ extension ModifiedContent: View where Content: View, Modifier: ViewModifier {
     // reason).
     let bound = bindingForwardedDynamicPropertyCaptures(modifier)
     #if DEBUG
-      return withBodyChangeScope(bound, kind: "modifier") {
+      return withBodyChangeScope(bound, kind: .modifier) {
         bound.body(content: ViewModifierContent(base: content, authoringScope: authoringScope))
       }
     #else

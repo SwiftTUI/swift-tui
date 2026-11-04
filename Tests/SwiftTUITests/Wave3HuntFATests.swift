@@ -1074,8 +1074,8 @@ struct Wave3HuntFACrossGroupTests {
       _ = w3faReadAvailable(scratch[0])
       DiagnosticScreenOwnership.acquire(owner[1])
       let record = BodyChangeRecord(
-        typeName: "W3FAReader", kind: "view",
-        causes: [.init("state", precision: "exact", property: "_value")])
+        typeName: "W3FAReader", kind: .view,
+        causes: [.init(.state, precision: .exact, property: "_value")])
       BodyChangeOutput.emitPortable(record, format: .text, descriptor: redirected[1])
       DiagnosticScreenOwnership.release(owner[1])
       BodyChangeOutput.flushSuppressed(to: scratch[1])
@@ -1484,7 +1484,7 @@ final class W4FEChainDiagnosticLog {
   func namedCauses(_ type: String) -> Set<String> {
     Set(
       records.filter { $0.typeName.contains(type) }.flatMap(\.causes)
-        .filter { $0.category == "state" && $0.precision == "exact" }.compactMap(\.property))
+        .filter { $0.category == .state && $0.precision == .exact }.compactMap(\.property))
   }
 }
 
@@ -1557,7 +1557,7 @@ final class W3FADiagnosticLog {
   func namedCauses(_ type: String) -> Set<String> {
     Set(
       records.filter { $0.typeName.contains(type) }.flatMap(\.causes)
-        .filter { $0.category == "state" && $0.precision == "exact" }.compactMap(\.property))
+        .filter { $0.category == .state && $0.precision == .exact }.compactMap(\.property))
   }
 }
 

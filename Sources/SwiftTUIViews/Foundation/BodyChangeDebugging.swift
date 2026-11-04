@@ -10,7 +10,7 @@ extension View {
   @_documentation(visibility: public)
   public static func _printChanges() {
     #if DEBUG
-      emitBodyChanges(Self.self, kind: "view", format: .text)
+      emitBodyChanges(Self.self, kind: .view, format: .text)
     #endif
   }
 
@@ -20,7 +20,7 @@ extension View {
   @_documentation(visibility: public)
   public static func _logChanges() {
     #if DEBUG
-      emitBodyChanges(Self.self, kind: "view", format: .json)
+      emitBodyChanges(Self.self, kind: .view, format: .json)
     #endif
   }
 }
@@ -31,7 +31,7 @@ extension ViewModifier {
   @_documentation(visibility: public)
   public static func _printChanges() {
     #if DEBUG
-      emitBodyChanges(Self.self, kind: "modifier", format: .text)
+      emitBodyChanges(Self.self, kind: .modifier, format: .text)
     #endif
   }
 
@@ -40,14 +40,16 @@ extension ViewModifier {
   @_documentation(visibility: public)
   public static func _logChanges() {
     #if DEBUG
-      emitBodyChanges(Self.self, kind: "modifier", format: .json)
+      emitBodyChanges(Self.self, kind: .modifier, format: .json)
     #endif
   }
 }
 
 #if DEBUG
   @MainActor
-  private func emitBodyChanges(_ type: Any.Type, kind: String, format: BodyChangeFormat) {
+  private func emitBodyChanges(
+    _ type: Any.Type, kind: BodyChangeRecord.Kind, format: BodyChangeFormat
+  ) {
     let record: BodyChangeRecord
     if let scope = BodyChangeScope.current,
       scope.key.type == ObjectIdentifier(type), scope.key.kind == kind
@@ -56,14 +58,14 @@ extension ViewModifier {
     } else {
       record = BodyChangeRecord(
         typeName: BodyChangeRecord.name(of: type), kind: kind,
-        causes: [.init("context-unavailable", precision: "unavailable")])
+        causes: [.init(.contextUnavailable, precision: .unavailable)])
     }
     BodyChangeOutput.emit(record, format: format)
   }
 
   @MainActor
   package func withBodyChangeScope<Value, Result>(
-    _ value: Value, kind: String, _ apply: () -> Result
+    _ value: Value, kind: BodyChangeRecord.Kind, _ apply: () -> Result
   ) -> Result {
     guard let node = ViewNodeContext.current, let graph = node.ownerGraph else {
       let saved = BodyChangeScope.current

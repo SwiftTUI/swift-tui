@@ -38,7 +38,7 @@ struct BodyChangeDebuggingTests {
       #expect(recorded.records[0].causes.contains { $0.property == "@identity" })
       #expect(
         recorded.records[2].causes.contains {
-          $0.category == "state" && $0.precision == "exact" && $0.property == "_value"
+          $0.category == .state && $0.precision == .exact && $0.property == "_value"
         })
     #else
       #expect(recorded.records.isEmpty)
@@ -54,8 +54,8 @@ struct BodyChangeDebuggingTests {
     }
     #if DEBUG
       #expect(
-        probe.records.first?.causes == [.init("context-unavailable", precision: "unavailable")])
-      let modifiers = probe.records.filter { $0.kind == "modifier" }
+        probe.records.first?.causes == [.init(.contextUnavailable, precision: .unavailable)])
+      let modifiers = probe.records.filter { $0.kind == .modifier }
       #expect(modifiers.count == 2)
       #expect(modifiers.first == modifiers.last)
       #expect(modifiers.first?.graph != 0)
@@ -67,10 +67,10 @@ struct BodyChangeDebuggingTests {
   @Test("formatters escape control scalars and bound complete JSON records")
   func formats() throws {
     let record = BodyChangeRecord(
-      typeName: "Type\n\u{1b}\"💡", kind: "view",
+      typeName: "Type\n\u{1b}\"💡", kind: .view,
       causes: (0..<90).map {
         .init(
-          "state", precision: "exact", property: "\($0)" + String(repeating: "💡\u{0}", count: 100))
+          .state, precision: .exact, property: "\($0)" + String(repeating: "💡\u{0}", count: 100))
       })
     let json = record.formatted(.json)
     let decoded = try #require(

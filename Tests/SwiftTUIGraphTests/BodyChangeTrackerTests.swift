@@ -15,19 +15,19 @@ import Testing
       let tracker = graph.debugBodyChanges
       let key = StateSlotKey(owner: node.ownerLifetimeID, ordinal: 1)
       tracker.beginOwner(node.ownerLifetimeID, initial: true)
-      let first = tracker.makeScope(type: Body.self, kind: "view", node: node)
+      let first = tracker.makeScope(type: Body.self, kind: .view, node: node)
       first.run {
-        #expect(first.record().causes.contains { $0.category == "identity" })
+        #expect(first.record().causes.contains { $0.category == .identity })
         first.stateRead(key)
       }
       tracker.finishOwner(node.ownerLifetimeID)
       tracker.note(.state(key), owner: node.ownerLifetimeID)
       tracker.note(.state(key), owner: node.ownerLifetimeID)
       tracker.beginOwner(node.ownerLifetimeID, initial: false)
-      let next = tracker.makeScope(type: Body.self, kind: "view", node: node)
+      let next = tracker.makeScope(type: Body.self, kind: .view, node: node)
       next.run {
         let record = next.record()
-        #expect(record.causes == [.init("state", precision: "exact")])
+        #expect(record.causes == [.init(.state, precision: .exact)])
         #expect(next.record() == record)
         tracker.note(.observation, owner: node.ownerLifetimeID)
         #expect(next.record() == record, "entry evidence is immutable")
@@ -44,8 +44,8 @@ import Testing
       let otherNode = other.prepareDynamicPropertyUpdate(identity: testIdentity("DebugBody"))
       let tracker = graph.debugBodyChanges
       tracker.beginOwner(node.ownerLifetimeID, initial: true)
-      let first = tracker.makeScope(type: Body.self, kind: "view", node: node)
-      let second = tracker.makeScope(type: Body.self, kind: "modifier", node: node)
+      let first = tracker.makeScope(type: Body.self, kind: .view, node: node)
+      let second = tracker.makeScope(type: Body.self, kind: .modifier, node: node)
       first.run {
         #expect(BodyChangeScope.current === first)
         second.run { #expect(BodyChangeScope.current === second) }
@@ -54,7 +54,7 @@ import Testing
       #expect(BodyChangeScope.current == nil)
       #expect(first.key != second.key)
       other.debugBodyChanges.beginOwner(otherNode.ownerLifetimeID, initial: true)
-      let foreign = other.debugBodyChanges.makeScope(type: Body.self, kind: "view", node: otherNode)
+      let foreign = other.debugBodyChanges.makeScope(type: Body.self, kind: .view, node: otherNode)
       #expect(first.graph != foreign.graph)
     }
 
@@ -65,16 +65,16 @@ import Testing
       graph.debugBodyChanges.note(.observation, owner: node.ownerLifetimeID)
       let checkpoint = graph.makeCheckpoint()
       graph.debugBodyChanges.beginOwner(node.ownerLifetimeID, initial: false)
-      let aborted = graph.debugBodyChanges.makeScope(type: Body.self, kind: "view", node: node)
+      let aborted = graph.debugBodyChanges.makeScope(type: Body.self, kind: .view, node: node)
       aborted.run { _ = aborted.record() }
       graph.debugBodyChanges.finishOwner(node.ownerLifetimeID)
       #expect(graph.debugBodyChanges.snapshot.pending.isEmpty)
       graph.restoreCheckpoint(checkpoint)
       #expect(graph.debugBodyChanges.snapshot.histories.isEmpty)
       graph.debugBodyChanges.beginOwner(node.ownerLifetimeID, initial: false)
-      let retry = graph.debugBodyChanges.makeScope(type: Body.self, kind: "view", node: node)
+      let retry = graph.debugBodyChanges.makeScope(type: Body.self, kind: .view, node: node)
       #expect(retry.attempt > aborted.attempt)
-      #expect(retry.record().causes.contains { $0.category == "observation" })
+      #expect(retry.record().causes.contains { $0.category == .observation })
     }
 
     @Test("late enrollment does not invent precise dependency attribution")
@@ -83,10 +83,10 @@ import Testing
       let node = graph.prepareDynamicPropertyUpdate(identity: testIdentity("DebugBody"))
       let tracker = graph.debugBodyChanges
       tracker.beginOwner(node.ownerLifetimeID, initial: false)
-      let scope = tracker.makeScope(type: Body.self, kind: "view", node: node)
+      let scope = tracker.makeScope(type: Body.self, kind: .view, node: node)
       scope.run {
         scope.stateRead(.init(owner: node.ownerLifetimeID, ordinal: 1))
-        #expect(scope.record().causes.contains { $0.category == "provenance-unavailable" })
+        #expect(scope.record().causes.contains { $0.category == .provenanceUnavailable })
       }
       #expect(tracker.snapshot.histories[scope.key]?.complete == false)
       tracker.remove(node.ownerLifetimeID)
@@ -103,7 +103,7 @@ import Testing
       let old = graph.prepareDynamicPropertyUpdate(identity: identity)
       let tracker = graph.debugBodyChanges
       tracker.beginOwner(old.ownerLifetimeID, initial: true)
-      let scope = tracker.makeScope(type: Body.self, kind: "view", node: old)
+      let scope = tracker.makeScope(type: Body.self, kind: .view, node: old)
       scope.run { _ = scope.record() }
       tracker.note(.observation, owner: old.ownerLifetimeID)
       graph.restoreCheckpoint(checkpoint)
@@ -111,9 +111,9 @@ import Testing
       #expect(new.viewNodeID == old.viewNodeID)
       #expect(new.ownerLifetimeID != old.ownerLifetimeID)
       tracker.beginOwner(new.ownerLifetimeID, initial: true)
-      let replacement = tracker.makeScope(type: Body.self, kind: "view", node: new)
+      let replacement = tracker.makeScope(type: Body.self, kind: .view, node: new)
       #expect(replacement.prior == nil)
-      #expect(!replacement.record().causes.contains { $0.category == "observation" })
+      #expect(!replacement.record().causes.contains { $0.category == .observation })
       #expect(replacement.attempt > scope.attempt)
     }
 
@@ -124,7 +124,7 @@ import Testing
       let tracker = graph.debugBodyChanges
       tracker.beginOwner(node.ownerLifetimeID, initial: false)
       for _ in 0..<(BodyChangeTracker.maximumBodies + 10) {
-        let scope = tracker.makeScope(type: Body.self, kind: "view", node: node)
+        let scope = tracker.makeScope(type: Body.self, kind: .view, node: node)
         scope.run { _ = scope.record() }
         #expect(tracker.snapshot.histories.count <= BodyChangeTracker.maximumBodies)
       }

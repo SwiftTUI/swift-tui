@@ -31,7 +31,7 @@ import Testing
       #expect(records.count == 2)
       #expect(
         records.last?.causes.contains {
-          $0.category == "observation" && $0.precision == "owner-only" && $0.property == nil
+          $0.category == .observation && $0.precision == .ownerOnly && $0.property == nil
         } == true)
     }
 
@@ -50,14 +50,14 @@ import Testing
       #expect(
         probe.records.contains {
           $0.causes.contains {
-            $0.category == "state" && $0.property == "_nested._value" && $0.precision == "exact"
+            $0.category == .state && $0.property == "_nested._value" && $0.precision == .exact
           }
         })
       #expect(
         probe.records.contains {
           $0.typeName.hasSuffix("DiagnosticBindingReader")
             && $0.causes.contains {
-              $0.category == "state" && $0.property == "_value" && $0.precision == "exact"
+              $0.category == .state && $0.property == "_value" && $0.precision == .exact
             }
         })
     }
@@ -82,7 +82,7 @@ import Testing
       #expect(probe.reflections.withLock { $0 } == plain.reflections.withLock { $0 })
       #expect(
         probe.records.contains {
-          $0.causes.contains { $0.property == "@self" && $0.precision == "exact" }
+          $0.causes.contains { $0.property == "@self" && $0.precision == .exact }
         })
     }
 
@@ -101,7 +101,7 @@ import Testing
       #expect(
         probe.records.contains {
           $0.typeName.hasSuffix("DiagnosticEnvironmentReader")
-            && $0.causes.contains { $0.category == "environment" && $0.precision == "exact" }
+            && $0.causes.contains { $0.category == .environment && $0.precision == .exact }
         })
     }
   }

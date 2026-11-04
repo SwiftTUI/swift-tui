@@ -20,7 +20,7 @@
     package struct Key: Hashable {
       package var owner: NodeOwnerLifetimeID
       package var type: ObjectIdentifier
-      package var kind: String
+      package var kind: BodyChangeRecord.Kind
       package var ordinal: Int
     }
 
@@ -106,7 +106,9 @@
       snapshot.histories = snapshot.histories.filter { $0.key.owner != owner }
     }
 
-    package func makeScope(type: Any.Type, kind: String, node: ViewNode) -> BodyChangeScope {
+    package func makeScope(type: Any.Type, kind: BodyChangeRecord.Kind, node: ViewNode)
+      -> BodyChangeScope
+    {
       let owner = node.ownerLifetimeID
       let entry = snapshot.entries[owner]
       let ordinal = entry?.ordinal ?? 0
@@ -208,36 +210,36 @@
       let propertyNames = cachedNames ?? [:]
       var causes: Set<BodyChangeRecord.Cause> = []
       if entry?.initial == true {
-        causes.insert(.init("identity", precision: "exact", property: "@identity"))
+        causes.insert(.init(.identity, precision: .exact, property: "@identity"))
       } else if prior == nil || prior?.complete != true {
-        causes.insert(.init("provenance-unavailable", precision: "unavailable"))
+        causes.insert(.init(.provenanceUnavailable, precision: .unavailable))
       }
       for reason in entry?.pending.reasons.keys ?? [BodyChangeTracker.Reason: UInt64]().keys {
         switch reason {
         case .state(let slot):
           if prior?.states.contains(slot) == true {
-            causes.insert(.init("state", precision: "exact", property: propertyNames[slot]))
+            causes.insert(.init(.state, precision: .exact, property: propertyNames[slot]))
           } else if prior?.complete != true {
-            causes.insert(.init("state", precision: "owner-only"))
+            causes.insert(.init(.state, precision: .ownerOnly))
           }
         case .environment(let key):
           if prior?.environment.contains(key) == true {
-            causes.insert(.init("environment", precision: "exact"))
+            causes.insert(.init(.environment, precision: .exact))
           } else if prior?.complete != true {
-            causes.insert(.init("environment"))
+            causes.insert(.init(.environment))
           }
-        case .observation: causes.insert(.init("observation"))
-        case .explicit: causes.insert(.init("explicit"))
-        case .ancestor: causes.insert(.init("ancestor"))
+        case .observation: causes.insert(.init(.observation))
+        case .explicit: causes.insert(.init(.explicit))
+        case .ancestor: causes.insert(.init(.ancestor))
         case .input(let type):
           if type == key.type {
-            causes.insert(.init("input", precision: "exact", property: "@self"))
+            causes.insert(.init(.input, precision: .exact, property: "@self"))
           }
-        case .dynamicProperty: causes.insert(.init("dynamic-property", precision: "unavailable"))
+        case .dynamicProperty: causes.insert(.init(.dynamicProperty, precision: .unavailable))
         }
       }
-      if causes.isEmpty { causes.insert(.init("input-unverified", precision: "unavailable")) }
-      if overflow { causes.insert(.init("provenance-unavailable", precision: "unavailable")) }
+      if causes.isEmpty { causes.insert(.init(.inputUnverified, precision: .unavailable)) }
+      if overflow { causes.insert(.init(.provenanceUnavailable, precision: .unavailable)) }
       return BodyChangeRecord(
         typeName: BodyChangeRecord.name(of: type), kind: key.kind, graph: graph,
         owner: key.owner.rawValue, body: key.ordinal, attempt: attempt,

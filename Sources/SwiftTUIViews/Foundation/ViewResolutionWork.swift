@@ -268,7 +268,7 @@ package func resolveViewElementsWork<V: View>(
     let authoring = currentAuthoringContext() ?? makeAuthoringContext(for: context)
     return withAuthoringContext(authoring) {
       #if DEBUG
-        let body = withBodyChangeScope(bound, kind: "view") {
+        let body = withBodyChangeScope(bound, kind: .view) {
           context.trackingObservableAccess { bound.body }
         }
       #else

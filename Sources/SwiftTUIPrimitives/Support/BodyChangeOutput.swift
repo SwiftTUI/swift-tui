@@ -66,21 +66,20 @@ extension BodyChangeRecord {
   package func formatted(_ format: BodyChangeFormat) -> String {
     var record = self
     record.typeName = Self.bounded(typeName, bytes: 512)
-    record.kind = Self.bounded(kind, bytes: 32)
     let sorted = Set(causes).sorted {
-      ($0.category, $0.property ?? "", $0.precision) < (
-        $1.category, $1.property ?? "", $1.precision
+      ($0.category.rawValue, $0.property ?? "", $0.precision.rawValue) < (
+        $1.category.rawValue, $1.property ?? "", $1.precision.rawValue
       )
     }
     let excessCauses = max(0, sorted.count - 64)
     record.omitted = min(record.omitted, Int.max - excessCauses) + excessCauses
     record.causes = sorted.prefix(64).map { cause in
       Cause(
-        Self.bounded(cause.category, bytes: 64),
-        precision: Self.bounded(cause.precision, bytes: 32),
+        cause.category,
+        precision: cause.precision,
         property: cause.property.map { Self.bounded($0, bytes: 256) })
     }
-    if record.typeName != typeName || record.kind != kind
+    if record.typeName != typeName
       || zip(record.causes, sorted).contains(where: { $0 != $1 })
     {
       record.omitted = min(record.omitted, Int.max - 1) + 1
@@ -98,18 +97,19 @@ extension BodyChangeRecord {
     if format == .text {
       let reasons = causes.map { cause in
         let name = cause.property.map { Self.escaped($0) + " " } ?? ""
-        return name + "(\(Self.escaped(cause.category)), \(Self.escaped(cause.precision)))"
+        return name
+          + "(\(Self.escaped(cause.category.rawValue)), \(Self.escaped(cause.precision.rawValue)))"
       }.joined(separator: ", ")
       return
-        "\(Self.escaped(typeName)) [kind=\(Self.escaped(kind)) graph=\(graph) owner=\(owner) body=\(body) attempt=\(attempt) phase=evaluate]: \(reasons)"
+        "\(Self.escaped(typeName)) [kind=\(Self.escaped(kind.rawValue)) graph=\(graph) owner=\(owner) body=\(body) attempt=\(attempt) phase=evaluate]: \(reasons)"
         + (omitted > 0 ? " omitted=\(omitted)" : "") + "\n"
     }
     let reasons = causes.map { cause in
-      "{\"category\":\(Self.quoted(cause.category)),\"precision\":\(Self.quoted(cause.precision))"
+      "{\"category\":\(Self.quoted(cause.category.rawValue)),\"precision\":\(Self.quoted(cause.precision.rawValue))"
         + (cause.property.map { ",\"property\":\(Self.quoted($0))" } ?? "") + "}"
     }.joined(separator: ",")
     return
-      "{\"schema\":1,\"type\":\(Self.quoted(typeName)),\"kind\":\(Self.quoted(kind)),\"graph\":\(graph),\"owner\":\(owner),\"body\":\(body),\"attempt\":\(attempt),\"phase\":\"evaluate\",\"causes\":[\(reasons)],\"omitted\":\(omitted)}\n"
+      "{\"schema\":1,\"type\":\(Self.quoted(typeName)),\"kind\":\(Self.quoted(kind.rawValue)),\"graph\":\(graph),\"owner\":\(owner),\"body\":\(body),\"attempt\":\(attempt),\"phase\":\"evaluate\",\"causes\":[\(reasons)],\"omitted\":\(omitted)}\n"
   }
 
   private static func bounded(_ text: String, bytes: Int) -> String {
