@@ -57,7 +57,7 @@ package struct MeasureCutoffPrePassResult: Sendable {
 /// evidence. One line per frame with attempts; silent otherwise.
 package enum MeasureCutoffTrace {
   /// Read once — trace arming latches like the feature gates.
-  package static let isArmed = DebugTraceSelection.current.isArmed("cutoff")
+  package static let isArmed = DebugTraceSelection.current.isArmed(.cutoff)
 
   package static func emit(_ metrics: PreMeasureCutoffMetrics) {
     guard isArmed, metrics.certificatesAttempted > 0 else {

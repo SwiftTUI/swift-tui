@@ -1,3 +1,7 @@
+package enum DebugTraceName: String, CaseIterable, Sendable {
+  case frames, memo, reuse, inval, soundness, publication, cutoff
+}
+
 /// The `SWIFTTUI_TRACE` selector: one variable that arms diagnostic-trace
 /// *emission* across the framework, replacing the per-trace
 /// `X` / `X_FILE` / `X_SAMPLE` variable triplets (which keep working as
@@ -7,7 +11,7 @@
 /// SWIFTTUI_TRACE = trace *( "," trace )
 /// trace          = name [ "@" sampleN ]
 /// name           = "frames" | "memo" | "reuse" | "inval"
-///                | "soundness" | "publication"
+///                | "soundness" | "publication" | "cutoff"
 /// ```
 ///
 /// Example: `SWIFTTUI_TRACE=memo@256,reuse,frames`.
@@ -20,20 +24,16 @@
 /// or per-trace `*_FILE` overrides), stderr otherwise.
 package struct DebugTraceSelection: Sendable, Equatable {
   package struct Entry: Sendable, Equatable {
-    package var name: String
+    package var name: DebugTraceName
     package var sampleEveryNFrames: Int?
 
-    package init(name: String, sampleEveryNFrames: Int? = nil) {
+    package init(name: DebugTraceName, sampleEveryNFrames: Int? = nil) {
       self.name = name
       self.sampleEveryNFrames = sampleEveryNFrames
     }
   }
 
   package static let environmentVariableName = SwiftTUIEnvironmentVariable.trace.rawValue
-
-  package static let knownTraceNames: Set<String> = [
-    "frames", "memo", "reuse", "inval", "soundness", "publication", "cutoff",
-  ]
 
   /// The process-level selection, parsed from `SWIFTTUI_TRACE` once.
   package static let current = DebugTraceSelection.parse(
@@ -74,21 +74,21 @@ package struct DebugTraceSelection: Sendable, Equatable {
       } else if parts.count > 2 {
         return DebugTraceSelection()
       }
-      guard knownTraceNames.contains(name) else {
+      guard let traceName = DebugTraceName(rawValue: name) else {
         // Unknown names are skipped, not fatal: forward compatibility with
         // selections written for a newer framework.
         continue
       }
-      entries.append(Entry(name: name, sampleEveryNFrames: sample))
+      entries.append(Entry(name: traceName, sampleEveryNFrames: sample))
     }
     return DebugTraceSelection(entries: entries)
   }
 
-  package func entry(named name: String) -> Entry? {
+  package func entry(named name: DebugTraceName) -> Entry? {
     entries.first { entry in entry.name == name }
   }
 
-  package func isArmed(_ name: String) -> Bool {
+  package func isArmed(_ name: DebugTraceName) -> Bool {
     entry(named: name) != nil
   }
 }

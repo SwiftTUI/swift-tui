@@ -250,7 +250,7 @@ package enum MemoSkipTrace {
     guard let rawValue = environmentValue(named: sampleEnvironmentVariableName),
       let parsed = Int(rawValue), parsed > 0
     else {
-      if let selected = DebugTraceSelection.current.entry(named: "memo")?.sampleEveryNFrames {
+      if let selected = DebugTraceSelection.current.entry(named: .memo)?.sampleEveryNFrames {
         return selected
       }
       #if DEBUG
@@ -274,7 +274,7 @@ package enum MemoSkipTrace {
     if environmentValue(named: fileEnvironmentVariableName) != nil {
       return true
     }
-    return DebugTraceSelection.current.isArmed("memo")
+    return DebugTraceSelection.current.isArmed(.memo)
   }
 
   private static func environmentValue(named name: String) -> String? {

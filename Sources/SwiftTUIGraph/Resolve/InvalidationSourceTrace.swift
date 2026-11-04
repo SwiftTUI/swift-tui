@@ -90,7 +90,7 @@ package enum InvalidationSourceTrace {
   private static func environmentDefault() -> Bool {
     guard let rawValue = FeatureFlags.environmentValue(named: environmentVariableName)
     else {
-      return DebugTraceSelection.current.isArmed("inval")
+      return DebugTraceSelection.current.isArmed(.inval)
     }
     return FeatureFlags.booleanValue(rawValue) ?? false
   }

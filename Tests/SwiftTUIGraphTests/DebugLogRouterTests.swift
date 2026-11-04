@@ -88,12 +88,12 @@ struct DebugTraceSelectionTests {
   @Test("parses names and per-trace samples")
   func parsesNamesAndSamples() {
     let selection = DebugTraceSelection.parse("memo@256, reuse,frames")
-    #expect(selection.isArmed("memo"))
-    #expect(selection.entry(named: "memo")?.sampleEveryNFrames == 256)
-    #expect(selection.isArmed("reuse"))
-    #expect(selection.entry(named: "reuse")?.sampleEveryNFrames == nil)
-    #expect(selection.isArmed("frames"))
-    #expect(!selection.isArmed("inval"))
+    #expect(selection.isArmed(.memo))
+    #expect(selection.entry(named: .memo)?.sampleEveryNFrames == 256)
+    #expect(selection.isArmed(.reuse))
+    #expect(selection.entry(named: .reuse)?.sampleEveryNFrames == nil)
+    #expect(selection.isArmed(.frames))
+    #expect(!selection.isArmed(.inval))
   }
 
   @Test("unset or empty input is an empty selection")
@@ -115,11 +115,11 @@ struct DebugTraceSelectionTests {
   @Test("unknown names are ignored, not fatal")
   func unknownNamesIgnored() {
     let selection = DebugTraceSelection.parse("hologram,reuse")
-    #expect(selection.entries.map(\.name) == ["reuse"])
+    #expect(selection.entries.map(\.name) == [.reuse])
   }
 
   @Test("names are case-normalized")
   func caseNormalized() {
-    #expect(DebugTraceSelection.parse("MEMO@8").entry(named: "memo")?.sampleEveryNFrames == 8)
+    #expect(DebugTraceSelection.parse("MEMO@8").entry(named: .memo)?.sampleEveryNFrames == 8)
   }
 }

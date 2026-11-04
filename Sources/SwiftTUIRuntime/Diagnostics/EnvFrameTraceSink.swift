@@ -75,7 +75,7 @@ import Synchronization
       if let path = FeatureFlags.environmentValue(.frameTrace), !path.isEmpty {
         return true
       }
-      return DebugTraceSelection.current.isArmed("frames") || debug
+      return DebugTraceSelection.current.isArmed(.frames) || debug
     #endif
   }
 

@@ -97,7 +97,8 @@ import SwiftTUICore
     lines.append("gates: \(gates)")
     let selection = DebugTraceSelection.current.entries
       .map { entry in
-        entry.sampleEveryNFrames.map { sample in "\(entry.name)@\(sample)" } ?? entry.name
+        entry.sampleEveryNFrames.map { sample in "\(entry.name.rawValue)@\(sample)" }
+          ?? entry.name.rawValue
       }
       .joined(separator: ",")
     lines.append("trace-selection: \(selection.isEmpty ? "(none)" : selection)")

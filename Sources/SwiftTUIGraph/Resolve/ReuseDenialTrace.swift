@@ -200,7 +200,7 @@ package enum ReuseDenialTrace {
 
   private static func environmentDefault() -> Bool {
     guard let rawValue = environmentValue(named: environmentVariableName) else {
-      return DebugTraceSelection.current.isArmed("reuse")
+      return DebugTraceSelection.current.isArmed(.reuse)
     }
     return FeatureFlags.booleanValue(rawValue) ?? false
   }

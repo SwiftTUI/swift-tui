@@ -97,7 +97,7 @@ package enum RuntimeRegistrationPublicationDiagnosticsConfiguration {
 
   private static func environmentDefault() -> Bool {
     guard FeatureFlags.environmentValue(named: environmentVariableName) != nil else {
-      return DebugTraceSelection.current.isArmed("publication")
+      return DebugTraceSelection.current.isArmed(.publication)
     }
     return FeatureFlags.isEnabled(named: environmentVariableName, default: false)
   }

@@ -767,7 +767,7 @@ package enum SoundnessProbeConfiguration {
     .soundnessProbeTraceFile.rawValue
   package static var isTraceEnabled: Bool =
     FeatureFlags.booleanValue(FeatureFlags.environmentValue(named: traceEnvironmentVariableName))
-    ?? DebugTraceSelection.current.isArmed("soundness")
+    ?? DebugTraceSelection.current.isArmed(.soundness)
 
   private static func emitTrace(_ kind: SoundnessViolationKind) {
     guard isTraceEnabled else {
@@ -808,7 +808,7 @@ package enum SoundnessProbeConfiguration {
     guard let rawValue = FeatureFlags.environmentValue(named: sampleEnvironmentVariableName),
       let parsed = Int(rawValue), parsed > 0
     else {
-      if let selected = DebugTraceSelection.current.entry(named: "soundness")?.sampleEveryNFrames {
+      if let selected = DebugTraceSelection.current.entry(named: .soundness)?.sampleEveryNFrames {
         return selected
       }
       #if DEBUG
