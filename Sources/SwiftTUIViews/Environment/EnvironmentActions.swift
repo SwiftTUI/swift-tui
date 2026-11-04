@@ -20,12 +20,14 @@ public import SwiftTUICore
 public struct RequestTerminationAction: Sendable, CustomStringConvertible,
   CustomDebugStringConvertible
 {
+  private let isCustom: Bool
   package let snapshotLabel: String
   package let isPlaceholder: Bool
   private let handler: @MainActor @Sendable () -> Bool
 
   @MainActor
   public init(_ handler: @escaping @MainActor @Sendable () -> Bool) {
+    isCustom = true
     snapshotLabel = "RequestTerminationAction.custom"
     isPlaceholder = false
     self.handler = handler
@@ -43,6 +45,7 @@ public struct RequestTerminationAction: Sendable, CustomStringConvertible,
     isPlaceholder: Bool,
     handler: @escaping @MainActor @Sendable () -> Bool
   ) {
+    isCustom = false
     self.snapshotLabel = snapshotLabel
     self.isPlaceholder = isPlaceholder
     self.handler = handler
@@ -60,6 +63,7 @@ private enum RequestTerminationActionKey: EnvironmentKey, FrameworkEnvironmentKe
 }
 
 public struct OpenLinkAction: Sendable, CustomStringConvertible, CustomDebugStringConvertible {
+  private let isCustom: Bool
   package let snapshotLabel: String
   package let isPlaceholder: Bool
   package let usesHostDefault: Bool
@@ -71,6 +75,7 @@ public struct OpenLinkAction: Sendable, CustomStringConvertible, CustomDebugStri
     _ handler: @escaping @MainActor @Sendable (LinkDestination) -> Bool
   ) {
     let authoringContext = currentImperativeAuthoringContextSnapshot()
+    isCustom = true
     snapshotLabel = "OpenLinkAction.custom"
     isPlaceholder = false
     usesHostDefault = false
@@ -105,6 +110,7 @@ public struct OpenLinkAction: Sendable, CustomStringConvertible, CustomDebugStri
     authoringContext: ImperativeAuthoringContextSnapshot? = nil,
     handler: @escaping @MainActor @Sendable (LinkDestination) -> Bool
   ) {
+    isCustom = false
     self.snapshotLabel = snapshotLabel
     self.isPlaceholder = isPlaceholder
     self.usesHostDefault = usesHostDefault
@@ -166,6 +172,7 @@ extension SubmitAction: TypedReuseEqualityProviding {
 /// A semantic action that asks the runtime to reevaluate default focus in a
 /// namespace-scoped focus region.
 public struct ResetFocusAction: Sendable, CustomStringConvertible, CustomDebugStringConvertible {
+  private let isCustom: Bool
   package let snapshotLabel: String
   package let isPlaceholder: Bool
   private let handler: @MainActor @Sendable (Namespace.ID) -> Bool
@@ -174,6 +181,7 @@ public struct ResetFocusAction: Sendable, CustomStringConvertible, CustomDebugSt
   public init(
     _ handler: @escaping @MainActor @Sendable (Namespace.ID) -> Bool
   ) {
+    isCustom = true
     snapshotLabel = "ResetFocusAction.custom"
     isPlaceholder = false
     self.handler = handler
@@ -208,6 +216,7 @@ public struct ResetFocusAction: Sendable, CustomStringConvertible, CustomDebugSt
     isPlaceholder: Bool,
     handler: @escaping @MainActor @Sendable (Namespace.ID) -> Bool
   ) {
+    isCustom = false
     self.snapshotLabel = snapshotLabel
     self.isPlaceholder = isPlaceholder
     self.handler = handler
@@ -227,6 +236,7 @@ private enum ResetFocusActionKey: EnvironmentKey, FrameworkEnvironmentKey {
 /// A semantic action that asks the active host to place text on the clipboard.
 public struct ClipboardWriteAction: Sendable, CustomStringConvertible, CustomDebugStringConvertible
 {
+  private let isCustom: Bool
   package let snapshotLabel: String
   package let isPlaceholder: Bool
   private let handler: @MainActor @Sendable (String) -> Bool
@@ -235,6 +245,7 @@ public struct ClipboardWriteAction: Sendable, CustomStringConvertible, CustomDeb
   public init(
     _ handler: @escaping @MainActor @Sendable (String) -> Bool
   ) {
+    isCustom = true
     snapshotLabel = "ClipboardWriteAction.custom"
     isPlaceholder = false
     self.handler = handler
@@ -261,6 +272,7 @@ public struct ClipboardWriteAction: Sendable, CustomStringConvertible, CustomDeb
     isPlaceholder: Bool,
     handler: @escaping @MainActor @Sendable (String) -> Bool
   ) {
+    isCustom = false
     self.snapshotLabel = snapshotLabel
     self.isPlaceholder = isPlaceholder
     self.handler = handler
@@ -279,6 +291,7 @@ private enum ClipboardWriteActionKey: EnvironmentKey, FrameworkEnvironmentKey {
 
 package struct ClipboardReadAction: Sendable, CustomStringConvertible, CustomDebugStringConvertible
 {
+  private let isCustom: Bool
   package let snapshotLabel: String
   package let isPlaceholder: Bool
   private let handler: @MainActor @Sendable () -> String?
@@ -301,6 +314,7 @@ package struct ClipboardReadAction: Sendable, CustomStringConvertible, CustomDeb
     isPlaceholder: Bool,
     handler: @escaping @MainActor @Sendable () -> String?
   ) {
+    isCustom = false
     self.snapshotLabel = snapshotLabel
     self.isPlaceholder = isPlaceholder
     self.handler = handler
@@ -354,6 +368,7 @@ public enum TerminalHandoffError: Error, Equatable, Sendable, CustomStringConver
 public struct TerminalHandoffAction: Sendable, CustomStringConvertible,
   CustomDebugStringConvertible
 {
+  private let isCustom: Bool
   package let snapshotLabel: String
   package let isPlaceholder: Bool
   private let handler:
@@ -373,6 +388,7 @@ public struct TerminalHandoffAction: Sendable, CustomStringConvertible,
         @escaping @MainActor @Sendable () async throws -> Void
       ) async throws -> Void
   ) {
+    isCustom = true
     snapshotLabel = "TerminalHandoffAction.custom"
     isPlaceholder = false
     self.handler = handler
@@ -417,6 +433,7 @@ public struct TerminalHandoffAction: Sendable, CustomStringConvertible,
         @escaping @MainActor @Sendable () async throws -> Void
       ) async throws -> Void
   ) {
+    isCustom = false
     self.snapshotLabel = snapshotLabel
     self.isPlaceholder = isPlaceholder
     self.handler = handler
@@ -440,8 +457,7 @@ private enum TerminalHandoffActionKey: EnvironmentKey, FrameworkEnvironmentKey {
 extension OpenLinkAction: TypedReuseEqualityProviding {
   package func isEqualForReuse(to other: any Sendable) -> Bool {
     guard let other = other as? Self,
-      snapshotLabel != "OpenLinkAction.custom",
-      other.snapshotLabel != "OpenLinkAction.custom"
+      !isCustom, !other.isCustom
     else {
       return false
     }
@@ -453,8 +469,7 @@ extension OpenLinkAction: TypedReuseEqualityProviding {
 extension RequestTerminationAction: TypedReuseEqualityProviding {
   package func isEqualForReuse(to other: any Sendable) -> Bool {
     guard let other = other as? Self,
-      snapshotLabel != "RequestTerminationAction.custom",
-      other.snapshotLabel != "RequestTerminationAction.custom"
+      !isCustom, !other.isCustom
     else { return false }
     return snapshotLabel == other.snapshotLabel && isPlaceholder == other.isPlaceholder
   }
@@ -463,8 +478,7 @@ extension RequestTerminationAction: TypedReuseEqualityProviding {
 extension ResetFocusAction: TypedReuseEqualityProviding {
   package func isEqualForReuse(to other: any Sendable) -> Bool {
     guard let other = other as? Self,
-      snapshotLabel != "ResetFocusAction.custom",
-      other.snapshotLabel != "ResetFocusAction.custom"
+      !isCustom, !other.isCustom
     else {
       return false
     }
@@ -476,8 +490,7 @@ extension ResetFocusAction: TypedReuseEqualityProviding {
 extension ClipboardWriteAction: TypedReuseEqualityProviding {
   package func isEqualForReuse(to other: any Sendable) -> Bool {
     guard let other = other as? Self,
-      snapshotLabel != "ClipboardWriteAction.custom",
-      other.snapshotLabel != "ClipboardWriteAction.custom"
+      !isCustom, !other.isCustom
     else {
       return false
     }
@@ -489,8 +502,7 @@ extension ClipboardWriteAction: TypedReuseEqualityProviding {
 extension ClipboardReadAction: TypedReuseEqualityProviding {
   package func isEqualForReuse(to other: any Sendable) -> Bool {
     guard let other = other as? Self,
-      snapshotLabel != "ClipboardReadAction.custom",
-      other.snapshotLabel != "ClipboardReadAction.custom"
+      !isCustom, !other.isCustom
     else {
       return false
     }
@@ -502,8 +514,7 @@ extension ClipboardReadAction: TypedReuseEqualityProviding {
 extension TerminalHandoffAction: TypedReuseEqualityProviding {
   package func isEqualForReuse(to other: any Sendable) -> Bool {
     guard let other = other as? Self,
-      snapshotLabel != "TerminalHandoffAction.custom",
-      other.snapshotLabel != "TerminalHandoffAction.custom"
+      !isCustom, !other.isCustom
     else {
       return false
     }
