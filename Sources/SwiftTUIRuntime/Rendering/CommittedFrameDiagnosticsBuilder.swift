@@ -49,8 +49,8 @@ extension CommittedFrameArtifactBuilder {
     )
     diagnostics.runtime.registrations = input.runtimeRegistrationDiagnostics
     diagnostics.presentation.rasterReuse = .init(
-      path: input.tail.diagnostics.rasterPath.rawValue,
-      barriers: input.tail.diagnostics.rasterReuseBarriers.map(\.rawValue).sorted()
+      path: input.tail.diagnostics.rasterPath,
+      barriers: input.tail.diagnostics.rasterReuseBarriers.sorted { $0.rawValue < $1.rawValue }
     )
     return diagnostics
   }

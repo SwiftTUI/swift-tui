@@ -69,13 +69,13 @@ struct IncrementalRasterReachabilityTests {
 
     let paths = sink.records.map(\.rasterPath)
     #expect(
-      paths.contains(Rasterizer.RasterPath.incremental.rawValue),
+      paths.contains(RasterPath.incremental.rawValue),
       "no frame reached the incremental rasterizer; paths were \(paths), barriers were \(sink.records.map(\.rasterReuseBarriers))"
     )
     // A repaired frame means the F13 oracle caught incomplete damage. Asserting
     // "the output looks right" would not catch that: DEBUG's verify policy
     // silently repairs the surface, so the wrong damage only ships in release.
-    #expect(!paths.contains(Rasterizer.RasterPath.incrementalRepaired.rawValue))
+    #expect(!paths.contains(RasterPath.incrementalRepaired.rawValue))
   }
 
   @Test("a wheel notch on a root-adjacent scroll view rasterizes incrementally")
@@ -130,14 +130,14 @@ struct IncrementalRasterReachabilityTests {
     // The R3.2b translation blit, when armed, reports the incremental path
     // with served band rows; both are the incremental tier this pin guards.
     #expect(
-      scrollRecord.rasterPath == Rasterizer.RasterPath.incremental.rawValue
-        || scrollRecord.rasterPath == Rasterizer.RasterPath.incrementalTranslated.rawValue,
+      scrollRecord.rasterPath == RasterPath.incremental.rawValue
+        || scrollRecord.rasterPath == RasterPath.incrementalTranslated.rawValue,
       "scroll frame path was \(scrollRecord.rasterPath), barriers \(scrollRecord.rasterReuseBarriers)"
     )
     #expect(!scrollRecord.rasterReuseBarriers.contains("root_invalidated"))
     // Bounded damage, and no F13 repair (see the sibling test's rationale).
     #expect(scrollRecord.damageRowCount != nil)
-    #expect(scrollRecord.rasterPath != Rasterizer.RasterPath.incrementalRepaired.rawValue)
+    #expect(scrollRecord.rasterPath != RasterPath.incrementalRepaired.rawValue)
   }
 
   @Test("a wheel notch on a deeply nested scroll view invalidates the route alone")
@@ -212,12 +212,12 @@ struct IncrementalRasterReachabilityTests {
     // The R3.2b translation blit, when armed, reports the incremental path
     // with served band rows; both are the incremental tier this pin guards.
     #expect(
-      scrollRecord.rasterPath == Rasterizer.RasterPath.incremental.rawValue
-        || scrollRecord.rasterPath == Rasterizer.RasterPath.incrementalTranslated.rawValue,
+      scrollRecord.rasterPath == RasterPath.incremental.rawValue
+        || scrollRecord.rasterPath == RasterPath.incrementalTranslated.rawValue,
       "scroll frame path was \(scrollRecord.rasterPath), barriers \(scrollRecord.rasterReuseBarriers)"
     )
     #expect(scrollRecord.damageRowCount != nil)
-    #expect(scrollRecord.rasterPath != Rasterizer.RasterPath.incrementalRepaired.rawValue)
+    #expect(scrollRecord.rasterPath != RasterPath.incrementalRepaired.rawValue)
   }
 }
 

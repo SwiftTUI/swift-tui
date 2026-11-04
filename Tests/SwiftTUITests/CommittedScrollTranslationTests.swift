@@ -465,13 +465,13 @@ struct CommittedScrollTranslationTests {
       // going dormant on the collection shape the program's headline
       // scenario measures.
       #expect(
-        record.rasterPath == Rasterizer.RasterPath.incrementalTranslated.rawValue,
+        record.rasterPath == RasterPath.incrementalTranslated.rawValue,
         "armed blit must serve the List band; barriers: \(record.rasterReuseBarriers)"
       )
     } else {
-      #expect(record.rasterPath == Rasterizer.RasterPath.incremental.rawValue)
+      #expect(record.rasterPath == RasterPath.incremental.rawValue)
     }
-    #expect(record.rasterPath != Rasterizer.RasterPath.incrementalRepaired.rawValue)
+    #expect(record.rasterPath != RasterPath.incrementalRepaired.rawValue)
   }
 
   /// The rendered value of one column, located by header name rather than by

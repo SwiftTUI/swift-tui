@@ -166,8 +166,8 @@ package enum FrameRecordDerivation {
       $0.duration(to: sample.frameInstant)
     }
     record.ingress = sample.ingress
-    record.rasterPath = diag.presentation.rasterReuse?.path ?? "-"
-    record.rasterReuseBarriers = diag.presentation.rasterReuse?.barriers ?? []
+    record.rasterPath = diag.presentation.rasterReuse?.path.rawValue ?? "-"
+    record.rasterReuseBarriers = diag.presentation.rasterReuse?.barriers.map(\.rawValue) ?? []
     record.runtimePublicationMode = publication.publicationMode
     record.runtimeDirtyPlanResult = publication.dirtyPlanResult
     record.runtimePublicationSubtreeRootCount = publication.subtreeRootCount

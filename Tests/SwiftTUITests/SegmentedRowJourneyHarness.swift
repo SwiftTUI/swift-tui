@@ -179,7 +179,7 @@ struct SegmentedRowJourneyResult {
   var mismatchDetail: String?
 
   var reachedIncrementalRaster: Bool {
-    rasterPaths.contains(Rasterizer.RasterPath.incremental.rawValue)
+    rasterPaths.contains(RasterPath.incremental.rawValue)
   }
 
   var summary: String {

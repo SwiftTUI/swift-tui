@@ -509,23 +509,3 @@ struct FrameTailRasterReusePlan: Sendable {
   var damage: PresentationDamage?
   var barriers: Set<FrameTailRasterReuseBarrier>
 }
-
-enum FrameTailRasterReuseBarrier: String, Hashable, Sendable, CaseIterable {
-  case missingRetainedFrame = "missing_retained_frame"
-  case rootInvalidated = "root_invalidated"
-  case emptyInvalidation = "empty_invalidation"
-  case surfaceTopologyChanged = "surface_topology_changed"
-  /// The previous frame's placed tree was rooted at a different identity, so
-  /// the two placed paths are not comparable.
-  case placedRootChanged = "placed_root_changed"
-  /// An identity on one of the placed paths resolved to more than one node, so
-  /// the path may mix nodes from different duplicate siblings.
-  case duplicateInvalidatedIdentity = "duplicate_invalidated_identity"
-  /// The head's animation-injection stage rewrote resolved values after
-  /// invalidation was computed, so `directlyInvalidated` is not the complete
-  /// set of identities that repaint this frame.
-  case animationInterpolationApplied = "animation_interpolation_applied"
-  /// The current placed tree carries animation overlay decoration that the
-  /// retained baseline placed tree does not.
-  case animationOverlayDecorated = "animation_overlay_decorated"
-}

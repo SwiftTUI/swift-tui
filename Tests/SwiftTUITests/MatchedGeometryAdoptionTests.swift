@@ -663,12 +663,12 @@ struct MatchedGeometryAdoptionTests {
     let records = harness.frameRecords
     let last = try #require(records.last)
     #expect(
-      last.rasterPath == Rasterizer.RasterPath.incremental.rawValue,
+      last.rasterPath == RasterPath.incremental.rawValue,
       "the text-change frame did not raster incrementally: \(last.rasterPath) \(last.rasterReuseBarriers)"
     )
     let paths = records.map(\.rasterPath)
     #expect(
-      !paths.contains(Rasterizer.RasterPath.incrementalRepaired.rawValue),
+      !paths.contains(RasterPath.incrementalRepaired.rawValue),
       "the F06 oracle repaired an under-damaged frame: \(paths)")
     // And the badge is still drawn on the source.
     let lines = harness.frame.split(separator: "\n").map(String.init)

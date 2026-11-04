@@ -21,21 +21,6 @@ package struct Rasterizer: Sendable {
     path: RasterPath
   )
 
-  /// Which of the rasterizer's two paths produced a surface.
-  package enum RasterPath: String, Sendable, Equatable {
-    /// Painted from an empty surface.
-    case fresh
-    /// Reused the previous surface's clean rows and repainted only the damaged
-    /// ones.
-    case incremental
-    /// The incremental path additionally served verified scroll-band rows by
-    /// moving the previous surface's row buffers (R3.2b translation blit).
-    case incrementalTranslated
-    /// Took the incremental path, then the F13 verification oracle caught a
-    /// divergence and repaired it with a fresh raster.
-    case incrementalRepaired
-  }
-
   /// Evidence from the incremental-repaint verification oracle (F13): the
   /// incremental surface diverged from a fresh rasterization, meaning the
   /// presentation damage the runtime proved sound was incomplete. Historically

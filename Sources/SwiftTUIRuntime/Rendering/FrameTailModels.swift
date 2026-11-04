@@ -226,7 +226,7 @@ struct FrameTailDiagnostics {
   /// say so — the TermUIPerf lanes checked in to prove it measured a flat zero,
   /// and establishing that required hand-patching the rasterizer. Tests and the
   /// perf harness now assert on this instead.
-  var rasterPath: Rasterizer.RasterPath
+  var rasterPath: RasterPath
   var rasterReuseBarriers: Set<FrameTailRasterReuseBarrier>
   var measureDuration: Duration
   var placeDuration: Duration
@@ -280,7 +280,7 @@ struct FrameTailDrawOutput {
 }
 
 struct FrameTailRasterOutput {
-  var path: Rasterizer.RasterPath
+  var path: RasterPath
   var surface: RasterSurface
   var drawnIdentities: Set<Identity>
   var presentationDamage: PresentationDamage?

@@ -117,6 +117,42 @@ public struct FrameDiagnosticPresentation: Equatable, Sendable {
   }
 }
 
+/// Which of the rasterizer's two paths produced a surface.
+public enum RasterPath: String, Sendable, Equatable {
+  /// Painted from an empty surface.
+  case fresh
+  /// Reused the previous surface's clean rows and repainted only the damaged
+  /// ones.
+  case incremental
+  /// The incremental path additionally served verified scroll-band rows by
+  /// moving the previous surface's row buffers (R3.2b translation blit).
+  case incrementalTranslated
+  /// Took the incremental path, then the F13 verification oracle caught a
+  /// divergence and repaired it with a fresh raster.
+  case incrementalRepaired
+}
+
+/// A reason a frame could not reuse its previous raster.
+public enum FrameTailRasterReuseBarrier: String, Hashable, Sendable, CaseIterable {
+  case missingRetainedFrame = "missing_retained_frame"
+  case rootInvalidated = "root_invalidated"
+  case emptyInvalidation = "empty_invalidation"
+  case surfaceTopologyChanged = "surface_topology_changed"
+  /// The previous frame's placed tree was rooted at a different identity, so
+  /// the two placed paths are not comparable.
+  case placedRootChanged = "placed_root_changed"
+  /// An identity on one of the placed paths resolved to more than one node, so
+  /// the path may mix nodes from different duplicate siblings.
+  case duplicateInvalidatedIdentity = "duplicate_invalidated_identity"
+  /// The head's animation-injection stage rewrote resolved values after
+  /// invalidation was computed, so `directlyInvalidated` is not the complete
+  /// set of identities that repaint this frame.
+  case animationInterpolationApplied = "animation_interpolation_applied"
+  /// The current placed tree carries animation overlay decoration that the
+  /// retained baseline placed tree does not.
+  case animationOverlayDecorated = "animation_overlay_decorated"
+}
+
 /// Whether a committed frame reached the incremental rasterizer.
 /// It also identifies the reason that stopped the frame.
 ///
@@ -128,14 +164,14 @@ public struct FrameDiagnosticPresentation: Equatable, Sendable {
 public struct RasterReuseDiagnostics: Equatable, Sendable {
   /// `fresh`, `incremental`, or `incrementalRepaired`. The last means the
   /// incremental surface diverged from a fresh raster and was repaired.
-  public var path: String
+  public var path: RasterPath
   /// Sorted, stable tokens naming why damage production returned no damage.
   /// Empty when damage was produced.
-  public var barriers: [String]
+  public var barriers: [FrameTailRasterReuseBarrier]
 
   public init(
-    path: String,
-    barriers: [String] = []
+    path: RasterPath,
+    barriers: [FrameTailRasterReuseBarrier] = []
   ) {
     self.path = path
     self.barriers = barriers
