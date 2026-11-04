@@ -841,6 +841,10 @@ are omitted even when SwiftUI exposes a corresponding API.
 
 ## Animation and transitions
 
+- **Custom animation state accepts legacy string keys.** *Provisional.*
+  `AnimationState` supports typed `AnimationStateKey` subscripts. The deprecated
+  string subscript retains separate storage for existing animations.
+
 - **`Int` animates with truncating scale.** *Ratified.* `Int` conforms to
   `VectorArithmetic` with truncate-toward-zero scaling, so a delta of one
   jumps at the end of the curve. Terminal cell coordinates are

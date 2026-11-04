@@ -1,11 +1,31 @@
 public import SwiftTUICore
 
+/// Identifies a value in a custom animation's state and supplies its initial value.
+public protocol AnimationStateKey {
+  associatedtype Value: Sendable
+  static var defaultValue: Value { get }
+}
+
 /// Keyed storage for custom animation state.
 public struct AnimationState: Sendable {
   private var storage: [String: any AnySendableValue] = [:]
 
+  private var keyedValues: [ObjectIdentifier: any AnySendableValue] = [:]
+
   public init() {}
 
+  /// Reads the key's default until the animation writes a value.
+  public subscript<Key: AnimationStateKey>(_ key: Key.Type) -> Key.Value {
+    get {
+      guard let box = keyedValues[ObjectIdentifier(key)] as? TypedValue<Key.Value> else {
+        return Key.defaultValue
+      }
+      return box.value
+    }
+    set { keyedValues[ObjectIdentifier(key)] = TypedValue(value: newValue) }
+  }
+
+  @available(*, deprecated, message: "Use an AnimationStateKey metatype.")
   public subscript<T: Sendable>(key: String, as type: T.Type = T.self) -> T? {
     get { (storage[key] as? TypedValue<T>)?.value }
     set {

@@ -266,7 +266,7 @@ final class StateRecorder: Sendable {
 /// state-survival test to verify the controller threads
 /// `customState` through `sample(_:at:)`.
 struct RecordingCustomAnimation: CustomAnimation {
-  static let counterKey = "RecordingCustomAnimation.counter"
+  enum CounterKey: AnimationStateKey { static let defaultValue = 0 }
 
   let id: String
   let recorder: StateRecorder
@@ -274,9 +274,9 @@ struct RecordingCustomAnimation: CustomAnimation {
   func animate<V: VectorArithmetic>(
     value: V, time: Duration, context: inout AnimationContext<V>
   ) -> V? {
-    let current: Int = context.state[Self.counterKey] ?? 0
+    let current: Int = context.state[CounterKey.self]
     recorder.record(observed: current)
-    context.state[Self.counterKey] = current + 1
+    context.state[CounterKey.self] = current + 1
 
     let ms =
       Double(time.components.seconds) * 1000.0

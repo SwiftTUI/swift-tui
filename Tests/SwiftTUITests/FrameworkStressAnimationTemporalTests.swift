@@ -646,9 +646,9 @@ private struct AnimationTemporalStatefulCurve: CustomAnimation {
     time: Duration,
     context: inout AnimationContext<V>
   ) -> V? {
-    let count: Int = context.state["animation-temporal-state"] ?? 0
+    let count: Int = context.state[TemporalCountKey.self]
     probe.record(count)
-    context.state["animation-temporal-state"] = count + 1
+    context.state[TemporalCountKey.self] = count + 1
     guard time < .seconds(10) else { return nil }
     var result = value
     result.scale(by: min(max(time.totalSeconds / 10, 0), 1))
@@ -1974,3 +1974,5 @@ private struct AnimationTemporal034Fixture: View {
     .environment(\.accessibilityReduceMotion, reducedMotion)
   }
 }
+
+private enum TemporalCountKey: AnimationStateKey { static let defaultValue = 0 }

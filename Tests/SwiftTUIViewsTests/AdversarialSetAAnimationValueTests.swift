@@ -102,11 +102,11 @@ struct AdversarialSetAAnimationValueTests {
     let animation = Animation(CountingLinearCurve(rate: 2)).delay(.milliseconds(250))
     var state = AnimationState()
     #expect(animation.evaluate(elapsed: .milliseconds(200), state: &state) == 0)
-    #expect(state["calls", as: Int.self] == nil)
+    #expect(state[CallCountKey.self] == 0)
     #expect(animation.evaluate(elapsed: .milliseconds(250), state: &state) == 0)
-    #expect(state["calls", as: Int.self] == 1)
+    #expect(state[CallCountKey.self] == 1)
     #expect(animation.evaluate(elapsed: .milliseconds(500), state: &state) == 0.5)
-    #expect(state["calls", as: Int.self] == 2)
+    #expect(state[CallCountKey.self] == 2)
   }
 
   @Test("set A 233: restarting a spring from sampled vector state preserves its future trajectory")
@@ -401,6 +401,9 @@ struct AdversarialSetAAnimationValueTests {
     #expect(transaction[OptionalKey.self] == nil)
   }
 
+  private enum CallCountKey: AnimationStateKey { static let defaultValue = 0 }
+
+  @available(*, deprecated, message: "Exercises the legacy string subscript.")
   @Test("set A 250: animation state copies and type replacement cannot expose stale values")
   func setA250AnimationStateCopyAndTypeReplacement() {
     // Hypothesis: type-erased state can retain a value under the wrong type or share a mutable copy's storage.
@@ -422,7 +425,7 @@ struct AdversarialSetAAnimationValueTests {
     func animate<V: VectorArithmetic>(
       value: V, time: Duration, context: inout AnimationContext<V>
     ) -> V? {
-      context.state["calls", as: Int.self] = (context.state["calls", as: Int.self] ?? 0) + 1
+      context.state[CallCountKey.self] = context.state[CallCountKey.self] + 1
       return value.scaled(by: time.totalSeconds * rate)
     }
 
