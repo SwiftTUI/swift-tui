@@ -37,7 +37,9 @@ Surface output follows `wire.md`; WASI commits the encoding baseline when it
 encodes output. There is no foreign size-query/copy transaction. A new module
 instance starts a fresh host session and retires pending actions and images.
 The browser input encoder emits RS-framed commands from `../grammar/host.abnf`.
-The terminal shim's legacy transport remains a separately selected adapter.
+A valid repair request schedules presentation even when the application is idle;
+it does not wait for another action or animation. The terminal shim's legacy
+transport remains a separately selected adapter.
 
 `SWIFTTUI_MODE=manifest` runs scene discovery natively without executing the
 WASI application. Catalog normalization follows the scene schema and wire

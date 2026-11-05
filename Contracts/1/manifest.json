@@ -4,7 +4,7 @@
   "profile": "swifttui.host-wire/1",
   "minimumReader": "full-v1-v2",
   "schemaDialect": "https://json-schema.org/draft/2020-12/schema",
-  "contentSHA256": "397db393d63ac956460133b349a95649788407032fdb8ca9611ea5288fce7a6b",
+  "contentSHA256": "7fe6a73816abcaeceb4030cb2e03e82fa990b64485772951233d03f20abe5e66",
   "files": {
     "README.md": {
       "sha256": "b32803c21d7c0aad46916194c191fdaebadba024e4c8872924aed4d3ce451ade",
@@ -19,8 +19,8 @@
       "bytes": 5752
     },
     "bindings/HostContract.ts": {
-      "sha256": "92276290da59482a15e80e0f0c5dcb473cd03a0c741466e3bd0cd6cea24eb6b1",
-      "bytes": 5502
+      "sha256": "ecfbbfa3c6bea54a134cf59f5483174d7e1c81c9d2daa4e7e623f8a6217c9ebe",
+      "bytes": 5712
     },
     "conformance/requirements-schema.txt": {
       "sha256": "756cc9e506ae4ee1a6f6c0507088b5cfc0dc8ba350fb2d2d46f1ffa72033adb6",
@@ -55,8 +55,8 @@
       "bytes": 18415
     },
     "generate.py": {
-      "sha256": "f3db30baaae1ad2a51841ca712f2de154f7e24a1c7d6fdae21b87f903680ff1d",
-      "bytes": 5667
+      "sha256": "2df40d53d6260d17cc93b51bb6f94220028ed381eefb26a8ba6b8848b7f618b8",
+      "bytes": 5877
     },
     "grammar/attach.abnf": {
       "sha256": "445c6305ffda3d37c123d4a9e82091d6fc7988cf7fbddd0d1526a6ba18c55c27",
@@ -75,8 +75,8 @@
       "bytes": 5216
     },
     "profiles/companion.md": {
-      "sha256": "5d61b8f7ac8e15cf8e9fc6484205ffb79039546d3f8e953192141addea0f0000",
-      "bytes": 3040
+      "sha256": "427bd23594eac055b8e60e020e7bea529b3bee34b99e733eb13ecb90ea6f36a2",
+      "bytes": 3243
     },
     "profiles/swift-source.md": {
       "sha256": "7e621643d38a9d731055883905fda394f2a184bae8189629b91d1c32f144fc9e",
@@ -87,12 +87,12 @@
       "bytes": 3829
     },
     "profiles/wasi-command.md": {
-      "sha256": "cd2ac211a805b5a8288b3fc91037b905bbfa8dd02a90d15705ea769bc67a292f",
-      "bytes": 3086
+      "sha256": "caea1fb0c07d7b3dc4285854a3e66838b8bb1545b7ac9f76db5bad08529f7668",
+      "bytes": 3217
     },
     "profiles/wire.md": {
-      "sha256": "fb10e55cc8b6894ba803192b56c8fa9557dbd2ede5b7895902f740dbe2556bc3",
-      "bytes": 7383
+      "sha256": "4194de821cdbaae18b1df4a4bf0e54570829f63186b3fc7d53b5130406ce8151",
+      "bytes": 7391
     },
     "schemas/capabilities.schema.json": {
       "sha256": "f64d70f60be266e0d7e20a4be204c2f9668c4af88d2864a9436ef3086a523b8c",

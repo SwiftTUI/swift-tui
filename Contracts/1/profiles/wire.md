@@ -71,7 +71,7 @@ independent and is reset with the connection. Image recovery IDs are capped at
 
 ## Delivery profiles
 
-WASI (`swifttui.wasi/1`) selects capabilities at startup from the documented
+WASI (`swifttui.wasi-command/1`) selects capabilities at startup from the documented
 surface environment and advances encoding state when a record is encoded.
 Input command boundaries are not read boundaries. Buffered input and terminal
 escape handling retain event ordering. WASI's finite input queue can impose a

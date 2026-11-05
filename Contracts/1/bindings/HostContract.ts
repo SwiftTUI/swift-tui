@@ -54,8 +54,14 @@ export const DELTA_WRITERREQUIRED = ["damage", "deltaRows", "encoding", "height"
 
 /** Lossless bounded legacy decimal ingress; writers emit the canonical result. */
 export function normalizeWireUInt64(value: unknown): string | undefined {
-  if (typeof value !== "string" || value.length < 1 || value.length > 20 || /[^0-9]/.test(value)) return;
-  const canonical = value.replace(/^0+(?=.)/, "");
+  if (typeof value !== "string" || value.length < 1 || value.length > 20) return;
+  for (let i = 0; i < value.length; i++) {
+    const digit = value.charCodeAt(i);
+    if (digit < 48 || digit > 57) return;
+  }
+  let start = 0;
+  while (start + 1 < value.length && value.charCodeAt(start) === 48) start++;
+  const canonical = start === 0 ? value : value.slice(start);
   if (canonical.length === 20 && canonical > "18446744073709551615") return;
   return canonical;
 }

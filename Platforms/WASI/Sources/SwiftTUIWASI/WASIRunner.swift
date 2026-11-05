@@ -209,6 +209,9 @@ public enum WASIRunner {
           break
         case .resync(let request):
           host.requestResync(request)
+          // Repair must progress even when the app has no further input or
+          // animation. Encoding state alone only affects the next presentation.
+          signalReader.send(.windowChange)
         }
       }
 

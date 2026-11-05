@@ -41,4 +41,7 @@ No stale delta is replayed as the first frame of a replacement connection.
 The browser resets its decoder, image state, pending action correlations and
 editing focus when the session changes. Application state can survive browser
 detachment; wire delivery state cannot. Clipboard draining, selective image
-repair and keyframe repair remain separate operations from `wire.md`.
+repair and keyframe repair remain separate operations from `wire.md`. A valid
+repair request re-encodes the most recently presented frame without waiting for
+new application input or animation. Before the first presentation it only marks
+encoding state for the next frame.

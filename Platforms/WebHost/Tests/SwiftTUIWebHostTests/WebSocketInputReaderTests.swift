@@ -104,7 +104,7 @@ struct WebSocketInputReaderTests {
     #expect(repeated.refreshRequestCount == 0)
   }
 
-  @Test("a resync record routes to the WebSocket transport")
+  @Test("a keyframe resync repairs the retained frame while the app is idle")
   func resyncRecordRoutesToTransport() async throws {
     let sink = RecordingInputTestSink()
     let transport = WebSocketSurfaceTransport(
@@ -129,15 +129,6 @@ struct WebSocketInputReaderTests {
     let resyncClient = await ChannelClient.attached(transport: transport)
     await resyncClient.feed("\u{001E}resync:{\"scope\":\"keyframe\"}\n")
 
-    _ = try transport.present(
-      SemanticHostFrame(
-        sequence: 3,
-        raster: RasterSurface(size: .init(width: 2, height: 1), lines: ["C "]),
-        semantics: .init(),
-        focusedIdentity: nil,
-        rasterDamage: .init(textRows: [.init(row: 0)])
-      )
-    )
     try await transport.drain()
 
     let records = await sink.records()
@@ -145,6 +136,7 @@ struct WebSocketInputReaderTests {
     #expect(records[1].contains("\"encoding\":\"delta\""))
     #expect(!records[2].contains("\"encoding\":\"delta\""))
     #expect(records[2].contains("\"gen\":3"))
+    #expect(records[2].contains("\"B\""))
   }
 
   @Test("a capability declaration refreshes the retained frame as a keyframe")
@@ -185,7 +177,7 @@ struct WebSocketInputReaderTests {
     #expect(records[1].contains("\"gen\":1"))
   }
 
-  @Test("an image resync request retransmits only the named payload")
+  @Test("an image resync retransmits only the named payload while the app is idle")
   func imageResyncRetransmitsOnlyNamedPayload() async throws {
     let sink = RecordingInputTestSink()
     let transport = WebSocketSurfaceTransport(
@@ -219,7 +211,6 @@ struct WebSocketInputReaderTests {
       "\u{001E}resync:{\"scope\":\"images\",\"ids\":[\"\(requestedID)\"]}\n"
     )
 
-    _ = try transport.present(Self.twoImageFrame(sequence: 3))
     try await transport.drain()
 
     let repairedRecords = await sink.records()

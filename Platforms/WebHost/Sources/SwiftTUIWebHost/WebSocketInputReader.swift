@@ -230,6 +230,7 @@ package final class WebSocketInputReader: ScopedInputReading, Sendable {
         )
       case .resync(let request):
         transport.requestResync(request)
+        transport.requestSurfaceRefresh()
       }
     }
   }
