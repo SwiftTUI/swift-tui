@@ -12,7 +12,10 @@ limits, canonical vocabulary and tuple arities. The [ABNF](grammar/host.abnf)
 owns command framing and scalar syntax. Semantic bounds and transport-specific
 lifecycle rules still apply after structural validation. The
 [Android ABI](profiles/android-abi.md) and [C header](include/swift_tui_android.h)
-specify the binary boundary independently of wire capabilities.
+specify the binary boundary independently of wire capabilities. The
+[WASI command](profiles/wasi-command.md), [loopback companion](profiles/companion.md)
+and [terminal/CLI](profiles/terminal-cli.md) profiles define their execution,
+bootstrap and ownership boundaries.
 
 Generated Swift, TypeScript and Kotlin leaf bindings are in `bindings/`.
 They contain constants, field sets, tuple arities and the checked UInt64 scalar;

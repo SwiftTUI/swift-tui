@@ -4,6 +4,21 @@ import Testing
 @testable import SwiftTUIWASI
 
 struct WASIRunnerTests {
+  @Test("native manifest selects the explicit second scene and derives legacy flags")
+  func manifestExplicitDefault() throws {
+    let scenes = [
+      SceneDescriptor(id: "alpha", title: "Alpha", isDefault: true),
+      SceneDescriptor(id: "beta", title: "Beta", isDefault: false),
+    ]
+    let manifest = try wasiManifest(scenes: scenes, selector: "beta")
+    #expect(manifest.defaultSceneID == "beta")
+    #expect(manifest.scenes.map(\.isDefault) == [false, true])
+    #expect(try wasiManifest(scenes: [], selector: nil).defaultSceneID == nil)
+    #expect(throws: WASIRunnerError.sceneNotFound("missing")) {
+      try wasiManifest(scenes: scenes, selector: "missing")
+    }
+  }
+
   @Test("native execution without manifest mode reports an explicit error")
   func nativeExecutionWithoutManifestModeReportsError() {
     #if canImport(WASILibc)

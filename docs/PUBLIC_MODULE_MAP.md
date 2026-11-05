@@ -51,7 +51,7 @@ implementation/vendor targets are named below; they have no symbol count here.
 | [`SwiftTUITerminalCLI`](PUBLIC_API_BASELINE.md#swifttuiterminalcli) | None (non-product support target) | 6 | 25 |
 | [`SwiftTUICLIAttach`](PUBLIC_API_BASELINE.md#swifttuicliattach) | None (non-product support target) | 1 | 6 |
 | [`SwiftTUICLI`](PUBLIC_API_BASELINE.md#swifttuicli) | `SwiftTUICLI` | 0 | 0 |
-| [`SwiftTUIWASI`](PUBLIC_API_BASELINE.md#swifttuiwasi) | `SwiftTUIWASI` | 3 | 8 |
+| [`SwiftTUIWASI`](PUBLIC_API_BASELINE.md#swifttuiwasi) | `SwiftTUIWASI` | 3 | 9 |
 | [`SwiftTUIWebHost`](PUBLIC_API_BASELINE.md#swifttuiwebhost) | `SwiftTUIWebHost` | 3 | 17 |
 | [`SwiftTUIWebHostCLI`](PUBLIC_API_BASELINE.md#swifttuiwebhostcli) | `SwiftTUIWebHostCLI` | 2 | 8 |
 | [`SwiftTUIAndroidHost`](PUBLIC_API_BASELINE.md#swifttuiandroidhost) | `SwiftTUIAndroidHost` | 17 | 45 |

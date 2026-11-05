@@ -521,5 +521,67 @@
       "scope": "everything"
     },
     "valid": false
+  },
+  {
+    "id": "cli-plain-rows",
+    "schema": "cli-frame.schema.json",
+    "value": {
+      "type": "frame",
+      "size": {
+        "width": 1,
+        "height": 1
+      },
+      "rows": [
+        "X"
+      ],
+      "accessibilityNodes": [],
+      "accessibilityAnnouncements": [],
+      "accessibilityWarnings": []
+    },
+    "valid": true
+  },
+  {
+    "id": "cli-not-surface-tuples",
+    "schema": "cli-frame.schema.json",
+    "value": {
+      "type": "frame",
+      "size": {
+        "width": 1,
+        "height": 1
+      },
+      "rows": [
+        [
+          [
+            0,
+            "X",
+            1,
+            0
+          ]
+        ]
+      ],
+      "accessibilityNodes": [],
+      "accessibilityAnnouncements": [],
+      "accessibilityWarnings": []
+    },
+    "valid": false
+  },
+  {
+    "id": "cli-open-fields",
+    "schema": "cli-frame.schema.json",
+    "value": {
+      "type": "frame",
+      "size": {
+        "width": 1,
+        "height": 1
+      },
+      "rows": [
+        "X"
+      ],
+      "accessibilityNodes": [],
+      "accessibilityAnnouncements": [],
+      "accessibilityWarnings": [],
+      "future": true
+    },
+    "valid": true
   }
 ]

@@ -28,6 +28,14 @@
       defaultSubcommand: Run.self
     )
 
+    /// Recognizes the bare launcher's runner namespace before the general
+    /// rendering options parser sees flags owned by a subcommand.
+    static func isInvocation(_ arguments: [String]) -> Bool {
+      guard let first = arguments.first else { return false }
+      return ["run", "instances", "scenes", "attach", "--instance"].contains(first)
+        || first.hasPrefix("--instance=")
+    }
+
     /// Default subcommand. `myapp` and `myapp --instance NAME` route here.
     ///
     /// `--instance` lives on `Run` rather than the root because a root-level

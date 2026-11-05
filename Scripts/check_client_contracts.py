@@ -26,4 +26,23 @@ with tempfile.TemporaryDirectory(prefix='swifttui-contract-digest-') as temp:
     fixture.write_bytes(fixture.read_bytes() + b'\n')
     result = subprocess.run([sys.executable, str(copy / 'conformance/run.py'), '--verify-only'], capture_output=True, text=True)
     assert result.returncode != 0 and 'kit digest mismatch' in result.stderr
+with tempfile.TemporaryDirectory(prefix='swifttui-contract-generator-') as temp:
+    checkout = Path(temp)
+    copied_kit = checkout / 'Contracts/1'
+    shutil.copytree(kit, copied_kit)
+    production = checkout / 'Sources/SwiftTUIRuntime/Terminal/HostContract.generated.swift'
+    production.parent.mkdir(parents=True)
+    shutil.copy2(kit / 'bindings/HostContract.swift', production)
+    schema_path = copied_kit / 'schemas/host.schema.json'
+    schema = json.loads(schema_path.read_text())
+    limit = next(iter(schema['x-limits']))
+    schema['x-limits'][limit] += 1
+    schema_path.write_text(json.dumps(schema, indent=2) + '\n')
+    generator = [sys.executable, str(copied_kit / 'generate.py')]
+    assert subprocess.run(generator + ['--check'], capture_output=True).returncode != 0
+    subprocess.run(generator, check=True, capture_output=True)
+    subprocess.run(generator + ['--check'], check=True, capture_output=True)
+    for language in ['swift', 'ts', 'kt']:
+        name = 'bindings/HostContract.' + language
+        assert (copied_kit / name).read_bytes() != (kit / name).read_bytes(), language
 print(f"client contract kit: {report['steps']} independent steps, four rejected transition mutations, rejected digest corruption")

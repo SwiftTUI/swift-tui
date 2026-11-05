@@ -101,6 +101,37 @@
       #expect(code != 0)
     }
 
+    @Test("bare launcher routes runner selectors before general options")
+    func bareRunnerSelectors() async throws {
+      let result = try await runFixture(
+        "EntryPointFixtureAtMain", arguments: ["scenes", "--pid", "2147483647"],
+        stoppingAt: nil, watchdog: .seconds(20))
+      #expect(!result.output.contains(Self.frameMarker))
+      #expect(!result.output.contains("Unknown option"))
+      #expect(!result.output.contains("unknownOption"))
+      #expect(result.output.contains("noRunningInstances"), "\(result.output)")
+      guard case .exited(let code) = result.exit else {
+        Issue.record("expected a normal lookup failure, got \(result.exit)")
+        return
+      }
+      #expect(code != 0)
+    }
+
+    @Test("bare launcher rejects conflicting selectors without starting the runtime")
+    func bareRunnerRejectsConflictingSelectors() async throws {
+      let result = try await runFixture(
+        "EntryPointFixtureAtMain",
+        arguments: ["scenes", "--pid", "1", "--instance", "contract"],
+        stoppingAt: nil, watchdog: .seconds(20))
+      #expect(result.output.contains("alternative selectors"))
+      #expect(!result.output.contains(Self.frameMarker))
+      guard case .exited(let code) = result.exit else {
+        Issue.record("expected a normal usage failure, got \(result.exit)")
+        return
+      }
+      #expect(code != 0)
+    }
+
     // MARK: - Verb dispatch
     //
     // A root command that declares an `@Argument` shadows its own subcommands,

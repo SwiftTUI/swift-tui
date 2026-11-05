@@ -1,0 +1,12 @@
+; Local POSIX attach transport. Case-sensitive RFC 7405 spellings.
+; One UTF-8 request and one UTF-8 response per Unix-domain stream connection.
+LF = %x0A
+SP = %x20
+request = (%s"LIST" / %s"COMPANION" / %s"ATTACH" SP scene-id) LF
+scene-id = 1*(%x20-7E / %x80-FF) ; validated WindowIdentifier; no CR/LF
+response = (%s"OK" SP (catalog / pty-path / companion-url) / %s"ERR" SP reason) LF
+catalog = %s"[" *OCTET %s"]" ; JSON scene array; see terminal-cli.md
+companion-url = 1*(%x21-7E)
+pty-path = 1*(%x20-7E / %x80-FF)
+reason = *(%x20-7E / %x80-FF)
+OCTET = %x00-FF

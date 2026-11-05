@@ -1,0 +1,35 @@
+name: Client contract kit
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "Contracts/**"
+      - "Sources/SwiftTUIRuntime/Terminal/HostContract.generated.swift"
+      - "Scripts/check_client_contracts.py"
+      - ".github/workflows/client-contracts.yml"
+  pull_request:
+    paths:
+      - "Contracts/**"
+      - "Sources/SwiftTUIRuntime/Terminal/HostContract.generated.swift"
+      - "Scripts/check_client_contracts.py"
+      - ".github/workflows/client-contracts.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  offline-kit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install tooling-only schema engine
+        run: |
+          python3 -m venv .build/contract-schema
+          .build/contract-schema/bin/pip install -r Contracts/1/conformance/requirements-schema.txt
+      - name: Verify generated bindings, traces and negative controls
+        run: python3 Scripts/check_client_contracts.py
+      - name: Validate schemas and independent cases without remote references
+        run: .build/contract-schema/bin/python Contracts/1/conformance/validate_schemas.py

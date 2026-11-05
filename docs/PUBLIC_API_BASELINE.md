@@ -28,7 +28,7 @@ For products, supported imports, and re-export reachability, see [PUBLIC_MODULE_
 | `SwiftTUITerminalCLI` | 6 | 25 |
 | `SwiftTUICLIAttach` | 1 | 6 |
 | `SwiftTUICLI` | 0 | 0 |
-| `SwiftTUIWASI` | 3 | 8 |
+| `SwiftTUIWASI` | 3 | 9 |
 | `SwiftTUIWebHost` | 3 | 17 |
 | `SwiftTUIWebHostCLI` | 2 | 8 |
 | `SwiftTUIAndroidHost` | 17 | 45 |
@@ -613,7 +613,7 @@ For products, supported imports, and re-export reachability, see [PUBLIC_MODULE_
 
 - `App` — extension — 1 member
 - `WASIRunner` — enum — 2 members
-- `WASIRunnerError` — enum — 2 members
+- `WASIRunnerError` — enum — 3 members
 
 ## SwiftTUIWebHost
 

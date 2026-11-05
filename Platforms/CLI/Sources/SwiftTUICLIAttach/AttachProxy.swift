@@ -39,6 +39,18 @@
       }
       defer { sceneClose(slaveFD) }
 
+      // Reopening a Darwin PTY slave can restore canonical defaults. Configure
+      // the remote transport endpoint before the scene starts emitting bytes;
+      // JSON mode deliberately does not acquire terminal screen ownership.
+      var slaveAttributes = termios()
+      guard unsafe tcgetattr(slaveFD, &slaveAttributes) == 0 else {
+        throw AttachProxyError.failedToSetRawMode(errno: errno)
+      }
+      unsafe cfmakeraw(&slaveAttributes)
+      guard unsafe tcsetattr(slaveFD, TCSANOW, &slaveAttributes) == 0 else {
+        throw AttachProxyError.failedToSetRawMode(errno: errno)
+      }
+
       sceneConfigureNoSigPipe(STDOUT_FILENO)
 
       // Set the slave's window size to match the current terminal

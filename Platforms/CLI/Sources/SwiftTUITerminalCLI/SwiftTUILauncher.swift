@@ -67,7 +67,18 @@ public enum SwiftTUILauncher {
   /// Parses CLI options and launches an app through terminal or web mode.
   @MainActor
   public static func run<A: App>(_ app: A) async throws {
-    let options = try SwiftTUIOptions.parse(Array(CommandLine.arguments.dropFirst()))
+    let arguments = Array(CommandLine.arguments.dropFirst())
+    if RunnerCLI.isInvocation(arguments) {
+      // The bare launcher owns this namespace. Validate here so a malformed
+      // selector cannot silently launch an app, while explicit-configuration
+      // callers retain ownership of their custom command-line parser.
+      _ = try RunnerCLI.parseAsRoot(arguments)
+      var configuration = try SwiftTUIOptions.parse([]).runtimeConfiguration()
+      configuration.web = nil
+      try await TerminalRunner.run(app, configuration: configuration)
+      return
+    }
+    let options = try SwiftTUIOptions.parse(arguments)
     try await run(app, configuration: options.runtimeConfiguration())
   }
 

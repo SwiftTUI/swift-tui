@@ -5859,6 +5859,7 @@ SwiftTUIWASI.WASIRunner.run(_:)
 SwiftTUIWASI.WASIRunnerError
 SwiftTUIWASI.WASIRunnerError.description
 SwiftTUIWASI.WASIRunnerError.nativeExecutionUnsupported
+SwiftTUIWASI.WASIRunnerError.sceneNotFound(_:)
 SwiftTUIWebHost.WebHostConfig
 SwiftTUIWebHost.WebHostConfig.bind
 SwiftTUIWebHost.WebHostConfig.browserAssetsPath

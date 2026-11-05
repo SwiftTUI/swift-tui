@@ -12,9 +12,12 @@ import SwiftTUIWASISurfaceBridge
 
 public enum WASIRunnerError: Error, Equatable, Sendable, CustomStringConvertible {
   case nativeExecutionUnsupported
+  case sceneNotFound(WindowIdentifier)
 
   public var description: String {
     switch self {
+    case .sceneNotFound(let identifier):
+      return "wasi.scene.notFound: no scene named \(identifier.rawValue)."
     case .nativeExecutionUnsupported:
       return
         "WASIRunner can run natively only in manifest mode. Build for WASI to execute scenes."
@@ -91,7 +94,11 @@ public enum WASIRunner {
     let selections = collectWindowSceneSelections(from: app.body)
     try validateWindowSceneIdentifiers(selections.map(\.descriptor))
     if requestedManifestMode() {
-      print(SceneManifest(for: app).jsonString)
+      let manifest = SceneManifest(for: app)
+      let selected = try wasiManifest(
+        scenes: manifest.scenes,
+        selector: environmentValue(named: SwiftTUIEnvironmentVariable.scene.rawValue))
+      print(selected.jsonString)
       return
     }
 
@@ -331,4 +338,13 @@ extension App {
   public static func main() async throws {
     try await WASIRunner.run(Self.self)
   }
+}
+
+/// Native discovery uses the same explicit scene selector as browser launch.
+package func wasiManifest(scenes: [SceneDescriptor], selector: String?) throws -> SceneManifest {
+  let identifier = selector.flatMap { $0.isEmpty ? nil : WindowIdentifier($0) }
+  if let identifier, !scenes.contains(where: { $0.id == identifier }) {
+    throw WASIRunnerError.sceneNotFound(identifier)
+  }
+  return SceneManifest(defaultSceneID: identifier, scenes: scenes)
 }
