@@ -2,9 +2,11 @@
 
 This document is the normative description of the converged host wire at
 `HEAD`. It covers record shapes, cross-frame state, capability ingress,
-transport ratchets, and current consumer obligations. The canonical field inventory
-remains `HostWireSchema`. This document explains the stateful behavior that a
-field manifest cannot express.
+transport ratchets, and current consumer obligations. The versioned
+[public contract kit](../Contracts/1/README.md) owns schemas, grammar, generated
+leaf definitions and the offline conformance runner. `HostWireSchema` retains
+the Swift source-property mappings and checks them against those generated
+field sets. This document explains the runtime details behind the kit's profiles.
 
 For host ownership and execution modes, see
 [HOSTS-AND-PLATFORMS.md](HOSTS-AND-PLATFORMS.md). This contract covers the
@@ -12,6 +14,23 @@ web-surface stream shared by the WASI browser host, localhost WebHost, and the
 host-managed Android path. It does not change the terminal-native protocol.
 The external native `SwiftUIHost` receives committed frames directly and does
 not consume this serialized stream.
+
+## Strict admission and session correlation
+
+Browser and Android readers reject malformed UTF-8, duplicate JSON keys,
+nonfinite binary64 values (including overflowing exponents), and extended cell
+tuples. State-bearing failure preserves the previous presentation and coalesces
+a keyframe repair; a matching delta cannot cancel that repair. A replacement
+full frame reanchors the baseline. A generation jump is valid when its declared
+baseline matches. Unknown optional object keys remain ignorable.
+
+Accessibility replies settle only the exact outstanding request ID and target
+in the active session. Malformed optional replies are discarded locally. Pending
+requests expire after 30 seconds, are capped at 256, and retire when their target
+or session disappears. An epoch change counts as a new session even when the
+application reuses its frame sequence or target text. IDs are not reused on
+reset. Request IDs are lossless ASCII decimal UInt64 strings; command writers
+normalize bounded legacy zero padding before framing.
 
 ## Admitted raster rows
 
@@ -275,7 +294,7 @@ fixture-sync gate byte-compares all three copies.
 
 ## String token vocabularies
 
-`HostWireSchema` owns the frozen emitted sets for focus semantics,
+The public schema generates the frozen emitted sets used by `HostWireSchema` for focus semantics,
 announcement politeness, accessibility live regions, image formats, and image
 scaling modes. Consumers normalize unknown strings at the point where a token
 affects behavior:

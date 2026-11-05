@@ -114,9 +114,13 @@
     _ count: Int
   ) -> Int {
     #if canImport(Darwin) || canImport(Glibc) || canImport(Android) || canImport(Musl)
-      let sent = unsafe send(fileDescriptor, buffer, count, Int32(MSG_NOSIGNAL))
-      if sent >= 0 || errno != ENOTSOCK {
-        return sent
+      // Android's send declaration requires a nonnull pointer. A nil buffer
+      // follows write(2)'s existing zero-count/error behavior below.
+      if let buffer = unsafe buffer {
+        let sent = unsafe send(fileDescriptor, buffer, count, Int32(MSG_NOSIGNAL))
+        if sent >= 0 || errno != ENOTSOCK {
+          return sent
+        }
       }
     #endif
     #if canImport(Darwin)

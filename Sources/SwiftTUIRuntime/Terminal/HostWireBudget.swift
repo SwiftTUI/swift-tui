@@ -2,19 +2,19 @@ import SwiftTUICore
 
 /// Fixed host-wire allocation limits. Native terminal grids are independent.
 package enum HostWireBudget {
-  package static let recordBytes = 4 * 1024 * 1024
-  package static let gridDimension = 1024
-  package static let gridCells = 65536
-  package static let images = 1024
-  package static let metadataEntries = 65536
-  package static let cellTextBytes = 256
-  package static let styleBytes = 1024
-  package static let rasterDimension = 8192
-  package static let rasterPixels = 16 * 1024 * 1024
+  package static let recordBytes = HostContract.recordBytes
+  package static let gridDimension = HostContract.gridDimension
+  package static let gridCells = HostContract.gridCells
+  package static let images = HostContract.images
+  package static let metadataEntries = HostContract.metadataEntries
+  package static let cellTextBytes = HostContract.cellTextBytes
+  package static let styleBytes = HostContract.styleBytes
+  package static let rasterDimension = HostContract.rasterDimension
+  package static let rasterPixels = HostContract.rasterPixels
   /// The largest magnitude of a pointer coordinate (in cells) or wheel delta
   /// on the wire. Far beyond any real pointer, and small enough that the cell
   /// arithmetic that follows stays inside a 32-bit `Int` (wasm32).
-  package static let pointerMagnitude = 1 << 24
+  package static let pointerMagnitude = HostContract.pointerMagnitude
 
   package enum Exceeded: Error { case limit }
 

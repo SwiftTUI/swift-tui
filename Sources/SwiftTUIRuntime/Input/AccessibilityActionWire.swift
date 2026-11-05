@@ -6,9 +6,7 @@ package enum AccessibilityActionWire {
     var parts = text.split(separator: ":", omittingEmptySubsequences: false).map(String.init)
     var requestID: UInt64?
     if parts.count == 4 || parts.count == 6 || parts.count == 8 {
-      guard (1...20).contains(parts[1].utf8.count),
-        parts[1].utf8.allSatisfy({ $0 >= 0x30 && $0 <= 0x39 }),
-        let parsedID = UInt64(parts[1])
+      guard let parsedID = HostContract.uint64(parts[1])
       else { return nil }
       requestID = parsedID
       parts.remove(at: 1)

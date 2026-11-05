@@ -1,0 +1,525 @@
+[
+  {
+    "id": "minimal-full",
+    "schema": "host.schema.json",
+    "definition": "full",
+    "value": {
+      "version": 2,
+      "width": 1,
+      "height": 1,
+      "styles": [
+        null
+      ],
+      "rows": [
+        [
+          [
+            0,
+            "A",
+            1,
+            0
+          ]
+        ]
+      ],
+      "images": []
+    },
+    "valid": true
+  },
+  {
+    "id": "additive-full",
+    "schema": "host.schema.json",
+    "definition": "full",
+    "value": {
+      "version": 2,
+      "width": 1,
+      "height": 1,
+      "styles": [
+        null
+      ],
+      "rows": [
+        [
+          [
+            0,
+            "A",
+            1,
+            0
+          ]
+        ]
+      ],
+      "images": [],
+      "future": {
+        "optional": "ignored"
+      }
+    },
+    "valid": true
+  },
+  {
+    "id": "missing-rows",
+    "schema": "host.schema.json",
+    "definition": "full",
+    "value": {
+      "version": 2,
+      "width": 1,
+      "height": 1,
+      "styles": [
+        null
+      ],
+      "images": []
+    },
+    "valid": false
+  },
+  {
+    "id": "invalid-cell-3",
+    "schema": "host.schema.json",
+    "definition": "cell",
+    "value": [
+      0,
+      "A",
+      1
+    ],
+    "valid": false
+  },
+  {
+    "id": "invalid-cell-4",
+    "schema": "host.schema.json",
+    "definition": "cell",
+    "value": [
+      0,
+      "A",
+      1,
+      0,
+      "future"
+    ],
+    "valid": false
+  },
+  {
+    "id": "invalid-cell-5",
+    "schema": "host.schema.json",
+    "definition": "cell",
+    "value": [
+      0,
+      "A",
+      1,
+      "0"
+    ],
+    "valid": false
+  },
+  {
+    "id": "producer-web-surface-basic",
+    "schema": "host.schema.json",
+    "definition": "full",
+    "value": {
+      "version": 1,
+      "epoch": 1,
+      "gen": 1,
+      "width": 2,
+      "height": 2,
+      "styles": [
+        null
+      ],
+      "rows": [
+        [
+          [
+            0,
+            "O",
+            1,
+            0
+          ],
+          [
+            1,
+            "K",
+            1,
+            0
+          ]
+        ],
+        [
+          [
+            0,
+            " ",
+            1,
+            0
+          ],
+          [
+            1,
+            "\u2713",
+            1,
+            0
+          ]
+        ]
+      ],
+      "images": []
+    },
+    "valid": true
+  },
+  {
+    "id": "producer-web-surface-styled",
+    "schema": "host.schema.json",
+    "definition": "full",
+    "value": {
+      "version": 1,
+      "epoch": 1,
+      "gen": 1,
+      "width": 4,
+      "height": 2,
+      "styles": [
+        null,
+        {
+          "fg": "#E05757FF",
+          "bg": "#000000FF",
+          "em": 19,
+          "underline": {
+            "pattern": "dash",
+            "color": "#EBB33CFF"
+          },
+          "strikethrough": {
+            "pattern": "dot",
+            "color": "#E05757FF"
+          },
+          "opacity": 0.75
+        },
+        {
+          "fg": "#5BA3FFFF",
+          "bg": "#61C67BFF",
+          "em": 4,
+          "underline": {
+            "pattern": "curly"
+          },
+          "opacity": 0.5
+        },
+        {
+          "fg": "#56B6C2FF",
+          "strikethrough": {
+            "pattern": "double",
+            "color": "#B46EFFFF"
+          }
+        }
+      ],
+      "rows": [
+        [
+          [
+            0,
+            "A",
+            1,
+            1
+          ],
+          [
+            1,
+            "\u754c",
+            2,
+            2
+          ],
+          [
+            3,
+            "\"",
+            1,
+            1
+          ]
+        ],
+        [
+          [
+            0,
+            "\\",
+            1,
+            3
+          ],
+          [
+            1,
+            "\n",
+            1,
+            3
+          ],
+          [
+            2,
+            "B",
+            1,
+            0
+          ],
+          [
+            3,
+            " ",
+            1,
+            0
+          ]
+        ]
+      ],
+      "images": []
+    },
+    "valid": true
+  },
+  {
+    "id": "producer-web-surface-composited-image",
+    "schema": "host.schema.json",
+    "definition": "full",
+    "value": {
+      "version": 2,
+      "epoch": 1,
+      "gen": 1,
+      "sequence": 41,
+      "width": 2,
+      "height": 1,
+      "styles": [
+        null
+      ],
+      "rows": [
+        [
+          [
+            0,
+            "i",
+            1,
+            0
+          ],
+          [
+            1,
+            " ",
+            1,
+            0
+          ]
+        ]
+      ],
+      "images": [
+        {
+          "id": "blend:png:90854746cfb46f1b",
+          "format": "png",
+          "bounds": [
+            0,
+            0,
+            1,
+            1
+          ],
+          "visibleBounds": [
+            0,
+            0,
+            1,
+            1
+          ],
+          "scalingMode": "fit",
+          "opacity": 0.5,
+          "pixelSize": [
+            2,
+            2
+          ],
+          "dataBase64": "iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAHUlEQVR4AQESAO3/AP8AAP//AAD/AP8AAP//AAD/R8oH+YOsvdsAAAAASUVORK5CYII="
+        }
+      ]
+    },
+    "valid": true
+  },
+  {
+    "id": "canonical-delta",
+    "schema": "host.schema.json",
+    "definition": "delta",
+    "value": {
+      "version": 3,
+      "encoding": "delta",
+      "epoch": 1,
+      "gen": 3,
+      "baselineGen": 1,
+      "width": 1,
+      "height": 1,
+      "styles": [
+        null
+      ],
+      "deltaRows": [
+        [
+          0,
+          [
+            [
+              0,
+              "B",
+              1,
+              0
+            ]
+          ]
+        ]
+      ],
+      "images": []
+    },
+    "valid": true
+  },
+  {
+    "id": "uint64-10",
+    "schema": "host.schema.json",
+    "definition": "uint64",
+    "value": "0",
+    "valid": true
+  },
+  {
+    "id": "uint64-11",
+    "schema": "host.schema.json",
+    "definition": "uint64",
+    "value": "18446744073709551615",
+    "valid": true
+  },
+  {
+    "id": "uint64-12",
+    "schema": "host.schema.json",
+    "definition": "uint64",
+    "value": "18446744073709551616",
+    "valid": false
+  },
+  {
+    "id": "uint64-13",
+    "schema": "host.schema.json",
+    "definition": "uint64",
+    "value": "0001",
+    "valid": false
+  },
+  {
+    "id": "uint64-14",
+    "schema": "host.schema.json",
+    "definition": "uint64",
+    "value": "+1",
+    "valid": false
+  },
+  {
+    "id": "uint64-15",
+    "schema": "host.schema.json",
+    "definition": "uint64",
+    "value": "\uff11",
+    "valid": false
+  },
+  {
+    "id": "uint64-16",
+    "schema": "host.schema.json",
+    "definition": "uint64",
+    "value": "",
+    "valid": false
+  },
+  {
+    "id": "uint64-17",
+    "schema": "host.schema.json",
+    "definition": "uint64",
+    "value": "1\n",
+    "valid": false
+  },
+  {
+    "id": "uint64-18",
+    "schema": "host.schema.json",
+    "definition": "uint64",
+    "value": "99999999999999999999",
+    "valid": false
+  },
+  {
+    "id": "catalog-19",
+    "schema": "host.schema.json",
+    "definition": "catalog",
+    "value": {
+      "defaultSceneId": "second",
+      "scenes": [
+        {
+          "id": "first",
+          "isDefault": false
+        },
+        {
+          "id": "second",
+          "isDefault": true
+        }
+      ]
+    },
+    "valid": true
+  },
+  {
+    "id": "catalog-20",
+    "schema": "host.schema.json",
+    "definition": "catalog",
+    "value": {
+      "scenes": [
+        {
+          "id": "first",
+          "isDefault": "true"
+        }
+      ]
+    },
+    "valid": false
+  },
+  {
+    "id": "catalog-21",
+    "schema": "host.schema.json",
+    "definition": "catalog",
+    "value": {
+      "scenes": []
+    },
+    "valid": true
+  },
+  {
+    "id": "max-reply",
+    "schema": "host.schema.json",
+    "definition": "actionResponse",
+    "value": {
+      "requestID": "18446744073709551615",
+      "target": "opaque",
+      "result": "accepted"
+    },
+    "valid": true
+  },
+  {
+    "id": "numeric-reply",
+    "schema": "host.schema.json",
+    "definition": "actionResponse",
+    "value": {
+      "requestID": 1,
+      "target": "opaque",
+      "result": "accepted"
+    },
+    "valid": false
+  },
+  {
+    "id": "typed-value",
+    "schema": "host.schema.json",
+    "definition": "value",
+    "value": {
+      "type": "boolean",
+      "value": true
+    },
+    "valid": true
+  },
+  {
+    "id": "string-boolean",
+    "schema": "host.schema.json",
+    "definition": "value",
+    "value": {
+      "type": "boolean",
+      "value": "true"
+    },
+    "valid": false
+  },
+  {
+    "id": "capability-addition",
+    "schema": "host.schema.json",
+    "definition": "capabilities",
+    "value": {
+      "acceptsDeltaFrames": true,
+      "future": false
+    },
+    "valid": true
+  },
+  {
+    "id": "invalid-capability",
+    "schema": "host.schema.json",
+    "definition": "capabilities",
+    "value": {
+      "acceptsDeltaFrames": "true"
+    },
+    "valid": false
+  },
+  {
+    "id": "selective-repair",
+    "schema": "host.schema.json",
+    "definition": "resync",
+    "value": {
+      "scope": "images",
+      "ids": [
+        "red"
+      ]
+    },
+    "valid": true
+  },
+  {
+    "id": "unknown-repair",
+    "schema": "host.schema.json",
+    "definition": "resync",
+    "value": {
+      "scope": "everything"
+    },
+    "valid": false
+  }
+]

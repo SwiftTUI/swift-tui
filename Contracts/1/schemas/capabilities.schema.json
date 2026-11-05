@@ -1,0 +1,5 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://swifttui.dev/contracts/1/schemas/capabilities.schema.json",
+  "$ref": "host.schema.json#/$defs/capabilities"
+}

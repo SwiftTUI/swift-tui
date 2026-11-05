@@ -1,0 +1,106 @@
+{
+  "formatVersion": 1,
+  "kitRevision": "1",
+  "profile": "swifttui.host-wire/1",
+  "minimumReader": "full-v1-v2",
+  "schemaDialect": "https://json-schema.org/draft/2020-12/schema",
+  "contentSHA256": "6bb137f70cad96769afd4a611f9557c1d0e7db53fb085669dd26d2cfcf176678",
+  "files": {
+    "README.md": {
+      "sha256": "5189034361483bf31ab1be64e0c509812236558470e1776333e4f0e6ff90c9f0",
+      "bytes": 4394
+    },
+    "bindings/HostContract.kt": {
+      "sha256": "a0e40f9d86cb1e5116c2545f0b067d054f1a7929b0e861839b8775fa5a0570d0",
+      "bytes": 1642
+    },
+    "bindings/HostContract.swift": {
+      "sha256": "797b153b893eb4c0c1c6c890e23283a08b5751565977ac65ed54e76775981c34",
+      "bytes": 5752
+    },
+    "bindings/HostContract.ts": {
+      "sha256": "92276290da59482a15e80e0f0c5dcb473cd03a0c741466e3bd0cd6cea24eb6b1",
+      "bytes": 5502
+    },
+    "conformance/requirements-schema.txt": {
+      "sha256": "756cc9e506ae4ee1a6f6c0507088b5cfc0dc8ba350fb2d2d46f1ffa72033adb6",
+      "bytes": 19
+    },
+    "conformance/run.py": {
+      "sha256": "40f2ce2d000ee886b20a51855702d254451a3dd8a4e40939fa81160c21da5e4a",
+      "bytes": 3637
+    },
+    "conformance/validate_schemas.py": {
+      "sha256": "0219745f37eb99fbc647c6ff9c14ec2a104297f8a4e30996cd27776d11206580",
+      "bytes": 1154
+    },
+    "examples/android_abi_probe.c": {
+      "sha256": "779eb19777366f77f104207a5a8f10bd2b2de1e191f049a6ab339120c8d03707",
+      "bytes": 1058
+    },
+    "examples/python_host.py": {
+      "sha256": "904ef48935b677e988c79d768672ee367a8540fbbeab7edac788221f3bafdbee",
+      "bytes": 9448
+    },
+    "fixtures/schema-cases.json": {
+      "sha256": "cb18e8a094fa49eaa2bd7bf211a665d2dc4ec7a2cdb6adf670c8458eb41e2867",
+      "bytes": 9181
+    },
+    "fixtures/trace-admission.json": {
+      "sha256": "a7d3ebfb95444c44159252d59e79ceb9efb8b67fec44caaed844032fa3235cb3",
+      "bytes": 9798
+    },
+    "fixtures/trace-recovery.json": {
+      "sha256": "bf53b3a9511c7fa5c3b57d200cb501cfbf5faf718835537b1856df31d10b5274",
+      "bytes": 18415
+    },
+    "generate.py": {
+      "sha256": "f3db30baaae1ad2a51841ca712f2de154f7e24a1c7d6fdae21b87f903680ff1d",
+      "bytes": 5667
+    },
+    "grammar/host.abnf": {
+      "sha256": "76eb2621c4e84ccdeb237be0d0e0a028941a74d4c7aee09c6c4be1dbe9540a59",
+      "bytes": 2661
+    },
+    "include/swift_tui_android.h": {
+      "sha256": "1bae1758e16e7f9974282be5030de0b01c20069791d7fb79b2d0249598d689c8",
+      "bytes": 3507
+    },
+    "profiles/android-abi.md": {
+      "sha256": "34d6fb926a00c5f510346e6d1f72f0e68b56ba11274ed8be51e1ccbd7436061e",
+      "bytes": 5216
+    },
+    "profiles/wire.md": {
+      "sha256": "fb10e55cc8b6894ba803192b56c8fa9557dbd2ede5b7895902f740dbe2556bc3",
+      "bytes": 7383
+    },
+    "schemas/capabilities.schema.json": {
+      "sha256": "f64d70f60be266e0d7e20a4be204c2f9668c4af88d2864a9436ef3086a523b8c",
+      "bytes": 192
+    },
+    "schemas/catalog.schema.json": {
+      "sha256": "ec2ef7280620fb8e9fd4320f61368c548340ec62aa0713e04e036add2117fb02",
+      "bytes": 324
+    },
+    "schemas/host.schema.json": {
+      "sha256": "b03076c14b62ced68ada2fcf232d63c4e4d935431c967cde7fc5df49db52b064",
+      "bytes": 30556
+    },
+    "schemas/records.schema.json": {
+      "sha256": "0dfaa528499a02a820c3769533d8aced3f1cd888cc10cc1ee14d42a494dd2cf9",
+      "bytes": 1253
+    },
+    "schemas/resync.schema.json": {
+      "sha256": "2c47b07eaf43eb8e2a9fccc74aff89ef508e7f64beea940573ccb813e32c0e25",
+      "bytes": 180
+    }
+  },
+  "runner": "conformance/run.py",
+  "bindingGenerator": "generate.py",
+  "capabilities": {
+    "delta": "acceptsDeltaFrames",
+    "styleAppend": "styleAppend",
+    "geometry": "geometryRevisions",
+    "viewport": "geometryRevisions+sharedViewport"
+  }
+}

@@ -1,6 +1,7 @@
 import Dispatch
 import Foundation
 package import SwiftTUIPrimitives
+import SwiftTUIRuntime
 import Synchronization
 
 /// The in-tree loopback HTTP + WebSocket host behind `WebHostRunner`.
@@ -24,7 +25,9 @@ package struct WebHostLoopbackServer: WebHostServer {
   ) async throws -> WebHostServerSession {
     let browserBundle = WebHostBrowserBundle(directory: configuration.browserAssetsPath)
     _ = try browserBundle.resource(for: "/")
-    guard !scenes.isEmpty, Set(scenes.map(\.id)).count == scenes.count else {
+    guard !scenes.isEmpty, Set(scenes.map(\.id)).count == scenes.count,
+      scenes.filter(\.isDefault).count <= 1
+    else {
       throw WebHostServerError.invalidScenes
     }
     var lastError: (any Error)?
@@ -771,13 +774,12 @@ struct WebHostRouteTable: Sendable {
   }
 
   static func sceneManifest(_ scenes: [WebHostSceneDescriptor]) -> String {
-    let primary = scenes.first(where: \.isDefault) ?? scenes[0]
-    let entries = scenes.map { scene in
-      let title = scene.title.map { ",\"title\":\(jsonString($0))" } ?? ""
-      return
-        "{\"id\":\(jsonString(scene.id.rawValue))\(title),\"isDefault\":\(scene.id == primary.id)}"
-    }.joined(separator: ",")
-    return "{\"defaultSceneId\":\(jsonString(primary.id.rawValue)),\"scenes\":[\(entries)]}"
+    SceneManifest(
+      defaultSceneID: nil,
+      scenes: scenes.map {
+        SceneDescriptor(id: $0.id, title: $0.title, isDefault: $0.isDefault)
+      }
+    ).canonicalJSONString
   }
 
 }

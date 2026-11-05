@@ -260,6 +260,7 @@ classifications:
     - "SwiftTUIAndroidHost.swift_tui_android_declare_capabilities(_:_:_:)"
     - "SwiftTUIAndroidHost.swift_tui_android_destroy(_:)"
     - "SwiftTUIAndroidHost.swift_tui_android_diag()"
+    - "SwiftTUIAndroidHost.swift_tui_android_get_abi_info(_:_:)"
     - "SwiftTUIAndroidHost.swift_tui_android_install_executor()"
     - "SwiftTUIAndroidHost.swift_tui_android_accessibility_action(_:_:_:)"
     - "SwiftTUIAndroidHost.swift_tui_android_request_resync(_:_:_:)"

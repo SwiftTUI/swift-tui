@@ -223,7 +223,7 @@ struct AdversarialSetBWebHostTests {
     let title = "q\"\\\n\u{2028}\t\u{01}é"
     let scenes: [WebHostSceneDescriptor] = [
       .init(id: "a/b", title: title, isDefault: true),
-      .init(id: "x?y", title: nil, isDefault: true),
+      .init(id: "x?y", title: nil, isDefault: false),
     ]
     let manifest = try setBJSON(WebHostRouteTable.sceneManifest(scenes))
     #expect(manifest["defaultSceneId"] as? String == "a-b")
@@ -253,6 +253,11 @@ struct AdversarialSetBWebHostTests {
     await #expect(throws: WebHostServerError.invalidScenes) {
       try await WebHostLoopbackServer().start(
         configuration: .init(port: 0), token: setBToken, scenes: [])
+    }
+    await #expect(throws: WebHostServerError.invalidScenes) {
+      try await WebHostLoopbackServer().start(
+        configuration: .init(port: 0), token: setBToken,
+        scenes: [.init(id: "a", isDefault: true), .init(id: "b", isDefault: true)])
     }
     let duplicates: [WebHostSceneDescriptor] = [.init(id: "dup"), .init(id: "dup")]
     await #expect(throws: WebHostServerError.invalidScenes) {

@@ -5,8 +5,8 @@ import SwiftTUICore
 /// deliberate.
 ///
 /// ``HostFrameProjection`` is the single seam host serialization reads a frame
-/// through; this manifest is the single place the *serialized* surface is
-/// named. Since the Android host converged onto the web-surface wire and the
+/// through; the generated public contract supplies the serialized field sets.
+/// This file retains the private Swift source-property mapping. Since the Android host converged onto the web-surface wire and the
 /// legacy keyed-JSON format was retired (convergence proposal
 /// 2026-07-22-002, Stage C4), every host speaks ONE wire. It is pinned
 /// against reality by two suites:
@@ -359,106 +359,33 @@ package enum HostWireSchema {
   /// totality test fully populates a frame so required ∪ optional must all be
   /// present on the wire.
   package enum WebWire {
-    package static let fullFrameKeys: Set<String> = [
-      "version", "width", "height", "styles", "rows", "images",
-    ]
-    package static let fullFrameOptionalKeys: Set<String> = [
-      "geometryRevision", "viewportRevision", "epoch", "gen", "sequence", "damage",
-      "accessibilityTree",
-      "accessibilityAnnouncements", "accessibilityActionResponse", "accessibilityFocusRequest",
-      "scrollRegions", "paragraphs", "links", "linkTargets", "focusPresentation",
-      "preferredGridWidth", "preferredGridHeight", "terminalStyle",
-    ]
-    package static let deltaFrameKeys: Set<String> = [
-      "version", "encoding", "width", "height", "styles", "deltaRows", "images",
-      "damage",
-    ]
-    package static let deltaFrameOptionalKeys: Set<String> = [
-      "geometryRevision", "viewportRevision", "epoch", "gen", "baselineGen", "sequence",
-      "accessibilityTree",
-      "accessibilityAnnouncements", "accessibilityActionResponse", "accessibilityFocusRequest",
-      "scrollRegions", "paragraphs",
-      "links",
-      "linkTargets", "focusPresentation",
-      "preferredGridWidth", "preferredGridHeight", "terminalStyle",
-      // Present only when `styleAppend` is negotiated. Optional in the manifest
-      // because absence is the deployed shape; its *presence* changes how
-      // `styles` must be read, which is why the bit is negotiated rather than
-      // the key additive.
-      "stylesBase",
-    ]
-    package static let paragraphKeys: Set<String> = ["id", "rect"]
-    package static let styleKeys: Set<String> = [
-      "fg", "bg", "em", "underline", "strikethrough", "opacity",
-    ]
-    package static let lineStyleKeys: Set<String> = ["pattern", "color"]
-    package static let imageKeys: Set<String> = [
-      "id", "format", "bounds", "visibleBounds", "scalingMode", "opacity", "pixelSize",
-      "dataBase64",
-    ]
-    package static let damageKeys: Set<String> = [
-      "textRows", "requiresFullTextRepaint", "requiresFullGraphicsReplay",
-    ]
-    package static let accessibilityNodeKeys: Set<String> = [
-      "id", "rect", "role", "isFocused", "isAccessibilityFocused", "navigationCategories",
-      "parentId", "label", "hint", "hidden",
-      "liveRegion", "cursorAnchor", "textSelection", "actionTarget", "actions", "isEnabled",
-      "value",
-      "valueMin", "valueMax", "valueStep", "properties", "selection", "customActions", "opensLink",
-    ]
-    package static let accessibilityPropertyKeys: Set<String> = [
-      "selected",
-      "expanded",
-      "popup",
-      "modal",
-      "required",
-      "invalid",
-      "busy",
-      "readOnly",
-      "description",
-      "valueDescription",
-      "language",
-      "headingLevel",
-      "level",
-      "positionInSet",
-      "setSize",
-      "rowIndex",
-      "columnIndex",
-      "rowCount",
-      "columnCount",
-      "rowSpan",
-      "columnSpan",
-      "textKind",
-      "sort",
-      "labelledBy",
-      "describedBy",
-      "errorMessage",
-      "controls",
-      "owns",
-      "flowTo",
-      "activeDescendant",
-    ]
-    package static let accessibilityAnnouncementKeys: Set<String> = [
-      "message", "politeness",
-    ]
-    package static let scrollRegionKeys: Set<String> = [
-      "id", "rect", "offset", "content",
-    ]
-    package static let focusPresentationKeys: Set<String> = [
-      "focusedIdentity", "semantics", "prefersTextInput", "hasFocusedRegion",
-    ]
+    package static let fullFrameKeys: Set<String> = HostContract.fullWriterRequired
+    package static let fullFrameOptionalKeys: Set<String> = HostContract.fullFields.subtracting(
+      HostContract.fullWriterRequired)
+    package static let deltaFrameKeys: Set<String> = HostContract.deltaWriterRequired
+    package static let deltaFrameOptionalKeys: Set<String> = HostContract.deltaFields.subtracting(
+      HostContract.deltaWriterRequired)
+    package static let paragraphKeys: Set<String> = HostContract.paragraphFields
+    package static let styleKeys: Set<String> = HostContract.styleObjectFields
+    package static let lineStyleKeys: Set<String> = HostContract.lineStyleFields
+    package static let imageKeys: Set<String> = HostContract.imageFields
+    package static let damageKeys: Set<String> = HostContract.damageFields
+    package static let accessibilityNodeKeys: Set<String> = HostContract.accessibilityNodeFields
+    package static let accessibilityPropertyKeys: Set<String> = HostContract
+      .accessibilityPropertiesFields
+    package static let accessibilityAnnouncementKeys: Set<String> = HostContract.announcementFields
+    package static let scrollRegionKeys: Set<String> = HostContract.scrollRegionFields
+    package static let focusPresentationKeys: Set<String> = HostContract.focusPresentationFields
     /// Additive-optional: emitted only on streams whose host consumes a
     /// runtime-owned appearance (the converged Android path).
-    package static let terminalStyleKeys: Set<String> = [
-      "foregroundColor", "backgroundColor", "tintColor",
-    ]
-    package static let colorKeys: Set<String> = ["hex"]
+    package static let terminalStyleKeys: Set<String> = HostContract.terminalStyleFields
+    package static let colorKeys: Set<String> = HostContract.colorFields
     /// `[x, text, spanWidth, styleIndex]` — FROZEN; see the tuple policy above.
-    package static let cellTupleArity = 4
+    package static let cellTupleArity = HostContract.cellArity
     /// `[rowIndex, runs]`.
-    package static let linkRowTupleArity = 2
+    package static let linkRowTupleArity = HostContract.linkRowArity
     /// `[x, spanWidth, linkTargetIndex]`.
-    package static let linkRunTupleArity = 3
+    package static let linkRunTupleArity = HostContract.linkRunArity
   }
 
   // MARK: - Delivery uplink and capability declarations
@@ -468,9 +395,7 @@ package enum HostWireSchema {
   /// and style: these records change or repair cross-frame wire state.
   package enum DeliveryUplink {
     package static let recordTypes: Set<String> = ["caps", "resync"]
-    package static let capabilityKeys: Set<String> = [
-      "acceptsDeltaFrames", "styleAppend", "geometryRevisions", "sharedViewport",
-    ]
+    package static let capabilityKeys: Set<String> = HostContract.capabilitiesFields
     package static let resyncRequiredKeys: Set<String> = ["scope"]
     package static let resyncOptionalKeys: Set<String> = ["ids"]
     package static let resyncScopeTokens: Set<String> = ["keyframe", "images"]
@@ -498,12 +423,12 @@ package enum HostWireSchema {
     /// types are silently dropped by `WebSurfaceInputParser`, so a new
     /// bundle against an old server degrades to defaults.
     ///
-    /// Lifecycle: accepted at any time, and every arrival is a connection
-    /// epoch — it re-anchors the delta baseline and the transmitted-image
-    /// set.
+    /// Lifecycle: accepted once from the current connection, before delivery.
+    /// Acceptance re-anchors its delta baseline and transmitted-image set;
+    /// repeated declarations on the same connection are ignored.
     package let webSocketIngress: String
     /// Android JNI ingress: the `declareCapabilities` host call, accepted
-    /// only before scene start. The JNI glue resolves the symbol lazily, so
+    /// only before scene start. The JNI loader resolves the optional symbol once, so
     /// a new AAR against an old host library degrades to defaults.
     ///
     /// Lifecycle: pre-start only. The poll-model host cannot change record
@@ -575,29 +500,19 @@ package enum HostWireSchema {
   // MARK: - Shared wire tokens
 
   /// Frozen tokens emitted for ``FocusPresentation/Semantics``.
-  package static let focusSemanticsTokens: Set<String> = [
-    "none", "automatic", "activate", "edit",
-  ]
+  package static let focusSemanticsTokens: Set<String> = HostContract.focusSemanticsTokens
 
   /// Frozen tokens emitted for accessibility announcements.
-  package static let politenessTokens: Set<String> = [
-    "off", "polite", "assertive",
-  ]
+  package static let politenessTokens: Set<String> = HostContract.politenessTokens
 
   /// Frozen tokens emitted for accessibility-node live regions.
-  package static let liveRegionTokens: Set<String> = [
-    "off", "polite", "assertive",
-  ]
+  package static let liveRegionTokens: Set<String> = HostContract.politenessTokens
 
   /// Frozen image-container tokens emitted on surface image records.
-  package static let imageFormatTokens: Set<String> = [
-    "png", "jpeg", "gif",
-  ]
+  package static let imageFormatTokens: Set<String> = HostContract.imageFormatTokens
 
   /// Frozen image-scaling tokens emitted on surface image records.
-  package static let scalingModeTokens: Set<String> = [
-    "stretch", "fit", "fill",
-  ]
+  package static let scalingModeTokens: Set<String> = HostContract.scalingModeTokens
 
   /// The focus-semantics wire token for the converged wire; the encoder
   /// consumes it directly and `WebSurfaceWireTotalityTests` pins the emitted

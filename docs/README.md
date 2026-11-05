@@ -94,3 +94,6 @@ are not part of this hierarchy:
 
 `Scripts/generate_public_api_inventory.sh` produces and compares them. See
 [DEVELOPMENT.md](https://github.com/SwiftTUI/swift-tui-org/blob/main/docs/swift-tui/DEVELOPMENT.md#public-api-baseline).
+
+The [public client contract kit](../Contracts/1/README.md) packages the wire schema,
+grammar, native ABI header, generated leaves and offline recovery conformance runner.

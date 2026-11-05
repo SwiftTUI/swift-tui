@@ -1,0 +1,44 @@
+; SwiftTUI host profile 1. ABNF uses RFC 5234 core rules.
+; Quoted command/token spellings are case-sensitive on the wire (RFC 7405).
+; Writers use the exact spelling below; numeric semantic limits apply after syntax.
+; JSON text is UTF-8 RFC 8259 with the admission limits in ../profiles/wire.md.
+RS = %x1E
+LF = %x0A
+DIGIT = %x30-39
+HEXDIG = DIGIT / %x41-46 / %x61-66
+uint = %s"0" / (%x31-39 *DIGIT)
+uint64 = uint ; at most 18446744073709551615, emitted without zero padding
+integer = [%s"-" / %s"+"] 1*DIGIT
+number = [%s"-" / %s"+"] (1*DIGIT [%s"." *DIGIT] / %s"." 1*DIGIT) [ (%s"e" / %s"E") integer ]
+percent = %s"%" HEXDIG HEXDIG
+; encodeURIComponent's ASCII unescaped alphabet; percent bytes must decode as UTF-8.
+escaped = *(%x21 / %x27-2A / %x2D-2E / DIGIT / %x41-5A / %x5F / %x61-7A / %x7E / percent)
+base64 = *(%x41-5A / %x61-7A / DIGIT / %s"+" / %s"/") [%s"=" [%s"="]]
+json = 1*(%x20-7E / %x80-FF) ; normative syntax: RFC 8259; no raw LF/RS
+output = RS (%s"surface:" / %s"clipboard:" / %s"runtimeIssue:" / %s"frameDiagnostic:") json LF
+input = RS command LF
+command = accessibility / resize / geometry / key / mouse / paste / style / caps / resync / pointer
+accessibility = %s"accessibility:" [uint64 %s":"] escaped %s":" action
+; Target is nonempty; empty custom names are invalid.
+action = %s"focus" / %s"accessibilityFocus" / %s"accessibilityBlur" / %s"activate" / %s"increment" / %s"decrement"
+       / %s"custom:name:" escaped
+       / %s"setValue:boolean:" (%s"true" / %s"false")
+       / %s"setValue:number:" number
+       / %s"setValue:text:" escaped
+       / (%s"editText:text:" / %s"selectText:text:") escaped %s":" uint %s":" uint
+resize = %s"resize:" uint %s":" uint [%s":" uint %s":" uint]
+geometry = %s"geometry:" uint %s":" uint %s":" uint %s":" uint %s":" uint [%s":" uint]
+key = %s"key:" (key-name / %s"character:" escaped) %s":" uint
+key-name = %s"return" / %s"space" / %s"tab" / %s"arrowLeft" / %s"arrowRight" / %s"arrowUp" / %s"arrowDown"
+         / %s"backspace" / %s"escape" / %s"home" / %s"end"
+         / %s"insert" / %s"delete" / %s"pageUp" / %s"pageDown" / %s"f" function-number
+function-number = %x31-39 / %s"1" DIGIT / %s"2" %x30-34
+mouse = (%s"mouse:" / %s"mouseGeometry:" uint %s":" / %s"mouseViewport:" uint %s":" uint %s":")
+        mouse-kind %s":" number %s":" number %s":" button %s":" integer %s":" integer %s":" uint
+mouse-kind = %s"down" / %s"up" / %s"moved" / %s"dragged" / %s"scrolled" / %s"cancelled"
+button = %s"primary" / %s"middle" / %s"secondary" / %s"none"
+paste = %s"paste:" escaped
+style = %s"style:" base64
+caps = %s"caps:" json
+resync = %s"resync:" json
+pointer = %s"pointer:panning=" (%s"0" / %s"1")

@@ -571,8 +571,26 @@ function isSupportedImageFormat(value) {
   return value === "png" || value === "jpeg" || value === "gif";
 }
 
+// dist/src/HostContract.generated.js
+var RECORD_BYTES = 4194304, GRID_DIMENSION = 1024, GRID_CELLS = 65536, IMAGES = 1024, METADATA_ENTRIES = 65536, STYLE_BYTES = 1024, RESULT_TOKENS = [
+  "accepted",
+  "disabled",
+  "invalidValue",
+  "outOfScope",
+  "staleTarget",
+  "unsupported"
+];
+function normalizeWireUInt64(value) {
+  if (typeof value !== "string" || value.length < 1 || value.length > 20 || /[^0-9]/.test(value))
+    return;
+  let canonical = value.replace(/^0+(?=.)/, "");
+  if (canonical.length === 20 && canonical > "18446744073709551615")
+    return;
+  return canonical;
+}
+
 // dist/src/HostWireBudget.js
-var HOST_WIRE_MAX_RECORD_BYTES = 4194304, HOST_WIRE_MAX_GRID_DIMENSION = 1024, HOST_WIRE_MAX_GRID_CELLS = 65536;
+var HOST_WIRE_MAX_RECORD_BYTES = RECORD_BYTES, HOST_WIRE_MAX_GRID_DIMENSION = GRID_DIMENSION, HOST_WIRE_MAX_GRID_CELLS = GRID_CELLS, HOST_WIRE_MAX_IMAGES = IMAGES, HOST_WIRE_MAX_METADATA_ENTRIES = METADATA_ENTRIES, HOST_WIRE_MAX_CELL_TEXT_BYTES = 256, HOST_WIRE_MAX_STYLE_BYTES = STYLE_BYTES, HOST_WIRE_MAX_JSON_DEPTH = 32;
 function fitsUTF8(text, limit) {
   let bytes = 0;
   for (let scalar of text) {
@@ -583,13 +601,13 @@ function fitsUTF8(text, limit) {
   return !0;
 }
 function fitsWireGrid(width, height) {
-  return Number.isInteger(width) && Number.isInteger(height) && width >= 0 && height >= 0 && width <= 1024 && height <= 1024 && width * height <= 65536;
+  return Number.isInteger(width) && Number.isInteger(height) && width >= 0 && height >= 0 && width <= HOST_WIRE_MAX_GRID_DIMENSION && height <= HOST_WIRE_MAX_GRID_DIMENSION && width * height <= HOST_WIRE_MAX_GRID_CELLS;
 }
 function wireStyleLimit(width, height) {
   return Math.max(1024, width * height + 1);
 }
 function fitsStyleContent(style) {
-  let remaining = 1024, chargeString = (text) => {
+  let remaining = HOST_WIRE_MAX_STYLE_BYTES, chargeString = (text) => {
     for (let scalar of text) {
       let code = scalar.codePointAt(0);
       if (remaining -= code <= 127 ? 1 : code <= 2047 ? 2 : code <= 65535 ? 3 : 4, remaining < 0)
@@ -609,25 +627,6 @@ function fitsStyleContent(style) {
   };
   return visit(style);
 }
-function fitsJSONDepth(text) {
-  let depth = 0, quoted = !1, escaped = !1;
-  for (let character of text)
-    if (quoted) {
-      if (escaped)
-        escaped = !1;
-      else if (character === "\\")
-        escaped = !0;
-      else if (character === '"')
-        quoted = !1;
-    } else if (character === '"')
-      quoted = !0;
-    else if (character === "[" || character === "{") {
-      if (++depth > 32)
-        return !1;
-    } else if (character === "]" || character === "}")
-      depth--;
-  return !0;
-}
 function fitsSurfaceBudget(frame) {
   let { width, height } = frame;
   if (!fitsWireGrid(width, height))
@@ -643,7 +642,7 @@ function fitsSurfaceBudget(frame) {
       return !1;
     let end = 0;
     for (let [x, text, span, style] of cells) {
-      if (!Number.isInteger(x) || !Number.isInteger(span) || x < end || span < 1 || x > width - span || !fitsUTF8(text, 256) || !Number.isInteger(style) || style < 0 || style >= frame.styles.length + (frame.stylesBase ?? 0))
+      if (!Number.isInteger(x) || !Number.isInteger(span) || x < end || span < 1 || x > width - span || !fitsUTF8(text, HOST_WIRE_MAX_CELL_TEXT_BYTES) || !Number.isInteger(style) || style < 0 || style >= frame.styles.length + (frame.stylesBase ?? 0))
         return !1;
       end = x + span;
     }
@@ -657,7 +656,7 @@ function fitsSurfaceBudget(frame) {
       return !1;
     seen.add(y);
   }
-  if ((frame.images?.length ?? 0) > 1024)
+  if ((frame.images?.length ?? 0) > HOST_WIRE_MAX_IMAGES)
     return !1;
   for (let image of frame.images ?? []) {
     if (!fitsUTF8(image.id, 1024))
@@ -696,10 +695,10 @@ function fitsSurfaceBudget(frame) {
     frame.scrollRegions,
     frame.linkTargets
   ])
-    if ((entries?.length ?? 0) > 65536)
+    if ((entries?.length ?? 0) > HOST_WIRE_MAX_METADATA_ENTRIES)
       return !1;
   for (let dimension of [frame.preferredGridWidth, frame.preferredGridHeight])
-    if (dimension !== void 0 && dimension > 1024)
+    if (dimension !== void 0 && dimension > HOST_WIRE_MAX_GRID_DIMENSION)
       return !1;
   if (!fitsWireGrid(frame.preferredGridWidth ?? 0, frame.preferredGridHeight ?? 0))
     return !1;
@@ -737,14 +736,87 @@ function encodeGeometryControlMessage(request) {
 `);
 }
 
-// dist/src/WireUInt64.js
-function normalizeWireUInt64(value) {
-  if (typeof value !== "string" || !/^[0-9]{1,20}$/.test(value))
-    return;
-  let canonical = value.replace(/^0+(?=.)/, "");
-  if (canonical.length === 20 && canonical > "18446744073709551615")
-    return;
-  return canonical;
+// dist/src/HostWireJSON.js
+function checkWireJSON(text) {
+  let keys = [];
+  for (let i = 0;i < text.length; i++) {
+    let c = text.charCodeAt(i);
+    if (c === 34) {
+      let start = ++i, escaped = !1;
+      for (;i < text.length; i++) {
+        let next = text.charCodeAt(i);
+        if (next === 92)
+          escaped = !0, i++;
+        else if (next === 34)
+          break;
+      }
+      if (i >= text.length)
+        return "ambiguous";
+      let end = i + 1;
+      while (end < text.length && /[\t\n\r ]/.test(text[end]))
+        end++;
+      if (text.charCodeAt(end) === 58) {
+        let object = keys[keys.length - 1];
+        if (!object)
+          return "ambiguous";
+        let key = text.slice(start, i);
+        if (escaped) {
+          let invalid = !1;
+          if (key = key.replace(/\\(u[0-9a-fA-F]{4}|.)/g, (_, code) => {
+            if (code[0] === "u")
+              return String.fromCharCode(Number.parseInt(code.slice(1), 16));
+            switch (code) {
+              case '"':
+                return '"';
+              case "\\":
+                return "\\";
+              case "/":
+                return "/";
+              case "b":
+                return "\b";
+              case "f":
+                return "\f";
+              case "n":
+                return `
+`;
+              case "r":
+                return "\r";
+              case "t":
+                return "\t";
+              default:
+                return invalid = !0, "";
+            }
+          }), invalid)
+            return "ambiguous";
+        }
+        if (object.has(key))
+          return "ambiguous";
+        object.add(key);
+      }
+    } else if (c === 123 || c === 91) {
+      if (keys.length >= HOST_WIRE_MAX_JSON_DEPTH)
+        return "depth";
+      keys.push(c === 123 ? /* @__PURE__ */ new Set : void 0);
+    } else if (c === 125 || c === 93) {
+      if (!keys.length)
+        return "ambiguous";
+      keys.pop();
+    } else if (c === 45 || c >= 48 && c <= 57) {
+      let start = i, exponent = !1;
+      while (i < text.length) {
+        let digit = text.charCodeAt(i);
+        if (digit === 69 || digit === 101)
+          exponent = !0;
+        else if (digit !== 43 && digit !== 45 && digit !== 46 && (digit < 48 || digit > 57))
+          break;
+        i++;
+      }
+      if ((exponent || i - start > 308) && !Number.isFinite(Number(text.slice(start, i))))
+        return "ambiguous";
+      i--;
+    }
+  }
+  return keys.length === 0 ? "admitted" : "ambiguous";
 }
 
 // dist/src/WebHostSurfaceTransport.js
@@ -813,7 +885,7 @@ function encodeAccessibilityActionMessage(target, request, requestID) {
   }
   let command = `\x1Eaccessibility:${id === void 0 ? "" : `${id}:`}${encodedTarget}:${request.action}${value}
 `;
-  if (command.length > 4194304)
+  if (command.length > HOST_WIRE_MAX_RECORD_BYTES)
     invalid("record size");
   return (/* @__PURE__ */ new TextEncoder()).encode(command);
 }
@@ -822,7 +894,7 @@ function isWebHostImageRecoveryId(id) {
   return id.length > 0 && id.length <= 1024 && textEncoder.encode(id).byteLength <= 1024;
 }
 var WebHostOutputDecoder = class {
-  textDecoder = /* @__PURE__ */ new TextDecoder;
+  textDecoder = new TextDecoder("utf-8", { fatal: !0 });
   bufferedText = "";
   bufferedBytes = 0;
   discardingLine = !1;
@@ -839,13 +911,23 @@ var WebHostOutputDecoder = class {
     while (offset < chunk.length) {
       let newline = chunk.indexOf(10, offset), end = newline < 0 ? chunk.length : newline;
       if (!this.discardingLine)
-        if (end - offset > 4194304 - this.bufferedBytes)
-          this.bufferedText = "", this.bufferedBytes = 0, this.textDecoder.decode(), this.discardingLine = !0, records.push(this.refuseBudget());
-        else
-          this.bufferedBytes += end - offset, this.bufferedText += this.textDecoder.decode(chunk.subarray(offset, end), { stream: !0 });
+        if (end - offset > HOST_WIRE_MAX_RECORD_BYTES - this.bufferedBytes)
+          this.bufferedText = "", this.bufferedBytes = 0, this.textDecoder = new TextDecoder("utf-8", { fatal: !0 }), this.discardingLine = !0, records.push(this.refuseBudget());
+        else {
+          this.bufferedBytes += end - offset;
+          try {
+            this.bufferedText += this.textDecoder.decode(chunk.subarray(offset, end), { stream: !0 });
+          } catch {
+            records.push(this.refuseUTF8());
+          }
+        }
       if (newline >= 0) {
         if (!this.discardingLine)
-          this.bufferedText += this.textDecoder.decode(), records.push(this.decodeLine(this.bufferedText));
+          try {
+            this.bufferedText += this.textDecoder.decode(), records.push(this.decodeLine(this.bufferedText));
+          } catch {
+            records.push(this.refuseUTF8());
+          }
         this.bufferedText = "", this.bufferedBytes = 0, this.discardingLine = !1;
       }
       offset = end + 1;
@@ -858,13 +940,19 @@ var WebHostOutputDecoder = class {
     return records;
   }
   flush() {
-    if (this.bufferedText += this.textDecoder.decode(), this.bufferedBytes = 0, this.discardingLine = !1, !this.bufferedText)
+    try {
+      this.bufferedText += this.textDecoder.decode();
+    } catch {
+      let refused = this.refuseUTF8();
+      return this.discardingLine = !1, [refused];
+    }
+    if (this.bufferedBytes = 0, this.discardingLine = !1, !this.bufferedText)
       return [];
     let text = this.bufferedText;
     return this.bufferedText = "", [this.decodeLine(text)];
   }
   rejectOversizedMessage() {
-    return this.bufferedText = "", this.bufferedBytes = 0, this.discardingLine = !1, this.textDecoder.decode(), this.refuseBudget();
+    return this.bufferedText = "", this.bufferedBytes = 0, this.discardingLine = !1, this.textDecoder = new TextDecoder("utf-8", { fatal: !0 }), this.refuseBudget();
   }
   takeResyncRequest(maximumEncodedBytes) {
     if (this.keyframeResyncPending)
@@ -915,8 +1003,20 @@ var WebHostOutputDecoder = class {
         this.imageResyncPendingIds.add(id);
   }
   decodeLine(line) {
-    if (line.startsWith(recordPrefix) && !fitsJSONDepth(line))
-      return this.refuseBudget();
+    if (line.startsWith(recordPrefix)) {
+      let admission = checkWireJSON(line.slice(line.indexOf(":") + 1));
+      if (admission === "depth")
+        return this.refuseBudget();
+      if (admission !== "admitted") {
+        if (line.startsWith(`${recordPrefix}surface:`))
+          return this.refuseInvalidRecord(line);
+        return {
+          type: "text",
+          text: `${line}
+`
+        };
+      }
+    }
     if (line.startsWith(`${recordPrefix}clipboard:`)) {
       try {
         let record = JSON.parse(line.slice(`${recordPrefix}clipboard:`.length));
@@ -1005,7 +1105,7 @@ var WebHostOutputDecoder = class {
             reason: "noBaseline"
           };
         }
-        if (carriesDeliveryStamps && (frame.epoch === void 0 || frame.gen === void 0 || frame.baselineGen === void 0 || frame.epoch !== this.lastEpoch || frame.baselineGen !== this.lastGen))
+        if (this.keyframeResyncOutstanding || carriesDeliveryStamps && (frame.epoch === void 0 || frame.gen === void 0 || frame.baselineGen === void 0 || frame.epoch !== this.lastEpoch || frame.baselineGen !== this.lastGen))
           return this.requestKeyframeResync(), {
             type: "surfaceDropped",
             reason: "staleBaseline"
@@ -1019,7 +1119,10 @@ var WebHostOutputDecoder = class {
         this.requestKeyframeResync();
       }
     } catch {}
-    return {
+    return this.refuseInvalidRecord(line);
+  }
+  refuseInvalidRecord(line) {
+    return this.requestKeyframeResync(), {
       type: "text",
       text: `${line}
 `
@@ -1029,6 +1132,13 @@ var WebHostOutputDecoder = class {
     if (this.keyframeResyncOutstanding)
       return;
     this.keyframeResyncOutstanding = !0, this.keyframeResyncPending = !0;
+  }
+  refuseUTF8() {
+    return this.bufferedText = "", this.bufferedBytes = 0, this.discardingLine = !0, this.textDecoder = new TextDecoder("utf-8", { fatal: !0 }), this.requestKeyframeResync(), {
+      type: "text",
+      text: `host.wire.invalidUTF8: record discarded
+`
+    };
   }
   refuseBudget() {
     return this.requestKeyframeResync(), {
@@ -1230,7 +1340,7 @@ function isWebHostSurfaceFrame(value) {
   if (!value || typeof value !== "object")
     return !1;
   let frame = value;
-  return (frame.version === 1 || frame.version === 2) && (frame.sequence === void 0 || Number.isSafeInteger(frame.sequence) && frame.sequence >= 0) && isSurfaceGridDimension(frame.width) && isSurfaceGridDimension(frame.height) && Array.isArray(frame.styles) && Array.isArray(frame.rows) && frame.rows.every(isWebHostSurfaceRow) && (frame.images === void 0 || isWebHostSurfaceImages(frame.images)) && (frame.damage === void 0 || isWebHostSurfaceDamage(frame.damage)) && (frame.accessibilityActionResponse === void 0 || isAccessibilityActionResponse(frame.accessibilityActionResponse)) && (frame.accessibilityTree === void 0 || isWebHostAccessibilityNodes(frame.accessibilityTree)) && (frame.accessibilityAnnouncements === void 0 || isWebHostAccessibilityAnnouncements(frame.accessibilityAnnouncements)) && (frame.scrollRegions === void 0 || isWebHostScrollRegions(frame.scrollRegions)) && (frame.paragraphs === void 0 || isWebHostParagraphs(frame.paragraphs)) && hasValidAdditiveFrameFields(frame);
+  return (frame.version === 1 || frame.version === 2) && frame.epoch === void 0 === (frame.gen === void 0) && (frame.sequence === void 0 || Number.isSafeInteger(frame.sequence) && frame.sequence >= 0) && isSurfaceGridDimension(frame.width) && isSurfaceGridDimension(frame.height) && Array.isArray(frame.styles) && Array.isArray(frame.rows) && frame.rows.every(isWebHostSurfaceRow) && (frame.images === void 0 || isWebHostSurfaceImages(frame.images)) && (frame.damage === void 0 || isWebHostSurfaceDamage(frame.damage)) && (frame.accessibilityActionResponse === void 0 || isAccessibilityActionResponse(frame.accessibilityActionResponse)) && (frame.accessibilityTree === void 0 || isWebHostAccessibilityNodes(frame.accessibilityTree)) && (frame.accessibilityAnnouncements === void 0 || isWebHostAccessibilityAnnouncements(frame.accessibilityAnnouncements)) && (frame.scrollRegions === void 0 || isWebHostScrollRegions(frame.scrollRegions)) && (frame.paragraphs === void 0 || isWebHostParagraphs(frame.paragraphs)) && hasValidAdditiveFrameFields(frame);
 }
 function isWebHostSurfaceDeltaFrame(value) {
   if (!value || typeof value !== "object")
@@ -1248,7 +1358,7 @@ function isAccessibilityFocusPresentation(value) {
   if (!value || typeof value !== "object" || Array.isArray(value))
     return !1;
   let request = value;
-  return typeof request.generation === "string" && /^(0|[1-9][0-9]{0,19})$/.test(request.generation) && BigInt(request.generation) <= 18446744073709551615n && (request.target === void 0 || typeof request.target === "string");
+  return typeof request.generation === "string" && normalizeWireUInt64(request.generation) === request.generation && (request.target === void 0 || typeof request.target === "string");
 }
 function isOptionalSafeInteger(value) {
   return value === void 0 || Number.isSafeInteger(value);
@@ -1340,14 +1450,7 @@ function isAccessibilityActionResponse(value) {
   if (!value || typeof value !== "object")
     return !1;
   let response = value;
-  return typeof response.requestID === "string" && normalizeWireUInt64(response.requestID) !== void 0 && typeof response.target === "string" && response.target.length > 0 && typeof response.result === "string" && [
-    "accepted",
-    "staleTarget",
-    "disabled",
-    "outOfScope",
-    "unsupported",
-    "invalidValue"
-  ].includes(response.result);
+  return typeof response.requestID === "string" && normalizeWireUInt64(response.requestID) !== void 0 && typeof response.target === "string" && response.target.length > 0 && typeof response.result === "string" && RESULT_TOKENS.includes(response.result);
 }
 function isAccessibilityValue(value) {
   if (!value || typeof value !== "object")
@@ -2716,6 +2819,8 @@ var AccessibilityTreeMounter = class {
   element;
   announcerElement;
   navigationElement;
+  presentedEpoch;
+  hasPresentedSession = !1;
   categorySelect;
   targetSelect;
   navigationGo;
@@ -2811,7 +2916,9 @@ var AccessibilityTreeMounter = class {
     }), this.element = document.createElement("div"), this.element.className = "webhost-scene__accessibility-tree", this.element.style.position = "absolute", this.element.style.inset = "0", this.element.style.opacity = "0", this.element.style.pointerEvents = "none", this.element.style.zIndex = "3", this.announcerElement = document.createElement("div"), this.announcerElement.className = "webhost-scene__accessibility-announcer", this.announcerElement.setAttribute("aria-atomic", "true"), this.announcerElement.setAttribute("aria-live", "polite"), applyScreenReaderOnlyStyle(this.announcerElement);
   }
   present(nodes, metrics, announcements = [], options = {}) {
-    this.presenting = !0;
+    if (this.hasPresentedSession && this.presentedEpoch !== options.epoch)
+      this.resetSession();
+    this.presentedEpoch = options.epoch, this.hasPresentedSession = !0, this.presenting = !0;
     try {
       this.presentFrame(nodes, metrics, announcements, options);
     } finally {
@@ -2928,7 +3035,7 @@ var AccessibilityTreeMounter = class {
     }
   }
   resetSession() {
-    this.requests.reset(), this.pendingMenu = void 0, this.pendingMenuReturn = void 0, this.hasLiveRegionBaseline = !1;
+    this.presentedEpoch = void 0, this.hasPresentedSession = !1, this.requests.reset(), this.pendingMenu = void 0, this.pendingMenuReturn = void 0, this.hasLiveRegionBaseline = !1;
     for (let element of this.nodesById.values())
       this.clearEditable(element);
     this.nodesById.clear(), this.actionGroupsById.clear(), this.modelsById.clear(), this.previousLabelsById.clear(), this.pendingValues.clear(), this.pendingFocus = void 0, this.runtimeFocusedElement = void 0, this.appliedAssistiveFocusGeneration = -1n, this.element.replaceChildren(), this.announcerElement.replaceChildren(), this.refreshNavigation([]);
@@ -5556,6 +5663,7 @@ var WebHostSceneRuntime = class {
       cellHeight: this.cellHeight
     }, [...announcements], {
       synchronizeFocus: this.synchronizeAccessibilityFocus && !this.nativePointerGesture && !this.hasSurfaceSelection(),
+      epoch: frame.epoch,
       actionResponse: frame.accessibilityActionResponse,
       focusRequest: frame.accessibilityFocusRequest
     });
@@ -5665,7 +5773,7 @@ var WebSocketSceneBridge = class {
   };
   handleMessage = (event) => {
     let generation = this.receiveGeneration, message = event.data, bytes = typeof message === "string" ? message.length * 3 : message instanceof Blob ? message.size : message instanceof ArrayBuffer || ArrayBuffer.isView(message) ? message.byteLength : 0, retainedBytes = Math.min(bytes, HOST_WIRE_MAX_RECORD_BYTES * 2);
-    if (this.pendingReceives >= 32 || this.pendingReceiveBytes + retainedBytes > 16777216) {
+    if (this.pendingReceives >= 32 || this.pendingReceiveBytes + retainedBytes > HOST_WIRE_MAX_RECORD_BYTES * 4) {
       this.socket.close(1009, "WebHost receive backlog exceeded"), this.resetReceiveSession();
       return;
     }

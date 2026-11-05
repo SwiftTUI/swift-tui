@@ -106,11 +106,15 @@ package func sceneManifest(
 }
 
 extension SceneManifest {
-  @_spi(Runners) public var jsonString: String {
+  @_spi(Runners) public var jsonString: String { encodedJSON(defaultKey: "defaultSceneID") }
+
+  package var canonicalJSONString: String { encodedJSON(defaultKey: "defaultSceneId") }
+
+  private func encodedJSON(defaultKey: String) -> String {
     let scenesJSON = scenes.map(\.jsonString).joined(separator: ",")
     let defaultJSON = defaultSceneID.map { "\"" + escapedJSONString($0.rawValue) + "\"" } ?? "null"
     return """
-      {"defaultSceneID":\(defaultJSON),"scenes":[\(scenesJSON)]}
+      {"\(defaultKey)":\(defaultJSON),"scenes":[\(scenesJSON)]}
       """
   }
 }

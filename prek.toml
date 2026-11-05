@@ -20,7 +20,7 @@ hooks = [
     entry = "swift format format -i --configuration .swift-format.json",
     language = "system",
     files = '.*\.swift$',
-    exclude = '^Vendor/(swift-hash|swift-png)/',
+    exclude = '^(Vendor/(swift-hash|swift-png)/|Contracts/1/bindings/|Sources/SwiftTUIRuntime/Terminal/HostContract\.generated\.swift$)',
     pass_filenames = true
   },
   {
