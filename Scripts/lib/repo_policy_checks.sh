@@ -284,6 +284,18 @@ run_repo_policy_phase() {
     "python3 Scripts/test_source_inventory.py" \
     python3 Scripts/test_source_inventory.py
 
+  run_repo_policy_check \
+    "$mode" "$repo_root" \
+    "Verify selected browser resource provenance" \
+    "python3 Scripts/webhost_bundle_provenance.py verify" \
+    python3 Scripts/webhost_bundle_provenance.py verify
+
+  run_repo_policy_check \
+    "$mode" "$repo_root" \
+    "Test selected browser provenance" \
+    "python3 Scripts/test_webhost_bundle_provenance.py" \
+    python3 Scripts/test_webhost_bundle_provenance.py
+
   if [ "${SWIFTTUI_SKIP_PUBLIC_API_BASELINE:-0}" = "1" ]; then
     skip_repo_policy_check \
       "$mode" \

@@ -59,11 +59,17 @@ struct WebHostBrowserBundleTests {
   @Test("browser bundle records the swift-tui-web revision it was built from")
   func browserBundleRecordsBuildProvenance() throws {
     // Scripts/update_webhost_bundle.sh writes this stamp; the coordination
-    // root's webhost_bundle_provenance gate compares it against the pinned
-    // swift-tui-web submodule to catch stale vendored bundles (F56).
+    // gate validates the selected source and resource digests independently
+    // of the current swift-tui-web development checkout.
     let provenance = try WebHostBrowserBundle.bundled.resource(for: "/bundle-provenance.json")
     let decoded = try JSONSerialization.jsonObject(with: provenance.data)
     let record = try #require(decoded as? [String: Any])
+    #expect(record["formatVersion"] as? Int == 2)
+    let selection = try #require(record["selection"] as? String)
+    #expect(selection == "candidate" || selection == "release")
+    let resources = try #require(record["resources"] as? [String: String])
+    #expect(resources["index.html"] != nil)
+    #expect(resources.keys.contains { $0.hasSuffix(".js") })
 
     let revision = try #require(record["webRevision"] as? String)
     #expect(revision.count == 40)
