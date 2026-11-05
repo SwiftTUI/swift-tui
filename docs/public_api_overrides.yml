@@ -30,6 +30,7 @@
 classifications:
 
   canonical:
+    - SwiftTUIAndroidHost.AndroidMainExecutorPump
     - SwiftTUIPrimitives.AccessibilityPreferences
     - SwiftTUIPrimitives.AccessibilityColorProfile
     - SwiftTUIViews.AccessibilityFocusState
@@ -1033,6 +1034,8 @@ default: pending-review
 # remain subject to ordinary key validation on every platform where they are
 # present. Keep this list exact; never use it for renamed or retired symbols.
 platform_exceptions:
+  # Android-only public bootstrap; the C host entry point calls it before actor work.
+  - SwiftTUIAndroidHost.AndroidMainExecutorPump
   # The ANSI terminal surface is supplied by WASILibc on browser/WASI builds.
   - SwiftTUIRuntime.WebTerminalHost
 
