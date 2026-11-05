@@ -204,6 +204,7 @@ classifications:
     - SwiftTUIRuntime.TerminalGraphicsCapabilities
     - SwiftTUIRuntime.TerminalHost
     - SwiftTUIRuntime.TerminalHostError
+    - SwiftTUIRuntime.WebTerminalHost
     - SwiftTUIRuntime.TerminalInputParser
     - SwiftTUIRuntime.TerminalInputReading
     - SwiftTUIRuntime.TerminalPresentationMetrics
@@ -1031,7 +1032,9 @@ default: pending-review
 # Symbols which are known to be compiled out on some dump platforms. Entries
 # remain subject to ordinary key validation on every platform where they are
 # present. Keep this list exact; never use it for renamed or retired symbols.
-platform_exceptions: []
+platform_exceptions:
+  # The ANSI terminal surface is supplied by WASILibc on browser/WASI builds.
+  - SwiftTUIRuntime.WebTerminalHost
 
 # Optional human-readable notes appended in the generated baseline next to a
 # live qualified name. Keep these short — PUBLIC-API.md owns longer rationale.

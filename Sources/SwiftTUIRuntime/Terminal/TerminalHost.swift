@@ -665,6 +665,8 @@ public enum TerminalHostError: Error, Equatable, Sendable, CustomStringConvertib
 
   }
 #else
+  /// The WASI terminal surface that writes ANSI presentation to an output descriptor.
+  /// This public hosting API is available when the platform supplies WASILibc.
   public final class WebTerminalHost: PresentationSurface, ClipboardWritingPresentationSurface,
     ClipboardReadingPresentationSurface, TerminalCursorFocusPresentationSurface, Sendable
   {
