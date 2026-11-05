@@ -60,6 +60,39 @@ import Testing
       ])
   }
 
+  @Test func checkedIDsAndEveryFragmentBoundary() {
+    for id in ["0", "00042", "18446744073709551615"] {
+      for command in [
+        "activate", "focus", "accessibilityFocus", "accessibilityBlur",
+        "increment", "decrement", "custom:name:A%3AB", "setValue:text:A%0A%1E",
+        "setValue:boolean:false", "setValue:number:2.5", "editText:text:a%F0%9F%98%80:1:3",
+        "selectText:text:a%F0%9F%98%80:3:1",
+      ] {
+        let bytes = Array("\u{1E}accessibility:\(id):t:\(command)\n".utf8)
+        var whole = WebSurfaceInputParser()
+        let expected = whole.feed(bytes).events
+        #expect(expected.count == 1)
+        if case .accessibility(let request) = expected.first {
+          #expect(request.requestID == UInt64(id))
+        } else {
+          Issue.record("expected exactly one accessibility action")
+        }
+        for split in 0...bytes.count {
+          var parser = WebSurfaceInputParser()
+          let actual =
+            parser.feed(Array(bytes[..<split])).events
+            + parser.feed(Array(bytes[split...])).events
+          #expect(actual == expected)
+          #expect(parser.flushTerminalInput().isEmpty)
+        }
+      }
+    }
+    for id in ["", "+1", "-1", "1_0", "１", "18446744073709551616", "000000000000000000000"] {
+      var parser = WebSurfaceInputParser()
+      #expect(parser.feed(Array("\u{1E}accessibility:\(id):t:activate\n".utf8)).events.isEmpty)
+    }
+  }
+
   @Test func malformedRequestsDoNotBecomeKeyboardInput() {
     for command in [
       "accessibility::activate", "accessibility:t:unknown", "accessibility:t:focus:extra",

@@ -426,12 +426,26 @@ function normalizeWebHostSceneManifest(source) {
   let scenes = normalizeSceneDescriptors(source);
   if (scenes.length === 0)
     throw Error("scene manifest must contain at least one scene");
-  let defaultScene = scenes.find((scene) => scene.isDefault) ?? scenes[0];
+  let ids = /* @__PURE__ */ new Set;
+  for (let scene of scenes) {
+    if (ids.has(scene.id))
+      throw Error(`duplicate scene id: ${scene.id}`);
+    ids.add(scene.id);
+  }
+  let catalog = isObject(source) && !Array.isArray(source) ? source : {}, explicit = [catalog.defaultSceneId, catalog.defaultSceneID].filter((id) => id !== void 0 && id !== null);
+  if (explicit.some((id) => typeof id !== "string" || !ids.has(id)))
+    throw Error("default scene must name an existing scene");
+  if (explicit.length === 2 && explicit[0] !== explicit[1])
+    throw Error("conflicting defaultSceneId and defaultSceneID");
+  let flagged = scenes.filter((scene) => scene.isDefault);
+  if (!explicit.length && flagged.length > 1)
+    throw Error("multiple default scenes require an explicit defaultSceneId");
+  let defaultSceneId = explicit[0] ?? flagged[0]?.id ?? scenes[0].id;
   return {
-    defaultSceneId: defaultScene.id,
-    scenes: scenes.map((scene, index) => ({
+    defaultSceneId,
+    scenes: scenes.map((scene) => ({
       ...scene,
-      isDefault: scene.id === defaultScene.id || index === 0 && !scenes.some((entry) => entry.isDefault)
+      isDefault: scene.id === defaultSceneId
     }))
   };
 }
@@ -464,10 +478,12 @@ function normalizeSceneDescriptors(source) {
 function normalizeDescriptor(value, index) {
   if (!isObject(value))
     throw Error(`scene descriptor at index ${index ?? 0} must be an object`);
-  let id = String(value.id ?? "").trim();
-  if (!id)
+  let id = value.id;
+  if (typeof id !== "string" || !id.trim())
     throw Error(`scene descriptor at index ${index ?? 0} is missing an id`);
-  let titleValue = value.title, isDefaultValue = Boolean(value.isDefault);
+  let titleValue = value.title, isDefaultValue = value.isDefault === void 0 ? !1 : value.isDefault;
+  if (typeof isDefaultValue !== "boolean")
+    throw Error(`scene ${id} isDefault must be boolean`);
   return {
     id,
     title: typeof titleValue === "string" && titleValue.trim().length > 0 ? titleValue.trim() : void 0,
@@ -721,11 +737,85 @@ function encodeGeometryControlMessage(request) {
 `);
 }
 
+// dist/src/WireUInt64.js
+function normalizeWireUInt64(value) {
+  if (typeof value !== "string" || !/^[0-9]{1,20}$/.test(value))
+    return;
+  let canonical = value.replace(/^0+(?=.)/, "");
+  if (canonical.length === 20 && canonical > "18446744073709551615")
+    return;
+  return canonical;
+}
+
 // dist/src/WebHostSurfaceTransport.js
 function encodeAccessibilityActionMessage(target, request, requestID) {
-  let value = request.action === "editText" || request.action === "selectText" ? `:text:${encodeURIComponent(request.text)}:${request.anchor}:${request.head}` : request.action === "setValue" ? `:${request.value.type}:${encodeURIComponent(String(request.value.value))}` : request.action === "custom" ? `:name:${encodeURIComponent(request.name)}` : "";
-  return (/* @__PURE__ */ new TextEncoder()).encode(`\x1Eaccessibility:${requestID === void 0 ? "" : `${requestID}:`}${encodeURIComponent(target)}:${request.action}${value}
-`);
+  let invalid = (field) => {
+    throw TypeError(`invalid accessibility ${field}`);
+  }, escaped = (value2, field, nonempty = !1) => {
+    if (typeof value2 !== "string" || nonempty && !value2.length)
+      return invalid(field);
+    try {
+      return encodeURIComponent(value2);
+    } catch {
+      return invalid(field);
+    }
+  }, encodedTarget = escaped(target, "target", !0), id = requestID === void 0 ? void 0 : normalizeWireUInt64(requestID);
+  if (requestID !== void 0 && id === void 0)
+    invalid("requestID");
+  if (!request || typeof request !== "object")
+    invalid("request");
+  let value = "";
+  switch (request.action) {
+    case "focus":
+    case "accessibilityFocus":
+    case "accessibilityBlur":
+    case "activate":
+    case "increment":
+    case "decrement":
+      break;
+    case "custom":
+      value = `:name:${escaped(request.name, "name", !0)}`;
+      break;
+    case "editText":
+    case "selectText": {
+      let text = escaped(request.text, "text");
+      for (let offset of [request.anchor, request.head])
+        if (!Number.isSafeInteger(offset) || offset < 0 || offset > request.text.length)
+          invalid("UTF-16 selection");
+      value = `:text:${text}:${request.anchor}:${request.head}`;
+      break;
+    }
+    case "setValue": {
+      let payload = request.value;
+      if (!payload || typeof payload !== "object")
+        invalid("value");
+      switch (payload.type) {
+        case "text":
+          value = `:text:${escaped(payload.value, "value")}`;
+          break;
+        case "boolean":
+          if (typeof payload.value !== "boolean")
+            invalid("boolean value");
+          value = `:boolean:${payload.value}`;
+          break;
+        case "number":
+          if (typeof payload.value !== "number" || !Number.isFinite(payload.value))
+            invalid("number value");
+          value = `:number:${payload.value}`;
+          break;
+        default:
+          invalid("value type");
+      }
+      break;
+    }
+    default:
+      invalid("action");
+  }
+  let command = `\x1Eaccessibility:${id === void 0 ? "" : `${id}:`}${encodedTarget}:${request.action}${value}
+`;
+  if (command.length > 4194304)
+    invalid("record size");
+  return (/* @__PURE__ */ new TextEncoder()).encode(command);
 }
 var recordPrefix = "\x1E", textEncoder = /* @__PURE__ */ new TextEncoder;
 function isWebHostImageRecoveryId(id) {
@@ -890,6 +980,11 @@ var WebHostOutputDecoder = class {
             description: `The app emitted a surface record with version ${frame.version}, but this @swifttui/web runtime understands versions up to 3. Update @swifttui/web to render it.`
           }
         };
+      if (frame && typeof frame === "object" && "accessibilityActionResponse" in frame)
+        if (!isAccessibilityActionResponse(frame.accessibilityActionResponse))
+          delete frame.accessibilityActionResponse;
+        else
+          frame.accessibilityActionResponse.requestID = normalizeWireUInt64(frame.accessibilityActionResponse.requestID);
       if (isWebHostSurfaceFrame(frame)) {
         if (!fitsSurfaceBudget(frame))
           return this.refuseBudget();
@@ -1245,7 +1340,7 @@ function isAccessibilityActionResponse(value) {
   if (!value || typeof value !== "object")
     return !1;
   let response = value;
-  return typeof response.requestID === "string" && /^[0-9]{1,20}$/.test(response.requestID) && typeof response.target === "string" && typeof response.result === "string" && [
+  return typeof response.requestID === "string" && normalizeWireUInt64(response.requestID) !== void 0 && typeof response.target === "string" && response.target.length > 0 && typeof response.result === "string" && [
     "accepted",
     "staleTarget",
     "disabled",
@@ -2513,6 +2608,58 @@ function registerCanvasSurfacePainterConformanceControl(painter, control) {
   canvasControls.set(painter, control);
 }
 
+// dist/src/AccessibilityRequests.js
+var AccessibilityRequests = class {
+  now;
+  next = 0n;
+  outstanding = /* @__PURE__ */ new Map;
+  constructor(now = () => performance.now()) {
+    this.now = now;
+  }
+  issue(target) {
+    if (this.prune(), this.next === 18446744073709551615n)
+      throw Error("accessibility request IDs exhausted");
+    let id = ++this.next;
+    if (this.outstanding.size >= 256)
+      this.outstanding.delete(this.outstanding.keys().next().value);
+    return this.outstanding.set(id, {
+      target,
+      expires: this.now() + 30000
+    }), id;
+  }
+  settle(response) {
+    this.prune();
+    let canonical = normalizeWireUInt64(response.requestID);
+    if (canonical === void 0)
+      return !1;
+    let id = BigInt(canonical);
+    if (this.outstanding.get(id)?.target !== response.target)
+      return !1;
+    return this.outstanding.delete(id), !0;
+  }
+  has(id) {
+    return this.prune(), this.outstanding.has(id);
+  }
+  cancel(id) {
+    this.outstanding.delete(id);
+  }
+  reset() {
+    this.outstanding.clear();
+  }
+  retainTargets(targets) {
+    for (let [id, request] of this.outstanding)
+      if (!targets.has(request.target))
+        this.outstanding.delete(id);
+    this.prune();
+  }
+  prune() {
+    let now = this.now();
+    for (let [id, request] of this.outstanding)
+      if (request.expires <= now)
+        this.outstanding.delete(id);
+  }
+};
+
 // dist/src/AccessibilitySelection.js
 function presentSelection(element, node, synchronizeValue, interactive) {
   let selection = node.selection, selected = node.value?.type === "text" ? node.value.value : "", enabled = interactive && node.isEnabled !== !1 && node.properties?.readOnly !== !0, active = document.activeElement, ownedFocus = active instanceof HTMLElement && active !== element && element.contains(active), previous = new Map(Array.from(element.children, (child) => [child.dataset.optionId, child])), nativeSelect = element instanceof HTMLSelectElement;
@@ -2582,8 +2729,7 @@ var AccessibilityTreeMounter = class {
   modelsById = /* @__PURE__ */ new Map;
   keysByElement = /* @__PURE__ */ new WeakMap;
   presenting = !1;
-  nextRequestID = 0n;
-  acknowledgedRequestID = 0n;
+  requests = new AccessibilityRequests;
   pendingValues = /* @__PURE__ */ new Map;
   pendingFocus;
   runtimeFocusedElement;
@@ -2626,7 +2772,7 @@ var AccessibilityTreeMounter = class {
     if (!element || !node.actionTarget)
       return;
     if (element.focus({ preventScroll: !0 }), this.presenting && node.actions?.includes("focus")) {
-      let requestID = ++this.nextRequestID;
+      let requestID = this.requests.issue(node.actionTarget);
       this.pendingFocus = {
         id: node.id,
         requestID
@@ -2642,7 +2788,7 @@ var AccessibilityTreeMounter = class {
         type: "boolean",
         value: expanded
       }
-    }, String(++this.nextRequestID)), !0;
+    }, String(this.requests.issue(trigger.actionTarget))), !0;
   }
   constructor(sendAction, openLink) {
     this.sendAction = sendAction, this.openLink = openLink, this.navigationElement = document.createElement("details"), this.navigationElement.hidden = !0, this.navigationElement.className = "webhost-scene__content-navigation";
@@ -2661,7 +2807,7 @@ var AccessibilityTreeMounter = class {
       } finally {
         this.presenting = !1;
       }
-      this.sendAction?.(node.actionTarget, { action: "accessibilityFocus" }, String(++this.nextRequestID));
+      this.sendAction?.(node.actionTarget, { action: "accessibilityFocus" }, String(this.requests.issue(node.actionTarget)));
     }), this.element = document.createElement("div"), this.element.className = "webhost-scene__accessibility-tree", this.element.style.position = "absolute", this.element.style.inset = "0", this.element.style.opacity = "0", this.element.style.pointerEvents = "none", this.element.style.zIndex = "3", this.announcerElement = document.createElement("div"), this.announcerElement.className = "webhost-scene__accessibility-announcer", this.announcerElement.setAttribute("aria-atomic", "true"), this.announcerElement.setAttribute("aria-live", "polite"), applyScreenReaderOnlyStyle(this.announcerElement);
   }
   present(nodes, metrics, announcements = [], options = {}) {
@@ -2680,11 +2826,8 @@ var AccessibilityTreeMounter = class {
       ...announcement,
       politeness: normalizePoliteness(announcement.politeness)
     }));
-    if (options.actionResponse) {
-      let acknowledged = BigInt(options.actionResponse.requestID);
-      if (acknowledged > this.acknowledgedRequestID)
-        this.acknowledgedRequestID = acknowledged;
-    }
+    if (this.requests.retainTargets(new Set(visibleNodes.flatMap((node) => node.actionTarget ? [node.actionTarget] : []))), options.actionResponse)
+      this.requests.settle(options.actionResponse);
     let previousById = this.nodesById, nextById = /* @__PURE__ */ new Map, modelsById = new Map(visibleNodes.map((node) => [node.id, node]));
     for (let node of visibleNodes) {
       let existing = previousById.get(node.id), tag = this.elementTag(node), previousModel = this.modelsById.get(node.id), reusable = existing?.tagName.toLowerCase() === tag && previousModel?.actionTarget === node.actionTarget && previousModel?.selection?.presentation === node.selection?.presentation, element2 = reusable ? existing : this.createElement(node, tag);
@@ -2737,7 +2880,7 @@ var AccessibilityTreeMounter = class {
           element2.tabIndex = node === chosen ? 0 : -1;
       }
       if ((options.synchronizeFocus ?? !0) && reviewedModel?.role === "tab" && reviewedModel.parentId === group[0]?.parentId && !enabled.some((node) => this.nodesById.get(node.id) === activeBeforePresentation) && chosen?.actionTarget && (!options.focusRequest || BigInt(options.focusRequest.generation) <= this.appliedAssistiveFocusGeneration))
-        this.nodesById.get(chosen.id)?.focus({ preventScroll: !0 }), this.sendAction?.(chosen.actionTarget, { action: "accessibilityFocus" }, String(++this.nextRequestID));
+        this.nodesById.get(chosen.id)?.focus({ preventScroll: !0 }), this.sendAction?.(chosen.actionTarget, { action: "accessibilityFocus" }, String(this.requests.issue(chosen.actionTarget)));
     }
     for (let menu of visibleNodes.filter((node) => node.role === "menu")) {
       let items = this.menuItems(menu), selected = items.find((node) => this.nodesById.get(node.id) === activeBeforePresentation) ?? items[0];
@@ -2775,7 +2918,7 @@ var AccessibilityTreeMounter = class {
       else if (assistiveRequest.target === void 0 && this.element.contains(document.activeElement))
         document.activeElement?.blur();
     }
-    let focused = visibleNodes.find((node) => node.isFocused), element = focused ? this.nodesById.get(focused.id) : void 0, pending = this.pendingFocus, focusAcknowledged = pending !== void 0 && pending.requestID <= this.acknowledgedRequestID, synchronize = focusAcknowledged ? this.nodesById.get(pending.id)?.contains(activeBeforePresentation) ?? !1 : element !== this.runtimeFocusedElement || element === activeBeforePresentation;
+    let focused = visibleNodes.find((node) => node.isFocused), element = focused ? this.nodesById.get(focused.id) : void 0, pending = this.pendingFocus, focusAcknowledged = pending !== void 0 && !this.requests.has(pending.requestID), synchronize = focusAcknowledged ? this.nodesById.get(pending.id)?.contains(activeBeforePresentation) ?? !1 : element !== this.runtimeFocusedElement || element === activeBeforePresentation;
     if (this.runtimeFocusedElement = element, focusAcknowledged)
       this.pendingFocus = void 0;
     if ((options.synchronizeFocus ?? !0) && !applyAssistiveRequest && synchronize && element && this.pendingFocus === void 0) {
@@ -2784,10 +2927,14 @@ var AccessibilityTreeMounter = class {
         focusElement.focus?.({ preventScroll: !0 });
     }
   }
-  dispose() {
+  resetSession() {
+    this.requests.reset(), this.pendingMenu = void 0, this.pendingMenuReturn = void 0, this.hasLiveRegionBaseline = !1;
     for (let element of this.nodesById.values())
       this.clearEditable(element);
-    this.nodesById.clear(), this.actionGroupsById.clear(), this.modelsById.clear(), this.previousLabelsById.clear(), this.pendingValues.clear(), this.pendingFocus = void 0, this.runtimeFocusedElement = void 0, this.appliedAssistiveFocusGeneration = -1n, this.element.replaceChildren(), this.announcerElement.replaceChildren(), this.navigationElement.remove();
+    this.nodesById.clear(), this.actionGroupsById.clear(), this.modelsById.clear(), this.previousLabelsById.clear(), this.pendingValues.clear(), this.pendingFocus = void 0, this.runtimeFocusedElement = void 0, this.appliedAssistiveFocusGeneration = -1n, this.element.replaceChildren(), this.announcerElement.replaceChildren(), this.refreshNavigation([]);
+  }
+  dispose() {
+    this.resetSession(), this.navigationElement.remove();
   }
   refreshNavigation(nodes) {
     this.navigationGroups = /* @__PURE__ */ new Map;
@@ -2872,7 +3019,7 @@ var AccessibilityTreeMounter = class {
           this.sendAction?.(current.actionTarget, {
             action: "custom",
             name
-          }, String(++this.nextRequestID));
+          }, String(this.requests.issue(current.actionTarget)));
         });
       if (previous.delete(name), button.disabled = node.isEnabled === !1 || node.properties?.readOnly === !0, button.tabIndex = button.disabled ? -1 : 0, group.children[index] !== button)
         group.insertBefore(button, group.children[index] ?? null);
@@ -2889,7 +3036,7 @@ var AccessibilityTreeMounter = class {
       let model = current(), semanticFocus = request.action === "accessibilityFocus" || request.action === "accessibilityBlur";
       if (this.presenting || !model?.actionTarget || model.isEnabled === !1 && !semanticFocus || model.properties?.readOnly === !0 && request.action !== "focus" && request.action !== "selectText" && !semanticFocus || !model.actions?.includes(request.action))
         return;
-      let requestID = ++this.nextRequestID;
+      let requestID = this.requests.issue(model.actionTarget);
       if ([
         "setValue",
         "editText",
@@ -3161,7 +3308,7 @@ var AccessibilityTreeMounter = class {
         input.type = node.role === "secureField" ? "password" : node.role === "slider" ? "range" : node.role === "stepper" ? "number" : "text";
       input.disabled = node.isEnabled === !1, input.readOnly = properties?.readOnly === !0, input.required = properties?.required === !0, setOrRemoveAttribute(element, "min", node.valueMin === void 0 ? void 0 : String(node.valueMin)), setOrRemoveAttribute(element, "max", node.valueMax === void 0 ? void 0 : String(node.valueMax)), setOrRemoveAttribute(element, "step", node.valueStep === void 0 ? void 0 : String(node.valueStep));
       let value = node.value ? String(node.value.value) : "", pending = this.pendingValues.get(node.id);
-      if (!this.composing.has(element) && (pending === void 0 || pending <= this.acknowledgedRequestID)) {
+      if (!this.composing.has(element) && (pending === void 0 || !this.requests.has(pending))) {
         this.pendingValues.delete(node.id);
         let previous = nativeTextSelection(input);
         if (node.role !== "secureField" && input.value !== value)
@@ -3175,7 +3322,7 @@ var AccessibilityTreeMounter = class {
       }
     }
     if (node.selection) {
-      let pending = this.pendingValues.get(node.id), synchronizeValue = pending === void 0 || pending <= this.acknowledgedRequestID;
+      let pending = this.pendingValues.get(node.id), synchronizeValue = pending === void 0 || !this.requests.has(pending);
       if (synchronizeValue)
         this.pendingValues.delete(node.id);
       presentSelection(element, node, synchronizeValue, this.isTabStop(node) && !!node.actions?.includes("setValue"));
@@ -4849,7 +4996,7 @@ var WebHostSceneRuntime = class {
       this.domGeometry = new DomGeometryController(this.terminalMount), this.paintScheduler.setHeld(!0);
     if (this.installInputHandlers(), this.installResizeObserver(), this.bridge?.bindOutput({
       resetSurfaceSession: () => {
-        this.awaitingConnectionFrame = !0, this.currentFrame = void 0, this.paintedGeometryRevision = void 0, this.paintedViewportRevision = void 0, this.finishGeometryWait(), this.domGeometry?.resetParagraphs(), this.geometrySession.resetConnection(), this.paintScheduler.resetSession(), this.terminalMount.setAttribute("aria-busy", "true"), this.lastSentResize = void 0, this.cancelGeometryPointer(), this.refreshGeometry();
+        this.accessibilityTree?.resetSession(), this.awaitingConnectionFrame = !0, this.currentFrame = void 0, this.paintedGeometryRevision = void 0, this.paintedViewportRevision = void 0, this.finishGeometryWait(), this.domGeometry?.resetParagraphs(), this.geometrySession.resetConnection(), this.paintScheduler.resetSession(), this.terminalMount.setAttribute("aria-busy", "true"), this.lastSentResize = void 0, this.cancelGeometryPointer(), this.refreshGeometry();
       },
       presentSurface: (frame, recoveredImagePayloadIds) => this.presentSurface(frame, recoveredImagePayloadIds),
       writeClipboard: (text) => this.writeClipboard(text),

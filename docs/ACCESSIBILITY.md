@@ -238,3 +238,13 @@ and directed caret once. An unchanged acknowledged value does not reset the
 native editor or undo history. Late events from a removed/replaced editor cannot
 mutate its replacement. These source contracts do not establish actual reader
 text-unit navigation or universal browser undo support.
+
+
+## Correlated input admission
+
+Accessibility request IDs admit one through twenty ASCII decimal digits within
+UInt64, including bounded legacy zero padding. Signs, separators, non-ASCII
+digits and overflow are rejected before dispatch. An opaque nonempty action
+target is independent of the presentation ID and request ID. Text and targets
+are percent-encoded so LF and RS cannot split a valid command. The WASI stream
+parser preserves exactly one action across arbitrary input fragmentation.

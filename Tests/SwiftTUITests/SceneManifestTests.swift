@@ -1,3 +1,4 @@
+import Foundation
 import SwiftTUIViews
 import Testing
 
@@ -48,6 +49,44 @@ struct SceneManifestTests {
         .init(id: WindowIdentifier("controls"), title: "Controls", isDefault: false),
       ]
     )
+  }
+
+  @Test func explicitSecondDefaultDerivesLegacyFlags() throws {
+    let manifest = SceneManifest(
+      defaultSceneID: "b",
+      scenes: [
+        .init(id: "a", title: nil, isDefault: true),
+        .init(id: "b", title: nil, isDefault: false),
+      ])
+    #expect(manifest.scenes.map(\.isDefault) == [false, true])
+    let json =
+      try JSONSerialization.jsonObject(with: JSONEncoder().encode(manifest)) as? [String: Any]
+    #expect(json?["defaultSceneId"] as? String == "b")
+    for key in ["defaultSceneId", "defaultSceneID"] {
+      let decoded = try JSONDecoder().decode(
+        SceneManifest.self,
+        from: Data(
+          "{\"\(key)\":\"b\",\"scenes\":[{\"id\":\"a\",\"isDefault\":true},{\"id\":\"b\",\"title\":null}]}"
+            .utf8))
+      #expect(decoded.defaultSceneID == "b")
+      #expect(decoded.scenes.map(\.isDefault) == [false, true])
+    }
+    #expect(
+      try JSONDecoder().decode(SceneManifest.self, from: Data("[]".utf8)).defaultSceneID == nil)
+  }
+
+  @Test func ambiguousDecodedCatalogsFail() {
+    for json in [
+      #"{"defaultSceneId":"a","defaultSceneID":"b","scenes":[{"id":"a"},{"id":"b"}]}"#,
+      #"{"defaultSceneId":"missing","scenes":[{"id":"a"}]}"#,
+      #"[{"id":"a"},{"id":"a"}]"#,
+      #"[{"id":"a","isDefault":true},{"id":"b","isDefault":true}]"#,
+      #"[{"id":"a","isDefault":"false"}]"#,
+    ] {
+      #expect(throws: (any Error).self) {
+        try JSONDecoder().decode(SceneManifest.self, from: Data(json.utf8))
+      }
+    }
   }
 
   @Test("scene manifest renders stable JSON")

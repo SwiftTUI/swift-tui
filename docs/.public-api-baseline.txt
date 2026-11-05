@@ -3095,6 +3095,7 @@ SwiftTUIRuntime.SceneDescriptor.isDefault
 SwiftTUIRuntime.SceneDescriptor.title
 SwiftTUIRuntime.SceneManifest
 SwiftTUIRuntime.SceneManifest.defaultSceneID
+SwiftTUIRuntime.SceneManifest.encode(to:)
 SwiftTUIRuntime.SceneManifest.init(defaultSceneID:scenes:)
 SwiftTUIRuntime.SceneManifest.init(for:)
 SwiftTUIRuntime.SceneManifest.init(from:)
