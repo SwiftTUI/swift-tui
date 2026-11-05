@@ -4,6 +4,15 @@ import Testing
 @testable import SwiftTUIWASI
 
 struct WASIRunnerTests {
+  @Test("WASI errors retain released Hashable conformance with scene payloads")
+  func releasedHashableConformance() {
+    let errors: Set<WASIRunnerError> = [
+      .nativeExecutionUnsupported, .nativeExecutionUnsupported,
+      .sceneNotFound("alpha"), .sceneNotFound("alpha"), .sceneNotFound("beta"),
+    ]
+    #expect(errors.count == 3)
+  }
+
   @Test("native manifest selects the explicit second scene and derives legacy flags")
   func manifestExplicitDefault() throws {
     let scenes = [

@@ -10,7 +10,7 @@ import SwiftTUIWASISurfaceBridge
   import WASILibc
 #endif
 
-public enum WASIRunnerError: Error, Equatable, Sendable, CustomStringConvertible {
+public enum WASIRunnerError: Error, Hashable, Sendable, CustomStringConvertible {
   case nativeExecutionUnsupported
   case sceneNotFound(WindowIdentifier)
 
