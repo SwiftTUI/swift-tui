@@ -2,15 +2,15 @@ import SwiftTUICore
 
 // Host-integration SPI: the native SwiftUI host (`swift-tui-swiftui`) composites
 // image blend modes against this compositor when drawing a `HostedRasterSurface`.
-// Exposed via `@_spi(Runners)` so it stays out of the canonical public surface.
-@_spi(Runners) public struct BlendedImageEncodedPayload: Equatable, Sendable {
+// Host is the supported native-host profile; Runners remains a compatibility alias.
+@_spi(Host) @_spi(Runners) public struct BlendedImageEncodedPayload: Equatable, Sendable {
   package var wireID: ImageWireID
-  @_spi(Runners) public var id: String {
+  @_spi(Host) @_spi(Runners) public var id: String {
     get { wireID.rawValue }
     set { wireID = ImageWireID(rawValue: newValue) }
   }
-  @_spi(Runners) public var bytes: [UInt8]
-  @_spi(Runners) public var pixelSize: PixelSize
+  @_spi(Host) @_spi(Runners) public var bytes: [UInt8]
+  @_spi(Host) @_spi(Runners) public var pixelSize: PixelSize
 
   package init(
     id: ImageWireID,
@@ -68,7 +68,7 @@ package struct ImageBlendCompositorCacheSnapshot: Sendable, Equatable {
   }
 }
 
-@_spi(Runners) public final class ImageBlendCompositor: Sendable {
+@_spi(Host) @_spi(Runners) public final class ImageBlendCompositor: Sendable {
   /// Shared cache payloads contain pixels, never an attachment owner's routing
   /// or placement metadata. Each lookup binds them to the current attachment.
   private struct DecodedPayload: Sendable {
@@ -261,7 +261,7 @@ package struct ImageBlendCompositorCacheSnapshot: Sendable, Equatable {
   private let storage: OSAllocatedUnfairLock<Storage>
   private let memoryMetricToken: MemoryMetricRegistry.Token
 
-  @_spi(Runners) public convenience init() {
+  @_spi(Host) @_spi(Runners) public convenience init() {
     self.init(repository: ImageAssetRepository())
   }
 
@@ -488,7 +488,7 @@ package struct ImageBlendCompositorCacheSnapshot: Sendable, Equatable {
     return variant
   }
 
-  @_spi(Runners) public func encodedPNGPayload(
+  @_spi(Host) @_spi(Runners) public func encodedPNGPayload(
     for attachment: RasterImageAttachment,
     fallbackBackground: Color
   ) -> BlendedImageEncodedPayload? {

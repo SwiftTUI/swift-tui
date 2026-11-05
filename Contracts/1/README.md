@@ -15,7 +15,9 @@ lifecycle rules still apply after structural validation. The
 specify the binary boundary independently of wire capabilities. The
 [WASI command](profiles/wasi-command.md), [loopback companion](profiles/companion.md)
 and [terminal/CLI](profiles/terminal-cli.md) profiles define their execution,
-bootstrap and ownership boundaries.
+bootstrap and ownership boundaries. The [native Swift source profile](profiles/swift-source.md)
+and [compiler-derived inventory](swift/inventory.jsonl) classify host and test
+operations, signature dependencies, actor requirements and default witnesses.
 
 Generated Swift, TypeScript and Kotlin leaf bindings are in `bindings/`.
 They contain constants, field sets, tuple arities and the checked UInt64 scalar;

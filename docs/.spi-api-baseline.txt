@@ -26,6 +26,7 @@ SwiftTUIProfiling.ProfiledMemorySnapshot.name
 SwiftTUIProfiling.TSVFileSink
 SwiftTUIProfiling.TSVFileSink.init(path:)
 SwiftTUIProfiling.TSVFileSink.record(_:)
+SwiftTUIRuntime.AccessibilityNode.presentationIdentity
 SwiftTUIRuntime.AccessibilityNode.runtimeFocusIdentity
 SwiftTUIRuntime.BlendedImageEncodedPayload
 SwiftTUIRuntime.BlendedImageEncodedPayload.bytes
@@ -59,6 +60,7 @@ SwiftTUIRuntime.HostedRasterSurfaceFrameDelivery.assumedMainActor
 SwiftTUIRuntime.HostedRasterSurfaceFrameDelivery.asynchronousMainActor
 SwiftTUIRuntime.HostedSceneSession.flushPendingInputEventsForTesting()
 SwiftTUIRuntime.HostedSceneSession.init(for:sceneID:surface:renderMode:runtimeIssueSink:onFocusPresentationChange:)
+SwiftTUIRuntime.Identity.hasPresentationOccurrence
 SwiftTUIRuntime.ImageBlendCompositor
 SwiftTUIRuntime.ImageBlendCompositor.encodedPNGPayload(for:fallbackBackground:)
 SwiftTUIRuntime.ImageBlendCompositor.init()
@@ -347,6 +349,15 @@ SwiftTUITestSupport.StageBudgetExceeded.stages
 SwiftTUITestSupport.StageClock
 SwiftTUITestSupport.StageClock.currentStage()
 SwiftTUITestSupport.StageClock.waitForStage(atLeast:)
+SwiftTUITestSupport.ViewTestContext
+SwiftTUITestSupport.ViewTestContext.environmentValues
+SwiftTUITestSupport.ViewTestContext.identity
+SwiftTUITestSupport.ViewTestContext.init(identity:environmentValues:invalidatedIdentities:)
+SwiftTUITestSupport.ViewTestContext.invalidatedIdentities
+SwiftTUITestSupport.ViewTestRenderer
+SwiftTUITestSupport.ViewTestRenderer.init()
+SwiftTUITestSupport.ViewTestRenderer.render(_:context:proposal:frameInstant:)
+SwiftTUITestSupport.ViewTestRenderer.reset()
 SwiftTUITestSupport.checkProperty(_:seed:iterations:maxShrinkSteps:_:)
 SwiftTUITestSupport.closeTestDescriptor(_:)
 SwiftTUITestSupport.hostileGraphemeAlphabet

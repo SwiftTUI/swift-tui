@@ -4,11 +4,11 @@
   "profile": "swifttui.host-wire/1",
   "minimumReader": "full-v1-v2",
   "schemaDialect": "https://json-schema.org/draft/2020-12/schema",
-  "contentSHA256": "9e3d40e8305c374fadb5b9cb975edf21f3c0276f554837e42733c66603a896f9",
+  "contentSHA256": "397db393d63ac956460133b349a95649788407032fdb8ca9611ea5288fce7a6b",
   "files": {
     "README.md": {
-      "sha256": "66d37804bad5bf5c61ccf710d2bd9646a596cd7bcfc4967da6becbdf0d7d9a20",
-      "bytes": 4598
+      "sha256": "b32803c21d7c0aad46916194c191fdaebadba024e4c8872924aed4d3ce451ade",
+      "bytes": 4815
     },
     "bindings/HostContract.kt": {
       "sha256": "a0e40f9d86cb1e5116c2545f0b067d054f1a7929b0e861839b8775fa5a0570d0",
@@ -78,6 +78,10 @@
       "sha256": "5d61b8f7ac8e15cf8e9fc6484205ffb79039546d3f8e953192141addea0f0000",
       "bytes": 3040
     },
+    "profiles/swift-source.md": {
+      "sha256": "7e621643d38a9d731055883905fda394f2a184bae8189629b91d1c32f144fc9e",
+      "bytes": 5387
+    },
     "profiles/terminal-cli.md": {
       "sha256": "0545089f914cb80026b8b1f4c407bc96f40820f2eb1e7bd93d61bc97ddd6f2bf",
       "bytes": 3829
@@ -113,6 +117,10 @@
     "schemas/resync.schema.json": {
       "sha256": "2c47b07eaf43eb8e2a9fccc74aff89ef508e7f64beea940573ccb813e32c0e25",
       "bytes": 180
+    },
+    "swift/inventory.jsonl": {
+      "sha256": "d5d8e39b94be81e365075b440cccad1dbab958f0b73428b5c2b3332dbca80c24",
+      "bytes": 3332641
     }
   },
   "runner": "conformance/run.py",

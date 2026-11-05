@@ -94,7 +94,7 @@ public struct TerminalPresentationMetrics: Equatable, Sendable {
     )
   }
 
-  @_spi(Runners) public static func rasterHostMetrics(
+  @_spi(Host) @_spi(Runners) public static func rasterHostMetrics(
     for surface: RasterSurface,
     damage: PresentationDamage?,
     bytesWritten: Int = 0,
@@ -269,7 +269,7 @@ public struct SemanticHostFrame: Equatable, Sendable {
   }
 }
 
-@_spi(Runners)
+@_spi(Host) @_spi(Runners)
 public protocol SemanticHostFramePresentationSurface:
   PresentationSurfaceMetricsProvider
 {

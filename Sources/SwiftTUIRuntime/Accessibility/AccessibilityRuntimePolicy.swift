@@ -34,7 +34,24 @@ extension AccessibilityNode {
   /// route, and any other node in a later duplicate publishes its
   /// occurrence-qualified identity (STUI-1296). A unique node's runtime
   /// identity is its action identity or reported identity, as before.
-  @_spi(Runners) public var runtimeFocusIdentity: Identity {
+  @_spi(Host) @_spi(Runners) public var runtimeFocusIdentity: Identity {
     actionIdentity ?? occurrenceIdentity ?? identity
+  }
+}
+
+extension Identity {
+  /// Whether this identity distinguishes a later occurrence of a repeated entity.
+  /// Hosts must not infer occurrence semantics by parsing the displayed path.
+  @_spi(Host) public var hasPresentationOccurrence: Bool {
+    typedComponents.contains(where: \.hasEntityOccurrence)
+  }
+}
+
+extension AccessibilityNode {
+  /// Stable presentation identity for this occurrence, distinct from the opaque
+  /// action target and from the runtime keyboard-focus identity of a row selector.
+  @_spi(Host) public var presentationIdentity: Identity {
+    let focus = runtimeFocusIdentity
+    return focus != identity && focus.hasPresentationOccurrence ? focus : identity
   }
 }

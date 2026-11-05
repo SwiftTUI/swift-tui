@@ -1,7 +1,7 @@
 import SwiftTUICore
 import Synchronization
 
-@_spi(Runners)
+@_spi(Host) @_spi(Testing) @_spi(Runners)
 public enum HostedRasterSurfaceFrameDelivery: Sendable {
   case asynchronousMainActor
   case assumedMainActor
@@ -68,7 +68,7 @@ public final class HostedRasterSurface:
     )
   }
 
-  @_spi(Runners)
+  @_spi(Host) @_spi(Runners)
   public convenience init(
     surfaceSize: CellSize,
     appearance: TerminalAppearance,
@@ -94,7 +94,7 @@ public final class HostedRasterSurface:
   /// history the `@_spi(Runners)` waiters can scan; production hosts keep the
   /// small default window (see `defaultFrameHistoryLimit`), while stress
   /// suites that assert on the deep rolling window pass an explicit limit.
-  @_spi(Runners)
+  @_spi(Testing) @_spi(Runners)
   public init(
     surfaceSize: CellSize,
     appearance: TerminalAppearance,
@@ -189,7 +189,7 @@ public final class HostedRasterSurface:
     clipboardWriter?(text) ?? false
   }
 
-  @_spi(Runners) public func waitForFrame(
+  @_spi(Testing) @_spi(Runners) public func waitForFrame(
     matching predicate: @escaping @Sendable (SemanticHostFrame) -> Bool = { _ in true }
   ) async -> SemanticHostFrame {
     if let frame = state.withLock({ state in state.frames.first(where: predicate) }) {
@@ -215,7 +215,7 @@ public final class HostedRasterSurface:
     }
   }
 
-  @_spi(Runners) public func waitForSurface(
+  @_spi(Testing) @_spi(Runners) public func waitForSurface(
     matching predicate: @escaping @Sendable (RasterSurface) -> Bool = { _ in true }
   ) async -> RasterSurface {
     let frame = await waitForFrame { frame in
@@ -224,7 +224,7 @@ public final class HostedRasterSurface:
     return frame.raster
   }
 
-  @_spi(Runners) public func waitForFrames(
+  @_spi(Testing) @_spi(Runners) public func waitForFrames(
     matching predicate: @escaping @Sendable ([SemanticHostFrame]) -> Bool
   ) async -> [SemanticHostFrame] {
     if let frames = state.withLock({ state -> [SemanticHostFrame]? in
@@ -311,8 +311,9 @@ public final class HostedRasterSurface:
   }
 }
 
-@_spi(Runners)
+@_spi(Host) @_spi(Runners)
 extension HostedRasterSurface: SemanticHostFramePresentationSurface {
+  @_spi(Host) @_spi(Runners)
   @discardableResult
   public func present(_ frame: SemanticHostFrame) throws -> PresentationMetrics {
     var prepared = frame

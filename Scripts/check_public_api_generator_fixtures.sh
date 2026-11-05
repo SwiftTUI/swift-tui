@@ -6,6 +6,7 @@ set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 fixture_root="${repo_root}/Scripts/data/public-api-fixtures"
+bun test "${repo_root}/Scripts/lib/swift_contract_inventory.test.ts"
 generator="${repo_root}/Scripts/lib/generate_public_api_inventory.ts"
 materializer="${repo_root}/Scripts/lib/materialize_override_entries.ts"
 scratch="$(mktemp -d -t swift-tui-public-api-fixtures.XXXXXX)"

@@ -137,9 +137,14 @@ GENERATE_ARGS=(
   --baseline-flat "docs/.public-api-baseline.txt"
   --spi-symbolgraph-dir "${SPI_SYMBOLGRAPH_DIR}"
   --baseline-spi "docs/.spi-api-baseline.txt"
+  --signature-baseline "Contracts/1/swift/inventory.jsonl"
 )
 if [[ "${CHECK_ONLY}" -eq 1 ]]; then
   GENERATE_ARGS+=(--check)
 fi
 
 bun run "${SCRIPT_DIR}/lib/generate_public_api_inventory.ts" "${GENERATE_ARGS[@]}"
+
+if [[ "${CHECK_ONLY}" -eq 0 ]]; then
+  python3 Contracts/1/generate.py
+fi

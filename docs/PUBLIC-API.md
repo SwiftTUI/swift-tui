@@ -14,17 +14,20 @@ consistent new API.
 
 A machine-generated enumeration of every public symbol lives in
 `PUBLIC_API_BASELINE.md` (grouped) and `.public-api-baseline.txt` (flat). The
-`.spi-api-baseline.txt` file separately tracks the `@_spi` surface. Its most
-important part is `@_spi(Runners)`, the host contract for the swiftui/web/android
-host repos; `@_spi(StyleFixtures)` is the style-library testing contract (the
+`.spi-api-baseline.txt` file separately tracks the `@_spi` surface. The supported native host import is `@_spi(Host)`; `Runners` remains a bounded
+legacy/internal adapter. `@_spi(Testing)` exposes the external snapshot facade
+and hosted-frame test synchronization. `@_spi(StyleFixtures)` is the
+style-library testing contract (the
 fixture initializers on every style configuration and captured slot;
 presentation values keep ordinary public initializers because styles
 construct them — see the `Testing-Styles` DocC article). Thus, an SPI
 break creates a reviewable diff instead of a silent downstream failure. The inventory script generates and compares all
 three symbol files and the [product and module map](PUBLIC_MODULE_MAP.md):
 `Scripts/generate_public_api_inventory.sh`; see
-[DEVELOPMENT.md](https://github.com/SwiftTUI/swift-tui-org/blob/main/docs/swift-tui/DEVELOPMENT.md#public-api-baseline). Those files answer "is
-symbol X public?". This document explains when to use a symbol and why it has
+[DEVELOPMENT.md](https://github.com/SwiftTUI/swift-tui-org/blob/main/docs/swift-tui/DEVELOPMENT.md#public-api-baseline). The [native Swift profile](../Contracts/1/profiles/swift-source.md) and its
+[compiler-derived inventory](../Contracts/1/swift/inventory.jsonl) also freeze
+signatures, actor requirements, conformances, default witnesses and reachable
+type dispositions. Those files answer "is symbol X public?". This document explains when to use a symbol and why it has
 its current shape.
 
 The generated map distinguishes library products (SwiftPM dependency choices)

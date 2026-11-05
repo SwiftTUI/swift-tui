@@ -24,6 +24,7 @@
 // handles the swift toolchain invocation; this file is pure parse + emit.
 
 import { Glob } from "bun";
+import { renderSwiftContractInventory } from "./swift_contract_inventory.ts";
 import { dirname, join, resolve } from "node:path";
 import { existsSync } from "node:fs";
 import { mkdir } from "node:fs/promises";
@@ -33,6 +34,7 @@ import { parse as parseYaml } from "yaml";
 // CLI args
 
 interface Args {
+  signatureBaseline?: string;
   symbolgraphDir: string;
   overrides: string;
   baselineMd: string;
@@ -73,6 +75,7 @@ function parseArgs(argv: readonly string[]): Args {
     overrides: required("--overrides"),
     baselineMd: required("--baseline-md"),
     baselineFlat: required("--baseline-flat"),
+    signatureBaseline: get("--signature-baseline"),
     spiSymbolgraphDir,
     baselineSpi,
     packageManifest: required("--package-manifest"),
@@ -152,7 +155,7 @@ const EXCLUDED_PRODUCTS: readonly string[] = [];
 // SwiftPM emits graphs for non-product implementation and vendored targets as
 // well as the configured public/test-support modules. Every blind spot is
 // named, rather than hidden behind a prefix rule.
-const KNOWN_UNSCANNED_MODULES = [
+export const KNOWN_UNSCANNED_MODULES = [
   // Executable entry-point support; it is not a library product or API surface.
   "CEntryPointImageLocator",
   // Vendored FIGlet implementation; consumers use SwiftTUI's Image surface.
@@ -1192,8 +1195,20 @@ async function main(): Promise<void> {
     }
   }
 
+  let signatureInventory: string | undefined;
+  if (args.signatureBaseline && args.spiSymbolgraphDir && !spiPartial) {
+    signatureInventory = await renderSwiftContractInventory(args.spiSymbolgraphDir,
+      (owner, module) => overrides.classification.get(owner)
+        ?? overrides.moduleDefaults.get(module as ModuleName)
+        ?? (KNOWN_UNSCANNED_MODULES.some(name => name === module) ? "implementation-support" : overrides.defaultClassification));
+  }
+
   if (args.check) {
     const failures: string[] = [];
+    if (signatureInventory !== undefined && args.signatureBaseline
+      && await readFileIfExists(args.signatureBaseline) !== signatureInventory) {
+      failures.push("Swift signature/actor/conformance/default-witness inventory is stale. Run Scripts/generate_public_api_inventory.sh.");
+    }
     if (moduleMapStale && missingModules.length === 0) {
       failures.push("Public module map is stale. Run Scripts/generate_public_api_inventory.sh to regenerate.");
     }
@@ -1298,6 +1313,9 @@ async function main(): Promise<void> {
     return;
   }
 
+  if (signatureInventory !== undefined && args.signatureBaseline) {
+    await writeFileEnsuringDir(args.signatureBaseline, signatureInventory);
+  }
   await writeFileEnsuringDir(args.baselineMd, renderedMd);
   await writeFileEnsuringDir(args.moduleMap, renderedMap);
   await writeFileEnsuringDir(args.baselineFlat, renderedFlat);
