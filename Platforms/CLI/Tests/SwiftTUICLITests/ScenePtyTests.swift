@@ -42,15 +42,18 @@
 
     @Test("Attached client detection tracks slave open and close")
     func attachedClientDetection() async throws {
-      try await withScenePty { pty in
-        #expect(await pty.hasAttachedClient() == false)
-
-        let slaveFD = sceneOpen(pty.slavePath, O_RDWR | O_NOCTTY)
-        #expect(slaveFD >= 0)
-        #expect(await pty.hasAttachedClient() == true)
-
-        sceneClose(slaveFD)
-        #expect(await pty.hasAttachedClient() == false)
+      // A concurrent fork can temporarily hold this process's slave descriptor.
+      // Allocate the PTY in a private process so this test owns every client.
+      await #expect(processExitsWith: .success) {
+        try await withScenePty { pty in
+          try #require(await pty.hasAttachedClient() == false)
+          let slaveFD = sceneOpen(pty.slavePath, O_RDWR | O_NOCTTY)
+          try #require(slaveFD >= 0)
+          let attached = await pty.hasAttachedClient()
+          sceneClose(slaveFD)
+          try #require(attached)
+          try #require(await pty.hasAttachedClient() == false)
+        }
       }
     }
 

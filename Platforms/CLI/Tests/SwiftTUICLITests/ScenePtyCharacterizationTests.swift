@@ -21,8 +21,11 @@
 
     @Test("hasAttachedClient returns false when no client has opened the slave")
     func hasAttachedClientFalseInitially() async throws {
-      try await withScenePty { pty in
-        #expect(await pty.hasAttachedClient() == false)
+      // No other suite may fork with a copy of this PTY's descriptors.
+      await #expect(processExitsWith: .success) {
+        try await withScenePty { pty in
+          try #require(await pty.hasAttachedClient() == false)
+        }
       }
     }
   }

@@ -247,7 +247,7 @@
       }
     }
 
-    @Test("a child whose exec fails releases its PTY")
+    @Test("a child whose exec fails releases its PTY", .timeLimit(.minutes(1)))
     func failedChildExec() async throws {
       let child = ChildProcessPty(
         executable: "/nonexistent/swifttui-reliability-test",
@@ -256,6 +256,9 @@
       let pair = try #require(await child.pair)
       let exit = await child.waitForExit()
       #expect(exit == .exited(code: 127))
+      // Process exit can be observed before the PTY finishes draining.
+      var output = await pair.read().makeAsyncIterator()
+      #expect(await output.next() == nil)
       #expect(await pair.rawMasterFD == -1)
     }
 
