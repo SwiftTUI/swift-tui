@@ -52,6 +52,7 @@ SwiftTUIRuntime.FrameDiagnosticWork.lifetimeAnchorCounters
 SwiftTUIRuntime.FrameDiagnosticWork.retainedValidationCounters
 SwiftTUIRuntime.HostedRasterSurface.init(surfaceSize:appearance:theme:capabilityProfile:frameDelivery:frameHistoryLimit:onFrame:onClipboardWrite:)
 SwiftTUIRuntime.HostedRasterSurface.init(surfaceSize:appearance:theme:capabilityProfile:frameDelivery:onFrame:onClipboardWrite:)
+SwiftTUIRuntime.HostedRasterSurface.setClipboardReader(_:)
 SwiftTUIRuntime.HostedRasterSurface.waitForFrame(matching:)
 SwiftTUIRuntime.HostedRasterSurface.waitForFrames(matching:)
 SwiftTUIRuntime.HostedRasterSurface.waitForSurface(matching:)

@@ -10,7 +10,7 @@ public enum HostedRasterSurfaceFrameDelivery: Sendable {
 /// Raster and semantic presentation surface for retained non-terminal hosts.
 public final class HostedRasterSurface:
   PresentationSurfaceMetricsProvider, RasterPresentationSurface,
-  ClipboardWritingPresentationSurface, Sendable
+  ClipboardWritingPresentationSurface, ClipboardReadingPresentationSurface, Sendable
 {
   /// Production hosts consume frames through `onFrame`; the retained frame
   /// history exists so the `@_spi(Runners)` frame waiters can match frames
@@ -26,6 +26,8 @@ public final class HostedRasterSurface:
   private let state: Mutex<HostedRasterSurfaceState>
   private let frameHandler: @Sendable (SemanticHostFrame) -> Void
   private let clipboardWriter: (@MainActor @Sendable (String) -> Bool)?
+
+  @MainActor private var clipboardReader: (@MainActor @Sendable () -> String?)?
 
   public let capabilityProfile: TerminalCapabilityProfile
 
@@ -187,6 +189,18 @@ public final class HostedRasterSurface:
   @MainActor
   public func writeClipboard(_ text: String) throws -> Bool {
     clipboardWriter?(text) ?? false
+  }
+
+  /// Supplies text when a focused editor handles a paste command. Hosts that
+  /// cannot read a platform clipboard may leave the reader unset.
+  @_spi(Host) @MainActor
+  public func setClipboardReader(_ reader: @escaping @MainActor @Sendable () -> String?) {
+    clipboardReader = reader
+  }
+
+  @MainActor
+  package func readClipboard() throws -> String? {
+    clipboardReader?()
   }
 
   @_spi(Testing) @_spi(Runners) public func waitForFrame(
