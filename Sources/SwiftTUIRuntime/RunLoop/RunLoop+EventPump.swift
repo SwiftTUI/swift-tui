@@ -328,6 +328,7 @@ extension RunLoop {
 
     var handledNonExitEvent = false
     for pumpedEvent in renderEventDrain.events {
+      let owedPresentation = handledNonExitEvent || hasUnpresentedInput
       let hadReadyFrameBeforeEvent = scheduler.hasPendingFrame(at: .now())
       if let exitReason = handle(pumpedEvent.event, arrival: pumpedEvent.arrival) {
         let effectiveExit: RunLoopExitReason
@@ -339,7 +340,7 @@ extension RunLoop {
           effectiveExit = reason
         }
         if shouldFlushOnExit(
-          effectiveExit, handledEventInBatch: handledNonExitEvent,
+          effectiveExit, owedPresentation: owedPresentation,
           hadReadyFrame: hadReadyFrameBeforeEvent)
         {
           try renderPendingFrames(

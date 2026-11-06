@@ -49,14 +49,16 @@ extension RunLoop {
     return exitReason
   }
 
-  /// An exit can arrive in its own batch after the previous input frame was
-  /// skipped. That input still needs presentation; producer work alone does not.
+  /// A skipped frame leaves its input outstanding. Read this before
+  /// dispatching the next event: an exit key may schedule work of its own.
+  var hasUnpresentedInput: Bool {
+    pendingAnsweredInputs != nil || pendingUnattributedInput
+  }
+
   func shouldFlushOnExit(
-    _ reason: RunLoopExitReason, handledEventInBatch: Bool, hadReadyFrame: Bool
+    _ reason: RunLoopExitReason, owedPresentation: Bool, hadReadyFrame: Bool
   ) -> Bool {
-    if handledEventInBatch || pendingAnsweredInputs != nil || pendingUnattributedInput {
-      return true
-    }
+    if owedPresentation { return true }
     if case .signal = reason { return hadReadyFrame }
     return false
   }

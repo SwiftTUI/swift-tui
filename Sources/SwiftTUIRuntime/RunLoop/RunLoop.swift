@@ -734,6 +734,7 @@ public final class RunLoop<State: Equatable & Sendable, Content: View>:
 
       var handledNonExitEvent = false
       for pumpedEvent in renderEventDrain.events {
+        let owedPresentation = handledNonExitEvent || hasUnpresentedInput
         let hadReadyFrameBeforeEvent = scheduler.hasPendingFrame(at: .now())
         if let exitReason = handle(pumpedEvent.event, arrival: pumpedEvent.arrival) {
           let effectiveExit: RunLoopExitReason
@@ -745,7 +746,7 @@ public final class RunLoop<State: Equatable & Sendable, Content: View>:
             effectiveExit = reason
           }
           if shouldFlushOnExit(
-            effectiveExit, handledEventInBatch: handledNonExitEvent,
+            effectiveExit, owedPresentation: owedPresentation,
             hadReadyFrame: hadReadyFrameBeforeEvent)
           {
             // Cooperative exits present the final input and its synchronous
