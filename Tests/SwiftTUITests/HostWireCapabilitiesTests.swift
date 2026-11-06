@@ -98,6 +98,21 @@ struct HostWireCapabilitiesTests {
     #expect(parsed == HostWireCapabilities(acceptsDeltaFrames: true))
   }
 
+  @Test("ignored strings still validate escapes, surrogate pairs and control characters")
+  func ignoredStringsUseTheFullJSONGrammar() {
+    func request(_ quoted: String) -> HostWireResyncRequest? {
+      HostWireResyncRequest.fromRequestJSON(
+        #"{"future":{\#(quoted):[\#(quoted)]},"scope":"keyframe"}"#)
+    }
+    #expect(request(#""ok 😀 \uD83D\uDE00 \" \\ \n""#)?.scope == .keyframe)
+    for invalid in [#""\uD83D""#, #""\uDE00""#, #""\u12xz""#, #""\q""#, "\"a\nb\""] {
+      #expect(request(invalid) == nil)
+      #expect(
+        HostWireCapabilities.fromDeclarationJSON(#"{"future":\#(invalid),"styleAppend":true}"#)
+          == nil)
+    }
+  }
+
   @Test("mistyped known keys are skipped rather than failing the declaration")
   func mistypedKnownKeysAreSkipped() {
     let parsed = HostWireCapabilities.fromDeclarationJSON(

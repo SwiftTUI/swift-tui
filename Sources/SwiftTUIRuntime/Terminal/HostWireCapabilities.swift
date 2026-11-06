@@ -302,10 +302,25 @@ private struct CapsJSONScanner {
   }
 
   mutating func consumeString(maximumUTF8Bytes: Int = HostWireBudget.recordBytes) -> String? {
-    guard consume("\"") else {
+    var value = String.UnicodeScalarView()
+    guard scanString(maximumUTF8Bytes: maximumUTF8Bytes, emit: { value.append($0) }) else {
       return nil
     }
-    var value = String.UnicodeScalarView()
+    return String(value)
+  }
+
+  // Unknown field values and nested object keys need validation, not storage.
+  // Share the decoder so skipped escapes and surrogate pairs obey the same grammar.
+  private mutating func skipString() -> Bool {
+    scanString(maximumUTF8Bytes: HostWireBudget.recordBytes, emit: { _ in })
+  }
+
+  private mutating func scanString(
+    maximumUTF8Bytes: Int, emit: (Unicode.Scalar) -> Void
+  ) -> Bool {
+    guard consume("\"") else {
+      return false
+    }
     var byteCount = 0
     func append(_ scalar: Unicode.Scalar) -> Bool {
       let bytes: Int
@@ -317,37 +332,37 @@ private struct CapsJSONScanner {
       }
       guard bytes <= maximumUTF8Bytes - byteCount else { return false }
       byteCount += bytes
-      value.append(scalar)
+      emit(scalar)
       return true
     }
     while index < scalars.count {
       let scalar = scalars[index]
       index += 1
       if scalar == "\"" {
-        return String(value)
+        return true
       }
       if scalar == "\\" {
         guard index < scalars.count else {
-          return nil
+          return false
         }
         let escaped = scalars[index]
         index += 1
         switch escaped {
         case "\"", "\\", "/":
-          guard append(escaped) else { return nil }
+          guard append(escaped) else { return false }
         case "b":
-          guard append("\u{0008}") else { return nil }
+          guard append("\u{0008}") else { return false }
         case "f":
-          guard append("\u{000C}") else { return nil }
+          guard append("\u{000C}") else { return false }
         case "n":
-          guard append("\n") else { return nil }
+          guard append("\n") else { return false }
         case "t":
-          guard append("\t") else { return nil }
+          guard append("\t") else { return false }
         case "r":
-          guard append("\r") else { return nil }
+          guard append("\r") else { return false }
         case "u":
           guard let firstCodeUnit = consumeHexCodeUnit() else {
-            return nil
+            return false
           }
           let scalarValue: UInt32
           if (0xD800...0xDBFF).contains(firstCodeUnit) {
@@ -355,7 +370,7 @@ private struct CapsJSONScanner {
               let secondCodeUnit = consumeHexCodeUnit(),
               (0xDC00...0xDFFF).contains(secondCodeUnit)
             else {
-              return nil
+              return false
             }
             scalarValue =
               0x1_0000
@@ -363,25 +378,25 @@ private struct CapsJSONScanner {
               + UInt32(secondCodeUnit - 0xDC00)
           } else {
             guard !(0xDC00...0xDFFF).contains(firstCodeUnit) else {
-              return nil
+              return false
             }
             scalarValue = UInt32(firstCodeUnit)
           }
           guard let decoded = Unicode.Scalar(scalarValue) else {
-            return nil
+            return false
           }
-          guard append(decoded) else { return nil }
+          guard append(decoded) else { return false }
         default:
-          return nil
+          return false
         }
         continue
       }
       guard scalar.value >= 0x20 else {
-        return nil
+        return false
       }
-      guard append(scalar) else { return nil }
+      guard append(scalar) else { return false }
     }
-    return nil
+    return false
   }
 
   private mutating func consumeHexCodeUnit() -> UInt16? {
@@ -521,7 +536,7 @@ private struct CapsJSONScanner {
     }
     switch scalars[index] {
     case "\"":
-      return consumeString() != nil
+      return skipString()
     case "{":
       return skipObject(nestingDepth: nestingDepth)
     case "[":
@@ -549,7 +564,7 @@ private struct CapsJSONScanner {
     }
     while true {
       skipWhitespace()
-      guard consumeString() != nil else {
+      guard skipString() else {
         return false
       }
       skipWhitespace()
