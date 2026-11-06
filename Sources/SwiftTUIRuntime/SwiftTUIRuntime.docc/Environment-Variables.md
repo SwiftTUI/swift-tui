@@ -124,7 +124,7 @@ for discovery and SSH forwarding.
 
 | Variable | Values | Effect |
 | --- | --- | --- |
-| `SWIFTTUI_KITTY_KEYBOARD` | `0` opts out | The host probes for the kitty keyboard protocol and enables its disambiguation flag when supported. Only the exact value `0` disables the probe. The probe is also skipped inside tmux/screen and on non-TTY descriptors. |
+| `SWIFTTUI_KITTY_KEYBOARD` | boolean | The host probes for the kitty keyboard protocol and enables its disambiguation flag when supported. A disable value opts out. The probe is also skipped inside tmux/screen and on non-TTY descriptors. |
 
 ### Render pipeline
 
