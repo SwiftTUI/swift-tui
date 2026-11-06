@@ -190,6 +190,9 @@ public final class RunLoop<State: Equatable & Sendable, Content: View>:
   /// presented, so those inputs are still unanswered and belong to whichever
   /// frame does present.
   package var pendingAnsweredInputs: AnsweredInputs?
+  // Schedulers without input attribution still owe a presentation after input.
+  // Keep that obligation separate from the optional diagnostic envelope.
+  var pendingUnattributedInput = false
   /// The injected scheduler's request-tally probe, resolved once. `nil` for a
   /// scheduler that does not conform, in which case no input is attributed
   /// and the latency columns stay empty.
@@ -741,16 +744,10 @@ public final class RunLoop<State: Equatable & Sendable, Content: View>:
           case .proceed(let reason):
             effectiveExit = reason
           }
-          let shouldFlushBeforeExit =
-            handledNonExitEvent
-            || (hadReadyFrameBeforeEvent
-              && {
-                if case .signal = effectiveExit {
-                  return true
-                }
-                return false
-              }())
-          if shouldFlushBeforeExit {
+          if shouldFlushOnExit(
+            effectiveExit, handledEventInBatch: handledNonExitEvent,
+            hadReadyFrame: hadReadyFrameBeforeEvent)
+          {
             // Cooperative exits present the final input and its synchronous
             // UI follow-ups, without draining unrelated producer writes.
             // Skipped acquisitions still retry within the normal count cap.

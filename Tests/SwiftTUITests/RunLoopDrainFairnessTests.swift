@@ -453,10 +453,43 @@ struct RunLoopDrainFairnessTests {
     }
   }
 
+  @Test("a synchronous EOF-only batch presents prior input without a diagnostic tally")
+  func separateEOFPresentsUnattributedInput() throws {
+    let harness = CooperativeExitHarness(scheduler: ForwardingFrameScheduler())
+    let loop = harness.runLoop
+    loop.isSessionActive = true
+    loop.stateContainer.invalidator = harness.scheduler
+    loop.focusTracker.invalidator = harness.scheduler
+    let pump = loop.makeEventPump()
+    defer {
+      pump.cancel()
+      loop.lifecycleCoordinator.shutdown()
+      loop.isSessionActive = false
+    }
+    var frames = 0
+    harness.scheduler.requestInvalidation(of: [harness.root])
+    try loop.renderPendingFrames(renderedFrames: &frames)
+    #expect(harness.surface.lastFrameContainsLine("input 0 tick 0"))
+    // Input was dispatched on a previous turn; no frame has answered it yet.
+    #expect(loop.handle(.input(.key(.return)), arrival: nil) == nil)
+    #expect(loop.pendingAnsweredInputs == nil)
+    harness.input.finish()
+    let exit = try loop.processPendingEventsSynchronously(from: pump, renderedFrames: &frames)
+    #expect(exit == .inputEnded)
+    #expect(harness.surface.frames.last?.contains("input 1 tick ") == true)
+    #expect(harness.producer.committedFrames >= 1)
+    #expect(
+      harness.producer.committedFrames
+        <= RunLoop<CooperativeExitState, CooperativeExitFixture>.maxFramesPerDrainPass)
+    #expect(harness.producer.answeredInputFrames == 0)
+  }
+
   @Test(
     "cooperative exit retries a cancelled input acquisition before stopping the producer drain",
-    arguments: [false, true])
-  func cooperativeExitRetainsInputAcrossCancelledAcquisition(inputEnds: Bool) async throws {
+    arguments: [false, true], [false, true])
+  func cooperativeExitRetainsInputAcrossCancelledAcquisition(
+    inputEnds: Bool, exitInLaterBatch: Bool
+  ) async throws {
     let harness = CooperativeExitHarness()
     let workerGate = AsyncFrameTailBlockingGate()
     let runTask = Task { try await harness.runLoop.run() }
@@ -477,16 +510,21 @@ struct RunLoopDrainFairnessTests {
       try await waitUntil { workerGate.rasterEntryCount > 0 }
 
       harness.input.send(.key(.return))
-      if inputEnds {
-        harness.input.finish()
-      } else {
-        harness.input.send(.key(.character("c"), modifiers: .ctrl))
+      func queueExit() {
+        if inputEnds {
+          harness.input.finish()
+        } else {
+          harness.input.send(.key(.character("c"), modifiers: .ctrl))
+        }
       }
+      if !exitInLaterBatch { queueExit() }
       harness.scheduler.requestInvalidation(of: [harness.root])
       try await waitUntil {
         harness.producer.acquiredFrames > 0
           && harness.runLoop.renderSuspensionDiagnostics.isSuspended
       }
+      // A pull after a skipped acquisition can deliver exit in its own batch.
+      if exitInLaterBatch { queueExit() }
       // Supersede the queued input frame while its tail cannot start. A single
       // acquisition exit budget would abandon the final handled input here.
       harness.runLoop.stateContainer.mutate {

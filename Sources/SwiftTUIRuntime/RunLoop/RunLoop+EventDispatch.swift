@@ -33,8 +33,13 @@ extension RunLoop {
     case .input, .scopedInput: isInput = true
     case .inputEnded, .signal: isInput = false
     }
-    guard isInput, let arrival, let tally = schedulerIntentTally else {
-      return handle(event)
+    guard isInput else { return handle(event) }
+    guard let arrival, let tally = schedulerIntentTally else {
+      let exitReason = handle(event)
+      if exitReason == nil && scheduler.hasPendingFrame(at: .now()) {
+        pendingUnattributedInput = true
+      }
+      return exitReason
     }
     let requestsBeforeDispatch = tally.coalescedIntentRequestCount
     let exitReason = handle(event)
@@ -42,6 +47,18 @@ extension RunLoop {
       pendingAnsweredInputs.fold(arrival)
     }
     return exitReason
+  }
+
+  /// An exit can arrive in its own batch after the previous input frame was
+  /// skipped. That input still needs presentation; producer work alone does not.
+  func shouldFlushOnExit(
+    _ reason: RunLoopExitReason, handledEventInBatch: Bool, hadReadyFrame: Bool
+  ) -> Bool {
+    if handledEventInBatch || pendingAnsweredInputs != nil || pendingUnattributedInput {
+      return true
+    }
+    if case .signal = reason { return hadReadyFrame }
+    return false
   }
 
   package func handle(_ event: RuntimeEvent) -> RunLoopExitReason? {

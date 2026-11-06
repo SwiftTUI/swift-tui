@@ -78,7 +78,7 @@ extension RunLoop {
       // Transfer-and-clear: everything dispatched before this acquisition is
       // what this frame answers. Inputs arriving during the frame belong to
       // the next one.
-      let answeredInputs = takePendingAnsweredInputs()
+      let inputs = takePendingInputs()
       let currentState = stateContainer.state
       scheduledFrame = scheduledFrameByReconcilingExternalState(
         scheduledFrame,
@@ -171,7 +171,7 @@ extension RunLoop {
         convergence: convergence,
         acquisition: FrameAcquisitionState(geometry: geometry),
         ingressAcquisition: ingressAcquisition,
-        answeredInputs: answeredInputs,
+        answeredInputs: inputs.answered,
         hasFrameSink: hasFrameSink,
         renderedFrames: &renderedFrames,
         drainPolicy: drainPolicy
@@ -230,17 +230,19 @@ extension RunLoop {
   /// Hands this frame the inputs dispatched since the previous acquisition
   /// and clears the accumulator, so an input is attributed to exactly one
   /// frame.
-  private func takePendingAnsweredInputs() -> AnsweredInputs? {
-    let answered = pendingAnsweredInputs
-    pendingAnsweredInputs = nil
-    return answered
+  private func takePendingInputs() -> (answered: AnsweredInputs?, unattributed: Bool) {
+    defer {
+      pendingAnsweredInputs = nil
+      pendingUnattributedInput = false
+    }
+    return (pendingAnsweredInputs, pendingUnattributedInput)
   }
 
-  /// Returns inputs to the accumulator when the frame that took them
-  /// presented nothing (skipped tail, off-screen elision). Folding rather
-  /// than assigning preserves any input that arrived in the meantime.
-  private func restorePendingAnsweredInputs(_ answeredInputs: AnsweredInputs?) {
-    pendingAnsweredInputs.fold(answeredInputs)
+  /// A skipped or elided frame presented nothing. Keep its inputs alongside
+  /// any that arrived while it was being rendered.
+  private func restorePendingInputs(_ inputs: (answered: AnsweredInputs?, unattributed: Bool)) {
+    pendingAnsweredInputs.fold(inputs.answered)
+    pendingUnattributedInput = pendingUnattributedInput || inputs.unattributed
   }
 
   /// Whether a drain pass that has already acquired a frame should return to
@@ -657,7 +659,7 @@ extension RunLoop {
       )
       // Transfer-and-clear (see the synchronous driver): this frame answers
       // what was dispatched before its acquisition.
-      let answeredInputs = takePendingAnsweredInputs()
+      let inputs = takePendingInputs()
       let currentState = stateContainer.state
       scheduledFrame = scheduledFrameByReconcilingExternalState(
         scheduledFrame,
@@ -719,7 +721,7 @@ extension RunLoop {
           // Earlier convergence passes of this frame DID commit, and their
           // deferred completions must not outlive the frame they rode with.
           fireDeferredAnimationCompletions()
-          restorePendingAnsweredInputs(answeredInputs)
+          restorePendingInputs(inputs)
           requestNextAnimationFrameAfterSkippedFrameIfNeeded(at: frameInstant)
           continue frameLoop
         case .elided:
@@ -737,7 +739,7 @@ extension RunLoop {
           // answered inputs stay unanswered and carry forward. Reporting them
           // here would claim a latency for pixels that never appeared.
           fireDeferredAnimationCompletions()
-          restorePendingAnsweredInputs(answeredInputs)
+          restorePendingInputs(inputs)
           deferCarriedLifecycle(convergence.lifecycleCarryForward)
           requestNextAnimationFrameIfNeeded(
             renderer.internalAnimationController.lastTickResult,
@@ -797,7 +799,7 @@ extension RunLoop {
         convergence: convergence,
         acquisition: acquisition,
         ingressAcquisition: ingressAcquisition,
-        answeredInputs: answeredInputs,
+        answeredInputs: inputs.answered,
         hasFrameSink: hasFrameSink,
         renderedFrames: &renderedFrames,
         drainPolicy: drainPolicy

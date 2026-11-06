@@ -338,16 +338,10 @@ extension RunLoop {
         case .proceed(let reason):
           effectiveExit = reason
         }
-        let shouldFlushBeforeExit =
-          handledNonExitEvent
-          || (hadReadyFrameBeforeEvent
-            && {
-              if case .signal = effectiveExit {
-                return true
-              }
-              return false
-            }())
-        if shouldFlushBeforeExit {
+        if shouldFlushOnExit(
+          effectiveExit, handledEventInBatch: handledNonExitEvent,
+          hadReadyFrame: hadReadyFrameBeforeEvent)
+        {
           try renderPendingFrames(
             renderedFrames: &renderedFrames,
             eventPump: eventPump,
