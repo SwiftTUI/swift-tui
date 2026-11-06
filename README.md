@@ -84,7 +84,7 @@ Add the package, depend on its `SwiftTUI` product, and `swift run`:
 
 ```swift
 // Package.swift
-.package(url: "https://github.com/SwiftTUI/swift-tui", .upToNextMinor(from: "0.20.1")),
+.package(url: "https://github.com/SwiftTUI/swift-tui.git", .upToNextMinor(from: "0.21.0")),
 // in your executable target:
 .product(name: "SwiftTUI", package: "swift-tui"),
 ```
@@ -218,3 +218,8 @@ Please join the [Discord](https://discord.gg/8j35kYDFxn) to discuss changes.
 SwiftTUI first-party code is licensed under the MIT License (`MIT`). Vendored
 third-party code under `Vendor/` keeps its own license and provenance notices.
 See [LICENSE](LICENSE).
+
+## Version compatibility
+
+See the [compatibility policy](docs/COMPATIBILITY.md) for supported minor lines,
+independent dependency adoption, and experimental interfaces.

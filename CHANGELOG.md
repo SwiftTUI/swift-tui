@@ -8,6 +8,17 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
 
 ## [Unreleased]
 
+## [0.21.0] - 2026-11-05
+
+The 0.21.x line protects supported public Swift source and the documented Host,
+Testing and StyleFixtures SPI. The bridge introduces typed identity, signal,
+diagnostic and raster values. Some existing callers need a source change:
+see the [0.21 migration guide](docs/MIGRATION-0.21.md) for geometry constraints,
+shape customization, overload references and exhaustive WASI error switches.
+The Runtime import route for `WindowIdentifier`, legacy signal/scheduling
+conformers and `WASIRunnerError: Hashable` remain available. The Android
+profiling product now imports the libc functions used by its TSV sink.
+
 ## [0.20.1] - 2026-11-01
 
 ### Fixed
@@ -2870,7 +2881,8 @@ precomposition work (still images), cache hardening, and glyph-aware backdrops.
 See the GitHub releases for the full per-tag history:
 <https://github.com/SwiftTUI/swift-tui/releases>.
 
-[Unreleased]: https://github.com/SwiftTUI/swift-tui/compare/0.20.1...HEAD
+[Unreleased]: https://github.com/SwiftTUI/swift-tui/compare/0.21.0...HEAD
+[0.21.0]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.21.0
 [0.20.1]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.20.1
 [0.20.0]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.20.0
 [0.19.5]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.19.5

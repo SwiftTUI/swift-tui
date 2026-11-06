@@ -2934,6 +2934,7 @@ var AccessibilityTreeMounter = class {
   presenting = !1;
   requests = new AccessibilityRequests;
   pendingValues = /* @__PURE__ */ new Map;
+  pendingTextRanges = /* @__PURE__ */ new WeakMap;
   pendingFocus;
   runtimeFocusedElement;
   pendingMenu;
@@ -3242,17 +3243,18 @@ var AccessibilityTreeMounter = class {
       if (this.presenting || !model?.actionTarget || model.isEnabled === !1 && !semanticFocus || model.properties?.readOnly === !0 && request.action !== "focus" && request.action !== "selectText" && !semanticFocus || !model.actions?.includes(request.action))
         return;
       let requestID = this.requests.issue(model.actionTarget);
-      if ([
-        "setValue",
-        "editText",
-        "selectText"
-      ].includes(request.action))
-        this.pendingValues.set(node.id, requestID);
-      if (request.action === "focus")
+      if (request.action === "selectText")
+        this.pendingTextRanges.set(element, requestID);
+      else if (request.action === "setValue" || request.action === "editText")
+        this.pendingTextRanges.delete(element), this.pendingValues.set(node.id, requestID);
+      if (request.action === "focus" || request.action === "activate" && this.pendingFocus?.id === node.id) {
+        if (this.pendingFocus)
+          this.requests.cancel(this.pendingFocus.requestID);
         this.pendingFocus = {
           id: node.id,
           requestID
         };
+      }
       this.sendAction?.(model.actionTarget, request, String(requestID));
     };
     if (element.addEventListener(node.selection ? "focusin" : "focus", () => {
@@ -3517,8 +3519,10 @@ var AccessibilityTreeMounter = class {
         this.pendingValues.delete(node.id);
         let previous = nativeTextSelection(input);
         if (node.role !== "secureField" && input.value !== value)
-          this.compositionCommits.delete(element), input.value = value;
-        if (input.selectionStart !== null) {
+          this.pendingTextRanges.delete(element), this.compositionCommits.delete(element), input.value = value;
+        let range = this.pendingTextRanges.get(element);
+        if (input.selectionStart !== null && (range === void 0 || !this.requests.has(range))) {
+          this.pendingTextRanges.delete(element);
           let [anchor, head] = node.textSelection ?? [previous.anchor, previous.head], boundedAnchor = Math.min(anchor, input.value.length), boundedHead = Math.min(head, input.value.length);
           if (input.selectionStart !== Math.min(boundedAnchor, boundedHead) || input.selectionEnd !== Math.max(boundedAnchor, boundedHead) || boundedAnchor !== boundedHead && input.selectionDirection !== (boundedHead < boundedAnchor ? "backward" : "forward"))
             input.setSelectionRange(Math.min(boundedAnchor, boundedHead), Math.max(boundedAnchor, boundedHead), boundedHead < boundedAnchor ? "backward" : "forward");

@@ -28,16 +28,16 @@
       ]
     ],
     "inputs": {
-      "bun.lock": "1ed6eab204e4288f22e3e3e29f51503cfc1a1b396fb22ff5b4e83510c31df021",
-      "package.json": "544b2df58bf412c29ac2a01cb51ad557da0a72705a6830ef8e244a273415ba74",
+      "bun.lock": "7909907a851058db99b114cac24d081a393aeafcb8540805118d7a83d4c7209c",
+      "package.json": "708091c15bb679d81d79a201a62e0fe982697e7859b2423b54af5be1da7d412a",
       "packages/build/index.ts": "8c036c869de26e26f2ed21038304e52bf04addfe754f99f6ef0467b054b179ca",
-      "packages/build/package.json": "1f10ce641ca4ae3f528248321d272eb38b97e1e6ec7d5eb9204e06a00154ed6a",
+      "packages/build/package.json": "2e7c5e21808451aaa150456c7bd3f516677ba4feae5826a1348044a62dc63788",
       "packages/build/src/build/buildBrowserBundle.ts": "500d302202f4ac963e613293e010b0b1bb46de28dc19228468285a5eb8a83b2b",
       "packages/build/src/build/copyDomFontAssets.ts": "bb1da3990eb96c7e0eea96ab94bda3c28a81302bf80f9cd0b1fa8dcf9e984f6c",
       "packages/build/src/build/runCommand.ts": "b3426209208b439a65a91bfcda00e8a8c49ced0e4da3e39280539fc11d6b4de9",
       "packages/web/cli.ts": "bb8bec8be4868f9fd5050947cb86b05e9db7b332784df6cb63e68e445b33991c",
       "packages/web/contract-profile.json": "1d67bb98f1f6707dc3d636f81536cb2368b1ad0a90c025edcebd29202f0cb672",
-      "packages/web/package.json": "2bafae356347adadf34478545bb9e16bba51c55025b8e9bda8858f698513ba47"
+      "packages/web/package.json": "d8512cc5268278f8c0631d087a933eeef3db53515809fc9ae3ffa7682827bd77"
     },
     "profiles": [
       "swifttui.host-wire/1",
@@ -45,15 +45,15 @@
       "swifttui.companion/1"
     ]
   },
-  "builtAt": "2026-11-05T20:09:25.575418+00:00",
+  "builtAt": "2026-11-06T19:21:37.026965+00:00",
   "formatVersion": 2,
   "resources": {
-    "browser-s6vwtvhb.js": "5ffe837664778b9d2acbaa75d0aaf137a94ceaaab815c40a1bb5685273bdca62",
-    "index.html": "dde7e5b0e74fcbb1506a93328428945207278db0c0d4dbd5d740d009811be98f"
+    "browser-wmpagsjp.js": "0e0e29e2dc28016843290354543e8a13a108a86d5fb8b215f0a8a5d993204478",
+    "index.html": "7f9a3b568357934b96d02cd640bd42cdd7489b25a7c69adaec9ecda489bc8e50"
   },
-  "selection": "candidate",
-  "webDescribe": "0.20.1-8-g57538d6",
-  "webRevision": "57538d66c69106b4dcb8c9780e9401f35fec6527",
-  "webTag": null,
-  "webTree": "dc02951af3dc8f891c615cc85f40beb90d0c812c"
+  "selection": "release",
+  "webDescribe": "0.21.0",
+  "webRevision": "b34bf30393529425d850fcdc360a5a7be0f7d508",
+  "webTag": "0.21.0",
+  "webTree": "79678727d157fab8820b8ab88ef57a8ca26055cd"
 }
