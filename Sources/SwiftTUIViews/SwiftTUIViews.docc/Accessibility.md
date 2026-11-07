@@ -609,6 +609,10 @@ child action owners through further combination. Adjustable controls such as
 steppers contribute their values and increase/decrease operations; editing and
 selection controls retain their independent surfaces.
 
+Repeated authored identities still form separate semantic containers. Each
+occurrence keeps its own children, grouping behavior, sort priority, and combined
+actions, including structural List and Table rows.
+
 A representation supplies controls for custom paint without drawing those controls
 or adding them to terminal keyboard/pointer traversal:
 

@@ -234,7 +234,7 @@ extension SemanticExtractor {
 
         let metadata = node.semanticMetadata
         if let structure = metadata.accessibilityStructure {
-          structures[node.identity.strippingEntityOccurrences] = structure
+          structures[node.identity] = structure
         }
         let isValueSource: Bool
         if case .source = metadata.accessibilityValueLabel {
