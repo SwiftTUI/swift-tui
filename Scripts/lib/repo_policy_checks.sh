@@ -179,6 +179,10 @@ run_repo_policy_phase() {
   run_repo_policy_check "$mode" "$repo_root" "Test native CI bundle identity" \
     "python3 Scripts/test_ci_test_bundle.py" python3 Scripts/test_ci_test_bundle.py
 
+  run_repo_policy_check "$mode" "$repo_root" "Test public import consumer state isolation" \
+    "bun test Scripts/check_public_import_consumers.test.ts" \
+    bun test Scripts/check_public_import_consumers.test.ts
+
   run_repo_policy_check \
     "$mode" \
     "$repo_root" \

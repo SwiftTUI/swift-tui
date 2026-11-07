@@ -4,8 +4,23 @@ set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "${repo_root}"
-scratch="${repo_root}/.build/public-import-consumers"
-mkdir -p "${scratch}"
+scratch_root="${repo_root}/.build/public-import-consumers"
+mkdir -p "${scratch_root}"
+# STUI-1107: a Swift 6.4 skipped-job reporter stall cleared with fresh state.
+# Each invocation proves the import contract from fresh consumer state, including
+# when two gates share a checkout. Keep failed state for compiler diagnosis.
+scratch="$(mktemp -d "${scratch_root}/run.XXXXXX")"
+cleanup() {
+  result=$?
+  if [ "$result" -eq 0 ]; then
+    rm -rf "${scratch}"
+  else
+    echo "[check_public_import_consumers] Failed consumer state retained: ${scratch}" >&2
+  fi
+  exit "$result"
+}
+trap cleanup EXIT
+echo "[check_public_import_consumers] Fresh consumer state: ${scratch}"
 
 for product in SwiftTUIViews SwiftTUIRuntime; do
   consumer="${scratch}/${product}"
