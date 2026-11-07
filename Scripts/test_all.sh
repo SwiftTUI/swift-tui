@@ -540,20 +540,22 @@ runtime_shard_command_text() {
 # keeps its own launch below). swift-testing matches the regexes against the
 # fully qualified name `Module.Suite/test()`, so the anchored module prefix
 # cannot bleed into SwiftTUIWASITests or SwiftTUIWebHostTests.
-# The socket, PTY, and process-launching targets stay out of the merged
+# The socket, PTY, signal, and process-launching targets stay out of the merged
 # launch: on the first CI run of the merged shape (swift-tui run 32844751713)
 # WebHostLoopbackWireTests lost its 5 s WebSocket reads and a
 # Terminal embedding formerly lost lifecycle wakeups under contention with 2,389
 # tests in flight on a 4-vCPU runner — contention, not defects (both pass in
-# their own launch, as they always did). They keep their own launches below;
-# the cost is four ~8 s discovery passes.
+# their own launch, as they always did). STUI-1493 also observed the signal
+# registration callback missing its five-second bound while 3,157 tests shared
+# the process. Keep these targets' own launches and their original bounds.
 run_non_runtime_test_targets() {
   run_swift test \
     --skip '^SwiftTUITests\.' \
     --skip '^EntryPointLaunchTests\.' \
     --skip '^SwiftTUICLITests\.' \
     --skip '^SwiftTUIPTYPrimitivesTests\.' \
-    --skip '^SwiftTUIWebHostTests\.'
+    --skip '^SwiftTUIWebHostTests\.' \
+    --skip '^SwiftTUIVendorUnixSignalsTests\.'
 }
 
 # The per-tick cadence suite re-runs under the WASI-shaped mode profiles and
@@ -967,7 +969,7 @@ if [ "$lane" = all ]; then
 elif [ "$lane" = core ]; then
   run_function_step \
     "Run non-runtime test targets" \
-    "$(swift_command_text test --skip '^SwiftTUITests\.' --skip '^EntryPointLaunchTests\.' --skip '^SwiftTUICLITests\.' --skip '^SwiftTUIPTYPrimitivesTests\.' --skip '^SwiftTUIWebHostTests\.')" \
+    "$(swift_command_text test --skip '^SwiftTUITests\.' --skip '^EntryPointLaunchTests\.' --skip '^SwiftTUICLITests\.' --skip '^SwiftTUIPTYPrimitivesTests\.' --skip '^SwiftTUIWebHostTests\.' --skip '^SwiftTUIVendorUnixSignalsTests\.')" \
     run_non_runtime_test_targets
 
   run_function_step \
@@ -1219,13 +1221,18 @@ fi
 
 # Absorbed Vendor test targets (sources under Vendor/<pkg>/, targets first-class
 # inside swift-tui's Package.swift since the Vendor sub-packages were absorbed).
-# The core lane covers them in its single non-runtime launch.
-if [ "$lane" = all ]; then
+# Signal handlers are process-global, and their registration callbacks must not
+# compete with the core aggregate's synchronous work. Both shapes run this
+# target exactly once in its own process (STUI-1493).
+if lane_runs_core; then
   run_function_step \
     "Run vendored UnixSignals tests" \
     "$(swift_command_text test --filter SwiftTUIVendorUnixSignalsTests)" \
     run_swift test --filter SwiftTUIVendorUnixSignalsTests
+fi
 
+# Other Vendor targets remain in the core aggregate.
+if [ "$lane" = all ]; then
   run_function_step \
     "Run vendored SwiftFiglet tests" \
     "$(swift_command_text test --filter SwiftTUIVendorFigletTests)" \
