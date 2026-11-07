@@ -76,7 +76,7 @@ jobs:
           . "${SWIFTLY_HOME_DIR:-$HOME/.swiftly}/env.sh"
           hash -r
           swift_version="$(tr -d '[:space:]' < .swift-version)"
-          swiftly install --use --assume-yes "$swift_version"
+          swiftly install --assume-yes "$swift_version"
           swiftly run swift --version
           echo "$HOME/.swiftly/bin" >> "$GITHUB_PATH"
           echo "SWIFTLY_HOME_DIR=$HOME/.swiftly" >> "$GITHUB_ENV"
@@ -181,7 +181,7 @@ jobs:
           . "${SWIFTLY_HOME_DIR:-$HOME/.swiftly}/env.sh"
           hash -r
           swift_version="$(tr -d '[:space:]' < .swift-version)"
-          swiftly install --use --assume-yes "$swift_version"
+          swiftly install --assume-yes "$swift_version"
           swiftly run swift --version
           echo "$HOME/.swiftly/bin" >> "$GITHUB_PATH"
           echo "SWIFTLY_HOME_DIR=$HOME/.swiftly" >> "$GITHUB_ENV"
@@ -326,7 +326,7 @@ jobs:
           . "${SWIFTLY_HOME_DIR:-$HOME/.swiftly}/env.sh"
           hash -r
           swift_version="$(tr -d '[:space:]' < .swift-version)"
-          swiftly install --use --assume-yes "$swift_version"
+          swiftly install --assume-yes "$swift_version"
           swiftly run swift --version
           echo "$HOME/.swiftly/bin" >> "$GITHUB_PATH"
           echo "SWIFTLY_HOME_DIR=$HOME/.swiftly" >> "$GITHUB_ENV"

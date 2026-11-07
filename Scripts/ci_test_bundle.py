@@ -24,6 +24,18 @@ def identity():
     }
 
 
+def verify_checkout():
+    changed = subprocess.check_output(
+        ["git", "diff", "--name-only", "HEAD"], cwd=ROOT, text=True).strip()
+    if changed:
+        raise SystemExit(f"test bundle requires an unchanged checkout; changed files:\n{changed}")
+    added_sources = subprocess.check_output(
+        ["git", "ls-files", "--others", "--exclude-standard", "--",
+         "Sources", "Platforms", "Tests", "Vendor", "Package.swift"], cwd=ROOT, text=True)
+    if added_sources.strip():
+        raise SystemExit(f"test bundle cannot include unbuilt source files:\n{added_sources.strip()}")
+
+
 def main():
     if len(sys.argv) != 2:
         raise SystemExit("usage: ci_test_bundle.py pack|verify")
@@ -31,6 +43,7 @@ def main():
     if mode == "pack":
         if os.environ.get("SWIFTTUI_WARNINGS_AS_ERRORS") != "1":
             raise SystemExit("CI bundle must be built with warnings as errors")
+        verify_checkout()
         RECEIPT.write_text(json.dumps(identity(), indent=2) + "\n")
         # Preserve permissions and symlinks (upload-artifact alone does not).
         # There is no cross-revision restore or fallback to a stale binary.
@@ -41,13 +54,7 @@ def main():
         expected = identity()
         if actual != expected:
             raise SystemExit(f"test bundle identity mismatch: {actual!r} != {expected!r}")
-        if subprocess.check_output(["git", "diff", "--name-only", "HEAD"], cwd=ROOT, text=True).strip():
-            raise SystemExit("--prebuilt requires an unchanged checkout")
-        added_sources = subprocess.check_output(
-            ["git", "ls-files", "--others", "--exclude-standard", "--",
-             "Sources", "Platforms", "Tests", "Vendor", "Package.swift"], cwd=ROOT, text=True)
-        if added_sources.strip():
-            raise SystemExit("--prebuilt cannot include unbuilt source files")
+        verify_checkout()
         print("Verified test bundle for", expected["revision"])
     else:
         raise SystemExit("usage: ci_test_bundle.py pack|verify")

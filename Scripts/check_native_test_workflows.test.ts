@@ -39,6 +39,12 @@ for (const name of ["run-tests-linux", "macos-gate"]) {
     });
     test("retains the complete core and runtime test surface", () => {
       if (name === "macos-gate") {
+        for (const job of [build, jobs["native-tests"], jobs["public-semantics"]]) {
+          const setup = job.steps.find((s: any) => s.name === "Install swiftly and Swift toolchain");
+          // --use rewrites the tracked version file, invalidating the receipt.
+          expect(setup.run).toContain('swiftly install --assume-yes "$swift_version"');
+          expect(setup.run).not.toContain("swiftly install --use");
+        }
         expect(jobs["native-tests"].strategy.matrix.lane).toEqual(["core", "runtime:A", "runtime:B", "runtime:C"]);
         expect(jobs["macos-gate"].name).toBe("macOS repo gate");
         expect(jobs["macos-gate"].needs).toEqual(["changes", "native-build", "native-tests"]);

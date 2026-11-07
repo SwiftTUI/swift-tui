@@ -37,8 +37,15 @@ class BundleIdentityTests(unittest.TestCase):
                     self.verify()
 
     def test_tracked_edits_cannot_run_stale_tests(self):
-        with self.assertRaisesRegex(SystemExit, 'unchanged checkout'):
+        with self.assertRaisesRegex(SystemExit, r'unchanged checkout; changed files:\nSources/Changed.swift'):
             self.verify(changes='Sources/Changed.swift\n')
+
+    def test_pack_rejects_setup_mutations_before_publishing_a_bundle(self):
+        with patch('sys.argv', ['ci_test_bundle.py', 'pack']), patch.dict(
+                bundle.os.environ, SWIFTTUI_WARNINGS_AS_ERRORS='1'), patch.object(
+                bundle.subprocess, 'check_output', return_value='.swift-version\n'):
+            with self.assertRaisesRegex(SystemExit, r'changed files:\n.swift-version'):
+                bundle.main()
 
     def test_new_sources_cannot_be_omitted_from_tests(self):
         with self.assertRaisesRegex(SystemExit, 'unbuilt source'):
