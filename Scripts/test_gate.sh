@@ -6,7 +6,7 @@ repo_root=$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)
 
 usage() {
   cat <<'EOF'
-Usage: Scripts/test_gate.sh [--clean] [--skip-bun-install] [--lane all|policy|core|runtime:<shard>]
+Usage: Scripts/test_gate.sh [--clean | --prebuilt] [--skip-bun-install] [--lane all|policy|core|runtime:<shard>]
 
 Runs the curated repo gate:
   - the same policy, root-package, platform-package, and tooling checks as
@@ -30,7 +30,7 @@ for argument in "$@"; do
   case "$argument" in
   --skip-bun-install)
     ;;
-  --clean)
+  --clean | --prebuilt)
     ;;
   --lane)
     # The value is validated by test_all.sh.

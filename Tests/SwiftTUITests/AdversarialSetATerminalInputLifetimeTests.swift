@@ -145,7 +145,10 @@
     @Test func setA1007ProbeReplayContinuesTheLiveBracketedPasteTransaction() async throws {
       // Hypothesis: replay uses a fresh parser, exposing probe-consumed bytes as
       // keys instead of continuing a paste already opened by the real FD.
-      try await withTerminalLifetimePipe { pipe in
+      // STUI-1491: this tests shared parser ownership across reads and replay,
+      // not the 25 ms idle recovery. Control that timer while awaiting the
+      // consumer; a loaded executor may otherwise recover the partial paste.
+      try await withTerminalLifetimePipe(automaticEscapeFlush: false) { pipe in
         let received = pipe.observe(pipe.reader.inputEvents())
         try pipe.write(Array("a\u{1B}[200~before".utf8))
         try await terminalLifetimeWait(received.first)
@@ -587,7 +590,7 @@
     private var consumers: [Task<Void, Never>] = []
     private var additionalSourceOwners: [InputReader] = []
 
-    init() throws {
+    init(automaticEscapeFlush: Bool = true) throws {
       var descriptors: [Int32] = [-1, -1]
       let created = unsafe pipe(&descriptors)
       try #require(created == 0)
@@ -604,7 +607,8 @@
       try #require(configured == 0)
       readFD = descriptors[0]
       writeFD = descriptors[1]
-      reader = InputReader(fileDescriptor: readFD)
+      reader = InputReader(
+        fileDescriptor: readFD, automaticEscapeFlushForTesting: automaticEscapeFlush)
       initialized = true
     }
 
@@ -726,9 +730,10 @@
 
   @MainActor
   private func withTerminalLifetimePipe(
+    automaticEscapeFlush: Bool = true,
     _ body: @MainActor (TerminalLifetimePipe) async throws -> Void
   ) async throws {
-    let pipe = try TerminalLifetimePipe()
+    let pipe = try TerminalLifetimePipe(automaticEscapeFlush: automaticEscapeFlush)
     do {
       try await body(pipe)
       pipe.closeWriter()

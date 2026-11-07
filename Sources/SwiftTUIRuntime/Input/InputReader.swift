@@ -28,6 +28,15 @@ public final class InputReader: InputReading, TerminalInputReading,
   #endif
 
   #if !canImport(WASILibc) && !canImport(ucrt)
+    private let automaticEscapeFlush = Mutex(true)
+
+    /// A replay fixture controls parser chunks, so its continuation must not
+    /// race the normal 25 ms idle recovery. EOF still flushes pending input.
+    package convenience init(fileDescriptor: Int32, automaticEscapeFlushForTesting: Bool) {
+      self.init(fileDescriptor: fileDescriptor)
+      automaticEscapeFlush.withLock { $0 = automaticEscapeFlushForTesting }
+    }
+
     #if canImport(Darwin)
       private typealias ReadSource = any DispatchSourceRead
     #else
@@ -522,6 +531,7 @@ extension InputReader {
   #else
     private func makeTerminalInputEventStream() -> AsyncStream<InputEvent> {
       makeManagedAsyncStream { [self] continuation in
+        let automaticEscapeFlush = self.automaticEscapeFlush.withLock { $0 }
         let fileDescriptor = self.fileDescriptor
         let controlHandler = self.controlHandler
         let controlChannelEnabled = self.controlChannelEnabled
@@ -577,7 +587,7 @@ extension InputReader {
         }
 
         let reconcileEscapeDisambiguation = {
-          guard decoder.isAwaitingEscapeDisambiguation else {
+          guard automaticEscapeFlush && decoder.isAwaitingEscapeDisambiguation else {
             scheduledEscapeFlush?.cancel()
             scheduledEscapeFlush = nil
             return
@@ -681,6 +691,7 @@ extension InputReader {
       flushTransform: @escaping @Sendable (inout TerminalInputParser) -> [Event]
     ) -> AsyncStream<Event> {
       makeManagedAsyncStream { [self] continuation in
+        let automaticEscapeFlush = self.automaticEscapeFlush.withLock { $0 }
         let fileDescriptor = self.fileDescriptor
         let controlHandler = self.controlHandler
         let controlChannelEnabled = self.controlChannelEnabled
@@ -707,7 +718,7 @@ extension InputReader {
         // continuation byte completes the sequence first. Both closures run on
         // `queue`, so the shared `decoder`/`scheduledEscapeFlush` need no lock.
         let reconcileEscapeDisambiguation = {
-          guard decoder.isAwaitingEscapeDisambiguation else {
+          guard automaticEscapeFlush && decoder.isAwaitingEscapeDisambiguation else {
             scheduledEscapeFlush?.cancel()
             scheduledEscapeFlush = nil
             return

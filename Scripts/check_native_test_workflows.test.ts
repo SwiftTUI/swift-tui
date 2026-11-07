@@ -1,6 +1,15 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
 import { parse } from "yaml";
+
+test("the public gate forwards prebuilt mode to the runner's validation", () => {
+  const result = spawnSync("sh", ["Scripts/test_gate.sh", "--prebuilt", "--clean"], {
+    cwd: new URL("..", import.meta.url), encoding: "utf8",
+  });
+  expect(result.status).toBe(1);
+  expect(result.stdout + result.stderr).toContain("--clean cannot be combined with --prebuilt");
+});
 
 // Exercise the actual workflow DAG and transfer contract. These checks catch
 // dropped container settings, cross-architecture restores and missing shards.
