@@ -908,7 +908,7 @@ fi
 # `-emit-loaded-module-trace` (see `emit_module_trace`), so the Foundation
 # audit reads the traces of this build instead of compiling Core+Views a second
 # time into its own scratch, and every later `swift test` launch in the lane
-# reuses this test bundle without replanning.
+# reuses this test bundle without compiling it again.
 if [ "$prebuilt" = 1 ]; then
   python3 Scripts/ci_test_bundle.py verify
   root_test_bundle_built=1

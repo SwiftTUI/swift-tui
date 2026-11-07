@@ -31,9 +31,9 @@
     }
   }
 
-  /// A closing Darwin PTY can temporarily make allocation fail with ENXIO.
-  /// The process-local mutex cannot serialize kernel teardown or other
-  /// processes. Retry only this error, for 7 ms total; persistent exhaustion
+  /// Concurrent Darwin PTY stress observed transient ENXIO; its kernel cause
+  /// is not established. The mutex covers only this process's allocations.
+  /// Retry only this error, for 7 ms total; persistent failure
   /// still throws the original error. Never retry descriptor-limit failures.
   func allocatePTYWithRetry(
     pause: (UInt32) -> Void = { _ = usleep($0) },
