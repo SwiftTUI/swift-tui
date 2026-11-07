@@ -176,6 +176,7 @@
     @Test func setE141DiscoveryScansReturnDescriptors() async throws {
       let fixture = try SetEAttachDirectory()
       defer { fixture.remove() }
+      let baseline = setEOpenSocketAndDirectoryCount()
       let run = await SetEServerRun.start(fixture.server(identifier: "live"))
       defer { run.cancel() }
       try #require(run.isReady)
@@ -185,17 +186,17 @@
       var address = try #require(sceneSocketAddress(for: stale))
       try #require(sceneBind(descriptor, &address) == 0)
       sceneClose(descriptor)
-      let baseline = setEOpenSocketAndDirectoryCount()
       for scan in 1...5 {
         let instances = SocketClient.discoverInstances(appName: fixture.appName)
         #expect(instances.map(\.identifier) == ["live"], "scan \(scan)")
-        #expect(
-          setEOpenSocketAndDirectoryCount() == baseline, "scan \(scan) leaked a probe descriptor")
       }
       #expect(setEEntryType(stale) == nil)
+      // Discovery can return before the server observes EOF on an accepted
+      // probe. Joining the server retires those peers and its listener; any
+      // descriptor leaked by the five scans still remains observable.
       run.cancel()
-      run.cancel()
-      _ = await run.finish()
+      #expect(await run.finish().didReturn)
+      #expect(setEOpenSocketAndDirectoryCount() == baseline, "discovery leaked a descriptor")
     }
 
     @Test func setE142RequestToSilentListenerTimesOutAndCloses() throws {
