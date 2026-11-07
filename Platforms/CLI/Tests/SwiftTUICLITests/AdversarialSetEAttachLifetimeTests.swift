@@ -108,27 +108,46 @@
     @Test func setE139ServerLifecycleReturnsDescriptorsAndEntry() async throws {
       let fixture = try SetEAttachDirectory()
       defer { fixture.remove() }
-      // The baseline is the count after the first two cycles: on Linux the
-      // first server starts allocate a process-lifetime runtime descriptor
-      // (after the first start on the arm64 container, after the second on
-      // amd64 CI), constant across every later cycle. The contract is that
-      // each lifecycle returns what it opened.
-      var baseline = 0
+      // The server owns sockets and discovery scans own directory handles.
+      // Runtime wakeup handles can initialize on any cycle (STUI-1492), so
+      // process-wide descriptor totals cannot establish server ownership.
+      let baseline = setEOpenSocketAndDirectoryCount()
       for cycle in 0...4 {
         let server = fixture.server(identifier: "cycle")
         let run = await SetEServerRun.start(server)
         try #require(run.isReady, "cycle \(cycle) never became ready")
         #expect(setEEntryType(server.socketPath) == S_IFSOCK)
+        #expect(setEOpenSocketAndDirectoryCount() == baseline + 1, "cycle \(cycle) listener")
         run.cancel()
         let outcome = await run.finish()
         #expect(outcome.didReturn, "\(outcome)")
         #expect(setEEntryType(server.socketPath) == nil, "cycle \(cycle) left its entry")
-        if cycle < 2 {
-          baseline = setEOpenDescriptorCount()
-        } else {
-          #expect(setEOpenDescriptorCount() == baseline, "cycle \(cycle) leaked a descriptor")
-        }
+        #expect(
+          setEOpenSocketAndDirectoryCount() == baseline,
+          "cycle \(cycle) leaked a socket or directory descriptor")
       }
+    }
+
+    @Test func setE139DescriptorAccountingTracksSocketAndDirectoryOwnership() throws {
+      let fixture = try SetEAttachDirectory()
+      defer { fixture.remove() }
+      let baseline = setEOpenSocketAndDirectoryCount()
+      // An unrelated process handle must not masquerade as a server leak.
+      let unrelated = sceneOpen("/dev/null", O_RDONLY)
+      try #require(unrelated >= 0)
+      defer { sceneClose(unrelated) }
+      #expect(setEOpenSocketAndDirectoryCount() == baseline)
+      do {
+        let socket = sceneSocket()
+        try #require(socket >= 0)
+        defer { sceneClose(socket) }
+        #expect(setEOpenSocketAndDirectoryCount() == baseline + 1)
+        let directory = sceneOpen(fixture.directory, O_RDONLY)
+        try #require(directory >= 0)
+        defer { sceneClose(directory) }
+        #expect(setEOpenSocketAndDirectoryCount() == baseline + 2)
+      }
+      #expect(setEOpenSocketAndDirectoryCount() == baseline)
     }
 
     @Test func setE140SecondServerLeavesLiveSocket() async throws {
@@ -166,11 +185,12 @@
       var address = try #require(sceneSocketAddress(for: stale))
       try #require(sceneBind(descriptor, &address) == 0)
       sceneClose(descriptor)
-      let baseline = setEOpenDescriptorCount()
+      let baseline = setEOpenSocketAndDirectoryCount()
       for scan in 1...5 {
         let instances = SocketClient.discoverInstances(appName: fixture.appName)
         #expect(instances.map(\.identifier) == ["live"], "scan \(scan)")
-        #expect(setEOpenDescriptorCount() == baseline, "scan \(scan) leaked a probe descriptor")
+        #expect(
+          setEOpenSocketAndDirectoryCount() == baseline, "scan \(scan) leaked a probe descriptor")
       }
       #expect(setEEntryType(stale) == nil)
       run.cancel()
@@ -189,7 +209,7 @@
       var address = try #require(sceneSocketAddress(for: path))
       try #require(sceneBind(listener, &address) == 0)
       try #require(sceneListen(listener, 4) == 0)
-      let baseline = setEOpenDescriptorCount()
+      let baseline = setEOpenSocketAndDirectoryCount()
       let started = ContinuousClock.now
       do {
         _ = try SocketClient.sendRequest(
@@ -201,13 +221,13 @@
         Issue.record("unexpected failure: \(error)")
       }
       #expect(ContinuousClock.now - started < .seconds(2))
-      #expect(setEOpenDescriptorCount() == baseline)
+      #expect(setEOpenSocketAndDirectoryCount() == baseline)
     }
 
     @Test func setE143CancelledServerReleasesPartialClient() async throws {
       let fixture = try SetEAttachDirectory()
       defer { fixture.remove() }
-      let baseline = setEOpenDescriptorCount()
+      let baseline = setEOpenSocketAndDirectoryCount()
       let server = fixture.server(identifier: "partial")
       let run = await SetEServerRun.start(server)
       defer { run.cancel() }
@@ -226,7 +246,7 @@
       #expect(received <= 0, "the cancelled server answered a partial request")
       sceneClose(client)
       #expect(setEEntryType(server.socketPath) == nil)
-      #expect(setEOpenDescriptorCount() == baseline)
+      #expect(setEOpenSocketAndDirectoryCount() == baseline)
     }
 
     // A disposable child with every descriptor slot taken: the server must
@@ -294,10 +314,17 @@
     #expect(!message.contains("running instance"), "\(message)")
   }
 
-  /// Counts the process's open descriptors below 4096.
-  private func setEOpenDescriptorCount() -> Int {
+  /// Counts the descriptor kinds owned by these APIs, below 4096. Anonymous
+  /// runtime wakeup handles are not discovery sockets or directory scans.
+  /// The suite still needs its own process: sibling CLI tests own sockets too.
+  private func setEOpenSocketAndDirectoryCount() -> Int {
     var count = 0
-    for fd in Int32(0)..<Int32(4096) where fcntl(fd, F_GETFD) != -1 { count += 1 }
+    for fd in Int32(0)..<Int32(4096) {
+      var status = stat()
+      guard unsafe fstat(fd, &status) == 0 else { continue }
+      let kind = status.st_mode & S_IFMT
+      if kind == S_IFSOCK || kind == S_IFDIR { count += 1 }
+    }
     return count
   }
 
