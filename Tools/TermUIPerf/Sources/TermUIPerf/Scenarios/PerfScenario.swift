@@ -839,23 +839,53 @@ public enum PerfScenarioRunner {
     #endif
   }
 
-  private static func processOutput(_ arguments: [String]) -> String? {
+  static func processOutput(_ arguments: [String], timeout: TimeInterval = 5) -> String? {
+    // Metadata must not block a completed benchmark. A file avoids pipe
+    // backpressure even for a large git status; stderr needs no capture.
+    let directory = FileManager.default.temporaryDirectory
+      .appendingPathComponent("termui-perf-metadata-\(UUID().uuidString)", isDirectory: true)
+    let output = directory.appendingPathComponent("stdout")
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let handle: FileHandle
+    do {
+      try FileManager.default.createDirectory(
+        at: directory, withIntermediateDirectories: false,
+        attributes: [.posixPermissions: 0o700])
+      guard
+        FileManager.default.createFile(
+          atPath: output.path, contents: nil, attributes: [.posixPermissions: 0o600])
+      else { return nil }
+      handle = try FileHandle(forWritingTo: output)
+    } catch {
+      return nil
+    }
+    defer { try? handle.close() }
     let process = Process()
     process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
     process.arguments = arguments
-    let pipe = Pipe()
-    process.standardOutput = pipe
-    process.standardError = Pipe()
+    process.standardOutput = handle
+    process.standardError = FileHandle.nullDevice
+    let exited = DispatchSemaphore(value: 0)
+    process.terminationHandler = { _ in exited.signal() }
     do {
       try process.run()
     } catch {
       return nil
     }
-    process.waitUntilExit()
+    if exited.wait(timeout: .now() + timeout) != .success {
+      if process.isRunning { process.terminate() }
+      if exited.wait(timeout: .now() + 0.25) != .success {
+        #if canImport(Darwin) || canImport(Glibc) || canImport(Android) || canImport(Musl)
+          if process.isRunning { _ = kill(process.processIdentifier, SIGKILL) }
+        #endif
+        _ = exited.wait(timeout: .now() + 0.25)
+      }
+      return nil
+    }
     guard process.terminationStatus == 0 else {
       return nil
     }
-    let data = pipe.fileHandleForReading.readDataToEndOfFile()
+    guard let data = try? Data(contentsOf: output) else { return nil }
     return String(data: data, encoding: .utf8)?
       .trimmingCharacters(in: .whitespacesAndNewlines)
   }
