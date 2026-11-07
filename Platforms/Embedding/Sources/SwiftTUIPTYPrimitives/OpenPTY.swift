@@ -26,6 +26,36 @@
   private let ptyAllocation = Mutex(())
 
   public func openPTY() throws(PTYError) -> PTYHandles {
+    try allocatePTYWithRetry { () throws(PTYError) -> PTYHandles in
+      try allocatePTY()
+    }
+  }
+
+  /// A closing Darwin PTY can temporarily make allocation fail with ENXIO.
+  /// The process-local mutex cannot serialize kernel teardown or other
+  /// processes. Retry only this error, for 7 ms total; persistent exhaustion
+  /// still throws the original error. Never retry descriptor-limit failures.
+  func allocatePTYWithRetry(
+    pause: (UInt32) -> Void = { _ = usleep($0) },
+    allocate: () throws(PTYError) -> PTYHandles
+  ) throws(PTYError) -> PTYHandles {
+    for attempt in 0..<4 {
+      do {
+        return try allocate()
+      } catch {
+        #if canImport(Darwin)
+          if case .allocationFailed(errno: ENXIO) = error, attempt < 3 {
+            pause(UInt32(1_000 << attempt))
+            continue
+          }
+        #endif
+        throw error
+      }
+    }
+    preconditionFailure("the final allocation attempt always returns or throws")
+  }
+
+  private func allocatePTY() throws(PTYError) -> PTYHandles {
     var masterFD: Int32 = -1
     var slaveFD: Int32 = -1
 

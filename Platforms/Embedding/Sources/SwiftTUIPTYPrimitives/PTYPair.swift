@@ -1,6 +1,7 @@
 // PTY plumbing is POSIX-only; dependency edges exclude Windows.
 #if !os(Windows)
   public import SwiftTUICore
+  import SwiftTUIPlatformIO
 
   #if canImport(Darwin)
     import Darwin
@@ -15,7 +16,13 @@
 
     private var masterFD: Int32
     private var retainedSlaveFD: Int32
-    private var readSource: (any DispatchSourceRead)?
+    #if canImport(Darwin)
+      private var readSource: (any DispatchSourceRead)?
+      private var writeSource: (any DispatchSourceWrite)?
+    #else
+      private var readSource: POSIXReadinessSource?
+      private var writeSource: POSIXReadinessSource?
+    #endif
     // The unfolding stream has no implicit buffer. At most 64 KiB waits here,
     // plus one <=4 KiB chunk owned by the consumer. Kernel buffers are separate.
     static let readBufferLimit = 65_536
@@ -45,7 +52,6 @@
     }
     private var pendingWrites: [PendingWrite] = []
     private var nextWriteID: UInt64 = 0
-    private var writeSource: (any DispatchSourceWrite)?
     private var writeGeneration: UInt64 = 0
     private var writingFinished = false
 
@@ -195,9 +201,13 @@
       }
       writeGeneration &+= 1
       let generation = writeGeneration
-      let source = DispatchSource.makeWriteSource(
-        fileDescriptor: fd,
-        queue: DispatchQueue.global(qos: .userInitiated))
+      #if canImport(Darwin)
+        let source = DispatchSource.makeWriteSource(
+          fileDescriptor: fd, queue: DispatchQueue.global(qos: .userInitiated))
+      #else
+        let source = POSIXReadinessSource(
+          fileDescriptor: fd, writable: true, queue: DispatchQueue.global(qos: .userInitiated))
+      #endif
       source.setEventHandler { [weak self] in
         source.cancel()
         Task { await self?.becameWritable(generation) }
@@ -307,8 +317,13 @@
       }
       readGeneration &+= 1
       let generation = readGeneration
-      let source = DispatchSource.makeReadSource(
-        fileDescriptor: fd, queue: DispatchQueue.global(qos: .userInitiated))
+      #if canImport(Darwin)
+        let source = DispatchSource.makeReadSource(
+          fileDescriptor: fd, queue: DispatchQueue.global(qos: .userInitiated))
+      #else
+        let source = POSIXReadinessSource(
+          fileDescriptor: fd, queue: DispatchQueue.global(qos: .userInitiated))
+      #endif
       // One callback per arm: a readable full PTY cannot enqueue unbounded
       // actor tasks while the consumer is stalled.
       source.setEventHandler { [weak self] in

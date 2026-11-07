@@ -1,3 +1,4 @@
+@_spi(Testing) import SwiftTUITestSupport
 import Synchronization
 import Testing
 
@@ -69,6 +70,37 @@ struct FrameTailQueueExitReleaseTests {
     await waiter.value
 
     #expect(!scheduler.hasPendingFrame(at: .now()))
+  }
+
+  @Test("release and frame wakes leave the deadline task uncancelled", arguments: [false, true])
+  func futureDeadlineDoesNotCancelSleeper(frameWake: Bool) async {
+    let sleeping = AsyncEvent()
+    let expire = AsyncEvent()
+    let finished = AsyncEvent()
+    let cancelled = Mutex(false)
+    let scheduler = FrameScheduler(mergePressurePacingEnabled: false) { _ in
+      await withTaskCancellationHandler {
+        sleeping.fire()
+        await expire.wait()
+      } onCancel: {
+        cancelled.withLock { $0 = true }
+      }
+      finished.fire()
+    }
+    let token = FrameTailJobCancellationToken()
+    scheduler.requestDeadline(MonotonicInstant.now().advanced(by: .seconds(60)))
+    let waiter = Task { await scheduler.waitForPendingFrame(releasedBy: token) }
+    await sleeping.wait()
+    if frameWake {
+      scheduler.requestInput()
+    } else {
+      #expect(token.markStarted())
+    }
+    await waiter.value
+    #expect(!cancelled.withLock { $0 })
+    expire.fire()
+    await finished.wait()
+    #expect(!cancelled.withLock { $0 })
   }
 
   @Test("layout stage completes when the signal waiter honors only the release")

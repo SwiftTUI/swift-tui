@@ -172,6 +172,13 @@ run_repo_policy_phase() {
     "./Scripts/check_ci_test_matrix_summary.sh" \
     ./Scripts/check_ci_test_matrix_summary.sh
 
+  run_repo_policy_check "$mode" "$repo_root" "Test native CI build transfer and shard coverage" \
+    "bun test Scripts/check_native_test_workflows.test.ts" \
+    bun test Scripts/check_native_test_workflows.test.ts
+
+  run_repo_policy_check "$mode" "$repo_root" "Test native CI bundle identity" \
+    "python3 Scripts/test_ci_test_bundle.py" python3 Scripts/test_ci_test_bundle.py
+
   run_repo_policy_check \
     "$mode" \
     "$repo_root" \

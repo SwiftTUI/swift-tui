@@ -60,6 +60,8 @@ soundness_trace_invocation_index=0
 runtime_shard_manifest=$repo_root/Scripts/data/runtime-shards.txt
 lane=all
 runtime_shard=""
+root_test_bundle_built=0
+prebuilt=0
 # Every Swift lane builds with `-emit-loaded-module-trace` so the Foundation
 # audit reads the core lane's own build (Stage 1c) instead of compiling
 # Core+Views a second time. The flag rides on EVERY swift build/test
@@ -173,7 +175,10 @@ export SWIFTTUI_WARNINGS_AS_ERRORS=1
 
 usage() {
   cat <<'EOF'
-Usage: Scripts/test_all.sh [--clean] [--skip-bun-install] [--lane <lane>]
+Usage: Scripts/test_all.sh [--clean] [--skip-bun-install] [--lane <lane>] [--prebuilt]
+
+--prebuilt verifies and uses the exact-revision CI test bundle downloaded by the
+workflow. Local runs build once automatically; --prebuilt cannot use --clean.
 
 Runs the exhaustive checked-in repo verification surface:
   - checked-in policy hooks
@@ -344,6 +349,9 @@ while [ "$#" -gt 0 ]; do
   --clean)
     clean_builds=1
     ;;
+  --prebuilt)
+    prebuilt=1
+    ;;
   --lane)
     shift
     if [ "$#" -eq 0 ]; then
@@ -368,6 +376,11 @@ while [ "$#" -gt 0 ]; do
   esac
   shift
 done
+
+if [ "$prebuilt" = 1 ] && [ "$clean_builds" = 1 ]; then
+  echo "--clean cannot be combined with --prebuilt" >&2
+  exit 1
+fi
 
 case "$lane" in
 all | policy | core) ;;
@@ -424,6 +437,15 @@ run_swift() {
   #     timing-dependent interleaving is reproducible/bisectable rather than
   #     racing across parallel workers.
   if [ "$#" -gt 0 ] && [ "$1" = "test" ]; then
+    # Only the root package was built by this gate. TermUIPerf owns a separate
+    # package and must still build. Avoid a 6-13s no-op planning pass before
+    # each of the root's isolated launches.
+    case " $* " in
+    *" --package-path "*) ;;
+    *)
+      if [ "$root_test_bundle_built" = 1 ]; then set -- "$@" --skip-build; fi
+      ;;
+    esac
     soundness_trace_invocation_index=$((soundness_trace_invocation_index + 1))
     trace_slug=${soundness_trace_step_slug:-swift-test}
     trace_file=$soundness_trace_root/$trace_slug-$soundness_trace_invocation_index.log
@@ -886,13 +908,23 @@ fi
 # `-emit-loaded-module-trace` (see `emit_module_trace`), so the Foundation
 # audit reads the traces of this build instead of compiling Core+Views a second
 # time into its own scratch, and every later `swift test` launch in the lane
-# is an incremental no-op build.
-if lane_runs_core; then
+# reuses this test bundle without replanning.
+if [ "$prebuilt" = 1 ]; then
+  python3 Scripts/ci_test_bundle.py verify
+  root_test_bundle_built=1
+fi
+
+if lane_needs_swift && [ "$root_test_bundle_built" = 0 ]; then
   run_function_step \
     "Build package and test bundles" \
     "$(swift_command_text build --build-tests)" \
     run_swift build --build-tests
+  # A failed gate must not continue using potentially stale test binaries.
+  [ "$any_failed" = 0 ] || exit 1
+  root_test_bundle_built=1
+fi
 
+if lane_runs_core; then
   run_step \
     "Check Foundation-free layers (transitive)" \
     "$repo_root" \

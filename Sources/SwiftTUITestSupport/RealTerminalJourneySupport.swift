@@ -1,5 +1,6 @@
 @unsafe @preconcurrency public import Dispatch
 public import SwiftTUICore
+import SwiftTUIPlatformIO
 import Synchronization
 
 #if canImport(Darwin)
@@ -620,7 +621,7 @@ import Synchronization
   #endif
 }
 
-/// A `DispatchSource`-backed signal that a PTY has bytes ready to drain.
+/// A readiness signal that a PTY has bytes ready to drain.
 ///
 /// The stream finishes at `deadline`, so a consumer can never hang after the
 /// runtime goes idle. Call and await ``cancel()`` before closing the file
@@ -628,7 +629,11 @@ import Synchronization
 @_spi(Testing) public final class RealTerminalPTYReadableSource {
   @_spi(Testing) public let events: AsyncStream<Void>
 
-  private let source: any DispatchSourceRead
+  #if os(Linux) || os(Android)
+    private let source: POSIXReadinessSource
+  #else
+    private let source: any DispatchSourceRead
+  #endif
   private let cancelled = CancellationInsensitiveEvent()
 
   @_spi(Testing) public init(
@@ -637,10 +642,11 @@ import Synchronization
     queueLabel: String = "SwiftTUITestSupport.realTerminalPTYReadable"
   ) {
     let queue = DispatchQueue(label: queueLabel)
-    let source = DispatchSource.makeReadSource(
-      fileDescriptor: fileDescriptor,
-      queue: queue
-    )
+    #if os(Linux) || os(Android)
+      let source = POSIXReadinessSource(fileDescriptor: fileDescriptor, queue: queue)
+    #else
+      let source = DispatchSource.makeReadSource(fileDescriptor: fileDescriptor, queue: queue)
+    #endif
     self.source = source
 
     var streamContinuation: AsyncStream<Void>.Continuation!

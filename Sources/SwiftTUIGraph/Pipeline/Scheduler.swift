@@ -324,18 +324,24 @@ public final class FrameScheduler: FrameScheduling, ThreadSafeInvalidating, Inte
     uncheckedState: PendingFrameRequestWaiters()
   )
 
+  private let deadlineWait: @Sendable (Duration) async -> Void
   private let pacingPolicy: MergePressurePacingPolicy
   package let mergePressurePacingEnabled: Bool
 
   public init() {
     mergePressurePacingEnabled = FeatureGate.mergePressurePacing.initialIsEnabled()
     pacingPolicy = .init()
+    deadlineWait = { try? await Task.sleep(for: $0) }
   }
 
-  package init(mergePressurePacingEnabled: Bool, pacingPolicy: MergePressurePacingPolicy = .init())
-  {
+  package init(
+    mergePressurePacingEnabled: Bool,
+    pacingPolicy: MergePressurePacingPolicy = .init(),
+    deadlineWait: @escaping @Sendable (Duration) async -> Void = { try? await Task.sleep(for: $0) }
+  ) {
     self.mergePressurePacingEnabled = mergePressurePacingEnabled
     self.pacingPolicy = pacingPolicy
+    self.deadlineWait = deadlineWait
   }
 
   private func pressureGap(_ state: CoalescingState, at now: MonotonicInstant) -> Duration {
@@ -621,8 +627,8 @@ public final class FrameScheduler: FrameScheduling, ThreadSafeInvalidating, Inte
         }
         waiterIDLock.withLockUnchecked { $0 = waiterID }
         if let timeout {
-          let timeoutTask = Task {
-            try? await Task.sleep(for: timeout)
+          let timeoutTask = Task { [deadlineWait] in
+            await deadlineWait(timeout)
             let continuation = pendingFrameRequestWaitersLock.withLockUnchecked { state in
               state.waiters.removeValue(forKey: waiterID)
             }
@@ -647,7 +653,7 @@ public final class FrameScheduler: FrameScheduling, ThreadSafeInvalidating, Inte
           let continuation = pendingFrameRequestWaitersLock.withLockUnchecked { state in
             state.waiters.removeValue(forKey: waiterID)
           }
-          timeoutTaskLock.withLockUnchecked { $0 }?.cancel()
+          if Task.isCancelled { timeoutTaskLock.withLockUnchecked { $0 }?.cancel() }
           continuation?.resume()
         }
       }
@@ -662,7 +668,9 @@ public final class FrameScheduler: FrameScheduling, ThreadSafeInvalidating, Inte
       }
       continuation.resume()
     }
-    timeoutTaskLock.withLockUnchecked { $0 }?.cancel()
+    // Only cancellation of the caller cancels its sleeper. Release and frame
+    // wakes retire the continuation without racing a timer's first enqueue.
+    if Task.isCancelled { timeoutTaskLock.withLockUnchecked { $0 }?.cancel() }
   }
 }
 

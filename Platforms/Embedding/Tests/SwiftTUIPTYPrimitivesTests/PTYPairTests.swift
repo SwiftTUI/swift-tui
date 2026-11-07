@@ -4,6 +4,7 @@
 
   import SwiftTUI
   import Testing
+  import SwiftTUIPlatformIO
   @_spi(Testing) import SwiftTUITestSupport
   import Dispatch
   import Synchronization
@@ -372,8 +373,13 @@
 
   private func writable(_ fd: Int32) async {
     await withCheckedContinuation { continuation in
-      let source = DispatchSource.makeWriteSource(
-        fileDescriptor: fd, queue: DispatchQueue.global())
+      #if canImport(Darwin)
+        let source = DispatchSource.makeWriteSource(
+          fileDescriptor: fd, queue: DispatchQueue.global())
+      #else
+        let source = POSIXReadinessSource(
+          fileDescriptor: fd, writable: true, queue: DispatchQueue.global())
+      #endif
       source.setEventHandler { source.cancel() }
       source.setCancelHandler { continuation.resume() }
       source.resume()
@@ -382,9 +388,12 @@
 
   private func readable(_ fd: Int32) async {
     await withCheckedContinuation { continuation in
-      let source = DispatchSource.makeReadSource(
-        fileDescriptor: fd,
-        queue: DispatchQueue.global())
+      #if canImport(Darwin)
+        let source = DispatchSource.makeReadSource(
+          fileDescriptor: fd, queue: DispatchQueue.global())
+      #else
+        let source = POSIXReadinessSource(fileDescriptor: fd, queue: DispatchQueue.global())
+      #endif
       source.setEventHandler { source.cancel() }
       source.setCancelHandler { continuation.resume() }
       source.resume()

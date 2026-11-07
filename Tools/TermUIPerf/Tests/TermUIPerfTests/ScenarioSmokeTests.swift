@@ -89,18 +89,20 @@ struct ScenarioSmokeTests {
     #expect(fileExists("summary.json", in: result.runDirectory))
   }
 
-  /// Comma-separated `PerfScenarioName` raw values quarantined from the smoke
-  /// sweep. Only CI lanes with a registered flake set this — see
-  /// swift-tui-org/docs/swift-tui/KNOWN-TEST-FLAKES.md for the active entries;
-  /// every skip must map to a register entry with its reproduction evidence.
-  private static var quarantinedScenarioNames: Set<String> {
-    guard let raw = ProcessInfo.processInfo.environment["SWIFTTUI_PERF_SMOKE_SKIP"] else {
-      return []
-    }
-    return Set(
-      raw.split(separator: ",").map {
-        $0.trimmingCharacters(in: .whitespaces)
-      })
+  @Test("app-shell closes its menu and sheet before toggling the inspector")
+  @MainActor
+  func appShellCompletesEveryInteraction() async throws {
+    let root = FileManager.default.temporaryDirectory
+      .appendingPathComponent("termui-perf-app-shell-\(UUID().uuidString)", isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let result = try await ExampleAppShellWorkflowScenario().run(
+      options: PerfScenarioRunOptions(
+        renderMode: .sync, iterations: 1, artifactRoot: root,
+        configuration: "debug", cpuSampleInterval: .milliseconds(1)))
+    #expect(result.events.count == 1)
+    #expect(result.events.first?.expectedVisualMarker == "Inspector hidden")
+    #expect(result.presentedFrameCount > 0)
+    #expect(fileExists("summary.json", in: result.runDirectory))
   }
 
   @Test("deterministic scenarios write artifact directories")
@@ -134,10 +136,6 @@ struct ScenarioSmokeTests {
     }
 
     for scenario in PerfScenarioRegistry.all {
-      if Self.quarantinedScenarioNames.contains(scenario.name.rawValue) {
-        print("[scenario-smoke] skipping quarantined scenario \(scenario.name.rawValue)")
-        continue
-      }
       let result = try await scenario.run(
         options: PerfScenarioRunOptions(
           renderMode: .sync,

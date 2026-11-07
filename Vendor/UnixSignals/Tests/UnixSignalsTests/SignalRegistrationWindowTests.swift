@@ -84,9 +84,29 @@
       @Test(.timeLimit(.minutes(1)))
       func signalRaisedDuringRegistrationWindowIsDelivered() async {
         let signal = UnixSignal.sigusr2
-        let pid = getpid()
         unsafe SignalRegistrationTrampoline.registrationGapHookForTesting = {
-          kill(pid, signal.rawValue)  // ignore-unacceptable-language
+          // TSan's test threads inherit SIGUSR2 blocked. Process-directed
+          // kill can remain pending throughout registration and the wait.
+          // Explicitly unmask and raise on one dedicated thread so the signal
+          // enters the window this test claims to exercise. Darwin forbids
+          // thread-directed signals on Swift's cooperative worker threads.
+          let result: Int32 = await withCheckedContinuation { continuation in
+            Thread.detachNewThread {
+              var unblocked = sigset_t()
+              var previous = sigset_t()
+              unsafe sigemptyset(&unblocked)
+              unsafe sigaddset(&unblocked, signal.rawValue)
+              let result = unsafe pthread_sigmask(SIG_UNBLOCK, &unblocked, &previous)
+              guard result == 0 else {
+                continuation.resume(returning: result)
+                return
+              }
+              let raised = raise(signal.rawValue)
+              _ = unsafe pthread_sigmask(SIG_SETMASK, &previous, nil)
+              continuation.resume(returning: raised)
+            }
+          }
+          #expect(result == 0)
         }
         defer {
           unsafe SignalRegistrationTrampoline.registrationGapHookForTesting = nil

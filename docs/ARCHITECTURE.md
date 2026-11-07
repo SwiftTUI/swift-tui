@@ -324,7 +324,12 @@ contains no nested Swift packages.
   Socket, pipe, and terminal writes save and restore shared file status flags
   around one nonblocking syscall; pipes also scope their no-SIGPIPE policy.
   Readiness waits occur outside the lock. Owned scene descriptors retain their
-  separate lifecycle policy.
+  separate lifecycle policy. On Linux, Android and Musl,
+  `SwiftTUIPlatformIO/POSIXReadinessSource.swift` waits with `poll` on a dedicated
+  thread and delivers one callback at a time through a user-data dispatch source.
+  Cancellation retires the poller before the owner may close or recycle its fd.
+  This avoids the pinned Linux libdispatch's descriptor hang-up teardown race;
+  Darwin retains native descriptor dispatch sources.
 - **External host** — the `SwiftUIHost` product for embedding SwiftTUI inside
   SwiftUI on macOS/iOS lives in the separate
   [`swift-tui-swiftui`](https://github.com/SwiftTUI/swift-tui-swiftui)

@@ -44,35 +44,35 @@ jobs:
         with:
           lane: macos-gate
 
-  macos-gate:
-    name: macOS repo gate
+  native-build:
+    name: Build macOS tests
     runs-on: macos-26
     needs: changes
     if: needs.changes.outputs.changed == 'true'
-    # The unsharded gate does not fit in 30 minutes on a macOS runner. Three of
-    # the five runs to 2026-08-26 were "cancelled" at 30m20s-30m24s — the cap,
-    # reported as a cancellation — and the two that failed did so at 26-28 min
-    # only because a failing lane ended the step early. With that failure fixed
-    # the gate runs further and hits the cap every time, so a green verdict was
-    # unreachable. Linux gets ~18 minutes by sharding across three runners;
-    # this lane runs the whole thing in one job.
-    # Cold compilation plus the serialized full-stress suites can exceed
-    # 75 minutes: run 39660747048 reached shard C after 61 minutes, with
-    # roughly 17 minutes of tests still remaining. Keep the per-step
-    # watchdog bounds unchanged and allow the full sequence to finish.
-    timeout-minutes: 90
-
+    timeout-minutes: 45
+    env:
+      SWIFTTUI_WARNINGS_AS_ERRORS: "1"
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+
+      - name: Cache pinned Swift toolchain
+        uses: actions/cache@v6
+        with:
+          path: |
+            ~/.swiftly
+            ~/Library/Developer/Toolchains
+          key: macos-26-swiftly-${{ runner.arch }}-${{ hashFiles('.swift-version') }}
 
       - name: Install swiftly and Swift toolchain
         shell: bash
         run: |
           set -euo pipefail
-          curl -O https://download.swift.org/swiftly/darwin/swiftly.pkg
-          installer -pkg swiftly.pkg -target CurrentUserHomeDirectory
-          ~/.swiftly/bin/swiftly init --skip-install --quiet-shell-followup --assume-yes
+          if [ ! -x "$HOME/.swiftly/bin/swiftly" ] || [ ! -f "$HOME/.swiftly/env.sh" ]; then
+            curl --fail --retry 3 -O https://download.swift.org/swiftly/darwin/swiftly.pkg
+            installer -pkg swiftly.pkg -target CurrentUserHomeDirectory
+            ~/.swiftly/bin/swiftly init --skip-install --quiet-shell-followup --assume-yes
+          fi
           . "${SWIFTLY_HOME_DIR:-$HOME/.swiftly}/env.sh"
           hash -r
           swift_version="$(tr -d '[:space:]' < .swift-version)"
@@ -120,46 +120,175 @@ jobs:
         shell: bash
         run: bun install --frozen-lockfile
 
-      - name: Run repo gate
+      - name: Build native test bundle once
+        timeout-minutes: 30
+        run: Scripts/build_ci_test_bundle.sh
+      - name: Retain native build diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: native-build-diagnostics-macos
+          path: .build/ci-build.*
+          retention-days: 3
+      - name: Package exact-revision test bundle
+        run: python3 Scripts/ci_test_bundle.py pack
+      - name: Upload native test bundle
+        uses: actions/upload-artifact@v7
+        with:
+          name: native-tests-macos
+          path: ci-test-bundle.tar.gz
+          compression-level: 0
+          retention-days: 1
+
+  native-tests:
+    name: macOS ${{ matrix.lane }}
+    runs-on: macos-26
+    needs: native-build
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        lane: [core, 'runtime:A', 'runtime:B', 'runtime:C']
+    env:
+      SWIFTTUI_TEST_STEP_TIMEOUT_SECONDS: "600"
+      SWIFTTUI_TEST_STEP_BUSY_GRACE_SECONDS: "300"
+      SWIFTTUI_TEST_STEP_ABSOLUTE_TIMEOUT_SECONDS: "1800"
+      SWIFTTUI_TEST_STEP_WATCHDOG_DEADLINE_SECONDS: "2400"
+      SWIFTTUI_SKIP_PUBLIC_API_BASELINE: "1"
+      SWIFTTUI_SKIP_TERMUIPERF: "1"
+      SWIFTTUI_STRESS_FULL: "1"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Cache pinned Swift toolchain
+        uses: actions/cache@v6
+        with:
+          path: |
+            ~/.swiftly
+            ~/Library/Developer/Toolchains
+          key: macos-26-swiftly-${{ runner.arch }}-${{ hashFiles('.swift-version') }}
+
+      - name: Install swiftly and Swift toolchain
         shell: bash
-        env:
-          SWIFTTUI_TEST_STEP_TIMEOUT_SECONDS: "1200"
-          # Worst-case kill = 1200 idle + 900 grace + 10 kill grace = 2110 s,
-          # inside the 5400 s cap declared below, so a wedge anywhere in the
-          # first ~54 minutes is dumped and named. It could not fire at all
-          # before 2026-08-29: the grace was three forgiven windows of the idle
-          # bound, i.e. 3600 s, for an earliest kill of 4810 s against a 4500 s
-          # cap. Every macOS wedge burned the whole job and left no diagnostic.
-          SWIFTTUI_TEST_STEP_BUSY_GRACE_SECONDS: "900"
-          # The livelock-while-printing backstop has to fit the cap too, or it
-          # is decoration: the default (4x the idle bound) is 4800 s.
-          SWIFTTUI_TEST_STEP_ABSOLUTE_TIMEOUT_SECONDS: "3300"
-          # This job's `timeout-minutes` in seconds. The gate refuses to start
-          # if the watchdog could not fire inside it — keep the two in step.
-          SWIFTTUI_TEST_STEP_WATCHDOG_DEADLINE_SECONDS: "5400"
-          SWIFTTUI_SKIP_PUBLIC_API_BASELINE: "1"
-          SWIFTTUI_SKIP_TERMUIPERF: "1"
-          # The nightly/tag lane runs the stress churn loops at their full
-          # historical iteration counts (plan 2026-08-25-001 Stage 2b); the
-          # push gate runs the hot-path counts and the 20 s per-test ratchet.
-          SWIFTTUI_STRESS_FULL: "1"
         run: |
           set -euo pipefail
-          sh ./Scripts/test_gate.sh --skip-bun-install
+          if [ ! -x "$HOME/.swiftly/bin/swiftly" ] || [ ! -f "$HOME/.swiftly/env.sh" ]; then
+            curl --fail --retry 3 -O https://download.swift.org/swiftly/darwin/swiftly.pkg
+            installer -pkg swiftly.pkg -target CurrentUserHomeDirectory
+            ~/.swiftly/bin/swiftly init --skip-install --quiet-shell-followup --assume-yes
+          fi
+          . "${SWIFTLY_HOME_DIR:-$HOME/.swiftly}/env.sh"
+          hash -r
+          swift_version="$(tr -d '[:space:]' < .swift-version)"
+          swiftly install --use --assume-yes "$swift_version"
+          swiftly run swift --version
+          echo "$HOME/.swiftly/bin" >> "$GITHUB_PATH"
+          echo "SWIFTLY_HOME_DIR=$HOME/.swiftly" >> "$GITHUB_ENV"
 
-      - name: Source structure observations
-        if: always()
+      - name: Install macOS test dependencies
         shell: bash
+        run: |
+          set -euo pipefail
+          if ! command -v rg >/dev/null 2>&1; then
+            brew install ripgrep
+          fi
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+
+      - name: Cache SwiftPM
+        uses: actions/cache@v6
+        with:
+          path: |
+            ~/.cache/org.swift.swiftpm
+            ~/.swiftpm
+          key: ${{ runner.os }}-swiftpm-gate-${{ hashFiles('Package.resolved') }}
+          restore-keys: |
+            ${{ runner.os }}-swiftpm-gate-
+            ${{ runner.os }}-swiftpm-
+
+      - name: Cache Bun deps
+        uses: actions/cache@v6
+        with:
+          path: |
+            ~/.bun/install/cache
+            node_modules
+          key: ${{ runner.os }}-bun-gate-${{ hashFiles('bun.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-bun-gate-
+            ${{ runner.os }}-bun-
+
+      - name: Install Bun workspace deps
+        shell: bash
+        run: bun install --frozen-lockfile
+
+      - name: Download native test bundle
+        uses: actions/download-artifact@v8
+        with:
+          name: native-tests-macos
+      - name: Restore native test bundle
+        run: tar -xzf ci-test-bundle.tar.gz && rm ci-test-bundle.tar.gz
+      - name: Run policy lane
+        if: matrix.lane == 'core'
+        run: sh Scripts/test_gate.sh --lane policy --skip-bun-install
+      - name: Run native lane
+        env:
+          LANE: ${{ matrix.lane }}
+        run: sh Scripts/test_gate.sh --prebuilt --lane "$LANE" --skip-bun-install
+      - name: Source structure observations
+        if: always() && matrix.lane == 'core'
         run: |
           python3 Scripts/source_inventory.py --compare docs/source-structure.json --output .build/source-observations/census.json
           cat .build/source-observations/census.md >> "$GITHUB_STEP_SUMMARY"
-
       - name: Upload source observations
-        if: always()
+        if: always() && matrix.lane == 'core'
         uses: actions/upload-artifact@v7
         with:
           name: source-observations-macos
           path: .build/source-observations
+      - name: Name trace artifact
+        if: always()
+        env:
+          LANE: ${{ matrix.lane }}
+        run: echo "TRACE_LANE=${LANE//:/-}" >> "$GITHUB_ENV"
+      - name: Upload soundness traces
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: soundness-macos-${{ env.TRACE_LANE }}
+          path: .build/soundness-trace
+          if-no-files-found: error
+          retention-days: 1
+
+  macos-gate:
+    name: macOS repo gate
+    runs-on: ubuntu-24.04
+    needs: [changes, native-build, native-tests]
+    if: always() && needs.changes.outputs.changed == 'true' && !contains(needs.*.result, 'cancelled')
+    timeout-minutes: 10
+    steps:
+      - name: Require every native lane green
+        env:
+          BUILD_RESULT: ${{ needs.native-build.result }}
+          TEST_RESULT: ${{ needs.native-tests.result }}
+        run: test "$BUILD_RESULT" = success && test "$TEST_RESULT" = success
+      - name: Checkout
+        uses: actions/checkout@v7
+      - name: Download soundness traces
+        uses: actions/download-artifact@v8
+        with:
+          path: .build/soundness-trace-merged
+          pattern: soundness-macos-*
+      - name: Scan merged soundness traces
+        shell: bash
+        run: |
+          set -euo pipefail
+          count=$(find .build/soundness-trace-merged -mindepth 1 -maxdepth 1 -type d -name 'soundness-macos-*' | wc -l)
+          test "$count" -eq 4
+          Scripts/scan_soundness_traces.sh .build/soundness-trace-merged Scripts/soundness_quarantine.txt
 
   public-semantics:
     name: macOS public semantic fixtures
@@ -177,13 +306,23 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
+      - name: Cache pinned Swift toolchain
+        uses: actions/cache@v6
+        with:
+          path: |
+            ~/.swiftly
+            ~/Library/Developer/Toolchains
+          key: macos-26-swiftly-${{ runner.arch }}-${{ hashFiles('.swift-version') }}
+
       - name: Install swiftly and Swift toolchain
         shell: bash
         run: |
           set -euo pipefail
-          curl -O https://download.swift.org/swiftly/darwin/swiftly.pkg
-          installer -pkg swiftly.pkg -target CurrentUserHomeDirectory
-          ~/.swiftly/bin/swiftly init --skip-install --quiet-shell-followup --assume-yes
+          if [ ! -x "$HOME/.swiftly/bin/swiftly" ] || [ ! -f "$HOME/.swiftly/env.sh" ]; then
+            curl --fail --retry 3 -O https://download.swift.org/swiftly/darwin/swiftly.pkg
+            installer -pkg swiftly.pkg -target CurrentUserHomeDirectory
+            ~/.swiftly/bin/swiftly init --skip-install --quiet-shell-followup --assume-yes
+          fi
           . "${SWIFTLY_HOME_DIR:-$HOME/.swiftly}/env.sh"
           hash -r
           swift_version="$(tr -d '[:space:]' < .swift-version)"

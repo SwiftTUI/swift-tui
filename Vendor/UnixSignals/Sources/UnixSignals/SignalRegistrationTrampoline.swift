@@ -52,7 +52,8 @@
   package enum SignalRegistrationTrampoline {
     /// Test seam: fires after the recording handlers are installed and before
     /// source registration is awaited — the window this type exists to cover.
-    nonisolated(unsafe) package static var registrationGapHookForTesting: (@Sendable () -> Void)?
+    nonisolated(unsafe) package static var registrationGapHookForTesting:
+      (@Sendable () async -> Void)?
 
     /// Installs the recording handler in place of the default disposition.
     /// Called where upstream called `signal(sig, SIG_IGN)`.

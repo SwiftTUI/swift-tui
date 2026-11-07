@@ -1,4 +1,5 @@
 import SwiftTUICore
+import SwiftTUIPlatformIO
 import Synchronization
 
 #if canImport(Dispatch)
@@ -27,6 +28,11 @@ public final class InputReader: InputReading, TerminalInputReading,
   #endif
 
   #if !canImport(WASILibc) && !canImport(ucrt)
+    #if canImport(Darwin)
+      private typealias ReadSource = any DispatchSourceRead
+    #else
+      private typealias ReadSource = POSIXReadinessSource
+    #endif
     /// Live dispatch read-sources, registered so ``withInputSuspended(_:)``
     /// can pause them around a capability probe's reads of the shared input
     /// descriptor (F42).
@@ -35,7 +41,7 @@ public final class InputReader: InputReading, TerminalInputReading,
       var drainedHandlerForTesting: (@Sendable () -> Void)?
       var sources:
         [UInt64: (
-          source: any DispatchSourceRead, queue: DispatchQueue,
+          source: ReadSource, queue: DispatchQueue,
           replay: any DispatchSourceUserDataAdd
         )] = [:]
     }
@@ -45,7 +51,7 @@ public final class InputReader: InputReading, TerminalInputReading,
     )
 
     private func registerSuspendableSource(
-      _ source: any DispatchSourceRead,
+      _ source: ReadSource,
       queue: DispatchQueue,
       replay: any DispatchSourceUserDataAdd
     ) -> UInt64 {
@@ -521,7 +527,11 @@ extension InputReader {
         let controlChannelEnabled = self.controlChannelEnabled
         let mouseCoordinateMode = self.mouseCoordinateMode.withLock { $0 }
         let queue = DispatchQueue(label: "InputReader.\(fileDescriptor)")
-        let source = DispatchSource.makeReadSource(fileDescriptor: fileDescriptor, queue: queue)
+        #if canImport(Darwin)
+          let source = DispatchSource.makeReadSource(fileDescriptor: fileDescriptor, queue: queue)
+        #else
+          let source = POSIXReadinessSource(fileDescriptor: fileDescriptor, queue: queue)
+        #endif
         var decoder = TerminalInputEventDecoder<InputEvent>(
           mouseCoordinateMode: mouseCoordinateMode,
           currentMouseCoordinateMode: { [weak self] in
@@ -676,7 +686,11 @@ extension InputReader {
         let controlChannelEnabled = self.controlChannelEnabled
         let mouseCoordinateMode = self.mouseCoordinateMode.withLock { $0 }
         let queue = DispatchQueue(label: "InputReader.\(fileDescriptor)")
-        let source = DispatchSource.makeReadSource(fileDescriptor: fileDescriptor, queue: queue)
+        #if canImport(Darwin)
+          let source = DispatchSource.makeReadSource(fileDescriptor: fileDescriptor, queue: queue)
+        #else
+          let source = POSIXReadinessSource(fileDescriptor: fileDescriptor, queue: queue)
+        #endif
         var decoder = TerminalInputEventDecoder<Event>(
           mouseCoordinateMode: mouseCoordinateMode,
           currentMouseCoordinateMode: { [weak self] in

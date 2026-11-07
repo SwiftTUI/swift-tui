@@ -156,14 +156,14 @@ config_is_accepted() {
   ) >/dev/null 2>&1
 }
 
-echo "1/11 a slow but talking step survives an idle bound it far exceeds"
+echo "1/12 a slow but talking step survives an idle bound it far exceeds"
 run_case chatty_slow 2 0 chatty_slow_step
 if [ "$case_exit" != "0" ]; then
   fail "a step that kept emitting output was killed (exit=$case_exit, detail='$case_detail'). \
 This is the entry-9 regression: the watchdog is measuring wall clock again."
 fi
 
-echo "2/11 a step that parks after emitting output is killed"
+echo "2/12 a step that parks after emitting output is killed"
 run_case parks_after_output 2 0 parks_after_output_step
 if [ "$case_wedged" = "1" ]; then
   fail "the watchdog reported a timeout but never actually killed the step, so the \
@@ -177,7 +177,7 @@ case "$case_detail" in
 *) fail "parked step reported an unexpected timeout detail: '$case_detail'" ;;
 esac
 
-echo "3/11 a step that never emits anything is killed"
+echo "3/12 a step that never emits anything is killed"
 run_case silent 2 0 silent_step
 if [ "$case_wedged" = "1" ]; then
   fail "a silent step outlived the watchdog's kill."
@@ -186,7 +186,7 @@ if [ "$case_exit" != "124" ]; then
   fail "a silent step was not killed (exit=$case_exit)."
 fi
 
-echo "4/11 the absolute backstop kills a step that livelocks while printing"
+echo "4/12 the absolute backstop kills a step that livelocks while printing"
 run_case livelock 60 3 livelock_step
 if [ "$case_wedged" = "1" ]; then
   fail "a livelocking step outlived the watchdog's kill. A step that respawns \
@@ -201,7 +201,7 @@ case "$case_detail" in
 *) fail "livelock step reported an unexpected timeout detail: '$case_detail'" ;;
 esac
 
-echo "5/11 a disabled watchdog (0) never kills anything"
+echo "5/12 a disabled watchdog (0) never kills anything"
 run_case disabled 0 0 chatty_slow_step
 if [ "$case_exit" != "0" ]; then
   fail "a step ran with the watchdog disabled but still failed (exit=$case_exit)."
@@ -212,7 +212,7 @@ fi
 # correctly classified this synthetic loop below the production floor. Use a
 # 1% floor only for these short branch tests; case 10 independently proves that
 # CPU below a configured floor is killed. Production remains at 25%.
-echo "6/11 a silent step that is still burning CPU survives the idle bound"
+echo "6/12 a silent step that is still burning CPU survives the idle bound"
 case_busy_grace_seconds=6
 case_busy_min_cpu_percent=1
 run_case busy_silent_survives 2 0 busy_silent_step 5
@@ -228,7 +228,7 @@ until its buffer fills, and killing it turns a healthy lane red with a hang dump
 that shows a working thread."
 fi
 
-echo "7/11 a silent, busy step still dies once its busy grace runs out"
+echo "7/12 a silent, busy step still dies once its busy grace runs out"
 case_busy_grace_seconds=2
 case_busy_min_cpu_percent=1
 run_case busy_silent_exhausts 2 0 busy_silent_step 600
@@ -246,7 +246,7 @@ case "$case_detail" in
 *) fail "exhausted-grace step reported an unexpected detail: '$case_detail'" ;;
 esac
 
-echo "8/11 a busy-grace budget does not save a parked step"
+echo "8/12 a busy-grace budget does not save a parked step"
 case_busy_grace_seconds=6
 run_case parked_with_budget 2 0 parks_after_output_step
 case_busy_grace_seconds=0
@@ -272,7 +272,7 @@ esac
 # silently dead on every lane whose grace was under its bound — the macOS gate
 # included. A budget that reads as 900 s and means 0 s is the same defect as
 # the window COUNT it replaced.
-echo "9/11 a busy grace shorter than the idle bound still buys silence"
+echo "9/12 a busy grace shorter than the idle bound still buys silence"
 case_busy_grace_seconds=2
 case_busy_min_cpu_percent=1
 run_case busy_partial_grace 4 0 busy_silent_step 5
@@ -287,6 +287,32 @@ detail='$case_detail'). A grant is being charged a whole idle bound instead of t
 silence it actually hands out, so any grace below one bound forgives nothing at all."
 fi
 
+# The diagnostic NOTE must not reset a partial grace to a full idle window.
+# Check the actual timeout decision as well as elapsed time: clock rounding and
+# process scheduling can add one probe interval, but cannot change a 2s window
+# back into the 4s idle bound.
+echo "10/12 watchdog diagnostics do not reset partial busy grace"
+case_busy_grace_seconds=2
+case_busy_min_cpu_percent=1
+partial_grace_started=$(current_epoch_seconds)
+run_case busy_partial_grace_exhausted 4 0 busy_silent_step 600
+partial_grace_elapsed=$(($(current_epoch_seconds) - partial_grace_started))
+case_busy_grace_seconds=0
+case_busy_min_cpu_percent=25
+if [ "$case_exit" != "124" ] || [ "$case_wedged" = "1" ]; then
+  fail "silent busy command did not exhaust its partial grace (exit=$case_exit)."
+fi
+case "$case_detail" in
+*"no output for 2s"*"busy-grace budget"* | *"no output for 3s"*"busy-grace budget"*) ;;
+*) fail "watchdog diagnostic reset the partial-grace window: '$case_detail'" ;;
+esac
+if [ "$partial_grace_elapsed" -gt 8 ]; then
+  fail "4s idle + 2s busy grace + 1s kill grace took ${partial_grace_elapsed}s (maximum 8s including probes)."
+fi
+if ! grep -q 'NOTE: no output' "$log_file" || ! grep -q 'TIMEOUT:' "$log_file"; then
+  fail "watchdog diagnostics were not retained in the step log."
+fi
+
 # The busy test is an average-utilisation FLOOR, not "did the total go up".
 # Until 2026-08-29 it was `current_cpu -gt window_start_cpu` — one centisecond,
 # tree-wide, over a window up to 20 minutes long — so a parked tree's signal and
@@ -294,7 +320,7 @@ fi
 # gate spent its whole grace on a wedge. Pinned here without depending on how
 # much CPU a shell loop happens to burn on the machine running this: the step is
 # genuinely busy at roughly one core, and the floor is set far above it.
-echo "10/11 a step below the busy CPU floor is killed even with grace available"
+echo "11/12 a step below the busy CPU floor is killed even with grace available"
 case_busy_grace_seconds=6
 case_busy_min_cpu_percent=400
 run_case busy_below_floor 2 0 busy_silent_step 600
@@ -321,7 +347,7 @@ esac
 # dump. That was the shipped macOS configuration until 2026-08-29 — a 1200 s
 # bound with three forgiven windows could not fire inside 4500 s — and nothing
 # reported it, because the arithmetic is only wrong when you multiply it out.
-echo "11/11 a watchdog that cannot fire inside the job's cap is rejected"
+echo "12/12 a watchdog that cannot fire inside the job's cap is rejected"
 if config_is_accepted 1200 3600 4800 10 4500; then
   fail "the historical macOS configuration (1200 s bound, 3600 s of grace, 4800 s \
 absolute) was accepted against a 4500 s job cap. Its earliest kill is 4810 s, so every \

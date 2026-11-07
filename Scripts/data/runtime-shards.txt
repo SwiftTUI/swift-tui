@@ -20,12 +20,14 @@
 # whitespace. A shard whose regex claims nothing fails the coverage check
 # (`swift test --filter` that matches nothing exits 0 silently).
 #
-# The 2026-10-20 amd64 run finished A in 267 s and B in 384 s, while C
-# reached its 1500 s cap with tests still progressing. Share the collection,
-# accessibility and presentation journeys across A/B; keep C as the catch-all.
+# The 2026-11-06 amd64 run (42283402631) spent 381/354/1028 seconds in
+# A/B/C. Move the A/D/E adversarial suites to A and the C adversarial suites
+# to B: the recorded suite times predict 581/567/615 seconds. Keep C as the
+# catch-all so newly added suites remain covered. Rebalance from suite times,
+# not test counts; one layout-bounds suite alone accounts for 131 seconds.
 # Test selection within each suite, serialization and watchdog bounds stay intact.
-A|^SwiftTUITests\.(FrameworkStress(PopoverTipLifecycle|NavigationPresentation|StateIdentity|ObservationEffects|LayoutLifecycle|LayoutProposal)|Accessibility|Collection|CompositionalLazy|HostedCollection|OffscreenAccessibility|Scroll)
-B|^SwiftTUITests\.(FrameworkStress|InteractiveRuntime|DefaultPalette|Palette|Portal|NestedPresentation)
+A|^SwiftTUITests\.(AdversarialSet(A|D|E)|FrameworkStress(PopoverTipLifecycle|NavigationPresentation|StateIdentity|ObservationEffects|LayoutLifecycle|LayoutProposal)|Accessibility|Collection|CompositionalLazy|HostedCollection|OffscreenAccessibility|Scroll)
+B|^SwiftTUITests\.(AdversarialSetC|FrameworkStress|InteractiveRuntime|DefaultPalette|Palette|Portal|NestedPresentation)
 C|^SwiftTUITests\.
 isolated|AsyncLifecycleGenerationTests
 isolated|AsyncFrameTailRenderingTests

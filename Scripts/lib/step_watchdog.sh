@@ -361,14 +361,20 @@ dump_hang_diagnostics() {
   done
 }
 
-run_logged_command() {
+run_logged_command() (
   log_file=$1
   status_file=$2
   timeout_file=$3
   watchdog_cancel_file=$timeout_file.cancel
+  watchdog_log_file=$timeout_file.diagnostics
   shift 3
 
-  rm -f "$status_file" "$timeout_file" "$watchdog_cancel_file"
+  rm -f "$status_file" "$timeout_file" "$watchdog_cancel_file" "$watchdog_log_file"
+  # Watchdog diagnostics must not be mistaken for command progress. Keep them
+  # live on the caller's output, then append them to the retained step log once
+  # its command-output tee has drained. In particular, a busy-grace NOTE must
+  # not reset the remaining grace to another whole idle window (STUI-853).
+  exec 4>&1
 
   (
     set +e
@@ -459,9 +465,8 @@ run_logged_command() {
             # Quiet, but working: a buffered writer, not a wedge. Grant another
             # window from a fixed per-step budget, so a genuine livelock still
             # dies here rather than at the absolute cap. The grant is charged
-            # UP FRONT and never refunded when output resumes — this very NOTE
-            # grows the log, and refunding on log growth would let the watchdog
-            # extend itself forever. Charging seconds rather than counting
+            # UP FRONT and never refunded when command output resumes.
+            # Charging seconds rather than counting
             # windows is what keeps the worst case additive: the whole budget
             # can never buy more than `step_busy_grace_seconds` of extra
             # silence, whatever the idle bound is.
@@ -500,7 +505,7 @@ run_logged_command() {
           kill_process_tree "$command_pid" KILL
         fi
       fi
-    ) &
+    ) 2>&1 | tee "$watchdog_log_file" >&4 &
     watchdog_pid=$!
 
     wait "$command_pid"
@@ -520,6 +525,10 @@ run_logged_command() {
     exit 0
   ) 2>&1 | tee "$log_file"
 
+  if [ -f "$watchdog_log_file" ]; then
+    cat "$watchdog_log_file" >>"$log_file"
+    rm -f "$watchdog_log_file"
+  fi
   command_status=$(read_step_exit_code "$status_file")
   [ "$command_status" -eq 0 ]
-}
+)

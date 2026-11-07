@@ -67,6 +67,32 @@ struct PerTickPresentCadenceTests {
     #expect(RuntimeRenderMode.parse("sync") == .sync)
   }
 
+  @Test("the steady-window wait cannot use presentations from before release")
+  @MainActor
+  func steadyWindowRequiresNewPresentations() async {
+    var frames = ["tick 0", "tick 1", "tick 2", "tick 3", "tick 4"]
+    let baseline = distinctTickValues(in: frames)
+    let evaluated = AsyncEvent()
+    let signal = MainActorConditionSignal()
+    var resumed = false
+    let waiter = Task { @MainActor in
+      await signal.wait {
+        evaluated.fire()
+        return hasFourNewTicks(in: frames, since: baseline)
+      }
+      resumed = true
+    }
+    await evaluated.wait()
+    #expect(!resumed)
+    frames += ["tick 5", "tick 6", "tick 7"]
+    signal.notify()
+    #expect(!hasFourNewTicks(in: frames, since: baseline))
+    frames.append("tick 8")
+    signal.notify()
+    await waiter.value
+    #expect(resumed)
+  }
+
   // MARK: Composed-runtime A/B pair
 
   @MainActor
@@ -97,14 +123,15 @@ struct PerTickPresentCadenceTests {
     harness.stateContainer.replace(with: 1)
     phase("awaiting injected pending intent")
     await harness.scheduler.waitForPendingFrame(at: .now())
+    let ticksBeforeRelease = distinctTickValues(in: harness.terminal.frames)
     harness.gate.release()
 
     // Steady window, signal-synchronised on presents: at least 4 distinct
     // tick values must reach the surface (per-tick delivery beyond the held
     // frame; kept small so slow runners fit the suite time limit).
-    phase("awaiting 4 distinct presented ticks")
+    phase("awaiting 4 new presented ticks; baseline=\(ticksBeforeRelease.sorted())")
     await harness.terminal.frameSignal.wait {
-      distinctTickValues(in: harness.terminal.frames).count >= 4
+      hasFourNewTicks(in: harness.terminal.frames, since: ticksBeforeRelease)
     }
 
     harness.requestExit()
@@ -287,15 +314,16 @@ struct PerTickPresentCadenceTests {
     harness.stateContainer.replace(with: 1)
     phase("awaiting injected pending intent")
     await harness.scheduler.waitForPendingFrame(at: .now())
+    let ticksBeforeRelease = distinctTickValues(in: harness.terminal.frames)
     harness.gate.release()
 
     // The guard's commit is observable as the held tick value presenting:
     // under plain `.async` this exact scenario records `dropped_completed`
     // (the red-proof above); with the guard on the frame must reach the
     // surface instead.
-    phase("awaiting 4 distinct presented ticks")
+    phase("awaiting 4 new presented ticks; baseline=\(ticksBeforeRelease.sorted())")
     await harness.terminal.frameSignal.wait {
-      distinctTickValues(in: harness.terminal.frames).count >= 4
+      hasFourNewTicks(in: harness.terminal.frames, since: ticksBeforeRelease)
     }
 
     harness.requestExit()
@@ -446,4 +474,8 @@ private func distinctTickValues(in frames: [String]) -> Set<Int> {
     }
   }
   return values
+}
+
+private func hasFourNewTicks(in frames: [String], since baseline: Set<Int>) -> Bool {
+  distinctTickValues(in: frames).subtracting(baseline).count >= 4
 }

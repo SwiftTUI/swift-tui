@@ -26,6 +26,11 @@ on:
       - "Scripts/**"
       - "Tools/TermUIPerf/**"
   workflow_dispatch:
+    inputs:
+      qualify_app_shell:
+        description: Run seven app-shell probes and the full suite on three fresh amd64 jobs
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -39,9 +44,13 @@ env:
 
 jobs:
   termui-perf-tests:
-    name: TermUIPerf package tests
+    name: TermUIPerf package tests (${{ matrix.sample }})
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: ${{ inputs.qualify_app_shell && 30 || 20 }}
+    strategy:
+      fail-fast: false
+      matrix:
+        sample: ${{ fromJSON(inputs.qualify_app_shell && '[1,2,3]' || '[1]') }}
 
     steps:
       - name: Checkout
@@ -112,17 +121,21 @@ jobs:
         shell: bash
         env:
           DISABLE_EXPLICIT_PLATFORMS: "1"
-          # Quarantined on the amd64 CI runners only — the app-shell scenario
-          # stalls after its close-menu click here (no frames for the whole
-          # idle window) while the identical suite passes on macOS arm64 and
-          # in the arm64 Linux container, and the Repo Gate's menu/presentation
-          # coverage is green on these same runners. Tracked in
-          # swift-tui-org/docs/swift-tui/KNOWN-TEST-FLAKES.md ("TermUIPerf app-shell scenario stall on
-          # amd64 CI"); remove this skip when that entry is closed.
-          SWIFTTUI_PERF_SMOKE_SKIP: "example-app-shell-workflow"
         run: |
           set -euo pipefail
           # Cold renders and live scenarios share the main actor. Keep unrelated
           # tests out of each scenario's watchdog window (STUI-1080); sync/async
           # rendering and all workload assertions remain exercised within tests.
           swiftly run swift test --no-parallel --package-path Tools/TermUIPerf
+
+      - name: Qualify the former app-shell quarantine
+        if: inputs.qualify_app_shell
+        shell: bash
+        env:
+          DISABLE_EXPLICIT_PLATFORMS: "1"
+        run: |
+          set -euo pipefail
+          for sample in 1 2 3 4 5 6 7; do
+            echo "App-shell qualification $sample of 7"
+            swiftly run swift test --skip-build --no-parallel --package-path Tools/TermUIPerf --filter appShellCompletesEveryInteraction
+          done

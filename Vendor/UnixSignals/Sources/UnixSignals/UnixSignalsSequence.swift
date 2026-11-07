@@ -125,7 +125,7 @@ extension UnixSignalsSequence {
         }
 
         #if canImport(Darwin)
-          unsafe SignalRegistrationTrampoline.registrationGapHookForTesting?()
+          unsafe await SignalRegistrationTrampoline.registrationGapHookForTesting?()
         #endif
 
         let stream = AsyncStream<UnixSignal> { continuation in

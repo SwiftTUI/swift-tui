@@ -1,39 +1,12 @@
 name: Repo Gate
 
-# The push/PR verdict for swift-tui: Linux only, one hot-path verdict per
-# push, with bounded build and execution steps.
-#
-# The single 30-minute job this replaced compiled the package once (≈ 9.6
-# min), launched `swift test` 27 more times (≈ 8 s of fixed cost each),
-# compiled Core+Views a second time for the Foundation audit, then spent
-# 18 minutes in the serialized SwiftTUITests lane. The jobs below run exactly
-# the same surface in parallel; `Scripts/test_all.sh --lane <lane>` is the
-# one implementation (its default `all` lane is the local `bun run test`),
-# and `Scripts/data/runtime-shards.txt` is the one source of truth for how
-# the serialized lane is sharded (the policy lane's coverage check fails if a
-# suite is claimed by no shard, or a shard claims nothing).
-#
-#   policy               bare runner + bun: policy phase, guardrails,
-#                        self-tests — no Swift toolchain            ~1.5 min
-#   core                 image: build once; every non-runtime test
-#                        target in one parallel launch; the isolated
-#                        SwiftTUITests suites; entry-point fixtures;
-#                        Foundation audit from the build's own
-#                        module traces                               ~15 min
-#   runtime (A, B, C)    image: bounded cold build, then one serialized
-#                        SwiftTUITests shard and execution check
-#   wasi-cross-compile   image (it ships the wasm SDK)                ~2 min
-#   Linux repo gate      aggregator: the branch-protection target;
-#                        scans the merged soundness traces of every
-#                        lane once, against the whole-surface ledger
-#
-# Container jobs run in the image build-linux-image.yml publishes (toolchain,
-# wasm SDK, bun, ripgrep, python3, gdb), which removes the apt + swiftly
-# install steps from every job and with them the apt-mirror stall class of
-# 2026-08-19. The image tag tracks .swift-version: bump the `swift-<version>`
-# tag below in the same commit as the toolchain pin. A pull failure or a
-# version mismatch (Scripts/prepare_ci_container.sh) fails fast on purpose —
-# no fallback to a network install.
+# One instrumented native build per architecture feeds the core and three
+# serialized runtime shards. The artifact belongs to this exact workflow run;
+# consumers verify revision, toolchain, platform, architecture and checkout path.
+# The required Linux repo gate checks every job and the merged soundness ledger.
+# Shard membership lives only in Scripts/data/runtime-shards.txt; policy checks
+# require every suite to be selected exactly once. WASI builds independently.
+# The container tag tracks .swift-version and is checked by prepare_ci_container.
 
 on:
   push:
@@ -64,7 +37,7 @@ env:
   # compile lines or per-test lines; the CPU-aware grace below distinguishes
   # slow active work from a parked process.
   #
-  # The core and runtime jobs override the deadline for their cold-build budget;
+  # Compilation has its own bounded job;
   # the policy job has a tighter cap and overrides these bounds.
   # Worst-case kill = 600 idle + 300 grace + 10 kill grace = 910 s. It was
   # 2410 s until 2026-08-29 — the grace was a COUNT of three forgiven windows,
@@ -172,23 +145,94 @@ jobs:
           if-no-files-found: error
           retention-days: 1
 
+  native-build:
+    name: Build native tests (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    container:
+      image: ghcr.io/swifttui/swift-tui-linux:swift-6.4.0
+      options: --cap-add=SYS_PTRACE
+    timeout-minutes: 35
+    env:
+      DISABLE_EXPLICIT_PLATFORMS: "1"
+      SWIFTTUI_WARNINGS_AS_ERRORS: "1"
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(github.event_name == 'workflow_dispatch' && inputs.run_arm64 && '{"include":[{"arch":"amd64","runner":"ubuntu-24.04"},{"arch":"arm64","runner":"ubuntu-24.04-arm"}]}' || '{"include":[{"arch":"amd64","runner":"ubuntu-24.04"}]}') }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+      - name: Record native build start
+        shell: bash
+        run: echo "LANE_STARTED_EPOCH=$(date +%s)" >> "$GITHUB_ENV"
+      - name: Prepare container environment
+        shell: bash
+        run: Scripts/prepare_ci_container.sh
+
+      - name: Cache SwiftPM
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/org.swift.swiftpm
+          key: ${{ runner.os }}-${{ matrix.arch }}-swiftpm-lane-${{ hashFiles('Package.resolved') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ matrix.arch }}-swiftpm-lane-
+
+      - name: Build native test bundle once
+        timeout-minutes: 30
+        shell: bash
+        run: Scripts/build_ci_test_bundle.sh
+
+      - name: Retain native build diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: native-build-diagnostics-linux-${{ matrix.arch }}
+          path: .build/ci-build.*
+          retention-days: 3
+      - name: Package exact-revision test bundle
+        run: python3 Scripts/ci_test_bundle.py pack
+
+      - name: Upload native test bundle
+        uses: actions/upload-artifact@v7
+        with:
+          name: native-tests-linux-${{ matrix.arch }}
+          path: ci-test-bundle.tar.gz
+          compression-level: 0
+          retention-days: 1
+
+      - name: Record native build result
+        if: always()
+        shell: bash
+        env:
+          ARCH: ${{ matrix.arch }}
+          LANE_RESULT: ${{ job.status }}
+        run: |
+          set -euo pipefail
+          mkdir -p .ci-results
+          duration="-"
+          if [ -n "${LANE_STARTED_EPOCH:-}" ]; then
+            duration="$(($(date +%s) - LANE_STARTED_EPOCH))"
+          fi
+          printf '%s|%s|%s\n' "native-build-$ARCH" "$LANE_RESULT" "$duration" > ".ci-results/native-build-$ARCH.result"
+      - name: Upload native build result
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ci-test-result-native-build-${{ matrix.arch }}
+          path: .ci-results/native-build-${{ matrix.arch }}.result
+          if-no-files-found: error
+          retention-days: 1
+
   core:
+    needs: native-build
     name: Core lane (${{ matrix.arch }})
     runs-on: ${{ matrix.runner }}
     container:
-      # Tracks .swift-version — bump together. See the header comment.
       image: ghcr.io/swifttui/swift-tui-linux:swift-6.4.0
-      # The step watchdog's hang diagnostics attach gdb to a process that is
-      # not its descendant; yama ptrace_scope=1 refuses that without the
-      # capability, and the default container capability set omits it.
       options: --cap-add=SYS_PTRACE
-    # A cold Swift 6.4 test build took 1205 s, followed by 177 s for public
-    # import consumers and the remaining suites. The 30-minute cap cancelled
-    # a progressing collection journey (STUI-1400); keep the per-step watchdog
-    # bounds unchanged and allow the full core lane to finish.
-    timeout-minutes: 45
+    timeout-minutes: 30
     env:
-      SWIFTTUI_TEST_STEP_WATCHDOG_DEADLINE_SECONDS: "2700"
+      SWIFTTUI_TEST_STEP_WATCHDOG_DEADLINE_SECONDS: "1800"
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(github.event_name == 'workflow_dispatch' && inputs.run_arm64 && '{"include":[{"arch":"amd64","runner":"ubuntu-24.04"},{"arch":"arm64","runner":"ubuntu-24.04-arm"}]}' || '{"include":[{"arch":"amd64","runner":"ubuntu-24.04"}]}') }}
@@ -213,16 +257,14 @@ jobs:
         shell: bash
         run: Scripts/prepare_ci_container.sh
 
-      - name: Cache SwiftPM
-        uses: actions/cache@v6
+      - name: Download native test bundle
+        uses: actions/download-artifact@v8
         with:
-          path: ~/.cache/org.swift.swiftpm
-          key: ${{ runner.os }}-${{ matrix.arch }}-swiftpm-lane-${{ hashFiles('Package.resolved') }}
-          restore-keys: |
-            ${{ runner.os }}-${{ matrix.arch }}-swiftpm-lane-
+          name: native-tests-linux-${{ matrix.arch }}
 
-      # Present in images built after 2026-08-25; installed here until then.
-      # Root in the container has no sudo.
+      - name: Restore native test bundle
+        run: tar -xzf ci-test-bundle.tar.gz && rm ci-test-bundle.tar.gz
+
       - name: Ensure gdb for hang diagnostics
         shell: bash
         run: |
@@ -239,7 +281,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          sh ./Scripts/test_gate.sh --lane core
+          sh ./Scripts/test_gate.sh --prebuilt --lane core
 
       - name: Record unsupported Apple semantic oracle on Linux
         shell: bash
@@ -301,17 +343,15 @@ jobs:
           retention-days: 1
 
   runtime:
+    needs: native-build
     name: Runtime shard ${{ matrix.shard }} (${{ matrix.arch }})
     runs-on: ${{ matrix.runner }}
     container:
       image: ghcr.io/swifttui/swift-tui-linux:swift-6.4.0
       options: --cap-add=SYS_PTRACE
-    # A cold test build took 750 s on amd64 before the serialized C shard
-    # started. Give compilation its own bounded step instead of consuming the
-    # runtime watchdog's unchanged 1500 s absolute limit.
-    timeout-minutes: 45
+    timeout-minutes: 30
     env:
-      SWIFTTUI_TEST_STEP_WATCHDOG_DEADLINE_SECONDS: "2700"
+      SWIFTTUI_TEST_STEP_WATCHDOG_DEADLINE_SECONDS: "1800"
     strategy:
       fail-fast: false
       # `arch` must be an original matrix key: an `include` row whose arch is
@@ -339,13 +379,13 @@ jobs:
         shell: bash
         run: Scripts/prepare_ci_container.sh
 
-      - name: Cache SwiftPM
-        uses: actions/cache@v6
+      - name: Download native test bundle
+        uses: actions/download-artifact@v8
         with:
-          path: ~/.cache/org.swift.swiftpm
-          key: ${{ runner.os }}-${{ matrix.arch }}-swiftpm-lane-${{ hashFiles('Package.resolved') }}
-          restore-keys: |
-            ${{ runner.os }}-${{ matrix.arch }}-swiftpm-lane-
+          name: native-tests-linux-${{ matrix.arch }}
+
+      - name: Restore native test bundle
+        run: tar -xzf ci-test-bundle.tar.gz && rm ci-test-bundle.tar.gz
 
       - name: Ensure gdb for hang diagnostics
         shell: bash
@@ -359,23 +399,13 @@ jobs:
             Scripts/apt_get_retry.sh install -y --no-install-recommends gdb
           fi
 
-      - name: Build runtime test bundle
-        timeout-minutes: 20
-        shell: bash
-        env:
-          DISABLE_EXPLICIT_PLATFORMS: "1"
-          SWIFTTUI_WARNINGS_AS_ERRORS: "1"
-        run: |
-          set -euo pipefail
-          swiftly run swift build --build-system native --build-tests -Xswiftc -emit-loaded-module-trace
-
       - name: Run runtime shard
         shell: bash
         env:
           SHARD: ${{ matrix.shard }}
         run: |
           set -euo pipefail
-          sh ./Scripts/test_gate.sh --lane "runtime:$SHARD"
+          sh ./Scripts/test_gate.sh --prebuilt --lane "runtime:$SHARD"
 
       - name: Upload soundness traces
         if: always() && matrix.arch == 'amd64'
@@ -496,6 +526,7 @@ jobs:
     runs-on: ubuntu-24.04
     needs:
       - policy
+      - native-build
       - core
       - runtime
       - wasi-cross-compile
@@ -553,6 +584,7 @@ jobs:
     runs-on: ubuntu-24.04
     needs:
       - policy
+      - native-build
       - core
       - runtime
       - linux-gate-required
@@ -584,6 +616,7 @@ jobs:
           expected_file=.ci-results/expected.txt
           cat > "$expected_file" <<'EOT'
           policy|Policy lane|Linux|amd64|ubuntu-24.04|SWIFTTUI_SKIP_PUBLIC_API_BASELINE=1 sh ./Scripts/test_gate.sh --lane policy --skip-bun-install
+          native-build-amd64|Native test build|Linux|amd64|ubuntu-24.04 (swift-tui-linux image)|Scripts/build_ci_test_bundle.sh
           core|Core lane|Linux|amd64|ubuntu-24.04 (swift-tui-linux image)|SWIFTTUI_SKIP_PUBLIC_API_BASELINE=1 SWIFTTUI_SKIP_TERMUIPERF=1 sh ./Scripts/test_gate.sh --lane core
           runtime-A|Runtime shard A|Linux|amd64|ubuntu-24.04 (swift-tui-linux image)|sh ./Scripts/test_gate.sh --lane runtime:A
           runtime-B|Runtime shard B|Linux|amd64|ubuntu-24.04 (swift-tui-linux image)|sh ./Scripts/test_gate.sh --lane runtime:B
@@ -591,6 +624,7 @@ jobs:
           EOT
           if [ "$RUN_ARM64" = "true" ]; then
             cat >> "$expected_file" <<'EOT'
+          native-build-arm64|Native test build|Linux|arm64|ubuntu-24.04-arm (swift-tui-linux image)|Scripts/build_ci_test_bundle.sh
           core-arm64|Core lane|Linux|arm64|ubuntu-24.04-arm (swift-tui-linux image)|SWIFTTUI_SKIP_PUBLIC_API_BASELINE=1 SWIFTTUI_SKIP_TERMUIPERF=1 sh ./Scripts/test_gate.sh --lane core
           runtime-A-arm64|Runtime shard A|Linux|arm64|ubuntu-24.04-arm (swift-tui-linux image)|sh ./Scripts/test_gate.sh --lane runtime:A
           runtime-B-arm64|Runtime shard B|Linux|arm64|ubuntu-24.04-arm (swift-tui-linux image)|sh ./Scripts/test_gate.sh --lane runtime:B
