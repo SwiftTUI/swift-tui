@@ -167,6 +167,7 @@ package enum WebSurfaceFrameEncoder {
   package struct EncodingOutcome {
     package var record: String
     package var failureDescription: String?
+    package var runtimeIssue: RuntimeIssue? = nil
   }
 
   package static func encode(
@@ -174,7 +175,10 @@ package enum WebSurfaceFrameEncoder {
     fallbackBackground: Color,
     state: inout HostWireEncodingState
   ) -> String {
-    encodeReportingFailure(model, fallbackBackground: fallbackBackground, state: &state).record
+    let output = encodeReportingFailure(
+      model, fallbackBackground: fallbackBackground, state: &state)
+    if let issue = output.runtimeIssue { RuntimeIssueSink.reportToStandardError(issue) }
+    return output.record
   }
 
   package static func encodeReportingFailure(
@@ -187,9 +191,27 @@ package enum WebSurfaceFrameEncoder {
       try HostWireBudget.validate(model)
       let output = try encodeAdmitted(
         model, fallbackBackground: fallbackBackground, state: &candidate)
+      candidate.omitsAccessibility = false
       state = candidate
       return EncodingOutcome(record: output)
     } catch {
+      if error is HostWireBudget.Exceeded, !model.accessibilityNodes.isEmpty {
+        let fallback = model.omittingAccessibilityTree()
+        // A failed attempt may have interned styles/images or advanced its
+        // generation. Retry from the last delivered state, not that candidate.
+        var retry = state
+        do {
+          try HostWireBudget.validate(fallback)
+          let output = try encodeAdmitted(
+            fallback, fallbackBackground: fallbackBackground, state: &retry)
+          let issue = state.omitsAccessibility ? nil : HostWireBudget.accessibilityOmissionIssue
+          retry.omitsAccessibility = true
+          state = retry
+          return EncodingOutcome(record: output, runtimeIssue: issue)
+        } catch {
+          // Non-accessibility overflow keeps the established rejection policy.
+        }
+      }
       state.hasBaseline = false
       return EncodingOutcome(
         record: HostWireBudget.rejectionRecord,

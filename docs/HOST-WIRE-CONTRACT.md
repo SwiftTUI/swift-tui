@@ -262,8 +262,27 @@ frame before committing its baseline and consumed generation.
 
 Swift encoding uses candidate delivery state, bounded component collection,
 and a byte-counted output builder. Renderer damage from an older grid or
-with duplicate rows is clipped and normalized before wire encoding. Failed
-surface encoding emits a fixed
+with duplicate rows is clipped and normalized before wire encoding. If a surface
+exceeds the budget and carries an accessibility tree, the encoder retries from
+the last delivered state with that entire tree omitted. This covers oversized
+labels, editable values, aggregate text, node count, and encoded JSON overhead.
+Values are never truncated. A successful retry admits the visual frame and
+clears the host's previous accessibility tree, on both full and delta frames.
+The complete tree returns automatically on the next frame that fits. Other
+metadata retains its normal validation and admission rules.
+
+The first successful omission in an episode reports the fixed warning
+`accessibility.budgetExceeded` through the standard runtime diagnostic channel
+(stderr, a diagnostic bundle, or the bounded terminal-deferred buffer).
+Diagnostics remain outside the surface record: Android accepts one record per
+copy, and appending a diagnostic could overflow WebHost's outbound byte budget.
+Repeated omitted frames do not repeat the warning; an admitted complete tree or
+a new negotiated encoding epoch starts a new episode. The internal encoding
+outcome also returns the warning separately. Omission is a degraded accessibility
+state, not full assistive conformance; applications should keep visible semantic
+content within the published wire budget.
+
+If the retry also fails, surface encoding emits a fixed
 `surface.budgetExceeded` runtime issue, preserves generation/style/image
 delivery state, and forces the next admitted surface to be full. Over-budget
 clipboard writes return false before queue admission. Image transmit-once

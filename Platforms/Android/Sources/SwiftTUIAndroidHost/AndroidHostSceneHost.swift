@@ -24,6 +24,7 @@ private struct AndroidHostSceneHostState: Sendable {
   // cross-frame state, so the bytes a consumer receives always name a
   // baseline the encoder still believes in.
   var candidateEncodingState: HostWireEncodingState?
+  var candidateRuntimeIssue: RuntimeIssue?
   // The accumulated damage the candidate encode consumed. Held aside rather
   // than dropped so an abandoned handshake can fold it back into the live
   // accumulator; dropped for good only at commit.
@@ -123,6 +124,7 @@ private final class AndroidHostSceneHostStateBox: Sendable {
       state.encodedFrameBytes = nil
       state.encodedUpToRevision = nil
       state.candidateEncodingState = nil
+      state.candidateRuntimeIssue = nil
       state.candidateDamage = nil
       state.hasCandidateDamage = false
       state.pendingDamage = nil
@@ -249,6 +251,7 @@ private final class AndroidHostSceneHostStateBox: Sendable {
           fallbackBackground: style.renderStyle.appearance.backgroundColor,
           state: &candidate
         )
+        state.candidateRuntimeIssue = output.runtimeIssue
         state.encodedFrameBytes = Array(output.record.utf8)
         state.encodedUpToRevision = state.frameDeliveryRevision
         state.encodedFrameCount += 1
@@ -274,6 +277,10 @@ private final class AndroidHostSceneHostStateBox: Sendable {
       if let candidate = state.candidateEncodingState {
         state.webEncodingState = candidate
         state.candidateEncodingState = nil
+        if let issue = state.candidateRuntimeIssue {
+          RuntimeIssueSink.reportToStandardError(issue)
+          state.candidateRuntimeIssue = nil
+        }
         state.candidateDamage = nil
         state.hasCandidateDamage = false
       }
@@ -306,6 +313,7 @@ private final class AndroidHostSceneHostStateBox: Sendable {
     state.candidateDamage = nil
     state.hasCandidateDamage = false
     state.candidateEncodingState = nil
+    state.candidateRuntimeIssue = nil
     state.encodedFrameBytes = nil
     state.encodedUpToRevision = nil
   }

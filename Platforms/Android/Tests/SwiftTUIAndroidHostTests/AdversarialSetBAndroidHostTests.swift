@@ -129,6 +129,59 @@
       #expect(host.consumedFrameEncodeCount == 3)
     }
 
+    @Test func oversizedAccessibilityStillCopiesOneSurfaceRecordAndRecovers() async throws {
+      let host = try AndroidHostSceneHost(app: SetBStaticApp())
+      let handle = AndroidHostHandleRegistry.register(host)
+      defer { swift_tui_android_destroy(handle) }
+      try #require(host.declareCapabilities(json: "{\"acceptsDeltaFrames\":true}"))
+      for (index, label) in [
+        "normal", String(repeating: "x", count: HostWireBudget.recordBytes),
+        "restored",
+      ].enumerated() {
+        let node = AccessibilityNode(
+          identity: Identity(components: ["label"]),
+          rect: .init(origin: .zero, size: .init(width: 1, height: 1)), role: .group, label: label)
+        _ = try host.surface.present(
+          SemanticHostFrame(
+            sequence: UInt64(index + 1),
+            raster: RasterSurface(size: .init(width: 1, height: 1), cells: setBCells(["A"])),
+            semantics: SemanticSnapshot(accessibilityNodes: [node]), focusedIdentity: nil,
+            rasterDamage: setBRowDamage(0, [0..<1])))
+        await Task.yield()
+        let record = try setBCopyRecord(handle)
+        #expect(record["gen"] as? Int == index + 1)
+        #expect((record["accessibilityTree"] as? [Any] ?? []).count == (index == 1 ? 0 : 1))
+        #expect(host.latestEncodingErrorDescription == nil)
+      }
+    }
+
+    @Test func abandonedOversizedAccessibilityQueriesDoNotCommitAnOmission() throws {
+      let host = try AndroidHostSceneHost(app: SetBStaticApp())
+      let handle = AndroidHostHandleRegistry.register(host)
+      defer { swift_tui_android_destroy(handle) }
+      let node = AccessibilityNode(
+        identity: Identity(components: ["label"]),
+        rect: .init(origin: .zero, size: .init(width: 1, height: 1)), role: .group,
+        label: String(repeating: "x", count: HostWireBudget.recordBytes))
+      for sequence in 1...3 {
+        _ = try host.surface.present(
+          SemanticHostFrame(
+            sequence: UInt64(sequence),
+            raster: RasterSurface(size: .init(width: 1, height: 1), cells: setBCells(["A"])),
+            semantics: SemanticSnapshot(accessibilityNodes: [node]), focusedIdentity: nil))
+        let required = setBSizeQuery(handle)
+        #expect(required > 0)
+        if sequence == 3 {
+          let record = try setBCopyRecord(handle)
+          #expect(record["gen"] as? Int == 1)
+          #expect(record["sequence"] as? Int == 3)
+          #expect((record["accessibilityTree"] as? [Any] ?? []).isEmpty)
+          // Repeated delivery also must not repeat the omission diagnostic.
+          _ = setBCopy(handle, capacity: required)
+        }
+      }
+    }
+
     // Damage that names only rows outside the grid cannot stand for "nothing
     // changed": the changed row must still reach the client, as a full frame
     // or as a delta row, not as an empty delta.

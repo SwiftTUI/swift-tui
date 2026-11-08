@@ -103,6 +103,8 @@ package enum HostWireSchema {
       .init("persistentStyles", wire: .derived("styles and stylesBase")),
       .init("hasBaseline", wire: .derived("selects full or delta record")),
       .init("baselineSize", wire: .derived("selects full or delta record")),
+      .init(
+        "omitsAccessibility", wire: .notSerialized("deduplicates accessibility budget diagnostics")),
     ],
     "AccessibilityFocusPresentation": [
       .init("generation", wire: .key("generation")),

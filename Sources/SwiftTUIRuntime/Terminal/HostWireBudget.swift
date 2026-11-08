@@ -18,6 +18,11 @@ package enum HostWireBudget {
 
   package enum Exceeded: Error { case limit }
 
+  package static let accessibilityOmissionIssue = RuntimeIssue(
+    severity: .warning, code: "accessibility.budgetExceeded",
+    message: "The accessibility tree exceeds the host wire budget and was omitted. "
+      + "The visual frame is still presented; accessibility resumes when the tree fits.")
+
   package static let rejectionRecord =
     "\u{001E}runtimeIssue:{\"severity\":\"error\",\"code\":\"surface.budgetExceeded\","
     + "\"message\":\"Host wire allocation budget exceeded\","
@@ -134,6 +139,13 @@ package enum HostWireBudget {
       try charge(node.label)
       try charge(node.hint)
       try charge(node.liveRegionToken)
+      for category in node.navigationCategories { try charge(category) }
+      if let target = node.actionTarget, let control = node.control {
+        try charge(target)
+        if node.roleToken != "secureField", case .text(let text) = control.value {
+          try charge(text)
+        }
+      }
       if let names = node.control?.customActions {
         guard names.count <= metadataEntries else { throw Exceeded.limit }
         for name in names { try charge(name) }

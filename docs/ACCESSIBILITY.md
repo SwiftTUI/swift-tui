@@ -19,6 +19,15 @@ presentation. Thus, one snapshot stays valid when focus moves.
 
 ## Snapshot consumers and their limits
 
+Browser and Android wire frames have a bounded accessibility representation.
+When an oversized tree would reject a visual frame, the encoder retries without
+the tree and reports `accessibility.budgetExceeded` through the standard runtime
+diagnostic channel. The host clears its previous tree; the complete tree returns
+when it fits again. No labels or editable values are shortened, and the original
+semantic snapshot used by terminal and SwiftUI consumers is unchanged. See the
+[wire admission policy](HOST-WIRE-CONTRACT.md#allocation-budgets) for limits and
+diagnostic delivery.
+
 The batteries-included app ships only the Canvas browser companion. The
 experimental DOM painter and fonts are excluded from its resources; apps can
 serve an explicitly built DOM bundle through `RuntimeConfiguration.browserAssetsPath`.

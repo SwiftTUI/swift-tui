@@ -33,6 +33,11 @@ truncation do not shorten the source. An explicit role
 an empty label stays empty. Empty or whitespace-only unannotated text is omitted.
 Use `accessibilityHidden()` for decorative text.
 
+Browser and Android wire budgets also apply to semantic text. If a tree exceeds
+those budgets, the visual frame continues with the tree omitted until it fits
+again. The runtime reports `accessibility.budgetExceeded`; editable values are
+never truncated. Terminal and native SwiftUI snapshots retain the full text.
+
 Primitive labels and style chrome are represented by their owner's accessible
 name rather than separate reading items. A standalone `Label` publishes its
 authored title, including when its style displays only the icon. Disclosed and

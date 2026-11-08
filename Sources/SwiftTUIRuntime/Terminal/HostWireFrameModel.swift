@@ -145,7 +145,7 @@ package struct HostWireFrameModel {
     }
   }
 
-  package let accessibilityNodes: [WireAccessibilityNode]
+  package private(set) var accessibilityNodes: [WireAccessibilityNode]
   package let paragraphs: [ParagraphRegion]
   package let accessibilityAnnouncements: [WireAnnouncement]
   package let accessibilityActionResponse: AccessibilityActionResponse?
@@ -158,6 +158,12 @@ package struct HostWireFrameModel {
   /// per-adapter (web reads file sources, Android forwards identifiers) but
   /// the pre-blend gate is shared — see ``blendedImagePayload(for:compositor:fallbackBackground:)``.
   package let imageAttachments: [RasterImageAttachment]
+
+  package func omittingAccessibilityTree() -> Self {
+    var copy = self
+    copy.accessibilityNodes = []
+    return copy
+  }
 
   // MARK: - Construction
 
@@ -357,6 +363,8 @@ package struct HostWireEncodingState: Sendable {
   package var persistentStyles: HostWireStyleTable
   package var hasBaseline: Bool
   package var baselineSize: CellSize?
+  /// Deduplicates the diagnostic during one uninterrupted omission episode.
+  package var omitsAccessibility = false
 
   package init(
     deltaEnabled: Bool,

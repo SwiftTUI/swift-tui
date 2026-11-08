@@ -10,17 +10,23 @@ extension RuntimeIssueSink {
 
   package static func standardError(to descriptor: Int32) -> RuntimeIssueSink {
     RuntimeIssueSink { issue in
-      let line = issue.description + "\n"
-      if DebugLogRouter.emit(
-        line,
-        toFileAt: DebugLogRouter.resolvedFilePath(
-          override: nil, bundleFileName: "runtime-issues.log"),
-        fallback: .safeStandardError, standardErrorDescriptor: descriptor)
-      {
-        return
-      }
-      DeferredRuntimeIssueBuffer.append(line)
+      reportToStandardError(issue, descriptor: descriptor)
     }
+  }
+
+  /// Encoding can run off the main actor, including Android's synchronous
+  /// copy path. Keep its diagnostic outside the bounded single-record buffer.
+  package static func reportToStandardError(_ issue: RuntimeIssue, descriptor: Int32 = 2) {
+    let line = issue.description + "\n"
+    if DebugLogRouter.emit(
+      line,
+      toFileAt: DebugLogRouter.resolvedFilePath(
+        override: nil, bundleFileName: "runtime-issues.log"),
+      fallback: .safeStandardError, standardErrorDescriptor: descriptor)
+    {
+      return
+    }
+    DeferredRuntimeIssueBuffer.append(line)
   }
 
   /// Writes any screen-deferred runtime issues to standard error.
