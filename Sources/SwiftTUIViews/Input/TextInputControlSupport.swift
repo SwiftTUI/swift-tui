@@ -21,6 +21,9 @@ package func registerTextInputBinding(
   intake.registerAction(
     identity: context.identity,
     accessibilityHandler: { action in
+      // Selection-only requests carry expected text. A secure control must not
+      // compare that guess with its binding, including through direct dispatch.
+      if traits.isSecure, action.kind == .selectText { return .unsupported }
       switch action {
       case .editText(let edit), .selectText(let edit):
         guard let selection = textSelection(for: edit),

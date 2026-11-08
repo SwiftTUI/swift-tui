@@ -80,15 +80,19 @@ Supported primitive routes:
 | Toggle, DisclosureGroup | activate, setValue | boolean |
 | Slider, Stepper | increment, decrement, setValue | number |
 | TextField, TextEditor | setValue, editText, selectText | text |
-| SecureField | setValue, editText, selectText | omitted |
+| SecureField | setValue, editText | omitted |
 
 Text edits carry a replacement string and directed UTF-16 anchor/head offsets.
 Selection-only requests carry the expected current string and never write the
 application binding. Both endpoints must be valid grapheme boundaries. The
 runtime rejects stale expected text and out-of-range/split-grapheme selections.
-Read-only editors permit selection review while rejecting value mutations.
+Read-only nonsecure editors permit selection review while rejecting value mutations.
 Ordinary keyboard commands reuse the resulting caret. Secure fields do not
-publish their value, selection or native text-query geometry.
+publish their value, selection or native text-query geometry. They neither
+advertise nor accept `selectText`: every selection-only request is unsupported,
+without comparing the supplied text to the secret. Secure `editText` and
+`setValue` remain replacement operations and acknowledge valid values identically
+whether or not the replacement equals the previous value.
 
 ### Wire compatibility
 

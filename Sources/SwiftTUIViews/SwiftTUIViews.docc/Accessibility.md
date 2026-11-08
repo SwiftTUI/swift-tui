@@ -450,12 +450,15 @@ Buttons support focus and activation. Toggle and DisclosureGroup also accept
 boolean values. Slider and Stepper accept increment, decrement, and numeric
 values within their bounds. TextField and TextEditor accept replacement text;
 SecureField accepts replacement text but never publishes its contents. The
-`editText` and `selectText` actions carry directed UTF-16 selection with the
-expected text. Selection-only review never writes the application binding;
-obsolete text, split graphemes and invalid offsets are rejected. Read-only
+`editText` action carries replacement text and directed UTF-16 selection.
+Nonsecure editors also accept `selectText` with the expected current text.
+Selection-only review never writes the application binding; obsolete text,
+split graphemes and invalid offsets are rejected. Read-only nonsecure
 controls permit selection review but reject edits. Nonsecure editors publish
 selection/caret for browser and ordinary keyboard handoff. Secure controls omit
-that state and their value from host snapshots. Input normalization remains
+that state and their value from host snapshots, and reject every `selectText`
+request without comparing its text to the secret. Their `editText` and `setValue`
+acknowledgements do not distinguish unchanged from replaced text. Input normalization remains
 owned by the control. Single-line fields reject assistive replacement values
 containing Unicode newlines as a whole; ordinary typed or pasted insertion
 removes those separators. Multiline editing and rendering recognize the same

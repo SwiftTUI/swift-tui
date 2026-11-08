@@ -1088,6 +1088,107 @@ struct AccessibilityActionRuntimeTests {
         == .init(requestID: 2, target: target, result: .accepted))
   }
 
+  @Test("SecureField selection responses never confirm text guesses", arguments: [false, true])
+  func secureFieldSelectionDoesNotRevealText(readOnly: Bool) throws {
+    var text = "secret"
+    var writes = 0
+    var reads = 0
+    let binding = Binding(
+      get: {
+        reads += 1
+        return text
+      },
+      set: {
+        text = $0
+        writes += 1
+      })
+    let surface = SemanticHostFrameDispatchSurface()
+    let root = testIdentity("SecureSelectionRoot")
+    let focus = FocusTracker(invalidationIdentities: [root])
+    let loop = RunLoop(
+      rootIdentity: root, presentationSurface: surface,
+      terminalInputReader: CursorFocusTestInputReader(),
+      signalReader: CursorFocusTestSignalReader(), scheduler: FrameScheduler(),
+      stateContainer: StateContainer(initialState: 0, invalidationIdentities: [root]),
+      focusTracker: focus, runtimeConfiguration: .default,
+      proposal: .init(width: 24, height: 6),
+      viewBuilder: ScopedMapper { _ in
+        SecureField("Password", text: binding)
+          .accessibilityProperties(.init(readOnly: readOnly))
+      })
+    focus.invalidator = loop.scheduler
+    loop.scheduler.requestInvalidation(of: [root])
+    var frames = 0
+    try loop.renderPendingFrames(renderedFrames: &frames)
+    let node = try #require(
+      loop.publishedAccessibilitySnapshot.accessibilityNodes.first { $0.role == .secureField })
+    let target = try #require(node.actionTarget)
+    let identity = try #require(node.actionIdentity)
+    #expect(node.control?.actions.contains(.selectText) == false)
+    #expect(node.control?.value == nil && node.textInput == nil)
+    let encodedTarget = target.utf8.map { "%" + String($0, radix: 16) }.joined()
+    for (index, guess) in ["wrong", "secret", "", "%73%65%63%72%65%74", "%F0%9F%98%80"].enumerated()
+    {
+      let request = try #require(
+        AccessibilityActionWire.parseCommand(
+          "accessibility:\(index + 1):\(encodedTarget):selectText:text:\(guess):0:0"))
+      _ = loop.handle(.input(.accessibility(request)))
+      try loop.renderPendingFrames(renderedFrames: &frames)
+      #expect(
+        surface.semanticFrames.last?.semantics.accessibilityActionResponse
+          == .init(requestID: UInt64(index + 1), target: target, result: .unsupported))
+      // A direct registry caller also cannot bypass the advertised action set.
+      let readsBeforeDispatch = reads
+      #expect(
+        loop.localActionRegistry.dispatchAccessibility(identity: identity, action: request.action)
+          == .unsupported)
+      #expect(reads == readsBeforeDispatch)
+    }
+    #expect(text == "secret" && writes == 0)
+    #expect(
+      loop.localActionRegistry.dispatchAccessibility(
+        identity: identity,
+        action: .selectText(.init(text: "a😀b", anchor: 2, head: 999))) == .unsupported)
+    // Retained registrations reject guesses even before an externally changed
+    // binding has rendered, and uncorrelated commands use the same policy.
+    text = "replacement"
+    for guess in ["secret", "replacement", "line%0Abreak"] {
+      let request = try #require(
+        AccessibilityActionWire.parseCommand(
+          "accessibility:\(encodedTarget):selectText:text:\(guess):0:0"))
+      let readsBeforeDispatch = reads
+      #expect(loop.handleAccessibilityAction(request) == .unsupported)
+      #expect(
+        loop.localActionRegistry.dispatchAccessibility(identity: identity, action: request.action)
+          == .unsupported)
+      #expect(reads == readsBeforeDispatch)
+    }
+    #expect(text == "replacement" && writes == 0)
+    text = "secret"
+    if !readOnly {
+      for (index, replacement) in ["secret", "changed", "changed", "next"].enumerated() {
+        let action: AccessibilityAction =
+          index < 2
+          ? .editText(.init(text: replacement, anchor: 0, head: 0))
+          : .setValue(.text(replacement))
+        _ = loop.handle(
+          .input(
+            .accessibility(
+              .init(
+                target: target, action: action, requestID: UInt64(10 + index)))))
+        try loop.renderPendingFrames(renderedFrames: &frames)
+        #expect(
+          surface.semanticFrames.last?.semantics.accessibilityActionResponse?.result == .accepted)
+        #expect(text == replacement)
+        let latest = surface.semanticFrames.last?.semantics.accessibilityNodes.first {
+          $0.role == .secureField
+        }
+        #expect(latest?.control?.value == nil && latest?.textInput == nil)
+      }
+      #expect(writes == 2)
+    }
+  }
+
   @Test("Assistive requests reach retained controls and publish typed values")
   func retainedControlActions() throws {
     let root = testIdentity("AssistiveRoot")

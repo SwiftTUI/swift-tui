@@ -131,7 +131,7 @@ extension SecureField {
         ).namingControl(with: label).merging(
           SemanticMetadata(accessibilityLabel: titleAccessibilityLabel)
         ).accessibilityControl(
-          .init(actions: [.focus, .setValue, .editText, .selectText]))
+          .init(actions: [.focus, .setValue, .editText]))
       )
 
     }

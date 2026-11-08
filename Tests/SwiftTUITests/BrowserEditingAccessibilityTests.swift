@@ -52,7 +52,9 @@ struct BrowserEditingAccessibilityTests {
         .init(target: try #require(node().actionTarget), action: action))
     }
     #expect(try send(.focus) == .accepted)
-    #expect(try send(.selectText(.init(text: text, anchor: 3, head: 1))) == .accepted)
+    #expect(
+      try send(.selectText(.init(text: text, anchor: 3, head: 1)))
+        == (kind == 2 ? .unsupported : .accepted))
     try await render()
     #expect(writes == 0)
     if kind == 2 {
@@ -70,7 +72,9 @@ struct BrowserEditingAccessibilityTests {
     _ = harness.runLoop.handle(.input(.key(.init(.character("!")))))
     try await render()
     #expect(text == "a😀X!c" && writes == 2)
-    #expect(try send(.selectText(.init(text: "obsolete", anchor: 0, head: 2))) == .invalidValue)
+    #expect(
+      try send(.selectText(.init(text: "obsolete", anchor: 0, head: 2)))
+        == (kind == 2 ? .unsupported : .invalidValue))
     for offset in [-1, 2, 999] {
       #expect(try send(.editText(.init(text: "a😀bc", anchor: offset, head: 0))) == .invalidValue)
     }
