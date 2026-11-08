@@ -206,23 +206,28 @@ struct AdversarialSetAWireTests {
     #expect(removed["linkTargets"] == nil)
   }
 
-  @Test("A164 an escaped semantic budget failure cannot poison delivery state")
-  func setA164RejectedSemanticPayloadKeepsGenerationAndImages() throws {
+  @Test("A164 escaped semantic overflow preserves visual delivery and image state")
+  func setA164OmittedSemanticPayloadAdvancesGenerationAndKeepsImages() throws {
     var state = deltaState(164)
     _ = try record(imageSurface(), state: &state)
     let knownImages = state.knownImageIDs
     let generation = state.recordsEncoded
     var node = controlNode(target: "valid")
     node.label = String(repeating: "\u{0}", count: HostWireBudget.recordBytes / 6 + 1)
-    let rejected = WebSurfaceFrameEncoder.encode(
-      surface(), sequence: 2, semanticSnapshot: .init(accessibilityNodes: [node]),
-      focusedIdentity: nil, damage: .init(), state: &state)
-    #expect(rejected == HostWireBudget.rejectionRecord)
-    #expect(state.recordsEncoded == generation)
+    let omitted = try record(surface(), nodes: [node], damage: .init(), state: &state)
+    #expect(omitted["accessibilityTree"] == nil)
+    #expect(omitted["encoding"] as? String == "delta")
+    #expect(omitted["gen"] as? UInt64 == generation + 1)
+    #expect(omitted["baselineGen"] as? UInt64 == generation)
+    #expect(state.recordsEncoded == generation + 1)
     #expect(state.knownImageIDs == knownImages)
-    let recovered = try record(surface("r"), state: &state)
-    #expect(recovered["rows"] != nil)
-    #expect(recovered["gen"] as? UInt64 == generation + 1)
+    node.label = "recovered"
+    let recovered = try record(surface("r"), nodes: [node], state: &state)
+    #expect(recovered["encoding"] as? String == "delta")
+    #expect(recovered["gen"] as? UInt64 == generation + 2)
+    #expect(recovered["baselineGen"] as? UInt64 == generation + 1)
+    #expect(try firstNode(recovered)["label"] as? String == "recovered")
+    #expect(state.knownImageIDs == knownImages)
   }
 
   @Test("A165 shrinking and regrowing the grid cannot reuse an obsolete baseline")
