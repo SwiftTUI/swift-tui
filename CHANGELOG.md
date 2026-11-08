@@ -8,6 +8,11 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
 
 ## [Unreleased]
 
+### Fixed
+
+- Deep styled composites no longer overflow the native frame-tail worker stack
+  while checking retained phase reuse (STUI-1494).
+
 ## [0.21.0] - 2026-11-05
 
 The 0.21.x line protects supported public Swift source and the documented Host,

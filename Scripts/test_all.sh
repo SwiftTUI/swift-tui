@@ -1065,6 +1065,13 @@ if lane_runs_core; then
     "Run SwiftTUI collection accessibility transport journeys" \
     "$(swift_command_text test --filter SwiftTUITests.CollectionAccessibilityTransportRegressionTests)" \
     run_swift test --filter SwiftTUITests.CollectionAccessibilityTransportRegressionTests
+
+  # Real compiler/dynamic-loader integration retains its complete serialized
+  # cases without applying the runtime hot-path latency ratchet (STUI-1496).
+  run_function_step \
+    "Run SwiftTUI native reload image integration tests" \
+    "$(swift_command_text test --no-parallel --filter SwiftTUITests.HotReloadLoaderTests)" \
+    run_swift test --no-parallel --filter SwiftTUITests.HotReloadLoaderTests
 fi
 
 # --- Runtime lane: the serialized SwiftTUITests surface --------------------

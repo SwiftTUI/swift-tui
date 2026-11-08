@@ -49,3 +49,7 @@ isolated|CollectionAccessibilityTransportRegressionTests
 # stressIterations(full:hotPath:), and sit at the 20 s hard bound on the amd64
 # runner class (13.3-20.7 s across the 0.19.x gate runs).
 isolated|ScrollMomentumJourneyTests
+# These integration tests launch swiftly/swiftc to build real dynamic images.
+# External compilation is not a runtime hot path (STUI-1496); retain the full
+# serialized suite in the core lane under its existing step watchdog.
+isolated|HotReloadLoaderTests

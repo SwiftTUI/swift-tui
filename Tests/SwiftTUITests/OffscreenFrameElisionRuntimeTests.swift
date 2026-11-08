@@ -291,6 +291,44 @@ struct OffscreenFrameElisionRuntimeTests {
     #expect(!proof.canReuseSubtree(rootedAt: dirty))
   }
 
+  @Test("deep retained phase proofs fit the native frame-tail worker stack")
+  func deepRetainedPhaseProofOnWorker() async {
+    let retainedState = FrameTailRetainedState()
+    let root = testIdentity("DeepRetainedProof", "Root")
+    let dirty = testIdentity("DeepRetainedProof", "Dirty")
+    let clean = testIdentity("DeepRetainedProof", "Clean")
+    let bounds = CellRect(origin: .zero, size: .init(width: 8, height: 1))
+    var previous = PlacedNode(identity: dirty, bounds: bounds, drawPayload: .text("before"))
+    var current = PlacedNode(identity: dirty, bounds: bounds, drawPayload: .text("after"))
+    // Styled composite content can exceed 130 placed wrappers. Exercise a
+    // deeper changed branch on the actual dispatch worker, whose stack is
+    // smaller than the main thread's, while retaining a clean sibling.
+    for depth in 0..<256 {
+      let identity = testIdentity("DeepRetainedProof", "Wrapper\(depth)")
+      previous = PlacedNode(identity: identity, bounds: bounds, children: [previous])
+      current = PlacedNode(identity: identity, bounds: bounds, children: [current])
+    }
+    let sibling = PlacedNode(identity: clean, bounds: bounds, drawPayload: .text("clean"))
+    let baseline = PlacedNode(identity: root, bounds: bounds, children: [previous, sibling])
+    let changed = PlacedNode(identity: root, bounds: bounds, children: [current, sibling])
+    let proposal = ProposedSize(width: .finite(8), height: .finite(1))
+    retainedState.storeCommittedFrame(
+      makeStoredArtifacts(
+        identity: root, placed: baseline, semantics: .init(),
+        draw: DrawExtractor().extract(from: baseline)),
+      baselinePlacedTree: baseline,
+      proposal: proposal
+    )
+    let result = await FrameTailWorkerExecutor().timedAsync(clock: nil) {
+      retainedState.input(invalidatedIdentities: [dirty]).phaseExtractionProof(
+        for: proposal, placed: changed, animationOverlaySnapshot: .init())
+    }
+    let proof = result.value
+    #expect(proof.canReuseSubtree(rootedAt: clean))
+    #expect(!proof.canReuseSubtree(rootedAt: dirty))
+    #expect(!proof.canReuseSubtree(rootedAt: root))
+  }
+
   // MARK: - Pre-frame-head offscreen property animation tick
 
   @Test("pre-frame-head offscreen property tick advances live animation state")

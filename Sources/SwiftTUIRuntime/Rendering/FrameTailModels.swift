@@ -65,32 +65,27 @@ struct FrameTailRetainedInput {
     invalidationSummary: RetainedInvalidationSummary,
     reusableRoots: inout Set<Identity>
   ) {
-    // Draw extraction bakes the accumulated ancestor opacity into emitted
-    // commands, so a subtree whose own signature is unchanged still re-emits
-    // differently when an ANCESTOR fade changed. The signature covers the
-    // subtree's interior; the inherited factor at its root covers everything
-    // outside it — both must match the previous frame before reuse is sound.
-    if !invalidationSummary.intersectsSubtree(at: node.identity),
-      let previousPlaced = previousFrameIndex.placedNode(for: node.identity),
-      previousInheritedOpacity(for: node.identity, in: previousFrameIndex) == inheritedOpacity,
-      let currentSignature = RetainedPhaseExtractionSignature.make(from: node),
-      let previousSignature = RetainedPhaseExtractionSignature.make(from: previousPlaced),
-      currentSignature == previousSignature
-    {
-      reusableRoots.insert(node.identity)
-      return
-    }
+    // Composite styles can produce deep placed trees. Keep traversal storage
+    // off the native frame-tail worker's limited call stack (STUI-1494).
+    var pending = [(node, inheritedOpacity)]
+    while let (node, inheritedOpacity) = pending.popLast() {
+      // Draw extraction bakes ancestor opacity into commands. Matching the
+      // subtree signature alone cannot prove reuse through a changed fade.
+      if !invalidationSummary.intersectsSubtree(at: node.identity),
+        let previousPlaced = previousFrameIndex.placedNode(for: node.identity),
+        previousInheritedOpacity(for: node.identity, in: previousFrameIndex) == inheritedOpacity,
+        let currentSignature = RetainedPhaseExtractionSignature.make(from: node),
+        let previousSignature = RetainedPhaseExtractionSignature.make(from: previousPlaced),
+        currentSignature == previousSignature
+      {
+        reusableRoots.insert(node.identity)
+        continue
+      }
 
-    let childInheritedOpacity =
-      inheritedOpacity * (node.drawMetadata.explicitOpacity ?? 1)
-    for child in node.children {
-      collectReusablePhaseSubtrees(
-        child,
-        inheritedOpacity: childInheritedOpacity,
-        previousFrameIndex: previousFrameIndex,
-        invalidationSummary: invalidationSummary,
-        reusableRoots: &reusableRoots
-      )
+      let childInheritedOpacity = inheritedOpacity * (node.drawMetadata.explicitOpacity ?? 1)
+      for child in node.children.reversed() {
+        pending.append((child, childInheritedOpacity))
+      }
     }
   }
 

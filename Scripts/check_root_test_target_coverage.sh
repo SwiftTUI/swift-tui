@@ -74,8 +74,10 @@ echo "All root Package.swift test targets are covered by Scripts/test_all.sh."
 #   3. every `isolated|` row names an existing suite type, and
 #   4. every regex is valid ERE with no whitespace (it is re-split into
 #      `swift test` arguments by test_all.sh).
-# Suite types are the column-0 `struct`/`class`/`final class`/`enum`/`actor`
-# declarations in Tests/SwiftTUITests files that contain `@Test` — the same
+# Suite types are top-level `struct`/`class`/`final class`/`enum`/`actor`
+# declarations in Tests/SwiftTUITests files that contain `@Test`. Remove only
+# the two-space indentation owned by conditional-compilation blocks, so suites
+# guarded by #if are counted while nested helper types remain indented. Use the
 # `SwiftTUITests.<Type>` prefix swift-testing puts on the fully qualified test
 # name (`SwiftTUITests.<Type>/<test>()`), which is what the regexes match.
 manifest=Scripts/data/runtime-shards.txt
@@ -92,8 +94,19 @@ fi
 grep -v '^[[:space:]]*#' "$manifest" | grep -v '^[[:space:]]*$' >"$manifest_rows"
 
 grep -l '@Test' $(find Tests/SwiftTUITests -type f -name '*.swift') |
-  xargs grep -hoE '^(final class|struct|enum|actor|class) [A-Za-z_][A-Za-z0-9_]*' |
-  awk '{ print $NF }' | LC_ALL=C sort -u >"$suite_names"
+  xargs awk '
+    FNR == 1 { conditionalDepth = 0 }
+    /^[[:space:]]*#endif/ { conditionalDepth-- }
+    {
+      line = $0
+      for (i = 0; i < conditionalDepth; i++) sub(/^  /, "", line)
+      if (match(line, /^(final class|struct|enum|actor|class) [A-Za-z_][A-Za-z0-9_]*/)) {
+        count = split(substr(line, RSTART, RLENGTH), words, " ")
+        print words[count]
+      }
+    }
+    /^[[:space:]]*#if[[:space:]]/ { conditionalDepth++ }
+  ' | LC_ALL=C sort -u >"$suite_names"
 
 if [ ! -s "$suite_names" ]; then
   >&2 echo "No SwiftTUITests suite types found; the census grep drifted."
@@ -122,6 +135,10 @@ while IFS= read -r row; do
   if [ "$kind" = isolated ]; then
     if ! grep -qx "$value" "$suite_names"; then
       >&2 echo "Isolated suite '$value' in $manifest is not a SwiftTUITests suite type."
+      census_failed=1
+    fi
+    if ! grep -Fq -- "--filter SwiftTUITests.$value" Scripts/test_all.sh; then
+      >&2 echo "Isolated suite '$value' has no explicit core-lane launch in Scripts/test_all.sh."
       census_failed=1
     fi
     continue
