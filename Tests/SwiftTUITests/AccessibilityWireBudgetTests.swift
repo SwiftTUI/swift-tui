@@ -65,20 +65,6 @@ struct AccessibilityWireBudgetTests {
     #expect(state.recordsEncoded == 1)
   }
 
-  @Test func largeOrdinaryTextStillPublishesItsClippedRaster() throws {
-    let rendered = DefaultRenderer().render(
-      Text(String(repeating: "x", count: HostWireBudget.recordBytes + 1)).lineLimit(1),
-      context: .init(identity: testIdentity("OversizedText")),
-      proposal: .init(width: 10, height: 1))
-    let frame = SemanticHostFrame(
-      sequence: 1, raster: rendered.rasterSurface,
-      semantics: rendered.semanticSnapshot, focusedIdentity: nil)
-    let output = WebSurfaceFrameEncoder.encode(frame)
-    let decoded = try surface(output)
-    #expect((decoded["accessibilityTree"] as? [Any] ?? []).isEmpty)
-    #expect(decoded["width"] as? Int == 10)
-  }
-
   @Test func omissionAndRecoveryKeepContiguousDeltaGenerations() throws {
     var state = HostWireCapabilities(acceptsDeltaFrames: true, styleAppend: true)
       .negotiatedEncodingState()

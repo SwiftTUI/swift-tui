@@ -53,3 +53,8 @@ isolated|ScrollMomentumJourneyTests
 # External compilation is not a runtime hot path (STUI-1496); retain the full
 # serialized suite in the core lane under its existing step watchdog.
 isolated|HotReloadLoaderTests
+# The STUI-809 ordinary-Text regression must render more than the real 4 MiB
+# wire budget. This fixed boundary workload has no reducible churn count and
+# took 20.229 s on amd64 (run 42570083064, STUI-1521). Keep that one case in
+# the core lane; the smaller AccessibilityWireBudgetTests remain in shard A.
+isolated|AccessibilityLargeTextWireBudgetTests

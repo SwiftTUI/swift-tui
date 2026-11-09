@@ -1072,6 +1072,13 @@ if lane_runs_core; then
     "Run SwiftTUI native reload image integration tests" \
     "$(swift_command_text test --no-parallel --filter SwiftTUITests.HotReloadLoaderTests)" \
     run_swift test --no-parallel --filter SwiftTUITests.HotReloadLoaderTests
+
+  # The source must exceed the production wire budget; preserve the complete
+  # renderer-to-encoder boundary case outside the hot-path ratchet (STUI-1521).
+  run_function_step \
+    "Run SwiftTUI large-text accessibility wire-boundary test" \
+    "$(swift_command_text test --no-parallel --filter SwiftTUITests.AccessibilityLargeTextWireBudgetTests)" \
+    run_swift test --no-parallel --filter SwiftTUITests.AccessibilityLargeTextWireBudgetTests
 fi
 
 # --- Runtime lane: the serialized SwiftTUITests surface --------------------
