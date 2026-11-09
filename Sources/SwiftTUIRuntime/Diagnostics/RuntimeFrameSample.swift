@@ -65,6 +65,7 @@ import SwiftTUICore
   package var scheduledFrame: ScheduledFrame
   package var diagnostics: FrameDiagnostics
   package var desiredGeneration: UInt64
+  package var newestDesiredAtTailResult: UInt64
   package var coalescedEventBatches: Int
   package var coalescedWakeCauses: Set<WakeCause>
   package var intentRequestCount: Int
@@ -139,12 +140,14 @@ import SwiftTUICore
       listLayoutDerivations: nil
     ),
     translationCandidate: ScrollTranslationCandidate? = nil,
-    committedTranslation: CommittedScrollTranslation? = nil
+    committedTranslation: CommittedScrollTranslation? = nil,
+    newestDesiredAtTailResult: UInt64? = nil
   ) {
     self.frameNumber = frameNumber
     self.scheduledFrame = scheduledFrame
     self.diagnostics = diagnostics
     self.desiredGeneration = desiredGeneration
+    self.newestDesiredAtTailResult = newestDesiredAtTailResult ?? desiredGeneration
     self.coalescedEventBatches = coalescedEventBatches
     self.coalescedWakeCauses = coalescedWakeCauses
     self.intentRequestCount = intentRequestCount

@@ -7,6 +7,23 @@ import Testing
 @MainActor
 @Suite
 struct SafeAreaSurfaceTests {
+
+  @Test("safe-area inset spacers absorb their stack allocation on either axis")
+  func insetSpacerFillsStack() {
+    let horizontal = render(
+      HStack(spacing: 0) {
+        Text("LEFT")
+        Spacer().safeAreaInset(edge: .bottom) { Text("REC") }
+      }, terminalSize: .init(width: 40, height: 8), safeAreaInsets: .zero)
+    #expect(horizontal.measuredTree.measuredSize.width == 40)
+    let vertical = render(
+      VStack(spacing: 0) {
+        Text("TOP")
+        Spacer().safeAreaInset(edge: .leading) { Text("I") }
+      }, terminalSize: .init(width: 40, height: 8), safeAreaInsets: .zero)
+    #expect(vertical.measuredTree.measuredSize.height == 8)
+  }
+
   @Test("ignoresSafeArea stays intrinsic on axes with no reclaimed inset")
   func ignoresSafeAreaStaysIntrinsicOnUnreclaimedAxes() {
     let zeroInsetArtifacts = render(

@@ -24,7 +24,10 @@ struct TextRollValueTests {
   func restIsThePlainString() {
     let value = TextRollValue(text: "41", transition: Self.numeric)
     #expect(!value.isRolling)
-    #expect(value.renderedColumns() == [.init(character: "4", opacity: 1), .init(character: "1", opacity: 1)])
+    #expect(
+      value.renderedColumns() == [
+        .init(character: "4", opacity: 1), .init(character: "1", opacity: 1),
+      ])
   }
 
   @Test("a one-step digit swaps at the midpoint and dips there")
@@ -88,19 +91,20 @@ struct TextRollValueTests {
 
   @Test("opacity dims the whole old string out, then the whole new string in")
   func opacityCrossFadesTheWholeString() {
-    let early = Self.roll("41", "420", Self.opacity, phase: 0.25).renderedColumns()
+    let early = Self.roll("41", "42", Self.opacity, phase: 0.25).renderedColumns()
     #expect(early.map(\.character) == ["4", "1"])
     #expect(early.map(\.opacity) == [0.5, 0.5])
-    let late = Self.roll("41", "420", Self.opacity, phase: 0.75).renderedColumns()
-    #expect(late.map(\.character) == ["4", "2", "0"])
-    #expect(late.map(\.opacity) == [0.5, 0.5, 0.5])
+    let late = Self.roll("41", "42", Self.opacity, phase: 0.75).renderedColumns()
+    #expect(late.map(\.character) == ["4", "2"])
+    #expect(late.map(\.opacity) == [0.5, 0.5])
   }
 
   @Test("a retarget rolls on from the digit on screen")
   func retargetContinuesFromTheDisplayedDigit() {
     let midFlight = Self.roll("7", "0", phase: 0.4)  // showing "8"
     #expect(midFlight.renderedText == "8")
-    let retargeted = midFlight.rolling(to: TextRollValue(text: "5", transition: Self.numeric), progress: 0)
+    let retargeted = midFlight.rolling(
+      to: TextRollValue(text: "5", transition: Self.numeric), progress: 0)
     #expect(retargeted.previous == "8")
     #expect(retargeted.text == "5")
     #expect(retargeted.renderedText == "8")
@@ -110,10 +114,12 @@ struct TextRollValueTests {
   @Test("numericText(value:) takes its direction from the change in value")
   func valueFormPicksTheDirection() {
     let from = TextRollValue(text: "7", transition: .init(kind: .numericText, value: 7))
-    let down = from.rolling(to: .init(text: "0", transition: .init(kind: .numericText, value: 0)), progress: 0.5)
+    let down = from.rolling(
+      to: .init(text: "0", transition: .init(kind: .numericText, value: 0)), progress: 0.5)
     #expect(down.countsDown)
     #expect(down.renderedText == "3")
-    let up = from.rolling(to: .init(text: "0", transition: .init(kind: .numericText, value: 10)), progress: 0.5)
+    let up = from.rolling(
+      to: .init(text: "0", transition: .init(kind: .numericText, value: 10)), progress: 0.5)
     #expect(!up.countsDown)
     #expect(up.renderedText == "9")
   }

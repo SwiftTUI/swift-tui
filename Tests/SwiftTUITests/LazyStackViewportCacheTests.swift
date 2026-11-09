@@ -6,6 +6,35 @@ import Testing
 
 @MainActor
 struct LazyStackViewportCacheTests {
+  @Test("a scrolled lazy stack below a header preserves its visible rows")
+  func scrolledNestedWindowSettles() throws {
+    final class Header { var height = 30 }
+    let header = Header()
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("NestedScrolledWindow"),
+      size: .init(width: 40, height: 12)
+    ) {
+      ScrollView {
+        VStack(alignment: .leading, spacing: 0) {
+          Text("header").frame(height: header.height)
+          LazyVStack(alignment: .leading, spacing: 0) {
+            ForEach(0..<1000, id: \.self) { Text("row \($0)") }
+          }
+        }
+      }
+    }
+    defer { harness.shutdown() }
+    _ = try harness.scrollPointer(at: .init(x: 3.5, y: 3.5), deltaY: 45)
+    let scrolled = harness.frame
+    #expect(scrolled.contains("row 15"))
+    _ = try harness.renderAfterExternalMutation()
+    _ = try harness.renderAfterExternalMutation()
+    #expect(harness.frame == scrolled)
+    header.height = 10
+    _ = try harness.renderAfterExternalMutation()
+    #expect(harness.frame.contains("row 35"))
+  }
+
   @Test(arguments: [false, true])
   func repeatedViewportJumpsPreserveAuthoredOffsets(selective: Bool) throws {
     let h = try StressRuntimeHarness(

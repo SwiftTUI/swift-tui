@@ -5,7 +5,8 @@ extension LayoutEngine {
     from resolved: ResolvedNode,
     bounds: CellRect,
     measured: MeasuredNode,
-    children: [PlacedNode]
+    children: [PlacedNode],
+    viewportContext: LazyStackViewportContext? = nil
   ) -> PlacedNode {
     let contentBounds = resolvedContentBounds(
       for: resolved,
@@ -32,6 +33,11 @@ extension LayoutEngine {
       placedChildren: children
     )
     node.lazyStackAllocationSnapshot = measured.containerAllocationSnapshot?.lazyStack
+    if case .lazyStack = resolved.layoutBehavior {
+      var metadata = node.placementMetadata
+      metadata.lazyStackPlacementViewport = viewportContext
+      node.placementMetadata = metadata
+    }
     node.hostedCollectionTableColumnWidths =
       measured.containerAllocationSnapshot?
       .hostedCollection?.tableColumnWidths

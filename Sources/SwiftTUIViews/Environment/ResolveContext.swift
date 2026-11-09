@@ -549,7 +549,8 @@ public struct ResolveContext: Equatable, Sendable {
     // node it evaluates, and any fresh descent reaching a drifted boundary
     // passes through an ancestor's evaluation first.
     if let viewGraph, viewGraph.hasEnvironmentDrift {
-      let drift = viewGraph.environmentDrift(for: identity)
+      let drift = viewGraph.environmentDrift(
+        for: identity, capturedWriters: refreshed.environmentValues.authoredEnvironmentWriters)
       if !drift.isEmpty {
         refreshed.environmentValues = refreshed.environmentValues.applyingEnvironmentDrift(drift)
         // Tolerated keys are never style keys (a style difference is

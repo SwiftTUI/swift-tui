@@ -237,7 +237,8 @@ extension ViewGraph {
   /// ancestor chain is guaranteed by ``recordEnvironmentDrift(at:keys:from:)``'s
   /// descendant pruning, so merge order is irrelevant.
   package func environmentDrift(
-    for identity: Identity
+    for identity: Identity,
+    capturedWriters: [ObjectIdentifier: ViewNodeID] = [:]
   ) -> [ObjectIdentifier: EnvironmentSnapshotValue] {
     guard !environmentDriftByBoundary.isEmpty,
       let node = nodeIfExists(for: identity)
@@ -251,7 +252,16 @@ extension ViewGraph {
       else {
         continue
       }
-      merged.merge(drift) { existing, _ in existing }
+      for (key, value) in drift {
+        // The captured value, including one authored on this very node, may
+        // come from a writer that appeared after the serve. Stop repair at
+        // that writer; contexts captured before it still receive the drift.
+        let isShadowed =
+          capturedWriters[key].flatMap { nodesByNodeID[$0] }.map { writer in
+            writer === boundary || writer.isDescendantBridgingIslandSeams(of: boundary)
+          } ?? false
+        if !isShadowed { merged[key] = value }
+      }
     }
     return merged
   }

@@ -5,6 +5,19 @@ import Testing
 
 @Suite
 struct DroppedPathParsingTests {
+
+  @Test("quoted prose and apostrophes are not file drops")
+  func proseApostrophes() {
+    for prose in ["don't panic", "it's fine", "'quoted prose'", "'unclosed prose"] {
+      #expect(parseDroppedPaths(prose).isEmpty)
+    }
+    #expect(parseDroppedPaths("don't panic /tmp/file") == [DroppedPath("/tmp/file")])
+    #expect(
+      parseDroppedPaths("'/tmp/my file' ~/other") == [
+        DroppedPath("/tmp/my file"), DroppedPath("~/other"),
+      ])
+  }
+
   @Test("Backslash-escaped spaces are unescaped")
   func backslashEscape() {
     let paths = parseDroppedPaths(#"/Users/me/my\ file.png"#)

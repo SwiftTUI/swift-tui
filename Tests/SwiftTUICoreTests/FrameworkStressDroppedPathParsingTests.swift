@@ -39,9 +39,9 @@ struct FrameworkStressDroppedPathParsingTests {
     #expect(parseDroppedPaths("before /tmp/kept after") == [DroppedPath("/tmp/kept")])
   }
 
-  @Test("stress dropped path parsing 008 quoted relative content retains terminal intent")
+  @Test("stress dropped path parsing 008 quoted relative prose remains text")
   func droppedPathParsing008QuotedRelativeContentRetainsTerminalIntent() {
-    #expect(parseDroppedPaths("'relative file.txt'") == [DroppedPath("relative file.txt")])
+    #expect(parseDroppedPaths("'relative file.txt'").isEmpty)
   }
 
   @Test("stress dropped path parsing 009 empty quotes do not create an empty drop")

@@ -6,6 +6,19 @@ import Testing
 @MainActor
 @Suite("Collection presentation validation", .serialized)
 struct CollectionStyleValidationTests {
+
+  @Test("custom table headers inherit foreground when their paint is nil")
+  func headerInheritsForeground() throws {
+    let result = render(
+      Table(0..<1, id: \.self, columns: [.init("Header", width: 8)]) { _ in Text("Body") }
+        .tableStyle(FixedTable(value: .init()))
+        .foregroundStyle(.red))
+    #expect(result.rasterSurface.lines.joined().contains("Header"))
+    let row = try #require(result.rasterSurface.lines.firstIndex { $0.contains("Header") })
+    #expect(
+      result.rasterSurface.styleRuns.contains { $0.y == row && $0.style.foregroundColor == .red })
+  }
+
   private func render(_ view: some View) -> RenderSnapshot {
     DefaultRenderer().render(
       view, context: .init(identity: testIdentity("CollectionValidation")),

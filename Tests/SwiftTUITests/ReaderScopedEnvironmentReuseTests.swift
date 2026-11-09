@@ -101,6 +101,63 @@ private struct Boundary<Content: View>: View, Equatable {
 @MainActor
 @Suite("Reader-scoped environment reuse")
 struct ReaderScopedEnvironmentReuseTests {
+
+  @Test("a newly live interior writer shadows outstanding ancestor drift")
+  func newWriterShadowsDrift() throws {
+    final class Probe {
+      var showWriter = false
+      var reader: Identity?
+      var rootEvaluations = 0
+    }
+    struct Reader: View {
+      @Environment(\.readerScopedTheme) var theme
+      let probe: Probe
+      var body: some View {
+        let _ = { probe.reader = currentAuthoringContext()?.viewIdentity }()
+        Text("value:\(theme)")
+      }
+    }
+    struct ConditionalWriter: View {
+      let probe: Probe
+      var body: some View {
+        if probe.showWriter {
+          Reader(probe: probe).environment(\.readerScopedTheme, "interior")
+        } else {
+          Text("unread")
+        }
+      }
+    }
+    struct Root: View {
+      let theme: String
+      let probe: Probe
+      var body: some View {
+        let _ = { probe.rootEvaluations += 1 }()
+        VStack { Boundary(content: ConditionalWriter(probe: probe)) }
+          .environment(\.readerScopedTheme, theme)
+      }
+    }
+    let probe = Probe()
+    let renderer = makeRenderer()
+    func frame(_ theme: String, dirty: Set<Identity> = []) -> RenderSnapshot {
+      renderer.render(
+        Root(theme: theme, probe: probe),
+        context: .init(identity: rootIdentity, invalidatedIdentities: dirty))
+    }
+    _ = frame("base")
+    _ = frame("dark", dirty: [rootIdentity])
+    #expect(toleratedBoundary(in: renderer))
+    let branch = try #require(
+      renderer.viewGraph.debugTotalStateSnapshot().identityByNodeID.values
+        .first { $0.components.last == "false" })
+    renderer.enableSelectiveEvaluation()
+    probe.showWriter = true
+    let count = probe.rootEvaluations
+    #expect(frame("dark", dirty: [branch]).rasterSurface.lines.joined().contains("value:interior"))
+    let reader = try #require(probe.reader)
+    #expect(frame("dark", dirty: [reader]).rasterSurface.lines.joined().contains("value:interior"))
+    #expect(probe.rootEvaluations == count)
+  }
+
   @Test("scroll and link style unread changes are tolerated", arguments: [false, true])
   func scrollLinkStyleUnread(link: Bool) {
     struct Root: View {

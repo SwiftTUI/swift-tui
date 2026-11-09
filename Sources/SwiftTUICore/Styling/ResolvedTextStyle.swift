@@ -23,9 +23,7 @@ extension ResolvedTextStyle {
       } else {
         switch (backgroundColor, underlay.backgroundColor) {
         case (let overlay?, let under?) where overlay.alpha < 1:
-          under.mixed(
-            with: overlay.withAlpha(1),
-            amount: overlay.alpha)
+          compositedTranslucentBackground(overlay, over: under)
         case (let overlay?, _):
           overlay
         case (nil, let under?):
@@ -47,6 +45,16 @@ extension ResolvedTextStyle {
       strikethroughStyle: strikethroughStyle,
       opacity: opacity
     )
+  }
+
+  private func compositedTranslucentBackground(_ overlay: Color, over under: Color) -> Color {
+    let outAlpha = overlay.alpha + under.alpha * (1 - overlay.alpha)
+    guard outAlpha > 0 else { return under }
+    // Normalize the source-over weights while retaining the authored
+    // perceptual mixing policy, including the opaque-backdrop result.
+    return under.withAlpha(1)
+      .mixed(with: overlay.withAlpha(1), amount: overlay.alpha / outAlpha)
+      .withAlpha(outAlpha)
   }
 
   private func compositedColor(

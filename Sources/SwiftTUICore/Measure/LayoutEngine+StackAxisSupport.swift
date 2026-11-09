@@ -104,7 +104,7 @@ extension LayoutEngine {
       }
       let childIndex: Int
       switch current.layoutBehavior {
-      case .padding, .border, .offset:
+      case .padding, .border, .offset, .safeAreaInset:
         childIndex = 0
       case .frame(let width, let height, _):
         guard (axis == .horizontal ? width : height) == nil else { return false }

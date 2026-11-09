@@ -88,7 +88,7 @@ extension RunLoop {
           .hasExplicitAnimationTransactions
       ) {
       case .rendered(let renderedArtifacts):
-        return .rendered(renderedArtifacts, .completed, nil, hostConfiguration.geometry)
+        return .rendered(renderedArtifacts, .completed, nil, hostConfiguration.geometry, nil)
       case .elided:
         return .elided
       }
@@ -110,7 +110,7 @@ extension RunLoop {
           .hasExplicitAnimationTransactions
       ) {
       case .rendered(let renderedArtifacts):
-        return .rendered(renderedArtifacts, .completed, nil, hostConfiguration.geometry)
+        return .rendered(renderedArtifacts, .completed, nil, hostConfiguration.geometry, nil)
       case .elided:
         return .elided
       }
@@ -147,7 +147,8 @@ extension RunLoop {
       outcomeArtifacts,
       renderOutcome.tailJobState,
       renderOutcome.completedFrameDropDecision,
-      hostConfiguration.geometry
+      hostConfiguration.geometry,
+      renderOutcome.newestDesiredGeneration?.rawValue
     )
   }
 

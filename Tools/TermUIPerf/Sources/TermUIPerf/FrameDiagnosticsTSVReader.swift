@@ -57,6 +57,7 @@ enum PerfFrameDiagnosticsTSVReader {
       throw PerfFrameDiagnosticsTSVError.missingFrameColumn
     }
 
+    var elidedFrames = 0
     return try lines.dropFirst().map { line in
       let fields = split(line)
       guard frameColumn < fields.count, let frameNumber = Int(fields[frameColumn]) else {
@@ -66,10 +67,14 @@ enum PerfFrameDiagnosticsTSVReader {
       }
 
       let tailState = string("tail_job_state", fields, column, default: "completed")
-      let hasNoArtifact = tailState == "cancelled_before_start" || tailState == "dropped_completed"
+      let isElided = bool("elided", fields, column)
+      let hasNoArtifact =
+        isElided || tailState == "cancelled_before_start" || tailState == "dropped_completed"
+      let presentedOrdinal = frameNumber - elidedFrames
+      if isElided { elidedFrames += 1 }
       return PerfFrameRecord(
         frameNumber: frameNumber,
-        presentedAtSeconds: hasNoArtifact ? nil : presentedAt[frameNumber],
+        presentedAtSeconds: hasNoArtifact ? nil : presentedAt[presentedOrdinal],
         totalMs: double("total_ms", fields, column),
         workerLayoutEnqueueMs: double("worker_layout_enqueue_ms", fields, column),
         workerLayoutComputeMs: double("worker_layout_compute_ms", fields, column),

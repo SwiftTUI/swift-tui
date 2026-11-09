@@ -2874,6 +2874,7 @@ package final class ViewGraph {
     )
     for task in diff.cancels {
       appendTaskCancelEvent(
+        viewNodeID: node.viewNodeID,
         identity: diff.cancelsKeyToCurrentIdentity
           ? node.resolvedIdentity : previousResolvedIdentity,
         task: task,
@@ -3115,16 +3116,11 @@ package final class ViewGraph {
     // conflict scan; the `Equatable`-only gate rode without it because
     // opt-in boundaries are author-audited read-free, and the plan-widened
     // capture is not.
-    let resolvedIdentity = node.resolvedIdentity
-    let containsInvalidatedDescendant = invalidatedIdentities.contains { invalidated in
-      invalidated.isDescendant(of: identity)
-        || (resolvedIdentity != identity && invalidated.isDescendant(of: resolvedIdentity))
-    }
-    guard !containsInvalidatedDescendant,
-      !memoSubtreeInvalidationIntersects(node, invalidatedIdentities: invalidatedIdentities)
-    else {
-      return nil
-    }
+    guard
+      !memoSubtreeHasInvalidation(
+        node, identity: identity,
+        invalidatedIdentities: invalidatedIdentities)
+    else { return nil }
     // Plan-dispatched value compare: `Equatable` values keep their own `==`,
     // planned types (POD / field plans, built once per type at capture time)
     // compare without reflection, and an unplannable value is skipped rather
@@ -4439,12 +4435,13 @@ package final class ViewGraph {
   }
 
   func appendTaskCancelEvent(
+    viewNodeID: ViewNodeID,
     identity: Identity,
     task: TaskDescriptor,
     isStructural: Bool
   ) {
     ViewGraphLifecycleEventCollector.appendTaskCancelEvent(
-      viewNodeID: viewNodeID(for: identity),
+      viewNodeID: viewNodeID,
       identity: identity,
       task: task,
       isStructural: isStructural,
@@ -4482,6 +4479,16 @@ package final class ViewGraph {
   /// identities remap to their nearest live ancestor; one landing at or below
   /// the candidate — or with no live ancestor at all, leaving the changed
   /// region unbounded — denies (mirrors Layer A's 8ace32a5 stance).
+  package func memoSubtreeHasInvalidation(
+    _ node: ViewNode, identity: Identity, invalidatedIdentities: Set<Identity>
+  ) -> Bool {
+    let resolvedIdentity = node.resolvedIdentity
+    return invalidatedIdentities.contains { invalidated in
+      invalidated.isDescendant(of: identity)
+        || (resolvedIdentity != identity && invalidated.isDescendant(of: resolvedIdentity))
+    } || memoSubtreeInvalidationIntersects(node, invalidatedIdentities: invalidatedIdentities)
+  }
+
   private func memoSubtreeInvalidationIntersects(
     _ node: ViewNode,
     invalidatedIdentities: Set<Identity>
@@ -4510,7 +4517,7 @@ package final class ViewGraph {
     return false
   }
 
-  private func memoSubtreeHasCurrentReadCertificates(_ root: ViewNode) -> Bool {
+  package func memoSubtreeHasCurrentReadCertificates(_ root: ViewNode) -> Bool {
     var pending = [root]
     var values = [root.committed]
     var visited: Set<ViewNodeID> = []

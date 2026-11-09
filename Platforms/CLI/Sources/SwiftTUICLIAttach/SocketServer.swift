@@ -383,13 +383,19 @@
 
     private func isSocketLive(_ path: String) -> Bool {
       let fd = sceneSocket()
-      guard fd >= 0 else { return false }
+      guard fd >= 0 else { return true }
       defer { sceneClose(fd) }
 
-      guard var addr = sceneSocketAddress(for: path) else { return false }
+      guard var addr = sceneSocketAddress(for: path) else { return true }
 
-      let result = sceneConnect(fd, &addr)
-      return result == 0
+      let flags = fcntl(fd, F_GETFL, 0)
+      guard flags >= 0, fcntl(fd, F_SETFL, flags | O_NONBLOCK) == 0 else {
+        return true  // A failed probe is not proof that the socket is stale.
+      }
+      if sceneConnect(fd, &addr) == 0 { return true }
+      // AF_UNIX backlog saturation reports EAGAIN on Linux; in-progress
+      // connects and other transient failures also must preserve the listener.
+      return errno != ECONNREFUSED && errno != ENOENT
     }
 
     @Sendable

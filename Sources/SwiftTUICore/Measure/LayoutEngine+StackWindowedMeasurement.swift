@@ -85,6 +85,39 @@ enum LazyStackIdealEstimateGate {
 }
 
 extension LayoutEngine {
+  /// Placement supplies the displacement missing during measurement. Reuse it
+  /// as the next frame's estimate; placement still validates the actual origin,
+  /// so moving headers or wrappers select a corrected band in that same frame.
+  func localLazyStackHint(
+    _ hint: MeasureViewportHint, for node: ResolvedNode, axis: Axis,
+    passContext: LayoutPassContext
+  ) -> MeasureViewportHint {
+    guard hint.lazyStackContentOrigin == nil,
+      let retained = passContext.retainedLayout ?? passContext.measurementSeedSession,
+      let placed = node.viewNodeID.flatMap({ retained.previousFrameIndex?.placedByNodeID[$0] })
+        ?? retained.placedNode(for: node.identity),
+      let viewport = placed.placementMetadata.lazyStackPlacementViewport,
+      viewport.scrollIdentity == hint.scrollIdentity, viewport.axes == hint.axes
+    else { return hint }
+    let origin = CellPoint(
+      x: SaturatingConversion.subtracting(
+        placed.bounds.origin.x,
+        SaturatingConversion.subtracting(viewport.viewportRect.origin.x, viewport.contentOffset.x)),
+      y: SaturatingConversion.subtracting(
+        placed.bounds.origin.y,
+        SaturatingConversion.subtracting(viewport.viewportRect.origin.y, viewport.contentOffset.y)))
+    var local = hint
+    local.lazyStackContentOrigin = origin
+    if axis == .vertical {
+      local.contentOffset.y = max(
+        0, SaturatingConversion.subtracting(hint.contentOffset.y, origin.y))
+    } else {
+      local.contentOffset.x = max(
+        0, SaturatingConversion.subtracting(hint.contentOffset.x, origin.x))
+    }
+    return local
+  }
+
   func scheduleWindowedLazyStackMeasurement(
     for node: ResolvedNode, originalProposal: ProposedSize, effectiveProposal: ProposedSize,
     grade: MeasurementGrade, passContext: LayoutPassContext?,
@@ -95,10 +128,11 @@ extension LayoutEngine {
       let source = node.indexedChildSource, let passContext,
       let candidate = passContext.currentMeasureViewportHint,
       axis == .vertical ? candidate.axes.contains(.vertical) : candidate.axes.contains(.horizontal),
-      let hint = passContext.claimCurrentMeasureViewportHint(for: node.identity),
-      mainDimension(of: hint.viewportSize, for: axis) > 0, source.count > 0,
+      let scrollHint = passContext.claimCurrentMeasureViewportHint(for: node.identity),
+      mainDimension(of: scrollHint.viewportSize, for: axis) > 0, source.count > 0,
       (spacing ?? 0) >= 0
     else { return false }
+    let hint = localLazyStackHint(scrollHint, for: node, axis: axis, passContext: passContext)
     let context = WindowedLazyStackMeasurementContext(
       node: node, originalProposal: originalProposal, effectiveProposal: effectiveProposal,
       axis: axis, spacing: spacing, horizontalAlignment: horizontal, verticalAlignment: vertical,

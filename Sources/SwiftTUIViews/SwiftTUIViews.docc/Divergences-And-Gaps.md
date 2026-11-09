@@ -916,7 +916,8 @@ are omitted even when SwiftUI exposes a corresponding API.
   lays out at the new width at once and the added columns fade in, the
   remaining columns paired right-aligned so the units column stays put.
   `.opacity` dims the whole old string out to the midpoint and the new string
-  in. The roll is a draw-time substitution on the new string's layout — every
+  in when both share a glyph layout; otherwise it fades in the new string.
+  The roll is a draw-time substitution on the new string's layout — every
   drawn column is the new string's character or a same-width substitute — so
   it never re-wraps or re-measures, and a retarget mid-roll continues from the
   digit on screen. An unanimated write, reduce motion, `.identity`, and rich

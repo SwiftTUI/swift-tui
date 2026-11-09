@@ -285,6 +285,8 @@ public struct ChangeLifecycleModifier<Value: Equatable>: IterativePrimitiveViewM
   }
 }
 
+private enum ImplicitTaskIdentity: Equatable { case task }
+
 private struct TaskLifecycleDescriptorIdentity {
   let valueType: Any.Type
   let token: @MainActor (ViewGraph, Identity, Int) -> UInt64
@@ -338,7 +340,8 @@ public struct TaskLifecycleModifier: IterativePrimitiveViewModifier {
       let ownerNode = context.viewGraph?.nodeForIdentity(lifecycleIdentity)
       let taskOrdinal = ownerNode?.claimTaskModifierOrdinal() ?? 0
       let token = context.viewGraph.flatMap { graph in
-        descriptorIdentity?.token(graph, lifecycleIdentity, taskOrdinal)
+        (descriptorIdentity ?? TaskLifecycleDescriptorIdentity(ImplicitTaskIdentity.task))
+          .token(graph, lifecycleIdentity, taskOrdinal)
       }
       let descriptor = TaskDescriptor(
         owner: lifecycleIdentity, ordinal: taskOrdinal, token: token,

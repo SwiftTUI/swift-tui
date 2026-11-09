@@ -65,8 +65,11 @@ extension LayoutEngine {
     {
       guard let passContext,
         let storedHint = lazySnapshot.windowHint ?? lazySnapshot.claimedHint,
-        passContext.currentMeasureViewportHint == storedHint,
-        passContext.claimCurrentMeasureViewportHint(for: resolved.identity) == storedHint
+        let currentHint = passContext.currentMeasureViewportHint,
+        localLazyStackHint(
+          currentHint, for: resolved, axis: lazySnapshot.axis,
+          passContext: passContext) == storedHint,
+        passContext.claimCurrentMeasureViewportHint(for: resolved.identity) == currentHint
       else {
         return nil
       }

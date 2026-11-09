@@ -6,7 +6,7 @@
 /// (the text cuts to its new string).
 package struct TextContentTransition: Hashable, Sendable {
   package enum Kind: Hashable, Sendable {
-    /// The old string dims out to the midpoint, then the new string dims in.
+    /// Equal glyph layouts fade old-then-new; other changes fade the target in.
     case opacity
     /// Changed digit columns count through the intermediate digits toward
     /// their target; other changed columns cross-fade.
@@ -129,6 +129,17 @@ package struct TextRollValue: Sendable, Animatable {
     let old = Array(previous)
     switch transition.kind {
     case .opacity:
+      // Geometry belongs to the target. A differently shaped string cannot
+      // fade out in those bounds without wrapping or dropping glyphs; fade
+      // the target in instead. Equal layouts retain the whole-string fade.
+      let sharesLayout =
+        old.count == new.count
+        && zip(old, new).allSatisfy {
+          $0 == $1 || (Self.isSingleCellASCII($0) && Self.isSingleCellASCII($1))
+        }
+      guard sharesLayout else {
+        return new.map { TextRollColumn(character: $0, opacity: phase) }
+      }
       if phase < 0.5 {
         return old.map { TextRollColumn(character: $0, opacity: 1 - 2 * phase) }
       }

@@ -520,6 +520,7 @@ extension RunLoop {
       scrollPositionChanged: convergence.scrollPositionChanged,
       preferenceObservationChanged: preferenceObservationChanged,
       tailJobState: acquisition.tailJobState,
+      newestDesiredAtTailResult: acquisition.newestDesiredAtTailResult,
       completedFrameDropDecision: acquisition.completedFrameDropDecision,
       animationControllerHasPendingWork: animationTick.hasPendingWork,
       presentationMetrics: presentationResult.metrics,
@@ -758,9 +759,12 @@ extension RunLoop {
           )
           previousRenderedState = currentState
           continue frameLoop
-        case .rendered(let renderedArtifacts, let tailJobState, let dropDecision, let geometry):
+        case .rendered(
+          let renderedArtifacts, let tailJobState, let dropDecision, let geometry, let newestDesired
+        ):
           acquisition.geometry = geometry
           acquisition.tailJobState = tailJobState
+          acquisition.newestDesiredAtTailResult = newestDesired
           acquisition.completedFrameDropDecision = dropDecision
           progressProbe?.record(
             .frameAcquired,

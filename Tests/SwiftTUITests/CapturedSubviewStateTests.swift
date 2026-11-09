@@ -6,6 +6,25 @@ import Testing
 
 @MainActor
 struct CapturedSubviewStateTests {
+
+  @Test("an archived slot survives repeated hosted empty ForEach frames")
+  func emptyHostedFramesRetainArchive() {
+    let probe = IndexedStateProbe()
+    let renderer = DefaultRenderer()
+    let context = ResolveContext(identity: testIdentity("EmptyRetainedSlot"))
+    func frame(hidden: Bool = false, ids: [Int] = [1]) -> RenderSnapshot {
+      renderer.render(IndexedGroup(hidden: hidden, ids: ids, probe: probe), context: context)
+    }
+    _ = frame()
+    probe.bindings[1]?.wrappedValue = 42
+    _ = frame()
+    _ = frame(hidden: true)
+    _ = frame(ids: [])
+    _ = frame(ids: [])
+    _ = frame(ids: [])
+    #expect(frame().rasterSurface.lines.joined().contains("Item 1:42"))
+  }
+
   @Test("a closed retained group survives its enclosing lazy tab becoming dormant")
   func closedGroupInDormantTab() {
     let probe = IndexedStateProbe()

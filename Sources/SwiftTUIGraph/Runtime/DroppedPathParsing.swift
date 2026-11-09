@@ -12,21 +12,17 @@
 public func parseDroppedPaths(_ pasted: String) -> [DroppedPath] {
   var results: [DroppedPath] = []
   var current = ""
-  var currentIsQuoted = false
   var index = pasted.startIndex
   let end = pasted.endIndex
 
   func flushCurrent() {
     defer {
       current.removeAll(keepingCapacity: true)
-      currentIsQuoted = false
     }
     guard !current.isEmpty else { return }
     guard let decoded = decodeFileURLIfNeeded(current), !decoded.utf8.contains(0) else { return }
     // A token is path-shaped only if it starts with `/` or `~`.
-    // Single-quoted segments also count — terminals quote paths that
-    // contain spaces, and quoted prose is extremely unusual here.
-    guard looksLikePath(decoded) || currentIsQuoted else { return }
+    guard looksLikePath(decoded) else { return }
     results.append(DroppedPath(decoded))
   }
 
@@ -45,7 +41,16 @@ public func parseDroppedPaths(_ pasted: String) -> [DroppedPath] {
         index = pasted.index(after: index)
       }
     case "'":
-      currentIsQuoted = true
+      // Apostrophes within prose are literal. Shell quoting starts a token
+      // or continues an already path-shaped token (including file URLs).
+      guard
+        current.isEmpty || looksLikePath(current)
+          || current.lowercased().hasPrefix("file://")
+      else {
+        current.append(character)
+        index = pasted.index(after: index)
+        continue
+      }
       var inside = pasted.index(after: index)
       while inside < end, pasted[inside] != "'" {
         current.append(pasted[inside])

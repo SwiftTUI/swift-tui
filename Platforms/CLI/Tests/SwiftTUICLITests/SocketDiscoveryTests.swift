@@ -18,6 +18,55 @@
 
   @Suite(.serialized)
   struct SocketDiscoveryTests {
+
+    #if os(Linux)
+      @Test("a saturated Unix listener is discovered promptly and never unlinked")
+      func fullAcceptBacklog() async throws {
+        let appName = uniqueAppName()
+        let server = makeServer(appName: appName, identifier: "saturated")
+        let directory = (server.socketPath as NSString).deletingLastPathComponent
+        try FileManager.default.createDirectory(
+          atPath: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(atPath: directory) }
+        let listener = sceneSocket()
+        try #require(listener >= 0)
+        defer { sceneClose(listener) }
+        var address = try #require(sceneSocketAddress(for: server.socketPath))
+        try #require(sceneBind(listener, &address) == 0)
+        try #require(sceneListen(listener, 1) == 0)
+        var clients: [Int32] = []
+        defer { for client in clients { sceneClose(client) } }
+        var saturated = false
+        for _ in 0..<32 {
+          let client = sceneSocket()
+          try #require(client >= 0)
+          clients.append(client)
+          try #require(fcntl(client, F_SETFL, O_NONBLOCK) == 0)
+          if sceneConnect(client, &address) != 0 {
+            #expect(errno == EAGAIN)
+            saturated = true
+            break
+          }
+        }
+        try #require(saturated)
+        let start = ContinuousClock.now
+        let instances = SocketClient.discoverInstances(appName: appName)
+        #expect(start.duration(to: .now) < .seconds(1))
+        #expect(instances.map(\.identifier) == ["saturated"])
+        #expect(FileManager.default.fileExists(atPath: server.socketPath))
+        do {
+          try await server.run()
+          Issue.record("Expected occupied listener rejection")
+        } catch let error as SceneDiscoveryServerError {
+          guard case .identifierAlreadyInUse = error else {
+            Issue.record("Unexpected error: \(error)")
+            return
+          }
+        }
+        #expect(FileManager.default.fileExists(atPath: server.socketPath))
+      }
+    #endif
+
     @Test("companion discovery restricts bearer URLs to an owner-only socket")
     func companionURLDiscovery() async throws {
       let url = "http://127.0.0.1:9134/?token=fixture-token&renderer=canvas"

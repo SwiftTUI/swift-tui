@@ -32,14 +32,15 @@ extension LayoutEngine {
           work: &work,
           results: &results
         )
-      case .finish(let node, let measured, let bounds, let childCount):
+      case .finish(let node, let measured, let bounds, let childCount, let viewportContext):
         let children = popPlacements(from: &results, count: childCount)
         results.append(
           placedNode(
             from: node,
             bounds: bounds,
             measured: measured,
-            children: children
+            children: children,
+            viewportContext: viewportContext
           )
         )
       }
@@ -178,7 +179,8 @@ extension LayoutEngine {
         node,
         measured: measured,
         bounds: bounds,
-        childCount: requests.count
+        childCount: requests.count,
+        viewportContext: viewportContext
       )
     )
     // Children inherit the CURRENT node's viewport context: a wrapper

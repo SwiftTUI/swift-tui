@@ -490,11 +490,11 @@ func shouldCaptureMemoViewValue<V: View>(_ view: V) -> Bool {
   return MemoComparisonPlanCache.hasPlan(for: V.self)
 }
 
-/// Token carrying the prior committed output of a recomputed node that the memo
+/// Token carrying the prior authored output of a recomputed node that the memo
 /// diagnostics classified as a memoization candidate, so the shadow oracle can
 /// compare it against the freshly recomputed output.
 struct MemoComputationObservation {
-  let priorCommitted: ResolvedNode
+  let priorOutput: ResolvedNode
   /// Whether the node had recorded dynamic reads last frame — distinguishes a
   /// dependency-closable unsound mismatch from a comparator false-equal.
   let hadReads: Bool
@@ -519,11 +519,18 @@ func beginMemoObservation<V: View>(
   MemoSkipTrace.recordPlanTier(MemoComparisonPlanCache.diagnosticTier(for: V.self))
   // Mirror the production reuse door: changed/uncertified updates are not
   // would-skip candidates and must not feed a false soundness alarm.
-  guard case .unchanged = dynamicPropertyUpdateResult else { return nil }
+  guard case .unchanged = dynamicPropertyUpdateResult,
+    !graphNode.isDirty, !graphNode.wasVisitedThisFrame
+  else { return nil }
   // A self-invalidated node must re-run; only nodes reached under a re-run
   // ancestor are memoization candidates.
   guard !context.effectiveInvalidatedIdentities.contains(context.identity),
-    let prior = graphNode.memoViewValue
+    let prior = graphNode.memoViewValue,
+    let priorOutput = graphNode.memoObservedOutput,
+    // A moved authored occurrence changes a resolve input: relative `.id`
+    // values derive their output identity from this structural location. View
+    // equality alone does not witness that input, even with no dynamic reads.
+    priorOutput.structuralPath == context.structuralPath
   else { return nil }
   // Mirror the production gate's uncertified-empty-invalidation rule: a
   // reference-identity plan is refused service on a forced re-render (the
@@ -536,6 +543,16 @@ func beginMemoObservation<V: View>(
   {
     return nil
   }
+  // A container with an invalidated descendant is not a would-skip candidate.
+  // Use the production gate's structural and graph-owner checks, including
+  // collapsed explicit identities. Infrastructure focused-value reads used to
+  // mask this omission by classifying every such node as a reader.
+  guard !context.withinChurnedSubtree,
+    !context.effectiveSuppressesValueVerifiedReuse(at: context.identity),
+    context.viewGraph?.memoSubtreeHasInvalidation(
+      graphNode, identity: context.identity,
+      invalidatedIdentities: context.effectiveInvalidatedIdentities) != true
+  else { return nil }
   switch MemoValueComparator.compare(prior, view) {
   case .blocked(let reason):
     MemoSkipTrace.recordBlocked(reason)
@@ -565,8 +582,14 @@ func beginMemoObservation<V: View>(
     {
       MemoSkipTrace.recordInertEquatableBoundary()
     }
+    // Keep the inert-opt-in census above the certificate veto: uncovered
+    // reads are precisely what that census diagnoses, but such nodes are not
+    // eligible for the soundness comparison itself.
+    guard context.viewGraph?.memoSubtreeHasCurrentReadCertificates(graphNode) != false else {
+      return nil
+    }
     return MemoComputationObservation(
-      priorCommitted: graphNode.committed,
+      priorOutput: priorOutput,
       hadReads: hadReads,
       viewTypeName: String(reflecting: V.self)
     )
@@ -578,10 +601,10 @@ func finishMemoObservation(
   _ observation: MemoComputationObservation,
   newResolved: ResolvedNode
 ) {
-  // Sound oracle: would reusing the committed node be observably identical
+  // Sound oracle: would reusing the prior authored output be observably identical
   // under retained-reuse semantics (structuralPath re-stamped, transaction by
   // reuse-equivalence)? Strict `==` over-counts re-stampable identity fields.
-  if newResolved.memoReuseEquivalent(to: observation.priorCommitted) {
+  if newResolved.memoReuseEquivalent(to: observation.priorOutput) {
     MemoSkipTrace.recordAddressableSkip()
   } else {
     // Content-vs-bookkeeping classification drives the memo-soundness alarm:
@@ -590,10 +613,10 @@ func finishMemoObservation(
     MemoSkipTrace.recordUnsoundSkip(
       hadReads: observation.hadReads,
       contentDivergenceField: newResolved.memoUnsoundContentDivergence(
-        from: observation.priorCommitted
+        from: observation.priorOutput
       ),
       firstDifferingField: newResolved.memoFirstDifferingField(
-        from: observation.priorCommitted
+        from: observation.priorOutput
       ),
       identity: newResolved.identity,
       viewTypeName: observation.viewTypeName

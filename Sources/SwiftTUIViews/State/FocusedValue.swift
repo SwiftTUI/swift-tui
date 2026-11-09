@@ -1,27 +1,23 @@
 public import SwiftTUICore
 
-private enum FocusedValuesKey: EnvironmentKey, FrameworkEnvironmentKey {
-  static let defaultValue = FocusedValues()
-}
-
 /// Synthetic dependency token for `@FocusedValue`/`@FocusedBinding` reads.
 ///
-/// Decoupled from the value-carrying ``FocusedValuesKey`` for the same reason
+/// Decoupled from the value-carrying `_focusedValues` side-field for the same reason
 /// `FocusedIdentityKey` is decoupled from `_focusedIdentity`: this key is never
 /// written into the environment and never read by framework plumbing, so the
 /// reverse dependency index for it contains *only* genuine focused-value readers.
-/// (Recording against `FocusedValuesKey` instead would attribute every node,
+/// (Recording infrastructure reads instead would attribute every node,
 /// because `ResolveContext.init` reads `environmentValues.focusedValues` per node.)
 private enum FocusedValuesDependencyKey: EnvironmentKey, FrameworkEnvironmentKey {
   static let defaultValue = false
 }
 
 extension EnvironmentValues {
-  package var capturedFocusedValues: FocusedValues { self[untracked: FocusedValuesKey.self] }
+  package var capturedFocusedValues: FocusedValues { _focusedValues }
 
   package var focusedValues: FocusedValues {
-    get { self[FocusedValuesKey.self] }
-    set { self[FocusedValuesKey.self] = newValue }
+    get { _focusedValues }
+    set { _focusedValues = newValue }
   }
 
   /// The environment dependency key a `@FocusedValue`/`@FocusedBinding` reader

@@ -13,6 +13,33 @@ struct FrameworkStressStateIdentityTests {}
 // MARK: - Attempt 001: Graph-scoped state seed isolation
 
 extension FrameworkStressStateIdentityTests {
+
+  @Test("shared scoped builders retain independent state at identified mounts")
+  func duplicatedScopedBuilderIsolation() throws {
+    struct Root: View {
+      var body: some View {
+        let shared = ScopedBuilder { StateIdentity004Counter() }
+        VStack(alignment: .leading, spacing: 1) {
+          shared.environment(\.stress004OwnerLabel, "Left").id("left")
+          shared.environment(\.stress004OwnerLabel, "Right").id("right")
+        }
+      }
+    }
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("SharedScoped"),
+      size: .init(width: 54, height: 12)
+    ) { Root() }
+    defer { harness.shutdown() }
+    for expected in 1...4 {
+      let first = try harness.clickText("Increment 004")
+      #expect(first.contains("Left 004 Count \(expected)"))
+      #expect(first.contains("Right 004 Count \(expected - 1)"))
+      let second = try harness.clickText("Increment 004", chooseLast: true)
+      #expect(second.contains("Left 004 Count \(expected)"))
+      #expect(second.contains("Right 004 Count \(expected)"))
+    }
+  }
+
   @Test("stress state identity 001 fresh graph ignores a prior graph mutation")
   func stateIdentity001FreshGraphSeedIsolation() throws {
     // Hypothesis: graph-backed writes also update StateBox.seedValue, so mounting the exact

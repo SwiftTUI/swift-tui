@@ -7,6 +7,22 @@ import Testing
 @MainActor
 @Suite("Task runner cancellation", .timeLimit(.minutes(1)))
 struct TaskRunnerCancellationTests {
+
+  @Test("a migrated identity cancel still reaches its original task owner")
+  func migratedOwnerCancellation() throws {
+    let runner = TaskRunner()
+    let identity = Identity(components: ["migrated"])
+    let descriptor = TaskDescriptor(
+      owner: identity, ordinal: 0, token: 1, detachedType: nil, priority: .medium)
+    let task = try #require(
+      runner.start(
+        viewNodeID: .init(rawValue: 1), identity: identity,
+        registration: TaskRegistration(descriptor: descriptor) {}))
+    runner.cancel(viewNodeID: .init(rawValue: 2), matching: descriptor)
+    #expect(task.isCancelled)
+    #expect(runner.activeTaskCount == 0)
+  }
+
   @Test("shutdown cancels once and refuses starts without entering user code")
   func shutdownRefusesStarts() async throws {
     let runner = TaskRunner()

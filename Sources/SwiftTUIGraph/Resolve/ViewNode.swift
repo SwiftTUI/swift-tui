@@ -1418,6 +1418,12 @@ package final class ViewNode {
     didSet { recordCheckpointMutation() }
   }
 
+  /// Output paired with `memoViewValue` on sampled diagnostic frames, before
+  /// any parent decorates it. The production reuse path uses `committed`.
+  package var memoObservedOutput: ResolvedNode? {
+    didSet { recordCheckpointMutation() }
+  }
+
   /// Whether this node would pass the retained-reuse guards *except* for the
   /// dirty / invalidation-intersection veto — the conjuncts that make a memoized
   /// skip safe (present, snapshot-fresh, island-fresh, reuse support, equal
@@ -2430,6 +2436,7 @@ extension ViewNode {
     package var evaluationState: EvaluationState
     package var evaluator: (@MainActor () -> Void)?
     package var memoViewValue: Any?
+    package var memoObservedOutput: ResolvedNode?
     /// Frame-scoped duplicate-`.id` claim scratch. Restoring a stale image is
     /// self-healing (the frame-ID guard resets the tally on the next claim in
     /// a newer frame) and same-frame re-claims are position-idempotent.
@@ -2469,6 +2476,7 @@ extension ViewNode {
       evaluationState: evaluationState,
       evaluator: evaluator,
       memoViewValue: memoViewValue,
+      memoObservedOutput: memoObservedOutput,
       exactIdentityOccurrenceTally: exactIdentityOccurrenceTally,
       exactIdentityOccurrenceTallyFrameID: exactIdentityOccurrenceTallyFrameID,
       stateSlotClaimantsThisEvaluation: stateSlotClaimantsThisEvaluation,
@@ -2496,6 +2504,7 @@ extension ViewNode {
     evaluationState = checkpoint.evaluationState
     evaluator = checkpoint.evaluator
     memoViewValue = checkpoint.memoViewValue
+    memoObservedOutput = checkpoint.memoObservedOutput
     exactIdentityOccurrenceTally = checkpoint.exactIdentityOccurrenceTally
     exactIdentityOccurrenceTallyFrameID = checkpoint.exactIdentityOccurrenceTallyFrameID
     stateSlotClaimantsThisEvaluation = checkpoint.stateSlotClaimantsThisEvaluation

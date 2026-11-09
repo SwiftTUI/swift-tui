@@ -13,6 +13,7 @@ extension RunLoop {
     scrollPositionChanged: Bool,
     preferenceObservationChanged: Bool,
     tailJobState: FrameTailJobState,
+    newestDesiredAtTailResult: UInt64? = nil,
     completedFrameDropDecision: CompletedFrameDropDecision?,
     animationControllerHasPendingWork: Bool,
     presentationMetrics: PresentationMetrics,
@@ -80,7 +81,8 @@ extension RunLoop {
       ingress: ingress,
       collectionProbes: collectionProbes,
       translationCandidate: translationCandidate,
-      committedTranslation: committedTranslation
+      committedTranslation: committedTranslation,
+      newestDesiredAtTailResult: newestDesiredAtTailResult
     )
     frameSink.record(.committed(sample))
   }

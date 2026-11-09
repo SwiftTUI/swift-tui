@@ -44,9 +44,20 @@ package struct ScopedBuilder<Output: View>: PrimitiveView, IterativeResolvableVi
     // capture-bind pass runs — a resolvable output forwarded here without its
     // own `resolveView` still binds its `@State` ownership before its
     // `resolveElements` evaluates.
-    withAuthoringContext(authoringContext) {
+    withAuthoringContext(effectiveAuthoringContext) {
       resolveViewElementsWork(output, in: context)
     }
+  }
+
+  private var effectiveAuthoringContext: AuthoringContext? {
+    if let captured = authoringContext, let ambient = currentAuthoringContext(),
+      ambient.rebasedFromOwnerNodeID == captured.ownerNodeID,
+      ambient.rebasedFromOwnerNodeID != nil,
+      ambient.ownerNodeID != captured.ownerNodeID
+    {
+      return ambient
+    }
+    return authoringContext
   }
 
   package var body: Never {
@@ -68,7 +79,7 @@ extension ScopedBuilder: AdditionalDynamicPropertyUpdating {
   ) -> DynamicPropertyUpdateResult {
     // `nil` is an explicit fresh-destination capture. It must not inherit an
     // enclosing builder's ambient capture when transparent builders nest.
-    let scope = authoringContext ?? context.destinationAuthoringContext
+    let scope = effectiveAuthoringContext ?? context.destinationAuthoringContext
     return withAuthoringContext(scope) {
       runForwardedDynamicPropertyUpdates(on: &output, in: context)
     }

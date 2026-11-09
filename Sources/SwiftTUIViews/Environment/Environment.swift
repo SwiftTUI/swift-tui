@@ -106,6 +106,8 @@ package enum EnvironmentValuesStorage {
 /// The inherited environment available while resolving a view subtree.
 public struct EnvironmentValues: Equatable, Sendable {
   private var storage: [ObjectIdentifier: EnvironmentValueBox]
+  // Provenance of the values captured by this context, not merely live writers.
+  package var authoredEnvironmentWriters: [ObjectIdentifier: ViewNodeID] = [:]
   package var _focusedIdentity: Identity?
   package var _pressedIdentity: Identity?
   package var _pointerPressedIdentity: Identity?
@@ -116,6 +118,8 @@ public struct EnvironmentValues: Equatable, Sendable {
   /// invalidated through the `FocusedIdentityKey` runtime focus dependency
   /// instead (`runtimeFocusStateDependencyKey(for:)`).
   package var _isFocused: Bool
+  // Focused-value readers use their own dependency key, outside reuse snapshots.
+  package var _focusedValues = FocusedValues()
 
   /// Creates an empty environment container.
   public init() {
@@ -195,8 +199,10 @@ public struct EnvironmentValues: Equatable, Sendable {
       // main-actor closure is a `sending` violation. Only the
       // `ObjectIdentifier` crosses — the same shape the getter above uses.
       if EnvironmentKeyReuseClassification.isReaderAttributedOnly(key) {
-        MainActor.assumeIsolated {
-          ViewNodeContext.current?.recordEnvironmentWrite(identifier)
+        authoredEnvironmentWriters[identifier] = MainActor.assumeIsolated {
+          let node = ViewNodeContext.current
+          node?.recordEnvironmentWrite(identifier)
+          return node?.viewNodeID
         }
       }
       storage[identifier] = EnvironmentValueBox(key: key, base: newValue)

@@ -40,6 +40,8 @@ package struct ScrollViewportContext: Equatable, Sendable {
 /// size, which is what measurement is computing) — the window math clamps
 /// to the content range itself.
 package struct MeasureViewportHint: Equatable, Sendable {
+  /// Non-nil when the offset has been converted to a lazy stack's local space.
+  package var lazyStackContentOrigin: CellPoint?
   package var scrollIdentity: Identity?
   package var axes: AxisSet
   package var contentOffset: CellPoint
@@ -159,7 +161,7 @@ package final class LayoutPassContext: Sendable {
   package let invalidatedIdentities: Set<Identity>
   /// A previous-frame session consulted ONLY by the custom-layout
   /// hysteresis-seeding seam (`RetainedMeasurementSeedableLayout`) and the
-  /// hosted collections' retained tall-row heights when `retainedLayout` is
+  /// hosted collections' retained tall-row heights and lazy-stack origin hints when `retainedLayout` is
   /// absent. The layout shadow oracle's scratch context
   /// carries the production session here so the fresh pass evaluates the same
   /// hysteresis inputs (for example `ScrollViewLayout`'s converged

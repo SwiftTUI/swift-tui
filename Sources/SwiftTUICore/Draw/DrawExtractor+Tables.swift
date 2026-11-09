@@ -1108,7 +1108,7 @@ extension DrawExtractor {
 
     if payload.showsHeaders {
       var headerStyle = TextStyle(
-        foregroundStyle: payload.style.headerForegroundStyle ?? .semantic(.muted)
+        foregroundStyle: payload.style.headerForegroundStyle ?? payload.foregroundStyle
       )
       headerStyle.opacity *= payload.opacity
       lines.append(

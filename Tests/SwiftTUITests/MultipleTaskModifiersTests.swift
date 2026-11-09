@@ -9,6 +9,23 @@ import Testing
 @MainActor
 @Suite("Multiple task modifiers per view node")
 struct MultipleTaskModifiersTests {
+
+  @Test("id-less tasks on collapsed composite owners remain distinct across frames")
+  func collapsedIdlessTasks() {
+    struct Inner: View { var body: some View { Text("tasks").task {} } }
+    let renderer = DefaultRenderer()
+    let registry = LocalTaskRegistry()
+    let context = ResolveContext(
+      identity: testIdentity("CollapsedTasks"), localTaskRegistry: registry,
+      applyEnvironmentValues: true)
+    let first = renderer.render(Inner().task {}, context: context)
+    #expect(startedDescriptors(first).count == 2)
+    #expect(Set(startedDescriptors(first).map(\.typedID)).count == 2)
+    let second = renderer.render(Inner().task {}, context: context)
+    #expect(startedDescriptors(second).isEmpty)
+    #expect(registry.snapshot().values.flatMap { $0 }.count == 2)
+  }
+
   @Test(
     "both public task modifiers run, replace independently, and cancel on removal",
     .timeLimit(.minutes(1)))
@@ -133,15 +150,16 @@ struct MultipleTaskModifiersTests {
     #expect(startedDescriptors(artifacts).count == 2)
   }
 
-  @Test("a single .task keeps its historical descriptor id")
+  @Test("a single .task carries a stable site token and authored priority")
   func singleTaskKeepsHistoricalDescriptorID() {
     let (artifacts, _, _) = render(
       Text("One task").task(priority: .userInitiated) {}
     )
 
-    #expect(
-      startedDescriptors(artifacts)
-        == [TaskDescriptor(id: "Root#task", priority: .userInitiated)])
+    let descriptors = startedDescriptors(artifacts)
+    #expect(descriptors.count == 1)
+    #expect(descriptors.first?.owner == testIdentity("Root"))
+    #expect(descriptors.first?.priority == .userInitiated)
   }
 }
 

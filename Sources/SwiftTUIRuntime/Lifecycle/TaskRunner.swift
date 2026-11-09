@@ -141,7 +141,17 @@ final class TaskRunner {
     if let descriptor {
       let key = ActiveTaskKey(
         identity: descriptor.owner, viewNodeID: viewNodeID, descriptorID: descriptor.typedID)
-      if activeTasks[key]?.descriptor == descriptor { cancel(key: key) }
+      if activeTasks[key]?.descriptor == descriptor {
+        cancel(key: key)
+      } else if let identity = descriptor.owner,
+        let previousKey = keyByLogicalTask[
+          LogicalTaskKey(identity: identity, descriptorID: descriptor.typedID)],
+        activeTasks[previousKey]?.descriptor == descriptor
+      {
+        // Identity claimants may migrate after the task starts. The complete
+        // descriptor still identifies the old operation, never a replacement.
+        cancel(key: previousKey)
+      }
       return
     }
     for key in keysByNode[viewNodeID] ?? [] {

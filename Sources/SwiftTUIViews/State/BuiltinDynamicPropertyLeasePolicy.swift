@@ -17,6 +17,5 @@ extension State: DynamicPropertyLeaseIndependent {}
 // omit the synthesized `_` storage. Other built-ins carry authored closures,
 // model references, or key paths and must remain in value comparison.
 extension FocusState: DynamicPropertyMemoStorageOnly {}
-extension GestureState: DynamicPropertyMemoStorageOnly {}
 extension Namespace: DynamicPropertyMemoStorageOnly {}
 extension State: DynamicPropertyMemoStorageOnly {}

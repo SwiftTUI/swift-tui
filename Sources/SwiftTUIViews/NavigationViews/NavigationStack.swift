@@ -134,7 +134,7 @@ public struct NavigationStack<Root: View>: PrimitiveView, ActionScope, Iterative
             let titleItem = ToolbarItemConfig(
               title: navigationTitle, position: .top, isEnabled: false, action: {})
             toolbarItems.insert(titleItem, at: 0)
-            stackNode.appendDirectToolbarItemContribution(titleItem)
+            stackNode.prependDirectToolbarItemContribution(titleItem)
             preferences[ToolbarItemsPreferenceKey.self] = toolbarItems
           }
 

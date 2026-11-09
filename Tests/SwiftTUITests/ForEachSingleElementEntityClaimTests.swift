@@ -217,7 +217,7 @@ struct ForEachSingleElementEntityClaimTests {
     }
     let initial = activeTaskIDs()
     #expect(
-      initial.count == 1 && initial.first?.hasSuffix("/ID[0]#task") == true,
+      initial.count == 1 && initial.first?.contains("/ID[0]#task[") == true,
       "the lone element's task did not start: \(initial)"
     )
 
@@ -226,7 +226,7 @@ struct ForEachSingleElementEntityClaimTests {
     _ = try harness.render()
     let grown = activeTaskIDs()
     #expect(
-      grown.contains { $0.hasSuffix("/ID[1]#task") },
+      grown.contains { $0.contains("/ID[1]#task[") },
       "the second element's task did not start: \(grown)"
     )
     // With the lone element flattened up as the container's value, the task
@@ -236,7 +236,7 @@ struct ForEachSingleElementEntityClaimTests {
     // `Group` (org task T172). The one-element `Group` keeps the container's
     // resolved identity its own, so the element owns its task throughout.
     #expect(
-      grown.contains { $0.hasSuffix("/ID[0]#task") },
+      initial.allSatisfy { grown.contains($0) },
       "the first element's task was cancelled by the container's growth: \(grown)"
     )
   }

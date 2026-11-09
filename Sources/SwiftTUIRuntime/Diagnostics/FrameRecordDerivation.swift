@@ -95,7 +95,7 @@ package enum FrameRecordDerivation {
       tailCancelReason: "-",
       cancelledRenderCount: sample.cancelledRenderCount,
       newestDesiredAtTailStart: sample.desiredGeneration,
-      newestDesiredAtTailResult: sample.desiredGeneration,
+      newestDesiredAtTailResult: sample.newestDesiredAtTailResult,
       dropEligibilityBlockers: sample.dropEligibilityBlockers,
       dropDecision: sample.completedFrameDropDecision?.action.rawValue
         ?? CompletedFrameDropDecision.Action.commitOrdered.rawValue,

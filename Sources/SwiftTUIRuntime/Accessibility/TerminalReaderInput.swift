@@ -157,7 +157,7 @@ package final class TerminalReaderInput: @preconcurrency TerminalInputReading,
       rejectedLine = true
       return
     }
-    guard text.unicodeScalars.allSatisfy({ $0.value >= 32 && !(127...159).contains($0.value) })
+    guard text.unicodeScalars.allSatisfy(TerminalReaderModel.isSafeInputScalar)
     else { return }
     line += text
     surface.commandIsBeingTyped = true

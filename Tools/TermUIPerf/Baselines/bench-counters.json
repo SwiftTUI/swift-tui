@@ -230,9 +230,9 @@
       "lazy-vstack-scroll" : {
         "cold" : {
           "answered_inputs" : 0,
-          "builtin_child_measure_requests" : 590,
+          "builtin_child_measure_requests" : 564,
           "builtin_child_measure_requests_probe" : 451,
-          "builtin_container_measures" : 77,
+          "builtin_container_measures" : 76,
           "committed_frames" : 1,
           "custom_child_measure_requests" : 8,
           "custom_child_measure_requests_probe" : 5,
@@ -243,7 +243,7 @@
           "lifetime_anchor_replace" : 40,
           "lifetime_anchor_replace_noop" : 33,
           "lifetime_anchor_walked" : 40,
-          "measured_computed" : 263,
+          "measured_computed" : 262,
           "present_cells" : 515,
           "resolved_computed" : 140,
           "resolved_reused" : 0
@@ -547,9 +547,9 @@
       "lazy-vstack-scroll" : {
         "cold" : {
           "answered_inputs" : 0,
-          "builtin_child_measure_requests" : 590,
+          "builtin_child_measure_requests" : 564,
           "builtin_child_measure_requests_probe" : 451,
-          "builtin_container_measures" : 77,
+          "builtin_container_measures" : 76,
           "committed_frames" : 1,
           "custom_child_measure_requests" : 8,
           "custom_child_measure_requests_probe" : 5,
@@ -560,7 +560,7 @@
           "lifetime_anchor_replace" : 40,
           "lifetime_anchor_replace_noop" : 33,
           "lifetime_anchor_walked" : 40,
-          "measured_computed" : 263,
+          "measured_computed" : 262,
           "present_cells" : 515,
           "resolved_computed" : 140,
           "resolved_reused" : 0

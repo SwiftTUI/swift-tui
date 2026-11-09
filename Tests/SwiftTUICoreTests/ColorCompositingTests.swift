@@ -39,3 +39,15 @@ private func expectColor(
   #expect(abs(actual.blue - blue) < tolerance)
   #expect(abs(actual.alpha - alpha) < tolerance)
 }
+
+@Test("translucent cell backgrounds use source-over alpha weights")
+func translucentTextStyleComposition() throws {
+  let under = Color(red: 0, green: 0, blue: 1, alpha: 0.5, profile: .linearSRGB)
+  let over = Color(red: 1, green: 0, blue: 0, alpha: 0.5, profile: .linearSRGB)
+  let actual = try #require(
+    ResolvedTextStyle(backgroundColor: over)
+      .composited(over: ResolvedTextStyle(backgroundColor: under)).backgroundColor)
+  // Equal input alphas contribute 2:1 after source-over normalization.
+  let expected = under.withAlpha(1).mixed(with: over.withAlpha(1), amount: 2.0 / 3)
+  expectColor(actual, red: expected.red, green: expected.green, blue: expected.blue, alpha: 0.75)
+}

@@ -15,6 +15,7 @@ enum PlacementWorkItem {
     ResolvedNode,
     measured: MeasuredNode,
     bounds: CellRect,
-    childCount: Int
+    childCount: Int,
+    viewportContext: LazyStackViewportContext?
   )
 }

@@ -1264,6 +1264,49 @@ struct DynamicPropertyUpdatePassTests {
     #expect(uncertified?.hadReads == nil)
   }
 
+  @Test("memo observation compares authored outputs before parent layout decoration")
+  func shadowOracleKeepsAuthoredOutput() throws {
+    struct OracleProbe: View, Equatable {
+      var body: some View { Text("oracle") }
+    }
+    let savedEnabled = MemoSkipTrace.isEnabled
+    let savedSampling = MemoSkipTrace.sampleEveryNFrames
+    let savedSampledFrame = MemoSkipTrace.isSampledFrame
+    defer {
+      MemoSkipTrace.isEnabled = savedEnabled
+      MemoSkipTrace.sampleEveryNFrames = savedSampling
+      MemoSkipTrace.isSampledFrame = savedSampledFrame
+    }
+    MemoSkipTrace.isEnabled = true
+    MemoSkipTrace.sampleEveryNFrames = 1
+    let graph = ViewGraph()
+    let identity = testIdentity("MemoAuthoredOutput")
+    let context = makeContext(graph, identity: identity)
+    graph.beginFrame()
+    let output = Resolver().resolve(OracleProbe(), in: context)
+    let node = try #require(graph.nodeForIdentity(identity))
+    var decorated = output
+    decorated.layoutBehavior = .frame(width: 20, height: 1, alignment: .leading)
+    node.apply(resolved: decorated, children: node.children)
+    node.setCommittedPresence(true)
+    _ = graph.finalizeFrame(rootIdentity: identity)
+    graph.beginFrame()
+    node.prepareForFrame(graph.resolvePassID)
+    let observation = try #require(
+      beginMemoObservation(
+        OracleProbe(), graphNode: node, context: context,
+        dynamicPropertyUpdateResult: .unchanged))
+    #expect(output.memoReuseEquivalent(to: observation.priorOutput))
+    // A genuine authored layout change still differs; the oracle has not
+    // exempted layoutBehavior to accommodate a parent's table-row decoration.
+    #expect(
+      decorated.memoUnsoundContentDivergence(from: observation.priorOutput) == "layoutBehavior")
+    let checkpoint = node.makeCheckpoint()
+    node.memoObservedOutput = nil
+    node.restoreCheckpoint(checkpoint)
+    #expect(node.memoObservedOutput?.memoReuseEquivalent(to: output) == true)
+  }
+
   @Test("changed and uncertified updates have named reuse-denial trace reasons")
   func updateResultsRemainVisibleInReuseDenialCensus() {
     let savedEnabled = ReuseDenialTrace.isEnabled

@@ -13,6 +13,19 @@ import Testing
 /// reader one frame later — is covered by `AppRuntimeTests`' focused-value suite.
 @MainActor
 struct FocusedValueReaderAttributionTests {
+
+  @Test("focused bindings remain outside the environment reuse snapshot")
+  func stableBindingSnapshot() {
+    var first = EnvironmentValues()
+    first.focusedValues[AttributionFocusedNumberKey.self] = .constant(42)
+    var second = EnvironmentValues()
+    second.focusedValues[AttributionFocusedNumberKey.self] = .constant(42)
+    let left = first.applying(to: .init())
+    let right = second.applying(to: .init())
+    #expect(left == right)
+    #expect(left.typedDiff(from: right).changedTypedKeys.isEmpty)
+  }
+
   /// Resolves a probe in a fresh graph and returns the identities recorded as
   /// dependents of the focused-values environment key (the reverse index the run
   /// loop queries to invalidate readers precisely).

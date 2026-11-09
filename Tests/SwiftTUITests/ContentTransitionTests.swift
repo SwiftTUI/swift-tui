@@ -18,6 +18,18 @@ import Testing
 @MainActor
 @Suite(.serialized)
 struct ContentTransitionTests {
+
+  @Test("opacity transitions keep target geometry when strings have different widths")
+  func opacityTargetGeometry() {
+    for (old, new) in [("420", "41"), ("ab😀", "xy"), ("a", "abcd"), ("😀", "x"), ("x", "😀")] {
+      let roll = TextRollValue(
+        previous: old, text: new,
+        transition: .init(kind: .opacity), phase: 0.25)
+      #expect(roll.renderedText == new)
+      #expect(roll.renderedColumns().allSatisfy { $0.opacity == 0.25 })
+    }
+  }
+
   private static let bumpLabel = "bump"
   private static let duration: Duration = .milliseconds(600)
 
@@ -115,9 +127,12 @@ struct ContentTransitionTests {
     #expect(rows.last?.text == "2.5", "rows: \(rows.map(\.text))")
     let separators = rows.map { String($0.text.dropFirst().prefix(1)) }
     Self.expectRun(separators, along: [",", "."])
-    #expect(rows.allSatisfy { $0.text.last == "5" && !$0.dimmed[2] }, "the suffix is untouched: \(rows)")
-    #expect(rows.allSatisfy { ["1", "2"].contains($0.text.first.map(String.init)) }, "rows: \(rows)")
-    #expect(rows.contains { $0.dimmed[1] }, "the separator column dims through the cross-fade: \(rows)")
+    #expect(
+      rows.allSatisfy { $0.text.last == "5" && !$0.dimmed[2] }, "the suffix is untouched: \(rows)")
+    #expect(
+      rows.allSatisfy { ["1", "2"].contains($0.text.first.map(String.init)) }, "rows: \(rows)")
+    #expect(
+      rows.contains { $0.dimmed[1] }, "the separator column dims through the cross-fade: \(rows)")
   }
 
   // MARK: - opacity, identity, and the cut cases
@@ -132,8 +147,11 @@ struct ContentTransitionTests {
     let rows = try await Self.rowsAfterBump(harness, restingOn: "42")
     #expect(rows.last?.text == "42", "rows: \(rows.map(\.text))")
     Self.expectRun(rows.map(\.text), along: ["41", "42"])
-    #expect(rows.contains { $0.text == "41" && $0.dimmed[0] && $0.dimmed[1] }, "old string dims: \(rows)")
-    #expect(rows.contains { $0.text == "42" && $0.dimmed[0] && $0.dimmed[1] }, "new string dims in: \(rows)")
+    #expect(
+      rows.contains { $0.text == "41" && $0.dimmed[0] && $0.dimmed[1] }, "old string dims: \(rows)")
+    #expect(
+      rows.contains { $0.text == "42" && $0.dimmed[0] && $0.dimmed[1] },
+      "new string dims in: \(rows)")
     #expect(rows.last.map { !$0.dimmed[0] && !$0.dimmed[1] } == true, "ends undimmed: \(rows)")
   }
 
@@ -215,7 +233,8 @@ struct ContentTransitionTests {
     var cursor = 0
     for value in values {
       guard let index = path.firstIndex(of: value) else {
-        Issue.record("\(value) is not on the path \(path): \(values)", sourceLocation: sourceLocation)
+        Issue.record(
+          "\(value) is not on the path \(path): \(values)", sourceLocation: sourceLocation)
         return
       }
       if index < cursor {

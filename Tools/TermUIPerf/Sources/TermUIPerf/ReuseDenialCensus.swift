@@ -83,13 +83,26 @@ public struct PerfReuseDenialCensus: Codable, Equatable, Sendable {
     )
   }
 
+  /// Captures the start of this run in an append-only trace.
+  public static func byteCount(at url: URL) throws -> UInt64 {
+    guard FileManager.default.fileExists(atPath: url.path) else { return 0 }
+    let handle = try FileHandle(forReadingFrom: url)
+    defer { try? handle.close() }
+    return try handle.seekToEnd()
+  }
+
   /// Writes nothing when the trace produced no file. A present-but-empty trace
   /// still writes a zero census so an armed yet vacuous diagnostic is visible.
-  public static func writeIfPresent(traceURL: URL, to outputURL: URL) throws {
+  public static func writeIfPresent(
+    traceURL: URL, to outputURL: URL, startingAt offset: UInt64 = 0
+  ) throws {
     guard FileManager.default.fileExists(atPath: traceURL.path) else {
       return
     }
-    let trace = try String(contentsOf: traceURL, encoding: .utf8)
+    let handle = try FileHandle(forReadingFrom: traceURL)
+    defer { try? handle.close() }
+    try handle.seek(toOffset: offset)
+    let trace = String(decoding: try handle.readToEnd() ?? Data(), as: UTF8.self)
     let census = parse(trace)
     let encoder = JSONEncoder()
     encoder.outputFormatting = [.prettyPrinted, .sortedKeys]

@@ -92,7 +92,7 @@ extension TerminalReaderCommands {
       }
       let insertion = verb == "delete" ? "" : value
       guard
-        insertion.unicodeScalars.allSatisfy({ $0.value >= 32 && !(127...159).contains($0.value) })
+        insertion.unicodeScalars.allSatisfy(TerminalReaderModel.isSafeInputScalar)
       else {
         return .init(
           output: "Control characters are not accepted. Use append-line for line breaks.")

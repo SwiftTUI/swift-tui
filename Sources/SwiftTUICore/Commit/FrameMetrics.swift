@@ -117,6 +117,8 @@ package struct LayoutBranchingMetrics: Equatable, Sendable {
   package var builtinChildMeasureRequests = 0
   /// Fragment requests issued by compositional lazy measurement, including cache serves.
   package var lazyFragmentMeasureRequests = 0
+  /// Window remeasurements requested by placement after measurement completed.
+  package var lazyPlacementRefinements = 0
   package var customContainerMeasureComputations = 0
   package var customChildMeasureRequests = 0
   package var customPlacementChildMeasureRequests = 0
@@ -152,6 +154,7 @@ package struct LayoutBranchingMetrics: Equatable, Sendable {
     builtinContainerMeasureComputations += other.builtinContainerMeasureComputations
     builtinChildMeasureRequests += other.builtinChildMeasureRequests
     lazyFragmentMeasureRequests += other.lazyFragmentMeasureRequests
+    lazyPlacementRefinements += other.lazyPlacementRefinements
     customContainerMeasureComputations += other.customContainerMeasureComputations
     customChildMeasureRequests += other.customChildMeasureRequests
     customPlacementChildMeasureRequests += other.customPlacementChildMeasureRequests

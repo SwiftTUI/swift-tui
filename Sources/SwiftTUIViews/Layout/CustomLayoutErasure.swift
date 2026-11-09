@@ -660,8 +660,23 @@ final class LayoutWorkerProxy<L: Layout>: WorkerCustomLayoutProxy,
             let viewportLength =
               snapshot.axis == .vertical
               ? viewport.viewportRect.size.height : viewport.viewportRect.size.width
-            let corrected = min(anchored, max(0, contentLength - viewportLength))
             let requested = viewport.contentOffset
+            // A nested stack measures in local coordinates. Apply its anchor
+            // movement to the scroll offset, preserving the header displacement
+            // and the clamped local-zero case above the stack.
+            let anchoredScrollOffset: Int
+            if let hint = snapshot.windowHint, hint.lazyStackContentOrigin != nil {
+              let localRequested =
+                snapshot.axis == .vertical ? hint.contentOffset.y : hint.contentOffset.x
+              let scrollRequested = snapshot.axis == .vertical ? requested.y : requested.x
+              anchoredScrollOffset = SaturatingConversion.adding(
+                scrollRequested,
+                SaturatingConversion.subtracting(anchored, localRequested))
+            } else {
+              anchoredScrollOffset = anchored
+            }
+            let corrected = min(
+              max(0, anchoredScrollOffset), max(0, contentLength - viewportLength))
             var offset = requested
             if snapshot.axis == .vertical {
               placement.position.y -= corrected - offset.y

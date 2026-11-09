@@ -8,6 +8,38 @@ import Testing
 @MainActor
 @Suite
 struct GestureStateTests {
+
+  @Test("a seed-only reauthor refreshes the gesture reset binding")
+  func reauthoredResetSeed() {
+    final class Probe { var binding: AnyGestureStateBinding? }
+    struct Child: View {
+      @GestureState var value: Int
+      let probe: Probe
+      init(seed: Int, probe: Probe) {
+        _value = GestureState(initialValue: seed)
+        self.probe = probe
+      }
+      var body: some View {
+        let _ = { probe.binding = $value.eraseToAnyBinding() }()
+        Text("Value \(value)").gesture(DragGesture().updating($value) { _, state, _ in state = 99 })
+      }
+    }
+    struct Root: View {
+      let seed: Int
+      let probe: Probe
+      var body: some View { Child(seed: seed, probe: probe) }
+    }
+    let probe = Probe()
+    let renderer = DefaultRenderer()
+    let context = ResolveContext(identity: testIdentity("GestureSeed"))
+    _ = renderer.render(Root(seed: 3, probe: probe), context: context)
+    _ = renderer.render(Root(seed: 7, probe: probe), context: context)
+    probe.binding?.setValueErased(99)
+    probe.binding?.resetToSeed()
+    let result = renderer.render(Root(seed: 7, probe: probe), context: context)
+    #expect(result.rasterSurface.lines.joined().contains("Value 7"))
+  }
+
   @Test("@GestureState wrappedValue starts at seed outside a resolve pass")
   func startsAtSeed() {
     struct V: View {

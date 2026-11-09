@@ -112,13 +112,20 @@ extension LayoutEngine {
           let storedLength = snapshot.windowHint.map {
             mainDimension(of: $0.viewportSize, for: axis)
           }
-          if storedOffset != offset || storedLength != length {
+          // A viewport before the stack's origin selects its first band,
+          // just like a zero measurement offset. Negative local offsets must
+          // not trigger a second identical measurement under a clamped hint.
+          if storedOffset != max(0, offset) || storedLength != length {
             let context = passContext ?? LayoutPassContext()
+            context.updateWorkMetrics { $0.branching.lazyPlacementRefinements += 1 }
             var hint =
               snapshot.windowHint
               ?? .init(
                 axes: viewportContext.axes,
                 contentOffset: viewportContext.contentOffset, viewportSize: viewport.size)
+            // This is already stack-local; measurement must not subtract the
+            // retained displacement a second time.
+            hint.lazyStackContentOrigin = .zero
             hint.viewportSize = viewport.size
             if axis == .vertical {
               hint.contentOffset.y = max(0, offset)

@@ -75,7 +75,11 @@
         let identifier = String(entryName.dropLast(5))  // strip ".sock"
         let socketPath = "\(dir)/\(entryName)"
 
-        // Check liveness by attempting a quick connection
+        // Only sockets can identify instances. Darwin reports non-socket
+        // entries with errors that are not definitive stale-listener errors.
+        // Do not follow symlinks or report arbitrary *.sock files as live.
+        guard isSocketEntry(socketPath) else { continue }
+        // Check liveness by attempting a quick connection.
         if isSocketLive(socketPath) {
           let pid = Int32(identifier)
           let instanceName: String? = pid == nil ? identifier : nil
@@ -203,13 +207,19 @@
 
     private static func isSocketLive(_ path: String) -> Bool {
       let fd = sceneSocket()
-      guard fd >= 0 else { return false }
+      guard fd >= 0 else { return true }
       defer { sceneClose(fd) }
 
-      guard var addr = sceneSocketAddress(for: path) else { return false }
+      guard var addr = sceneSocketAddress(for: path) else { return true }
 
-      let result = sceneConnect(fd, &addr)
-      return result == 0
+      let flags = fcntl(fd, F_GETFL, 0)
+      guard flags >= 0, fcntl(fd, F_SETFL, flags | O_NONBLOCK) == 0 else {
+        return true  // A failed probe is not proof that the socket is stale.
+      }
+      if sceneConnect(fd, &addr) == 0 { return true }
+      // AF_UNIX backlog saturation reports EAGAIN on Linux; in-progress
+      // connects and other transient failures also must preserve the listener.
+      return errno != ECONNREFUSED && errno != ENOENT
     }
 
     /// Whether the directory entry itself is a socket; `lstat(2)` does not

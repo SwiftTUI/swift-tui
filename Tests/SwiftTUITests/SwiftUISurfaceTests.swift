@@ -1013,7 +1013,11 @@ struct SwiftUISurfaceTests {
       Issue.record("ancestor identity churn must emit taskCancel followed by taskStart")
       return
     }
-    #expect(oldTask == newTask)
+    #expect(oldTask.owner == newTask.owner)
+    #expect(oldTask.priority == newTask.priority)
+    // The author-facing owner is stable, but the replacement graph lifetime
+    // owns a new id-less task token. Cancellation must name the old token.
+    #expect(oldTask.typedID != newTask.typedID)
     let taskOwnerIDs = updated.commitPlan.lifecycle.compactMap(\.viewNodeID)
     #expect(taskOwnerIDs.count == 2)
     #expect(taskOwnerIDs.first != taskOwnerIDs.last)

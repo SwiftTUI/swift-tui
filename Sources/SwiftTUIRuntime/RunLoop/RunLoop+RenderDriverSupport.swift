@@ -125,6 +125,7 @@ extension RunLoop {
   struct FrameAcquisitionState {
     var geometry: HostGeometryStamp?
     var tailJobState: FrameTailJobState = .completed
+    var newestDesiredAtTailResult: UInt64?
     var completedFrameDropDecision: CompletedFrameDropDecision?
   }
 

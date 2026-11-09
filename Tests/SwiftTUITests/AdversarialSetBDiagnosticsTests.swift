@@ -23,6 +23,16 @@ import Testing
 @MainActor
 @Suite("Adversarial set B: diagnostics and profiling sinks", .serialized)
 struct AdversarialSetBDiagnosticsTests {
+
+  @Test("committed diagnostics preserve the observed desired generation at tail completion")
+  func committedTailObservation() {
+    var sample = SetBSamples.committed()
+    sample.newestDesiredAtTailResult = sample.desiredGeneration + 5
+    let record = FrameRecordDerivation.record(from: .committed(sample))
+    #expect(record.newestDesiredAtTailResult == sample.desiredGeneration + 5)
+    #expect(record.newestDesiredAtTailStart == sample.desiredGeneration)
+  }
+
   private var header: [String] { FrameDiagnosticsTSVFormatting.headerFields }
 
   private func columns(_ record: FrameDiagnosticRecord) -> [String: String] {

@@ -3,6 +3,15 @@ import Testing
 @testable import TermUIPerf
 
 struct FrameDiagnosticsTSVReaderTests {
+
+  @Test("elided frames do not consume presentation ordinals")
+  func elidedFramesKeepPresentationJoinAligned() throws {
+    let records = try PerfFrameDiagnosticsTSVReader.parse(
+      "frame\telided\ttail_job_state\n1\t0\tcompleted\n2\t1\t-\n3\t0\tcancelled_before_start\n3\t0\tcompleted\n4\t1\t-\n5\t0\tcompleted\n",
+      presentedAt: [1: 10, 2: 20, 3: 30])
+    #expect(records.map(\.presentedAtSeconds) == [10, nil, nil, 20, nil, 30])
+  }
+
   @Test("skipped acquisitions sharing a frame ordinal do not inherit its presentation")
   func skippedAcquisitionsDoNotJoinPresents() throws {
     let records = try PerfFrameDiagnosticsTSVReader.parse(

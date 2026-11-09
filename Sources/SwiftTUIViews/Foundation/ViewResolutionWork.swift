@@ -90,6 +90,14 @@ func resolveViewWork<V: View>(
       return .value(served)
     }
 
+    // Observe the same lookup and freshness as the reuse door, before
+    // beginEvaluation resets dirty state and marks the occurrence visited.
+    let memoObservation = beginMemoObservation(
+      view,
+      graphNode: context.viewGraph?.nodeForIdentity(context.identity),
+      context: context,
+      dynamicPropertyUpdateResult: dynamicPropertyUpdateResult
+    )
     let graphNode = context.viewGraph?.beginEvaluation(
       identity: context.identity,
       entityIdentity: routeIdentity,
@@ -112,16 +120,6 @@ func resolveViewWork<V: View>(
       graphNode.map { context.stampingFrameTransaction(forEvaluationOf: $0) } ?? context
     let resolveFresh = { () -> ResolveWork<ResolvedNode> in
       context.recordResolvedComputation()
-      // Memoization diagnostics: would this recomputed node have been memoizable?
-      // Captured before the body runs, while `graphNode.committed` still holds the
-      // prior frame's output. In release this is sampled and opt-in via
-      // `SWIFTTUI_MEMO_TRACE`; when unsampled it is a single Bool guard.
-      let memoObservation = beginMemoObservation(
-        view,
-        graphNode: graphNode,
-        context: context,
-        dynamicPropertyUpdateResult: dynamicPropertyUpdateResult
-      )
       let erased: Any = view
       var ordinalTracker: AuthoringOrdinalTracker?
       graphNode?.beginRegistrationCapture()
@@ -209,13 +207,17 @@ func resolveViewWork<V: View>(
         }
         resolved.structuralPath = context.structuralPath
         // Shadow oracle: a would-skip node's freshly recomputed output must equal
-        // the prior committed output; a mismatch is the soundness alarm. Then stash
+        // the prior authored output; a mismatch is the soundness alarm. Then stash
         // this frame's view value for next frame's comparison.
         if let memoObservation {
           finishMemoObservation(memoObservation, newResolved: resolved)
         }
         if shouldCaptureMemoViewValue(view) {
           graphNode?.memoViewValue = view
+          // Parent collections and transparent modifiers can subsequently
+          // decorate the committed snapshot. Keep the output paired with this
+          // exact view witness for the sampled body-comparison oracle.
+          graphNode?.memoObservedOutput = MemoSkipTrace.shouldObserve ? resolved : nil
         } else if graphNode?.memoViewValue != nil {
           // Not capturing must CLEAR, not leave the previous value standing. This
           // node's committed output now belongs to the view resolved this frame,
@@ -229,6 +231,7 @@ func resolveViewWork<V: View>(
           // Guarded on non-nil so the common never-captured node pays no
           // checkpoint mutation.
           graphNode?.memoViewValue = nil
+          graphNode?.memoObservedOutput = nil
         }
         return resolved
       }

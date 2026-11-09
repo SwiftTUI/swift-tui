@@ -52,6 +52,7 @@ public enum RunCommand {
     }
 
     let reuseTraceURL = PerfScenarioRunner.configureReuseTraceArtifact(at: artifactRoot)
+    let reuseTraceStart = try reuseTraceURL.map { try PerfReuseDenialCensus.byteCount(at: $0) } ?? 0
     var perIteration: [PerfScenarioRunResult] = []
     var aggregates: [PerfAggregateSummary] = []
 
@@ -70,7 +71,8 @@ public enum RunCommand {
     if let reuseTraceURL {
       try PerfReuseDenialCensus.writeIfPresent(
         traceURL: reuseTraceURL,
-        to: artifactRoot.appendingPathComponent("reuse-census.json")
+        to: artifactRoot.appendingPathComponent("reuse-census.json"),
+        startingAt: reuseTraceStart
       )
     }
 

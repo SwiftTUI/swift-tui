@@ -8,6 +8,36 @@ import Testing
 @MainActor
 @Suite
 struct TerminalReaderTests {
+
+  @Test(
+    "typed bidi controls never reach application value or editor actions", arguments: [false, true])
+  func typedBidiControls(editor: Bool) throws {
+    let surface = TerminalReaderSurface(terminal: ReaderRecordingHost(), enabled: true)
+    let input = TerminalReaderInput(source: ReaderEmptyInput(), surface: surface)
+    var field = node("Text", role: .textField)
+    field.actionTarget = "text#1"
+    field.control = .init(actions: [.setValue], value: .text(""))
+    try surface.present(frame(1, [field]))
+    func type(_ text: String) throws -> [InputEvent] {
+      for character in text { _ = try input.process(.key(.character(character))) }
+      return try input.process(.key(.return)).events
+    }
+    if editor { _ = try type("edit") }
+    let text = "a\u{202E}\u{2066}\u{061C}\u{200F}\u{200E}b"
+    let events: [InputEvent]
+    if editor {
+      _ = try type("insert " + text)
+      events = try type("save")
+    } else {
+      events = try type("set " + text)
+    }
+    guard case .accessibility(let request) = events.first else {
+      Issue.record("Expected a value action")
+      return
+    }
+    #expect(request.action == .setValue(.text("ab")))
+  }
+
   @Test("clearing assistive focus preserves review and consumes the request generation")
   func clearAssistiveFocusPreservesReview() {
     var model = TerminalReaderModel()

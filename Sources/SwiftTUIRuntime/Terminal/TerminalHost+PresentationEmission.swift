@@ -50,9 +50,12 @@ import SwiftTUICore
         )
       }
 
+      // Targeted replays can upload new content-derived ids (e.g. a file
+      // changed in place). Track every referenced buffer for a later sweep.
+      residentKittyImageData.formUnion(referencedImageIDs)
+
       // Only a frame that replaced every attachment enumerates the full set of
-      // still-needed ids. Targeted/none replays leave attachments unchanged
-      // (same ids), so nothing is superseded and the sweep is skipped.
+      // still-needed ids, so partial replays cannot safely sweep old buffers.
       let replacedAllKittyImages =
         graphicsCapabilities.preferredProtocol == .kitty
         && (plan.strategy == .fullRepaint || plan.graphicsReplay.scope == .full)

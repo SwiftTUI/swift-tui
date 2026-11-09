@@ -23,7 +23,8 @@ package struct CapturedSubviewRetention: Sendable {
       owner.graphScope == graph.stateGraphScopeID
         ? graph.nodeForOwnerLifetimeID(owner.ownerLifetime) : nil
     }
-    if let ownerNode, let archive = capturedSubviewArchive(in: ownerNode) {
+    let consumedArchive = ownerNode.flatMap { capturedSubviewArchive(in: $0) }
+    if let ownerNode, let archive = consumedArchive {
       context.viewGraph?.restoreRetainedSubviewState(archive)
       storeCapturedSubviewArchive(nil, in: ownerNode)
     }
@@ -34,6 +35,9 @@ package struct CapturedSubviewRetention: Sendable {
     return CapturedSubviewSequenceView(payloads: payloads).makeResolveWork(in: contentContext).map {
       completed in
       var children = completed
+      if children.isEmpty, let ownerNode, let consumedArchive {
+        storeCapturedSubviewArchive(consumedArchive, in: ownerNode)
+      }
       if !children.isEmpty {
         children[0].preferenceValues[ActiveCapturedSubviewOwnersPreferenceKey.self].insert(owner)
       }

@@ -8,6 +8,54 @@ import Testing
 @MainActor
 @Suite(.serialized)
 struct CompositionalLazyStackTests {
+
+  @Test("a lazy stack below a header retains its settled window", arguments: [1, 30], [0, 45])
+  func nestedWindowSettles(headerHeight: Int, offset: Int) {
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    func frame() -> RenderSnapshot {
+      renderer.render(
+        ScrollView(.vertical, position: .constant(.init(x: 0, y: offset))) {
+          VStack(alignment: .leading, spacing: 0) {
+            Text("header").frame(height: headerHeight)
+            LazyVStack(alignment: .leading, spacing: 0) {
+              ForEach(0..<1000, id: \.self) { Text("row \($0)") }
+            }
+          }
+        }, context: .init(identity: testIdentity("NestedWindow")),
+        proposal: .init(width: 40, height: 12))
+    }
+    _ = frame()
+    _ = frame()
+    let settled = frame()
+    #expect(settled.diagnostics.work.layoutBranching.lazyPlacementRefinements == 0)
+    if offset >= headerHeight || headerHeight == 1 {
+      #expect(settled.rasterSurface.lines.joined().contains("row \(max(0, offset - headerHeight))"))
+    }
+  }
+
+  @Test("a horizontal lazy stack below leading content retains its settled window")
+  func horizontalNestedWindowSettles() {
+    let renderer = DefaultRenderer()
+    func frame() -> RenderSnapshot {
+      renderer.render(
+        ScrollView(.horizontal, position: .constant(.init(x: 45, y: 0))) {
+          HStack(spacing: 0) {
+            Text("header").frame(width: 30)
+            LazyHStack(spacing: 0) {
+              ForEach(0..<1000, id: \.self) { _ in Text("x") }
+            }
+          }
+        }.scrollIndicators(.hidden),
+        context: .init(identity: testIdentity("HorizontalNestedWindow")),
+        proposal: .init(width: 12, height: 2))
+    }
+    _ = frame()
+    _ = frame()
+    let settled = frame()
+    #expect(settled.diagnostics.work.layoutBranching.lazyPlacementRefinements == 0)
+    #expect(settled.rasterSurface.lines.joined().contains("xxxxxxxxxxxx"))
+  }
+
   @Test(
     "composed default-spacing stacks bound row bodies", arguments: [1_000, 10_000, 100_000],
     [false, true])

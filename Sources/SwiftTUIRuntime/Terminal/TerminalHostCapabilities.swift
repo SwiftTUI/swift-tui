@@ -73,7 +73,7 @@ import SwiftTUICore
 
         if let registersResponse = try? performGraphicsQuery(.sixelColorRegisters),
           let registers = parseXTSMGraphicsResponse(from: registersResponse, item: 1),
-          registers.status >= 0,
+          registers.status == 0,
           let firstValue = registers.values.first
         {
           capabilities.sixelColorRegisters = firstValue
@@ -81,7 +81,7 @@ import SwiftTUICore
 
         if let geometryResponse = try? performGraphicsQuery(.sixelGeometry),
           let geometry = parseXTSMGraphicsResponse(from: geometryResponse, item: 2),
-          geometry.status >= 0,
+          geometry.status == 0,
           geometry.values.count >= 2
         {
           capabilities.sixelGeometry = .init(

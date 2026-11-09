@@ -12,7 +12,7 @@ extension RunLoop {
   /// without running the tail or presenting.
   enum FrameAcquisitionOutcome {
     case rendered(
-      FrameArtifacts, FrameTailJobState, CompletedFrameDropDecision?, HostGeometryStamp?)
+      FrameArtifacts, FrameTailJobState, CompletedFrameDropDecision?, HostGeometryStamp?, UInt64?)
     case skipped
     case elided
   }

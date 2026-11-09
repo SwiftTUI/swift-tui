@@ -465,6 +465,7 @@ extension ViewGraph {
     if emitsOwnLifecycleEvents {
       for task in lifecycleMetadata.tasks {
         appendTaskCancelEvent(
+          viewNodeID: node.viewNodeID,
           identity: snapshot.identity,
           task: task,
           isStructural: true

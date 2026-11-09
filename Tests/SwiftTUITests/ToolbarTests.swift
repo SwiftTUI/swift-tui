@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 
 @testable import SwiftTUICore
@@ -7,6 +8,29 @@ import Testing
 @MainActor
 @Suite
 struct ToolbarTests {
+
+  @Test("navigation title stays before toolbar items and the frame pump settles")
+  func navigationTitleOrderAndQuiescence() throws {
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("TitleToolbar"), size: .init(width: 48, height: 10)
+    ) {
+      Panel(id: "host") {
+        NavigationStack {
+          Text("Content").navigationTitle("MegaTitle")
+            .toolbarItem(.init(title: "Save", position: .top, isEnabled: true, action: {}))
+        }
+      }.toolbar().toolbarStyle(DefaultTopToolbarStyle())
+    }
+    defer { harness.shutdown() }
+    let row = try #require(harness.frame.split(separator: "\n").first { $0.contains("MegaTitle") })
+    let title = try #require(row.range(of: "MegaTitle"))
+    let save = try #require(row.range(of: "Save"))
+    #expect(title.lowerBound < save.lowerBound)
+    var frames = 0
+    try harness.runLoop.renderPendingFrames(renderedFrames: &frames)
+    #expect(frames == 0)
+  }
+
   @Test("a nested bottom toolbar fills its allocating stack proposal")
   func nestedBottomToolbarFillsStack() {
     let frame = DefaultRenderer().render(

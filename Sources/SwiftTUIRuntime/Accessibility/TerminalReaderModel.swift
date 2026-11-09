@@ -265,6 +265,13 @@ package struct TerminalReaderModel {
     }
   }
 
+  package static func isSafeInputScalar(_ scalar: UnicodeScalar) -> Bool {
+    let value = scalar.value
+    return value >= 32 && !(127...159).contains(value)
+      && !(0x202A...0x202E).contains(value) && !(0x2066...0x2069).contains(value)
+      && value != 0x061C && value != 0x200E && value != 0x200F
+  }
+
   package static func safe(_ text: String, limit: Int = 8192) -> String {
     var result = ""
     var count = 0
@@ -276,9 +283,7 @@ package struct TerminalReaderModel {
       let value = scalar.value
       guard
         value == 10 || value == 9
-          || (value >= 32 && !(127...159).contains(value)
-            && !(0x202A...0x202E).contains(value) && !(0x2066...0x2069).contains(value)
-            && value != 0x061C && value != 0x200E && value != 0x200F)
+          || isSafeInputScalar(scalar)
       else { continue }
       result.unicodeScalars.append(scalar)
       count += 1

@@ -106,6 +106,9 @@ package enum ToolbarItemsPreferenceKey: PreferenceKey {
 }
 
 private enum DirectToolbarItemContributionsKey {}
+private enum PrependedToolbarItemContributionsKey {}
+private let prependedToolbarItemContributionsMetadataKey = ObjectIdentifier(
+  PrependedToolbarItemContributionsKey.self)
 
 private let directToolbarItemContributionsMetadataKey = ObjectIdentifier(
   DirectToolbarItemContributionsKey.self
@@ -134,6 +137,22 @@ extension ResolvedNode {
       for: directToolbarItemContributionsMetadataKey,
       as: DirectToolbarItemContributions.self
     )?.items ?? []
+  }
+
+  package var prependedToolbarItemContributions: [ToolbarItemConfig] {
+    layoutMetadata.layoutValue(
+      for: prependedToolbarItemContributionsMetadataKey,
+      as: DirectToolbarItemContributions.self
+    )?.items ?? []
+  }
+
+  package mutating func prependDirectToolbarItemContribution(_ item: ToolbarItemConfig) {
+    let items = [item] + prependedToolbarItemContributions
+    layoutMetadata = layoutMetadata.settingLayoutValue(
+      DirectToolbarItemContributions(items: items),
+      for: prependedToolbarItemContributionsMetadataKey,
+      debugName: "toolbar-prepended-contributions",
+      debugValue: items.map(\.title).joined(separator: "|"))
   }
 
   package mutating func appendDirectToolbarItemContribution(

@@ -204,7 +204,8 @@ private func reconcileToolbarHostSubtree(
 
   let content = node.toolbarHostContent()
   let items =
-    content.children.flatMap(toolbarItemsForNearestHost(in:))
+    node.prependedToolbarItemContributions
+    + content.children.flatMap(toolbarItemsForNearestHost(in:))
     + node.directToolbarItemContributions
   let reconciled = descriptor.reconcile(node, items)
   changed = changed || reconciled != node
@@ -229,7 +230,8 @@ private func toolbarItemsForNearestHost(
   }
 
   return
-    node.children.flatMap(toolbarItemsForNearestHost(in:))
+    node.prependedToolbarItemContributions
+    + node.children.flatMap(toolbarItemsForNearestHost(in:))
     + node.directToolbarItemContributions
 }
 

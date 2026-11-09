@@ -15,6 +15,65 @@ import Testing
 @MainActor
 @Suite
 struct TerminalGraphicsProtocolTests {
+
+  @Test("failed Sixel attribute replies never override capability defaults", arguments: [1, 2, 3])
+  func failedSixelAttributeReplies(status: Int) {
+    let controller = GraphicsProtocolMockTerminalController(
+      isTTY: true,
+      readResponses: [
+        Array("\u{1B}[?62;4c".utf8), [], [],
+        Array("\u{1B}[?1;\(status);0S".utf8),
+        Array("\u{1B}[?2;\(status);0;0S".utf8),
+      ], cellPixelSize: .init(width: 8, height: 16))
+    let host = TerminalHost(
+      inputFileDescriptor: 0, outputFileDescriptor: 1,
+      fallbackSize: .init(width: 80, height: 24), controller: controller,
+      capabilityProfile: .trueColor, environment: ["TERM": "unknown"])
+    let capabilities = host.resolvedGraphicsCapabilities(probingProtocols: true)
+    #expect(capabilities.supportedProtocols.contains(.sixel))
+    #expect(capabilities.sixelColorRegisters == nil)
+    #expect(capabilities.sixelGeometry == nil)
+    #expect(controller.writes.joined().contains("?1;1;0S"))
+    #expect(controller.writes.joined().contains("?2;1;0S"))
+  }
+
+  @Test("targeted Kitty uploads are tracked and reclaimed by the next full replay")
+  func targetedKittyResidency() throws {
+    let builder = TerminalHostPresentationEmissionBuilder(
+      capabilityProfile: .trueColor,
+      usesTerminalEditOperations: false,
+      imageRenderer: TerminalImageRenderer(repository: ImageAssetRepository()),
+      fallbackBackground: .black, terminalBackgroundColor: nil)
+    let capabilities = TerminalGraphicsCapabilities(
+      supportedProtocols: [.kitty],
+      preferredProtocol: .kitty, cellPixelSize: .init(width: 1, height: 1))
+    let bytes = try makePNGBytes(
+      width: 1, height: 1, pixels: [rgbaPixel(red: 255, green: 0, blue: 0)])
+    let surface = RasterSurface(
+      size: .init(width: 4, height: 1), lines: ["    "],
+      imageAttachments: [
+        blendedRasterImageAttachment(pngBytes: bytes, background: .blue, signature: 1)
+      ])
+    var transmitted: Set<UInt32> = []
+    var resident: Set<UInt32> = []
+    let upload = builder.build(
+      for: surface,
+      plan: .incremental(
+        rowBatches: [],
+        graphicsReplay: .init(scope: .targeted, attachmentsToReplay: surface.imageAttachments),
+        surfaceSize: surface.size), graphicsCapabilities: capabilities,
+      transmittedKittyImages: &transmitted, residentKittyImageData: &resident)
+    let id = try #require(kittyTransmitImageID(in: upload.output))
+    #expect(resident == [id])
+    let empty = RasterSurface(size: surface.size, lines: ["    "])
+    let sweep = builder.build(
+      for: empty, plan: .fullRepaint(surfaceSize: empty.size),
+      graphicsCapabilities: capabilities, transmittedKittyImages: &transmitted,
+      residentKittyImageData: &resident)
+    #expect(sweep.output.contains("d=I,i=\(id)"))
+    #expect(resident.isEmpty)
+  }
+
   @Test("every capability probe returns interleaved input on success and timeout")
   func capabilityProbesPreserveInput() throws {
     let gate = SpyInputSuspensionGate()

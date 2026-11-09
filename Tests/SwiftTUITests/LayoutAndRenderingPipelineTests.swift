@@ -228,19 +228,19 @@ struct LayoutAndRenderingPipelineTests {
         testIdentity("Root"),
         testIdentity("Root"),
       ])
+    let taskRegistration = try #require(taskRegistry.registration(for: testIdentity("Root")))
     #expect(
       artifacts.commitPlan.lifecycle.map(\.operation.handlerLabels) == [
         .appear(handlerIDs: ["Root#appear[0]"]),
-        .taskStart(.init(id: "Root#task", priority: .userInitiated)),
+        .taskStart(taskRegistration.descriptor),
       ]
     )
     #expect(artifacts.commitPlan.lifecycle.map { $0.viewNodeID != nil } == [false, true])
     #expect(lifecycleRegistry.appearHandler(for: "Root#appear[0]") != nil)
     #expect(lifecycleRegistry.disappearHandler(for: "Root#disappear[0]") != nil)
 
-    let taskRegistration = try #require(taskRegistry.registration(for: testIdentity("Root")))
-    #expect(
-      taskRegistration.descriptor == TaskDescriptor(id: "Root#task", priority: .userInitiated))
+    #expect(taskRegistration.descriptor.owner == testIdentity("Root"))
+    #expect(taskRegistration.descriptor.priority == .userInitiated)
 
     await MainActor.run {
       lifecycleRegistry.appearHandler(for: "Root#appear[0]")?()
