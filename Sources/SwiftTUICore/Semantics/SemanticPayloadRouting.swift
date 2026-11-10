@@ -223,7 +223,8 @@ extension SemanticExtractor {
             ownerIdentity: node.identity,
             collectionFocusTarget: hostedRow.map {
               CollectionFocusTarget(itemIdentity: $0.identity, rowIndex: rowIndex)
-            }
+            },
+            compositeTraversalOwner: .init(nodeID: node.viewNodeID, identity: node.identity)
           )
         )
         focusRegions[focusRegions.count - 1].isCollectionEntry =

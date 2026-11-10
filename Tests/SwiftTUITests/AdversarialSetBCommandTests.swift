@@ -320,8 +320,8 @@ private struct SetBSheetKeysFixture: View {
     }
     .sheet("S", isPresented: $show) {
       VStack(alignment: .leading) {
-        Button("A") {}
-        Button("B") {}
+        Text("A").focusable()
+        Text("B").focusable()
       }
     }
   }

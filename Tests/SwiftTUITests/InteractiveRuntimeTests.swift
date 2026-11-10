@@ -4057,11 +4057,18 @@ struct InteractiveRuntimeTests {
       (terminal.visibleFrames.last ?? "").contains("Scroll Control")
     }
 
+    // Authored sections visit every button. Reach Up 2, then the scroll
+    // indicator, before reversing from it to preserve the original journey.
     let inputBatches: [[UInt8]] = [
-      [0x09],
-      [0x09],
+      [0x09],  // Top
+      [0x09],  // Build
+      [0x09],  // Errors
+      [0x09],  // Bottom
+      [0x09],  // Up 2
       [0x0D],
-      [0x09],
+      [0x09],  // Down 2
+      [0x09],  // Offset 6
+      [0x09],  // Scroll indicator
       [0x0D],
       [0x1B, 0x5B, 0x5A],
     ]

@@ -914,7 +914,8 @@ extension FrameworkStressLayoutLifecycleTests {
       _ = try harness.clickText("Increment Sheet Local", chooseLast: true)
       let frame = try harness.clickText("Refresh Sheet Payload", chooseLast: true)
       #expect(frame.contains("sheet version \(generation) local \(generation)"))
-      #expect(harness.actionRegistrationCount <= 5)  // Includes the live semantic Dismiss operation.
+      // Includes the live semantic Dismiss operation.
+      #expect(harness.actionRegistrationCount <= 5)
     }
   }
 }
@@ -1069,7 +1070,7 @@ extension FrameworkStressLayoutLifecycleTests {
     for _ in 1...6 {
       _ = try harness.clickText("Reverse Tabs")
       _ = try harness.focus(StressLL018Fixture.tabIdentity)
-      let frame = try harness.pressKey(KeyPress(.return))
+      let frame = try harness.pressKey(KeyPress(.space))
       #expect(frame.contains("selected tag C"))
       #expect(frame.contains("content C"))
     }
@@ -1797,7 +1798,8 @@ extension FrameworkStressLayoutLifecycleTests {
     for generation in 1...8 {
       let frame = try harness.clickText("Advance Root Environment", chooseLast: true)
       #expect(frame.contains("sheet environment \(generation)"))
-      #expect(harness.actionRegistrationCount <= 4)  // Includes the live semantic Dismiss operation.
+      // Includes the live semantic Dismiss operation.
+      #expect(harness.actionRegistrationCount <= 4)
     }
   }
 }

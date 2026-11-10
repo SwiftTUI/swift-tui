@@ -1131,10 +1131,10 @@ private struct StressAF021Fixture: View {
 // MARK: - Attempt 022: focus-section traversal under reorder
 
 extension FrameworkStressAccessibilityFocusTests {
-  @Test("stress accessibility focus 022 tab escapes reordered focus section")
-  func stress022TabEscapesReorderedFocusSection() throws {
-    // Hypothesis: retained section metadata can follow the old structural ordinal when two focus
-    // sections reorder, causing Tab to stop inside the current section instead of escaping it.
+  @Test("stress accessibility focus 022 tab visits every member of reordered focus section")
+  func stress022TabVisitsReorderedFocusSection() throws {
+    // Reordering must preserve every section member in sequential traversal,
+    // including the inner stop previously skipped by the section-escape policy.
     let harness = try StressRuntimeHarness(
       rootIdentity: testIdentity("StressAF022", "Root"),
       size: .init(width: 46, height: 9)
@@ -1145,6 +1145,10 @@ extension FrameworkStressAccessibilityFocusTests {
 
     for _ in 0..<10 {
       _ = try harness.focus(StressAF022Fixture.firstIdentity)
+      _ = try harness.pressKey(KeyPress(.tab))
+      #expect(
+        harness.runLoop.focusTracker.currentFocusIdentity
+          == StressAF022Fixture.secondIdentity)
       _ = try harness.pressKey(KeyPress(.tab))
       #expect(
         harness.runLoop.focusTracker.currentFocusIdentity

@@ -40,7 +40,7 @@ struct FocusTrackerTests {
     _ = tracker.updateRegions(regions)
     _ = tracker.focusNext()
 
-    // FocusTracker focuses the last region first (bottom-up order)
+    // Initial adoption chose button1; advancing selects button2.
     #expect(tracker.currentFocusIdentity == testIdentity("button2"))
   }
 
@@ -63,7 +63,7 @@ struct FocusTrackerTests {
     _ = tracker.focusNext()
     _ = tracker.focusNext()
 
-    // After two focusNext calls from the last region, wraps to first
+    // Two advances wrap back to the initially adopted region.
     #expect(tracker.currentFocusIdentity == testIdentity("a"))
   }
 
@@ -112,136 +112,86 @@ struct FocusTrackerTests {
       ) == .focus(fallback))
   }
 
-  // MARK: - Section-skipping Tab traversal
-
-  @Test("focusNext skips past every region sharing the current section")
-  func focusNextSkipsPastCurrentSection() {
-    // A = standalone, B/C/D = calculator section, E = standalone.
+  @Test(
+    "authored sections visit every member in both directions",
+    arguments: [false, true])
+  func sectionsTraverseEveryMember(singleSection: Bool) {
     let regions = sectionedRegions([
-      ("A", nil),
-      ("B", "calc"),
-      ("C", "calc"),
-      ("D", "calc"),
-      ("E", nil),
+      ("A", singleSection ? "section" : nil),
+      ("B", "section"),
+      ("C", "section"),
+      ("D", singleSection ? "section" : "second"),
+      ("E", singleSection ? "section" : nil),
     ])
-    let tracker = FocusTracker()
-    _ = tracker.updateRegions(regions)
-
-    _ = tracker.setFocus(to: testIdentity("C"))
-    _ = tracker.focusNext()
-
-    // From a calc-section region, Tab must land on the first region
-    // outside the section — skipping D.
-    #expect(tracker.currentFocusIdentity == testIdentity("E"))
+    let tracker = FocusTracker(focusRegions: regions)
+    for (index, region) in regions.enumerated() {
+      _ = tracker.setFocus(to: region.identity)
+      #expect(tracker.focusNext() == regions[(index + 1) % regions.count].identity)
+      #expect(tracker.focusPrevious() == region.identity)
+      #expect(
+        tracker.focusPrevious() == regions[(index + regions.count - 1) % regions.count].identity)
+      #expect(tracker.focusNext() == region.identity)
+    }
+    _ = tracker.clearFocus()
+    #expect(tracker.focusNext() == regions.first?.identity)
+    _ = tracker.clearFocus()
+    #expect(tracker.focusPrevious() == regions.last?.identity)
   }
 
-  @Test("focusPrevious skips past every region sharing the current section")
-  func focusPreviousSkipsPastCurrentSection() {
-    let regions = sectionedRegions([
-      ("A", nil),
-      ("B", "calc"),
-      ("C", "calc"),
-      ("D", "calc"),
-      ("E", nil),
-    ])
-    let tracker = FocusTracker()
-    _ = tracker.updateRegions(regions)
-
-    _ = tracker.setFocus(to: testIdentity("C"))
-    _ = tracker.focusPrevious()
-
-    // Shift-Tab from inside the section skips B and lands on A.
-    #expect(tracker.currentFocusIdentity == testIdentity("A"))
+  @Test("counter section traversal reverses the actual preceding stop")
+  func counterSectionTraversal() {
+    let tracker = FocusTracker(
+      focusRegions: sectionedRegions([
+        ("minus", "math"), ("plus", "math"), ("step", "settings"), ("reset", "settings"),
+      ]))
+    #expect(tracker.currentFocusIdentity == testIdentity("minus"))
+    #expect(tracker.focusNext() == testIdentity("plus"))
+    #expect(tracker.focusPrevious() == testIdentity("minus"))
+    #expect(tracker.focusNext() == testIdentity("plus"))
+    #expect(tracker.focusNext() == testIdentity("step"))
+    #expect(tracker.focusNext() == testIdentity("reset"))
   }
 
-  @Test("focusNext skipping the trailing section wraps to the beginning")
-  func focusNextWrapsAroundTrailingSection() {
-    let regions = sectionedRegions([
-      ("A", nil),
-      ("B", nil),
-      ("C", "calc"),
-      ("D", "calc"),
-    ])
+  @Test("empty and one-member sections have bounded traversal")
+  func degenerateSections() {
     let tracker = FocusTracker()
-    _ = tracker.updateRegions(regions)
-
-    _ = tracker.setFocus(to: testIdentity("D"))
-    _ = tracker.focusNext()
-
-    // Only "calc" regions follow D — wrap past them and land on A.
-    #expect(tracker.currentFocusIdentity == testIdentity("A"))
+    #expect(tracker.focusNext() == nil)
+    #expect(tracker.focusPrevious() == nil)
+    tracker.updateRegions(sectionedRegions([("only", "section")]))
+    #expect(tracker.focusNext() == testIdentity("only"))
+    #expect(tracker.focusPrevious() == testIdentity("only"))
   }
 
-  @Test("focusPrevious skipping the leading section wraps to the end")
-  func focusPreviousWrapsAroundLeadingSection() {
-    let regions = sectionedRegions([
-      ("A", "calc"),
-      ("B", "calc"),
-      ("C", nil),
-      ("D", nil),
+  @Test("composite rows escape their owner without skipping an enclosing section")
+  func compositeOwnersAreIndependentOfSections() {
+    var regions = sectionedRegions([
+      ("before", "outer"), ("a0", "outer"), ("a1", "outer"),
+      ("peer", "outer"), ("b0", "outer"), ("b1", "outer"), ("after", "outer"),
     ])
-    let tracker = FocusTracker()
-    _ = tracker.updateRegions(regions)
+    for (indices, nodeID) in [(1...2, UInt64(1)), (4...5, UInt64(2))] {
+      for index in indices {
+        // The owner node, not an authored section or even owner identity alone,
+        // distinguishes two live instances. Synthetic rows have no item target.
+        regions[index].compositeTraversalOwner = .init(
+          nodeID: .init(rawValue: nodeID), identity: testIdentity("List"))
+      }
+    }
+    let tracker = FocusTracker(focusRegions: regions)
+    #expect(tracker.focusNext() == testIdentity("a0"))
+    #expect(tracker.focusNext() == testIdentity("peer"))
+    #expect(tracker.focusNext() == testIdentity("b0"))
+    #expect(tracker.focusNext() == testIdentity("after"))
+    #expect(tracker.focusPrevious() == testIdentity("b1"))
+    #expect(tracker.focusPrevious() == testIdentity("peer"))
+    #expect(tracker.focusPrevious() == testIdentity("a1"))
+    #expect(tracker.focusPrevious() == testIdentity("before"))
 
-    _ = tracker.setFocus(to: testIdentity("A"))
-    _ = tracker.focusPrevious()
-
-    // Shift-Tab from the first calc button skips back past B and
-    // wraps around to the last non-section region.
-    #expect(tracker.currentFocusIdentity == testIdentity("D"))
-  }
-
-  @Test("focusNext from a region with no section advances one step")
-  func focusNextFromUnsectionedRegionAdvancesOneStep() {
-    let regions = sectionedRegions([
-      ("A", nil),
-      ("B", "calc"),
-      ("C", "calc"),
-    ])
-    let tracker = FocusTracker()
-    _ = tracker.updateRegions(regions)
-
-    _ = tracker.setFocus(to: testIdentity("A"))
-    _ = tracker.focusNext()
-
-    // A has no section, so Tab advances into the section normally.
-    #expect(tracker.currentFocusIdentity == testIdentity("B"))
-  }
-
-  @Test("focusNext with every region in one section falls back to linear cycling")
-  func focusNextEveryRegionInOneSectionCycles() {
-    let regions = sectionedRegions([
-      ("A", "calc"),
-      ("B", "calc"),
-      ("C", "calc"),
-    ])
-    let tracker = FocusTracker()
-    _ = tracker.updateRegions(regions)
-
-    _ = tracker.setFocus(to: testIdentity("B"))
-    _ = tracker.focusNext()
-
-    // There's nothing outside the section — fall back to plain
-    // linear step so Tab still cycles within it.
-    #expect(tracker.currentFocusIdentity == testIdentity("C"))
-  }
-
-  @Test("focusNext skips a section even when not starting at its first member")
-  func focusNextSkipsSectionMidway() {
-    let regions = sectionedRegions([
-      ("A", nil),
-      ("B", "calc"),
-      ("C", "calc"),
-      ("D", "calc"),
-      ("E", nil),
-    ])
-    let tracker = FocusTracker()
-    _ = tracker.updateRegions(regions)
-
-    _ = tracker.setFocus(to: testIdentity("B"))
-    _ = tracker.focusNext()
-
-    #expect(tracker.currentFocusIdentity == testIdentity("E"))
+    let onlyRows = FocusTracker(focusRegions: Array(regions[1...2]))
+    #expect(onlyRows.focusNext() == testIdentity("a0"))
+    #expect(onlyRows.focusPrevious() == testIdentity("a0"))
+    var changed = regions[1]
+    changed.compositeTraversalOwner = regions[4].compositeTraversalOwner
+    #expect(changed != regions[1], "semantic equality must include composite ownership")
   }
 
   // MARK: - Helpers

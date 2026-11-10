@@ -228,6 +228,7 @@ extension TabView {
       }
       intake.registerKeyPressHandler(
         identity: context.identity,
+        requiresFocusedTarget: true,
         handler: {
           keyPress in
           guard !orderedTags.isEmpty else {
@@ -263,48 +264,6 @@ extension TabView {
               delta: 1,
               presentation: stylePresentation,
               invalidationIdentity: context.identity
-            )
-            return true
-          case KeyPress(.home, modifiers: []):
-            TabSelectionState.setStoredTabOverflowMenuExpanded(
-              false,
-              in: ownerNode,
-              invalidationIdentity: context.identity
-            )
-            TabSelectionState.setStoredFocusedTabIndex(
-              0,
-              tags: orderedTags,
-              in: ownerNode,
-              invalidationIdentity: context.identity,
-              certifiedInvalidationIdentities: TabSelectionState.certifiedStripFocusIdentities(
-                controlIdentity: context.identity,
-                ownerNode: ownerNode,
-                selectedIndex: selectedIndex,
-                orderedTags: orderedTags,
-                presentation: stylePresentation,
-                nextStoredIndex: 0
-              )
-            )
-            return true
-          case KeyPress(.end, modifiers: []):
-            TabSelectionState.setStoredTabOverflowMenuExpanded(
-              false,
-              in: ownerNode,
-              invalidationIdentity: context.identity
-            )
-            TabSelectionState.setStoredFocusedTabIndex(
-              max(0, orderedTags.count - 1),
-              tags: orderedTags,
-              in: ownerNode,
-              invalidationIdentity: context.identity,
-              certifiedInvalidationIdentities: TabSelectionState.certifiedStripFocusIdentities(
-                controlIdentity: context.identity,
-                ownerNode: ownerNode,
-                selectedIndex: selectedIndex,
-                orderedTags: orderedTags,
-                presentation: stylePresentation,
-                nextStoredIndex: max(0, orderedTags.count - 1)
-              )
             )
             return true
           case KeyPress(.escape, modifiers: [])
@@ -357,21 +316,22 @@ extension TabView {
               in: ownerNode,
               invalidationIdentity: context.identity
             )
-            TabSelectionState.setStoredFocusedTabIndex(
-              nil,
-              tags: orderedTags,
-              in: ownerNode,
-              invalidationIdentity: context.identity,
-              certifiedInvalidationIdentities: TabSelectionState.certifiedStripFocusIdentities(
-                controlIdentity: context.identity,
-                ownerNode: ownerNode,
-                selectedIndex: selectedIndex,
-                orderedTags: orderedTags,
-                presentation: stylePresentation,
-                nextStoredIndex: nil
-              )
-            )
+            // Native SwiftUI remembers the strip cursor across a Tab round trip.
             return false
+          case KeyPress(.return, modifiers: []):
+            // Space activates ordinary tab items. Preserve Return for the
+            // terminal overflow trigger and its expanded menu.
+            if TabSelectionState.storedTabOverflowMenuExpanded(in: ownerNode) {
+              return false
+            }
+            _ = TabSelectionState.expandFocusedOverflowMenuIfNeeded(
+              ownerNode: ownerNode,
+              selectedIndex: selectedIndex,
+              orderedTags: orderedTags,
+              presentation: stylePresentation,
+              invalidationIdentity: context.identity
+            )
+            return true
           default:
             return false
           }

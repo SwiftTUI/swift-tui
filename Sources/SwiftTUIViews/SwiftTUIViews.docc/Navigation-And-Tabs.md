@@ -182,9 +182,14 @@ struct MailboxView: View {
 body resolves and draws.
 
 The tab strip is a single focus stop. While it is focused, the Left and
-Right arrows move the highlighted tab, Home and End jump to the first and
-last tabs, and Return or Space commits the highlighted tab to the selection
-binding. The binding is also yours to write — setting `screen = .archive`
+Right arrows move the highlighted tab and wrap at the ends. Space commits
+the highlighted tab to the selection binding; Return does not activate a
+strip item. Home and End leave the cursor unchanged. The terminal overflow
+trigger and expanded menu also accept Return. The highlighted cursor survives
+leaving and returning with Tab.
+Keys pressed in the active tab's content belong to that content, so they do
+not move the enclosing strip's cursor or operate its overflow menu.
+The binding is also yours to write — setting `screen = .archive`
 from any action switches tabs programmatically.
 
 ## Switch the strip style

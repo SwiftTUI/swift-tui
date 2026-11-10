@@ -352,6 +352,18 @@ extension RunLoop {
       }
     }
 
+    // Activation-only controls use Tab for traversal. After their own handlers
+    // decline an arrow, keep focus in place, as native SwiftUI does for buttons.
+    // Authored move commands and composite-control navigation already ran above.
+    if focusedInteractions == .activate, keyPress.modifiers.isEmpty {
+      switch keyPress.key {
+      case .arrowLeft, .arrowRight, .arrowUp, .arrowDown:
+        return nil
+      default:
+        break
+      }
+    }
+
     switch keyPress {
     case KeyPress(.tab, modifiers: .shift):
       performFocusTraversal(step: -1) { focusTracker.focusPrevious() }

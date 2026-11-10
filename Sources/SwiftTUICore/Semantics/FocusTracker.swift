@@ -125,7 +125,7 @@ public final class FocusTracker {
     }
 
     let previousFocus = currentFocusIdentity
-    currentIndex = indexEscapingCurrentSection(step: 1)
+    currentIndex = sequentialTraversalIndex(step: 1)
     prefersNoFocus = false
 
     _ = notifyIfFocusChanged(from: previousFocus)
@@ -139,51 +139,30 @@ public final class FocusTracker {
     }
 
     let previousFocus = currentFocusIdentity
-    currentIndex = indexEscapingCurrentSection(step: -1)
+    currentIndex = sequentialTraversalIndex(step: -1)
     prefersNoFocus = false
 
     _ = notifyIfFocusChanged(from: previousFocus)
     return currentFocusIdentity
   }
 
-  /// Computes the next (or previous) focus index for linear traversal,
-  /// skipping past every region that shares the current focus region's
-  /// `sectionIdentity`.
-  ///
-  /// When the current focus has a non-nil `sectionIdentity`, linear
-  /// traversal walks past every region belonging to that section before
-  /// landing, so one `Tab` press escapes the entire section instead of
-  /// stepping through each member. Regions outside a section, or
-  /// degenerate cases where every region shares the same section,
-  /// continue to advance one step at a time.
-  ///
-  /// - Parameter step: `+1` for `focusNext`, `-1` for `focusPrevious`.
-  private func indexEscapingCurrentSection(step: Int) -> Int {
+  /// Authored focus sections visit every descendant. Only a composite
+  /// control's own row targets share a sequential stop (STUI-1523).
+  private func sequentialTraversalIndex(step: Int) -> Int {
     let count = focusRegions.count
-    precondition(count > 0, "indexEscapingCurrentSection called with no regions")
+    precondition(count > 0, "sequentialTraversalIndex called with no regions")
     guard let startIndex = currentIndex else {
       return collectionEntryIndex(landingAt: step > 0 ? 0 : count - 1, in: focusRegions)
     }
 
-    let linearNext = (startIndex + step + count) % count
-    guard let section = focusRegions[startIndex].sectionIdentity else {
-      return collectionEntryIndex(landingAt: linearNext, in: focusRegions)
-    }
-
-    // Walk forward (or backward) past every region that shares the
-    // current section. Cap the walk at `count` iterations so a tree
-    // where every region happens to sit in the same section still
-    // advances — in that degenerate case we fall back to a single
-    // linear step so focus at least cycles within the section.
-    var candidate = linearNext
-    var steps = 0
-    while steps < count, focusRegions[candidate].sectionIdentity == section {
-      candidate = (candidate + step + count) % count
-      steps += 1
-    }
-
-    if focusRegions[candidate].sectionIdentity == section {
-      return linearNext
+    var candidate = (startIndex + step + count) % count
+    if let owner = focusRegions[startIndex].compositeTraversalOwner {
+      while candidate != startIndex, focusRegions[candidate].compositeTraversalOwner == owner {
+        candidate = (candidate + step + count) % count
+      }
+      // A scene containing only this composite keeps its current row. Tab
+      // cannot manufacture row navigation or change its active selection.
+      if candidate == startIndex { return startIndex }
     }
     return collectionEntryIndex(landingAt: candidate, in: focusRegions)
   }

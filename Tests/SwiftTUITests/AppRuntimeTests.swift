@@ -1158,7 +1158,7 @@ struct AppRuntimeTests {
   }
 
   @MainActor
-  @Test("arrow keys use geometry-aware top-level focus traversal")
+  @Test("automatic focus targets use geometry-aware arrow traversal")
   func arrowKeysUseGeometryAwareTopLevelFocusTraversal() async throws {
     let terminal = RecordingTerminalHost()
 
@@ -1966,15 +1966,15 @@ private struct GeometryFocusWindow: View {
       }
       HStack(alignment: .top, spacing: 4) {
         VStack(alignment: .leading, spacing: 1) {
-          Button("Top Left") {}
+          Text("Top Left").focusable()
             .id(testIdentity("Geometry", "TopLeft"))
-          Button("Bottom Left") {}
+          Text("Bottom Left").focusable()
             .id(testIdentity("Geometry", "BottomLeft"))
         }
         VStack(alignment: .leading, spacing: 1) {
-          Button("Top Right") {}
+          Text("Top Right").focusable()
             .id(testIdentity("Geometry", "TopRight"))
-          Button("Bottom Right") {}
+          Text("Bottom Right").focusable()
             .id(testIdentity("Geometry", "BottomRight"))
         }
       }

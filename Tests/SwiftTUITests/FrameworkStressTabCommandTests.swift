@@ -47,7 +47,7 @@ extension FrameworkStressTabCommandTests {
     _ = try harness.focus(StressTC001Fixture.tabsIdentity)
     _ = try harness.pressKey(KeyPress(.arrowRight))
     _ = try harness.pressKey(KeyPress(.character("r"), modifiers: .ctrl))
-    let frame = try harness.pressKey(KeyPress(.return))
+    let frame = try harness.pressKey(KeyPress(.space))
 
     #expect(frame.contains("B body selected"))
     #expect(!frame.contains("C body selected"))
@@ -110,7 +110,7 @@ extension FrameworkStressTabCommandTests {
     _ = try harness.focus(StressTC002Fixture.tabsIdentity)
     _ = try harness.pressKey(KeyPress(.arrowRight))
     _ = try harness.pressKey(KeyPress(.character("x"), modifiers: .ctrl))
-    let frame = try harness.pressKey(KeyPress(.return))
+    let frame = try harness.pressKey(KeyPress(.space))
 
     #expect(frame.contains("C body selected"))
     #expect(!frame.contains("A body selected"))
@@ -254,7 +254,7 @@ extension FrameworkStressTabCommandTests {
     _ = try harness.focus(StressTC005Fixture.tabsIdentity)
     _ = try harness.pressKey(KeyPress(.arrowRight))
     _ = try harness.pressKey(KeyPress(.character("s"), modifiers: .ctrl))
-    let frame = try harness.pressKey(KeyPress(.return))
+    let frame = try harness.pressKey(KeyPress(.space))
 
     #expect(frame.contains("B content after style replacement"))
     #expect(!frame.contains("A content after style replacement"))

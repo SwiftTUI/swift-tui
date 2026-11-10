@@ -102,7 +102,9 @@ struct FocusChromeOnlyMemberTests {
     // recomputing the highlight even though the row identities themselves
     // carry no reader.
     let frameBefore = try #require(harness.lastFrame)
-    try harness.moveFocusNext()
+    // Tab treats this List as one stop. Exercise row focus directly so the
+    // test continues to isolate focus presentation from selection writes.
+    try harness.moveFocusDown()
     let frameAfter = try #require(harness.lastFrame)
     #expect(
       frameBefore != frameAfter,
@@ -256,6 +258,11 @@ private final class ChromeOnlyHarness<Root: View> {
 
   func moveFocusNext() throws {
     runLoop.focusTracker.focusNext()
+    try settle()
+  }
+
+  func moveFocusDown() throws {
+    runLoop.focusTracker.moveFocus(.down)
     try settle()
   }
 

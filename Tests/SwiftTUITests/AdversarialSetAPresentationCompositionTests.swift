@@ -431,7 +431,7 @@ struct AdversarialSetAPresentationCompositionTests {
     order = [2, 1, 3]
     try h.renderAfterExternalMutation()
     try h.pressKey(.init(.arrowRight))
-    try h.pressKey(.init(.return))
+    try h.pressKey(.init(.space))
     #expect(model.selection == 1)
     #expect(h.frame.contains("Body 1"))
   }

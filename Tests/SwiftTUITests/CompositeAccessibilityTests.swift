@@ -8,7 +8,7 @@ import Testing
 @Suite(.serialized)
 struct CompositeAccessibilityTests {
   @Test(
-    "Authored actions preserve tab-strip keyboard activation", arguments: [false, true],
+    "Authored actions preserve native tab-strip keyboard activation", arguments: [false, true],
     [false, true])
   func authoredTabKeyboard(overflow: Bool, useSpace: Bool) throws {
     let harness = try StressRuntimeHarness(
@@ -31,7 +31,7 @@ struct CompositeAccessibilityTests {
       #expect(harness.frame.contains("Three"))
       #expect(harness.frame.contains("Four"))
     } else {
-      #expect(harness.frame.contains("Selected two"))
+      #expect(harness.frame.contains(useSpace ? "Selected two" : "Selected one"))
     }
     #expect(harness.frame.contains("Authored 0"))
     // A fresh resolve must replace callbacks rather than retain old chains.

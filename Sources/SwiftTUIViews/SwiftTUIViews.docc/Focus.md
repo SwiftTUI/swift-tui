@@ -402,8 +402,19 @@ What a focus section does:
 `focusSection()` does not make a container a control. It uses the larger region
 to guide movement toward the controls inside it.
 
-A focus section helps only when its frame is larger than its contents. It
-cannot guide movement through geometry that it does not occupy.
+For sequential keyboard navigation, Tab visits every eligible descendant of
+the section in order before continuing outside it. Shift-Tab reverses that
+sequence. Nested sections retain their descendants; entering a section does
+not turn its other controls into skipped stops. Empty sections add no stop.
+
+A selectable List has its own composite navigation policy: Tab enters at its
+active row, then skips the other row targets on the next Tab. Its row navigation
+keys operate within the List. Independently focusable row content keeps its own
+stops. Wrapping a List and a Button in `focusSection()` does not merge their
+keyboard stops, nor does it merge two Lists.
+
+For directional movement, a focus section helps only when its frame is larger
+than its contents. It cannot guide movement through geometry that it does not occupy.
 
 ## Movement And Traversal Semantics
 
@@ -413,7 +424,14 @@ The default keyboard model:
 
 - focus starts at the top-most control nearest the leading edge
 - pressing Tab moves focus forward in layout order
+- pressing Shift-Tab moves backward through the same sequence
 - reaching the end wraps back to the beginning
+
+Buttons and other activation-only controls use Tab for focus traversal.
+Their own key handlers and authored handlers can consume arrow keys; a
+declined arrow leaves focus in place. Editing controls such as sliders and
+text fields use their arrows for editing. Custom focusable content with
+automatic interactions can use the runtime's directional navigation.
 
 That is a useful baseline model, but authors still influence it by:
 

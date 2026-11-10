@@ -395,7 +395,8 @@ extension FrameworkStressInputRoutingTests {
   func stressInputRouting003DirectionalContinuationPreservesGeometry() throws {
     // Hypothesis: removal of the first directional landing may fall back to
     // document order, selecting the below-row decoy instead of the next region
-    // on the same horizontal ray.
+    // on the same horizontal ray. Custom automatic focus targets retain
+    // directional navigation; activation-only buttons now use Tab.
     let harness = try StressRuntimeHarness(
       rootIdentity: testIdentity("StressInput003Root"),
       size: .init(width: 52, height: 8)
@@ -432,20 +433,20 @@ private struct StressInput003Fixture: View {
 
   var body: some View {
     ZStack(alignment: .topLeading) {
-      Button("Geo A") {}
+      Text("Geo A").focusable()
         .id(Self.aIdentity)
         .focused($focusedField, equals: .a)
-      Button("Geo Decoy") {}
+      Text("Geo Decoy").focusable()
         .id(Self.decoyIdentity)
         .focused($focusedField, equals: .decoy)
         .padding(.top, 3)
       if !removesLanding {
-        Button("Geo B") {}
+        Text("Geo B").focusable()
           .id(Self.bIdentity)
           .focused($focusedField, equals: .b)
           .padding(.leading, 14)
       }
-      Button("Geo C") {}
+      Text("Geo C").focusable()
         .id(Self.cIdentity)
         .focused($focusedField, equals: .c)
         .padding(.leading, 28)

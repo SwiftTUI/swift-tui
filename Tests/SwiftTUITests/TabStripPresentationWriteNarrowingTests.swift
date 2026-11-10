@@ -63,11 +63,11 @@ struct TabStripPresentationWriteNarrowingTests {
     try harness.press(KeyPress(.arrowLeft))
     #expect(harness.contentCounter.count == evaluationsBefore)
 
-    // Enter commits the focused tab through the selection binding. That is a
+    // Space commits the focused tab through the selection binding. That is a
     // genuine data write (the content payload changes), so the content MUST
     // recompute — the narrowing only covers the presentation slot, never the
     // selection axis.
-    try harness.press(KeyPress(.return))
+    try harness.press(KeyPress(.space))
     let frameAfterCommit = try #require(harness.lastFrame)
     #expect(frameAfterCommit.contains("second tab content"))
   }

@@ -9,6 +9,18 @@ package struct CollectionFocusTarget: Equatable, Sendable {
   }
 }
 
+/// A control whose rows share one stop in sequential keyboard navigation.
+/// The node distinguishes live owners; detached snapshots retain the authored identity.
+package struct CompositeFocusOwner: Equatable, Sendable {
+  package var nodeID: ViewNodeID?
+  package var identity: Identity
+
+  package init(nodeID: ViewNodeID?, identity: Identity) {
+    self.nodeID = nodeID
+    self.identity = identity
+  }
+}
+
 /// A focusable region extracted from the placed tree.
 /// Equality deliberately includes `package`-level bookkeeping fields (F120).
 /// These types carry change detection through the frame pipeline.
@@ -33,6 +45,8 @@ public struct FocusRegion: Equatable, Sendable {
   package var isCollectionEntry = false
   package var scopePath: [Identity]
   package var sectionIdentity: Identity?
+  /// Independent of authored focus sections, which visit every descendant.
+  package var compositeTraversalOwner: CompositeFocusOwner? = nil
   package var modalFocusScopePath: [Identity]?
 
   public init(
@@ -61,7 +75,8 @@ public struct FocusRegion: Equatable, Sendable {
     modalFocusScopePath: [Identity]?,
     ownerNodeID: ViewNodeID? = nil,
     ownerIdentity: Identity? = nil,
-    collectionFocusTarget: CollectionFocusTarget? = nil
+    collectionFocusTarget: CollectionFocusTarget? = nil,
+    compositeTraversalOwner: CompositeFocusOwner? = nil
   ) {
     self.identity = identity
     self.rect = rect
@@ -69,6 +84,7 @@ public struct FocusRegion: Equatable, Sendable {
     self.ownerNodeID = ownerNodeID
     self.ownerIdentity = ownerIdentity
     self.collectionFocusTarget = collectionFocusTarget
+    self.compositeTraversalOwner = compositeTraversalOwner
     self.scopePath = scopePath
     self.sectionIdentity = sectionIdentity
     self.modalFocusScopePath = modalFocusScopePath

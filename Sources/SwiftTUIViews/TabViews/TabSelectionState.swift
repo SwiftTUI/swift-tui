@@ -59,8 +59,10 @@ enum TabSelectionState {
         let nextIndex =
           if direction < 0, let lastVisible = presentation.visibleOptionIndices.last {
             lastVisible
+          } else if direction > 0, let firstVisible = presentation.visibleOptionIndices.first {
+            firstVisible
           } else {
-            overflow.preferredOverflowFocusIndex ?? overflow.overflowIndices.first ?? currentIndex
+            currentIndex
           }
         setStoredFocusedTabIndex(
           nextIndex,
@@ -72,10 +74,7 @@ enum TabSelectionState {
         return
       }
 
-      let nextIndex = min(
-        max(currentIndex + direction, 0),
-        optionCount - 1
-      )
+      let nextIndex = (currentIndex + direction + optionCount) % optionCount
       if overflowIndices.contains(nextIndex),
         let overflowFocusIndex =
           overflow.preferredOverflowFocusIndex ?? overflow.overflowIndices.first
@@ -99,10 +98,7 @@ enum TabSelectionState {
       return
     }
 
-    let nextIndex = min(
-      max(currentIndex + direction, 0),
-      optionCount - 1
-    )
+    let nextIndex = (currentIndex + direction + optionCount) % optionCount
     setStoredFocusedTabIndex(
       nextIndex,
       tags: orderedTags,
@@ -294,47 +290,9 @@ enum TabSelectionState {
     )
   }
 
-  /// Resolves the old and new *display* indices for a stored-index write (the
-  /// display index falls back to the selection when storage is nil) and returns
-  /// the certified strip cone between them.
-  static func certifiedStripFocusIdentities(
-    controlIdentity: Identity,
-    ownerNode: SwiftTUICore.ViewNode?,
-    selectedIndex: Int?,
-    orderedTags: [SelectionTag],
-    presentation: TabViewStylePresentation,
-    nextStoredIndex: Int?
-  ) -> Set<Identity> {
-    let optionCount = orderedTags.count
-    let currentIndex = resolvedFocusedTabIndex(
-      storedIndex: storedFocusedTabIndex(in: ownerNode, tags: orderedTags),
-      selectedIndex: selectedIndex,
-      optionCount: optionCount
-    )
-    let nextIndex = resolvedFocusedTabIndex(
-      storedIndex: nextStoredIndex,
-      selectedIndex: selectedIndex,
-      optionCount: optionCount
-    )
-    return stripFocusInvalidationIdentities(
-      controlIdentity: controlIdentity,
-      presentation: presentation,
-      flippedIndices: [currentIndex, nextIndex]
-    )
-  }
-
-  /// The strip-chrome subtrees whose resolved output can differ when the stored
-  /// strip-focus index moves between `flippedIndices` (the resolved old/new
-  /// display indices): the flipped visible bar items, the flipped overflow-menu
-  /// items while the menu is expanded, and the overflow trigger (whose
-  /// focused/expanded presentation tracks the focused domain) whenever an
-  /// overflow surface exists. The stored index is read only by the declaring
-  /// `TabView`'s own body — its re-run rides the state-dirty queue — and the
-  /// content slot is `f(authored, selection)`, which a pure strip-focus move
-  /// cannot change (the same promise the focus-presentation-inert slot
-  /// declaration certifies for tracker moves). Styles that do not stamp these
-  /// route identities fail the certified write's liveness check and keep the
-  /// reader-attributed broad cone.
+  /// Chrome routes whose presentation can differ between cursor positions.
+  /// Content depends on selection, so a pure strip move excludes its slot.
+  /// Styles without these live route identities retain broad invalidation.
   static func stripFocusInvalidationIdentities(
     controlIdentity: Identity,
     presentation: TabViewStylePresentation,

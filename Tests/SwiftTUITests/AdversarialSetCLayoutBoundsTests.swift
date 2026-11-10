@@ -541,10 +541,10 @@ struct AdversarialSetCLayoutBoundsTests {
     #expect(extreme.selections == [0, 1, 2, 3, 2])
   }
 
-  /// STUI-1333: directional focus moves to and from a button at an extreme
-  /// offset, position or frame exactly as to a merely distant twin. Moving
-  /// focus repaints both buttons, so the presentation damage of the far one
-  /// is exercised too.
+  /// STUI-1333: directional focus moves to and from an automatic focus target
+  /// at an extreme offset, position or frame exactly as to a distant twin.
+  /// Native-style activation-only buttons use Tab; custom focusable content
+  /// exercises the directional geometry fallback (STUI-1524).
   @Test(arguments: SetCFarFocus.allCases)
   func directionalFocusReachesExtremeGeometryLikeADistantTwin(_ shape: SetCFarFocus) throws {
     func run(extreme: Bool) throws -> [Identity?] {
@@ -1050,40 +1050,40 @@ enum SetCFarFocus: CaseIterable, Sendable, CustomTestStringConvertible {
     case .rightToOffsetMaxX:
       return AnyView(
         HStack {
-          Button("a") {}
-          Button("b") {}.offset(x: extreme ? .max : far)
+          Text("a").focusable()
+          Text("b").focusable().offset(x: extreme ? .max : far)
         })
     case .leftToOffsetMinX:
       return AnyView(
         HStack {
-          Button("a") {}
-          Button("b") {}.offset(x: extreme ? .min : -far)
+          Text("a").focusable()
+          Text("b").focusable().offset(x: extreme ? .min : -far)
         })
     case .downToOffsetMaxY:
       return AnyView(
         VStack {
-          Button("a") {}
-          Button("b") {}.offset(y: extreme ? .max : far)
+          Text("a").focusable()
+          Text("b").focusable().offset(y: extreme ? .max : far)
         })
     case .upToPositionMin:
       return AnyView(
         VStack {
-          Button("a") {}
-          Button("b") {}.position(x: extreme ? .min : -far, y: extreme ? .min : -far)
+          Text("a").focusable()
+          Text("b").focusable().position(x: extreme ? .min : -far, y: extreme ? .min : -far)
         })
     case .acrossFrameMax:
       return AnyView(
         HStack {
-          Button("a") {}
-          Button("b") {}.frame(width: extreme ? .max : far, height: extreme ? .max : far)
-          Button("c") {}
+          Text("a").focusable()
+          Text("b").focusable().frame(width: extreme ? .max : far, height: extreme ? .max : far)
+          Text("c").focusable()
         })
     case .mixedOffsets:
       return AnyView(
         HStack {
-          Button("a") {}.offset(x: extreme ? .max : far, y: extreme ? .max : far)
-          Button("b") {}.offset(x: extreme ? .min : -far, y: extreme ? .min : -far)
-          Button("c") {}
+          Text("a").focusable().offset(x: extreme ? .max : far, y: extreme ? .max : far)
+          Text("b").focusable().offset(x: extreme ? .min : -far, y: extreme ? .min : -far)
+          Text("c").focusable()
         })
     }
   }

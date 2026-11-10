@@ -489,7 +489,7 @@ struct FocusTransitionTests {
       "Shift-Tab frame should differ from Tab frame (focus moved back)")
   }
 
-  @Test("TabView arrow navigation moves focus without auto-selecting and Enter commits selection")
+  @Test("TabView arrow navigation moves focus without auto-selecting and Space commits selection")
   func tabViewArrowNavigationSeparatesFocusFromSelection() throws {
     let terminalSize = CellSize(width: 50, height: 8)
     let terminal = FocusTestTerminalHost(surfaceSizeProvider: { terminalSize })
@@ -537,14 +537,14 @@ struct FocusTransitionTests {
       "Moving tab focus should not auto-select the newly focused tab")
     #expect(!afterArrowLines.contains { $0.contains("Other body") })
 
-    _ = runLoop.handleKeyPress(KeyPress(.return))
+    _ = runLoop.handleKeyPress(KeyPress(.space))
     try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
 
-    let afterReturnLines = terminal.latestSurface!.lines
+    let afterSpaceLines = terminal.latestSurface!.lines
     #expect(
-      afterReturnLines.contains { $0.contains("Other body") },
-      "Enter should select the focused tab")
-    #expect(!afterReturnLines.contains { $0.contains("Demo body") })
+      afterSpaceLines.contains { $0.contains("Other body") },
+      "Space should select the focused tab")
+    #expect(!afterSpaceLines.contains { $0.contains("Demo body") })
   }
 }
 

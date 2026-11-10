@@ -475,6 +475,18 @@ The archive registry and transient live-graph locator remain separate slots;
 `TabView.swift` composes the active content and registers input handlers through
 these collaborators.
 
+TabView's control key handler requires the live focused target. Content
+descendants retain their own editing and navigation handlers; they cannot
+mutate an enclosing tab strip through key bubbling. Strip focus is distinct
+from selection, persists across Tab traversal, and wraps with Left/Right.
+
+Sequential focus visits every authored focus-section descendant. A
+`FocusRegion` separately carries an optional `CompositeFocusOwner` for a
+control's row targets. List extraction stamps that owner even inside an
+authored section, so Tab can leave one List without skipping its sibling
+controls. The node ID distinguishes live owner instances; detached snapshots
+also carry the owner identity. This metadata participates in region equality.
+
 `SwiftTUIGraph/HotReload/` owns package-internal cross-generation state currency.
 `SnapshotCoding` encodes Codable slots into detached scalar/container values
 without Foundation. Limits bound nesting (128), values (65,536), and cumulative
