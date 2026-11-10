@@ -197,7 +197,15 @@ package struct PlacedNode: Equatable, Sendable {
   package var surfaceComposition: SurfaceCompositionMetadata
   private var _semanticMetadata: Boxed<SemanticMetadata>?
   package var semanticMetadata: SemanticMetadata {
-    get { _semanticMetadata?.value ?? SemanticMetadata() }
+    // Borrowed, not copied: the semantics walk reads several fields of every
+    // node, and a copy retains and releases each of the value's references.
+    _read {
+      if let boxed = _semanticMetadata {
+        yield boxed.value
+      } else {
+        yield defaultSemanticMetadata
+      }
+    }
     set {
       if newValue == SemanticMetadata() {
         _semanticMetadata = nil
@@ -231,7 +239,13 @@ package struct PlacedNode: Equatable, Sendable {
   /// border wrappers actually populate this field.
   package var _boxedLayoutBehavior: Boxed<LayoutBehavior>?
   package var layoutBehavior: LayoutBehavior {
-    get { _boxedLayoutBehavior?.value ?? .intrinsic }
+    _read {
+      if let boxed = _boxedLayoutBehavior {
+        yield boxed.value
+      } else {
+        yield intrinsicLayoutBehavior
+      }
+    }
     set {
       if case .intrinsic = newValue {
         _boxedLayoutBehavior = nil
@@ -269,7 +283,13 @@ package struct PlacedNode: Equatable, Sendable {
   /// `nil` everywhere else.
   private var _placementMetadata: Boxed<PlacedNodePlacementMetadata>?
   package var placementMetadata: PlacedNodePlacementMetadata {
-    get { _placementMetadata?.value ?? .init() }
+    _read {
+      if let boxed = _placementMetadata {
+        yield boxed.value
+      } else {
+        yield emptyPlacementMetadata
+      }
+    }
     set {
       _placementMetadata = newValue.isEmpty ? nil : Boxed(newValue)
     }
@@ -581,3 +601,9 @@ extension PlacedNode: DeeplyNestedValueTree {
     set { children = newValue }
   }
 }
+
+// The values a placed node's boxed fields read as while unset. File-scoped so
+// the accessors can lend them without building a value per read.
+private let defaultSemanticMetadata = SemanticMetadata()
+private let intrinsicLayoutBehavior = LayoutBehavior.intrinsic
+private let emptyPlacementMetadata = PlacedNodePlacementMetadata()

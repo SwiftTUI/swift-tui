@@ -559,14 +559,15 @@ package struct Rasterizer: Sendable {
     func cell(_ cells: [RasterCell], _ column: Int) -> RasterCell {
       column < cells.count ? cells[column] : .empty
     }
+    var comparator = RasterCellRunComparator()
     for column in 0..<max(0, min(surfaceWidth, bandColumns.lowerBound)) {
-      guard cell(row, column) == cell(sourceRow, column) else {
+      guard comparator.areEqual(cell(row, column), cell(sourceRow, column)) else {
         return false
       }
     }
     if bandColumns.upperBound < surfaceWidth {
       for column in bandColumns.upperBound..<surfaceWidth {
-        guard cell(row, column) == cell(sourceRow, column) else {
+        guard comparator.areEqual(cell(row, column), cell(sourceRow, column)) else {
           return false
         }
       }

@@ -1986,9 +1986,13 @@ SwiftTUIPrimitives.ProposedSize.init(width:height:)
 SwiftTUIPrimitives.ProposedSize.unspecified
 SwiftTUIPrimitives.ProposedSize.width
 SwiftTUIPrimitives.RGBColorProfile
+SwiftTUIPrimitives.RGBColorProfile.==(_:_:)
 SwiftTUIPrimitives.RGBColorProfile.acescg
 SwiftTUIPrimitives.RGBColorProfile.adobeRGB
+SwiftTUIPrimitives.RGBColorProfile.customMirror
 SwiftTUIPrimitives.RGBColorProfile.displayP3
+SwiftTUIPrimitives.RGBColorProfile.encode(to:)
+SwiftTUIPrimitives.RGBColorProfile.hash(into:)
 SwiftTUIPrimitives.RGBColorProfile.id
 SwiftTUIPrimitives.RGBColorProfile.init(from:)
 SwiftTUIPrimitives.RGBColorProfile.init(name:primaries:whitePoint:transferFunction:)
@@ -2023,8 +2027,10 @@ SwiftTUIPrimitives.RadialGradient.init(colors:center:startRadius:endRadius:)
 SwiftTUIPrimitives.RadialGradient.init(gradient:center:startRadius:endRadius:)
 SwiftTUIPrimitives.RadialGradient.startRadius
 SwiftTUIPrimitives.RasterCell
+SwiftTUIPrimitives.RasterCell.==(_:_:)
 SwiftTUIPrimitives.RasterCell.character
 SwiftTUIPrimitives.RasterCell.continuationLeadX
+SwiftTUIPrimitives.RasterCell.customMirror
 SwiftTUIPrimitives.RasterCell.empty
 SwiftTUIPrimitives.RasterCell.hyperlink
 SwiftTUIPrimitives.RasterCell.init(character:spanWidth:continuationLeadX:style:hyperlink:)

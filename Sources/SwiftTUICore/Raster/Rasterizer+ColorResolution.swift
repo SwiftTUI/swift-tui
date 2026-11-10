@@ -770,3 +770,21 @@ extension Rasterizer {
   }
 
 }
+
+extension Rasterizer.ResolvedShapeColorMode {
+  /// Whether `resolveColor(from:bounds:sampleX:sampleY:)` returns the same
+  /// colour for every sample position.
+  var isPositionIndependent: Bool {
+    switch self {
+    case .constant:
+      true
+    case .opaque(let inner), .accessibility(let inner, _):
+      inner.isPositionIndependent
+    case .tile(let tile):
+      // A tile reduces to its foreground when read as a single colour.
+      tile.foreground.isPositionIndependent
+    case .sampled, .sampledRadial, .sampledAngular, .sampledMesh:
+      false
+    }
+  }
+}

@@ -199,9 +199,12 @@ extension Rasterizer {
     }
 
     var changed: [Range<Int>] = []
+    var comparator = RasterCellRunComparator()
     var index = 0
     while index < width {
-      guard cell(at: index, in: previousRow) != cell(at: index, in: currentRow) else {
+      guard
+        !comparator.areEqual(cell(at: index, in: previousRow), cell(at: index, in: currentRow))
+      else {
         index += 1
         continue
       }
@@ -209,7 +212,7 @@ extension Rasterizer {
       let start = index
       index += 1
       while index < width,
-        cell(at: index, in: previousRow) != cell(at: index, in: currentRow)
+        !comparator.areEqual(cell(at: index, in: previousRow), cell(at: index, in: currentRow))
       {
         index += 1
       }

@@ -52,14 +52,13 @@ package enum RasterSurfaceDamageDiff {
     for row in 0..<height {
       let previousRow = row < previous.cells.count ? previous.cells[row] : []
       let currentRow = row < current.cells.count ? current.cells[row] : []
-      // Unchanged rows compare equal here without the per-column walk below.
-      // Incremental rasterization copies untouched rows from the previous
-      // surface, so this comparison usually hits the stdlib's identical-storage
-      // fast path and the whole-surface diff costs O(rows + changed cells)
-      // rather than O(W×H) per committed frame (F36). Equal rows cannot
-      // produce damage: columns beyond both counts read as `.empty` on both
-      // sides.
-      guard previousRow != currentRow else {
+      // Incremental rasterization carries untouched rows over from the
+      // previous surface without copying them, so most rows are the same
+      // buffer on both sides and the whole-surface diff costs
+      // O(rows + cells of repainted rows) rather than O(W×H) per committed
+      // frame (F36). The same buffer cannot produce damage: columns beyond
+      // both counts read as `.empty` on both sides.
+      guard !RasterCell.rowsShareStorage(previousRow, currentRow) else {
         continue
       }
       let width = max(
@@ -68,11 +67,12 @@ package enum RasterSurfaceDamageDiff {
         currentRow.count
       )
       var ranges: [Range<Int>] = []
+      var comparator = RasterCellRunComparator()
 
       for column in 0..<width {
         let previousCell = cell(in: previousRow, at: column)
         let currentCell = cell(in: currentRow, at: column)
-        guard previousCell != currentCell else {
+        guard !comparator.areEqual(previousCell, currentCell) else {
           continue
         }
         ranges.append(occupiedRange(in: previousRow, at: column, surfaceWidth: width))

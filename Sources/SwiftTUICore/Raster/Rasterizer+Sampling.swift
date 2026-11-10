@@ -216,6 +216,77 @@ extension Rasterizer {
     presentationRecorder: RasterPresentationLayerRecorder? = nil,
     presentationEffects: [DrawEffect] = []
   ) {
+    let glyphWidth = max(1, width)
+    guard
+      canWrite(
+        atX: x, y: y, glyphWidth: glyphWidth, cells: cells, clip: clip, dirtyRows: dirtyRows)
+    else {
+      return
+    }
+    let overlay =
+      if let memo = presentationRecorder?.attributeMemo {
+        memo.attributes(style: style, hyperlink: hyperlink)
+      } else {
+        RasterCellAttributes.make(style: style, hyperlink: hyperlink)
+      }
+    writeComposited(
+      character,
+      glyphWidth: glyphWidth,
+      overlay: overlay,
+      atX: x,
+      y: y,
+      cells: &cells,
+      blendMode: blendMode,
+      presentationRecorder: presentationRecorder,
+      presentationEffects: presentationEffects
+    )
+  }
+
+  /// Writes a glyph whose style and hyperlink the caller already shares as
+  /// one ``RasterCellAttributes``. Equivalent to the style-taking overload
+  /// with `attributes.style` and `attributes.hyperlink`.
+  internal func write(
+    _ character: Character,
+    width: Int = 1,
+    attributes: RasterCellAttributes?,
+    atX x: Int,
+    y: Int,
+    cells: inout [[RasterCell]],
+    clip: CellRect?,
+    blendMode: BlendMode? = nil,
+    dirtyRows: Set<Int>? = nil,
+    presentationRecorder: RasterPresentationLayerRecorder? = nil,
+    presentationEffects: [DrawEffect] = []
+  ) {
+    let glyphWidth = max(1, width)
+    guard
+      canWrite(
+        atX: x, y: y, glyphWidth: glyphWidth, cells: cells, clip: clip, dirtyRows: dirtyRows)
+    else {
+      return
+    }
+    writeComposited(
+      character,
+      glyphWidth: glyphWidth,
+      overlay: attributes,
+      atX: x,
+      y: y,
+      cells: &cells,
+      blendMode: blendMode,
+      presentationRecorder: presentationRecorder,
+      presentationEffects: presentationEffects
+    )
+  }
+
+  @inline(__always)
+  private func canWrite(
+    atX x: Int,
+    y: Int,
+    glyphWidth: Int,
+    cells: [[RasterCell]],
+    clip: CellRect?,
+    dirtyRows: Set<Int>?
+  ) -> Bool {
     // Incremental repaint clamps writes to the EXACT dirty-row set (F125):
     // the paint walk culls by the dirty hull, so a node spanning two
     // disjoint dirty bands reaches rows between them — rows that were
@@ -224,11 +295,10 @@ extension Rasterizer {
     // surface drifts a step per incremental frame. `nil` (fresh raster)
     // never clamps.
     if let dirtyRows, !dirtyRows.contains(y) {
-      return
+      return false
     }
-    let glyphWidth = max(1, width)
     guard y >= 0, y < cells.count, x >= 0, x < cells[y].count else {
-      return
+      return false
     }
     if let clip {
       guard x >= clip.origin.x,
@@ -236,72 +306,115 @@ extension Rasterizer {
         y >= clip.origin.y,
         y < clip.maxY
       else {
-        return
+        return false
       }
     }
+    return true
+  }
 
-    let composedBlock = compositeVerticalBlockCell(
-      RasterCell(character: character, spanWidth: glyphWidth, style: style, hyperlink: hyperlink),
-      over: cells[y][x], blendMode: blendMode)
-    let underlayStyle = cells[y][x].style
-    let finalStyle: ResolvedTextStyle?
-    if let composedBlock {
-      finalStyle = composedBlock.style
+  /// Composites `overlay` over the cell at `(x, y)` and stores the glyph.
+  ///
+  /// The composite of one overlay over one underlay under one blend mode is a
+  /// pure function of those three, so a run that repeats them reuses the
+  /// previous cell's attributes (`RasterAttributeMemo`) instead of compositing
+  /// and allocating per cell.
+  private func writeComposited(
+    _ character: Character,
+    glyphWidth: Int,
+    overlay: RasterCellAttributes?,
+    atX x: Int,
+    y: Int,
+    cells: inout [[RasterCell]],
+    blendMode: BlendMode?,
+    presentationRecorder: RasterPresentationLayerRecorder?,
+    presentationEffects: [DrawEffect]
+  ) {
+    let underlayCell = cells[y][x]
+    let underlay = underlayCell.attributes
+    let memo = presentationRecorder?.attributeMemo
+    var finalCharacter = character
+    let finalAttributes: RasterCellAttributes?
+
+    if glyphWidth == 1, isVerticalHalfBlock(character),
+      let composedBlock = compositeVerticalBlockCell(
+        RasterCell(character: character, spanWidth: 1, attributes: overlay),
+        over: underlayCell, blendMode: blendMode)
+    {
+      finalCharacter = composedBlock.character
+      // The composed cell keeps the written hyperlink even when the block
+      // resolved to the underlay's own glyph and style.
+      finalAttributes =
+        if composedBlock.attributes?.hyperlink == nil, overlay?.hyperlink == nil {
+          composedBlock.attributes
+        } else {
+          RasterCellAttributes.make(style: composedBlock.style, hyperlink: overlay?.hyperlink)
+        }
+    } else if let remembered = memo?.composite(
+      overlay: overlay, underlay: underlay, blendMode: blendMode)
+    {
+      finalAttributes = remembered
     } else {
-      switch (style, underlayStyle) {
+      switch (overlay?.style, underlay?.style) {
       case (nil, nil):
-        finalStyle = nil
+        // No style on either side: the overlay carries at most a hyperlink.
+        finalAttributes = overlay
       case (let overlayStyle?, nil):
-        finalStyle = overlayStyle.isDefault ? nil : overlayStyle
+        finalAttributes =
+          overlayStyle.isDefault
+          ? RasterCellAttributes.make(style: nil, hyperlink: overlay?.hyperlink)
+          : overlay
       case (nil, let underlayStyle?):
         let compositedStyle = Self.emptyCompositingStyle.composited(
           over: underlayStyle,
           blendMode: blendMode
         )
-        finalStyle = compositedStyle.isDefault ? nil : compositedStyle
+        finalAttributes = RasterCellAttributes.make(
+          style: compositedStyle.isDefault ? nil : compositedStyle,
+          hyperlink: overlay?.hyperlink
+        )
       case (let overlayStyle?, let underlayStyle?):
         let compositedStyle = overlayStyle.composited(
           over: underlayStyle,
           blendMode: blendMode
         )
-        finalStyle = compositedStyle.isDefault ? nil : compositedStyle
+        finalAttributes = RasterCellAttributes.make(
+          style: compositedStyle.isDefault ? nil : compositedStyle,
+          hyperlink: overlay?.hyperlink
+        )
       }
-
+      memo?.recordComposite(
+        overlay: overlay, underlay: underlay, blendMode: blendMode, result: finalAttributes)
     }
 
-    for offset in 0..<glyphWidth {
-      let targetX = x + offset
-      guard targetX >= 0, targetX < cells[y].count else {
-        continue
+    // Every cell in the glyph's span is overwritten below, so only a cell
+    // that belongs to a wide glyph reaching outside the span needs clearing.
+    let rowWidth = cells[y].count
+    for targetX in x..<min(x + glyphWidth, rowWidth) {
+      let existing = targetX == x ? underlayCell : cells[y][targetX]
+      if existing.isContinuation || existing.spanWidth > 1 {
+        clearExistingGlyph(atX: targetX, y: y, cells: &cells)
       }
-      clearExistingGlyph(atX: targetX, y: y, cells: &cells)
     }
 
     cells[y][x] = RasterCell(
-      character: composedBlock?.character ?? character,
+      character: finalCharacter,
       spanWidth: glyphWidth,
-      style: finalStyle,
-      hyperlink: hyperlink
+      attributes: finalAttributes
     )
 
     if glyphWidth > 1 {
-      for offset in 1..<glyphWidth {
-        let targetX = x + offset
-        guard targetX >= 0, targetX < cells[y].count else {
-          continue
-        }
+      for targetX in (x + 1)..<min(x + glyphWidth, rowWidth) {
         cells[y][targetX] = RasterCell(
           character: " ",
           spanWidth: 0,
           continuationLeadX: x,
-          style: finalStyle,
-          hyperlink: hyperlink
+          attributes: finalAttributes
         )
       }
     }
 
-    if rasterBackdropCoverage(for: character, spanWidth: glyphWidth) != .none
-      || (style?.backgroundColor?.alpha ?? 0) > 0
+    if glyphCoversBackdrop(character, spanWidth: glyphWidth)
+      || (overlay?.style?.backgroundColor?.alpha ?? 0) > 0
     {
       presentationRecorder?.appendCellFragment(
         from: cells,
@@ -311,6 +424,14 @@ extension Rasterizer {
         effects: presentationEffects
       )
     }
+  }
+
+  /// Whether `character` is one of the two half-block glyphs that
+  /// `compositeVerticalBlockCell` composes with the cell beneath.
+  @inline(__always)
+  private func isVerticalHalfBlock(_ character: Character) -> Bool {
+    // Both glyphs are single non-ASCII scalars; ASCII text skips the compare.
+    singleASCIIByte(of: character) == nil && (character == "▀" || character == "▄")
   }
 
   internal func clearExistingGlyph(

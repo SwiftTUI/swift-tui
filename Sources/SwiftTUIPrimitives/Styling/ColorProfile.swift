@@ -333,10 +333,121 @@ public enum CompositingSpace: Hashable, Sendable, Codable {
 public struct RGBColorProfile: Hashable, Sendable, Codable, Identifiable {
   public var id: String { name }
 
-  public let name: String
-  public let primaries: RGBPrimaries
-  public let whitePoint: ReferenceWhite
-  public let transferFunction: TransferFunction
+  /// One word of storage.
+  ///
+  /// Every `Color` embeds its profile, and a resolved text style embeds up to
+  /// four colors, so the profile's footprint multiplies through styles,
+  /// themes, environment snapshots and raster cells. The built-in profiles
+  /// are payload-free cases: copying or comparing one touches no reference
+  /// count and no string. Only a profile the caller defined carries a shared
+  /// immutable definition.
+  ///
+  /// `init(name:primaries:whitePoint:transferFunction:)` maps a definition
+  /// that equals a built-in profile onto that built-in's case, so a custom
+  /// definition never equals a built-in one and equality between two
+  /// built-ins is a case compare.
+  private enum Storage: Sendable {
+    case sRGB
+    case displayP3
+    case adobeRGB
+    case rec2020
+    case proPhotoRGB
+    case acescg
+    case linearSRGB
+    case linearDisplayP3
+    case custom(CustomDefinition)
+
+    static let builtIns: [Storage] = [
+      .sRGB, .displayP3, .adobeRGB, .rec2020, .proPhotoRGB, .acescg, .linearSRGB,
+      .linearDisplayP3,
+    ]
+
+    /// Position among the built-in cases, or `nil` for a custom definition.
+    var builtInOrdinal: UInt8? {
+      switch self {
+      case .sRGB: 0
+      case .displayP3: 1
+      case .adobeRGB: 2
+      case .rec2020: 3
+      case .proPhotoRGB: 4
+      case .acescg: 5
+      case .linearSRGB: 6
+      case .linearDisplayP3: 7
+      case .custom: nil
+      }
+    }
+  }
+
+  private final class CustomDefinition: Sendable {
+    let name: String
+    let primaries: RGBPrimaries
+    let whitePoint: ReferenceWhite
+    let transferFunction: TransferFunction
+
+    init(
+      name: String,
+      primaries: RGBPrimaries,
+      whitePoint: ReferenceWhite,
+      transferFunction: TransferFunction
+    ) {
+      self.name = name
+      self.primaries = primaries
+      self.whitePoint = whitePoint
+      self.transferFunction = transferFunction
+    }
+  }
+
+  private let storage: Storage
+
+  private init(storage: Storage) {
+    self.storage = storage
+  }
+
+  public var name: String {
+    switch storage {
+    case .sRGB: "sRGB"
+    case .displayP3: "Display P3"
+    case .adobeRGB: "Adobe RGB"
+    case .rec2020: "Rec. 2020"
+    case .proPhotoRGB: "ProPhoto RGB"
+    case .acescg: "ACEScg"
+    case .linearSRGB: "Linear sRGB"
+    case .linearDisplayP3: "Linear Display P3"
+    case .custom(let definition): definition.name
+    }
+  }
+
+  public var primaries: RGBPrimaries {
+    switch storage {
+    case .sRGB, .linearSRGB: Self.sRGBPrimaries
+    case .displayP3, .linearDisplayP3: Self.displayP3Primaries
+    case .adobeRGB: Self.adobeRGBPrimaries
+    case .rec2020: Self.rec2020Primaries
+    case .proPhotoRGB: Self.proPhotoRGBPrimaries
+    case .acescg: Self.acescgPrimaries
+    case .custom(let definition): definition.primaries
+    }
+  }
+
+  public var whitePoint: ReferenceWhite {
+    switch storage {
+    case .sRGB, .displayP3, .adobeRGB, .rec2020, .linearSRGB, .linearDisplayP3: .d65
+    case .proPhotoRGB: .d50
+    case .acescg: .d60
+    case .custom(let definition): definition.whitePoint
+    }
+  }
+
+  public var transferFunction: TransferFunction {
+    switch storage {
+    case .sRGB, .displayP3: .sRGB
+    case .adobeRGB: .gamma(2.2)
+    case .rec2020: .rec2020
+    case .proPhotoRGB: .proPhotoRGB
+    case .acescg, .linearSRGB, .linearDisplayP3: .linear
+    case .custom(let definition): definition.transferFunction
+    }
+  }
 
   public init(
     name: String,
@@ -348,28 +459,68 @@ public struct RGBColorProfile: Hashable, Sendable, Codable, Identifiable {
       name.drop(while: \.isWhitespace).reversed().drop(while: \.isWhitespace).reversed())
     precondition(!trimmed.isEmpty, "Profile name must not be empty")
     precondition(transferFunction.isValid, "Transfer function must be valid")
-    self.name = trimmed
-    self.primaries = primaries
-    self.whitePoint = whitePoint
-    self.transferFunction = transferFunction
     let matrix = _makeRGBToXYZMatrix(primaries: primaries, whitePoint: whitePoint)
     precondition(
       matrix.determinant.isFinite && abs(matrix.determinant) > 1e-18,
       "Profile matrix must be invertible")
+    for builtIn in Storage.builtIns {
+      let candidate = RGBColorProfile(storage: builtIn)
+      if candidate.name == trimmed, candidate.primaries == primaries,
+        candidate.whitePoint == whitePoint, candidate.transferFunction == transferFunction
+      {
+        self.storage = builtIn
+        return
+      }
+    }
+    self.storage = .custom(
+      CustomDefinition(
+        name: trimmed,
+        primaries: primaries,
+        whitePoint: whitePoint,
+        transferFunction: transferFunction
+      )
+    )
+  }
+
+  public static func == (lhs: RGBColorProfile, rhs: RGBColorProfile) -> Bool {
+    switch (lhs.storage, rhs.storage) {
+    case (.custom(let left), .custom(let right)):
+      left === right
+        || (left.name == right.name && left.primaries == right.primaries
+          && left.whitePoint == right.whitePoint
+          && left.transferFunction == right.transferFunction)
+    case (.custom, _), (_, .custom):
+      // A definition equal to a built-in profile is stored as that built-in.
+      false
+    default:
+      lhs.storage.builtInOrdinal == rhs.storage.builtInOrdinal
+    }
+  }
+
+  public func hash(into hasher: inout Hasher) {
+    hasher.combine(name)
+    hasher.combine(primaries)
+    hasher.combine(whitePoint)
+    hasher.combine(transferFunction)
   }
 
   public var rgbToXYZMatrix: Matrix3x3 {
-    if self == .sRGB || self == .linearSRGB { return Self._sRGBToXYZ }
-    if self == .displayP3 || self == .linearDisplayP3 { return Self._displayP3ToXYZ }
-    if self == .rec2020 { return Self._rec2020ToXYZ }
-    return _makeRGBToXYZMatrix(primaries: primaries, whitePoint: whitePoint)
+    switch storage {
+    case .sRGB, .linearSRGB: Self._sRGBToXYZ
+    case .displayP3, .linearDisplayP3: Self._displayP3ToXYZ
+    case .rec2020: Self._rec2020ToXYZ
+    case .adobeRGB, .proPhotoRGB, .acescg, .custom:
+      _makeRGBToXYZMatrix(primaries: primaries, whitePoint: whitePoint)
+    }
   }
 
   public var xyzToRGBMatrix: Matrix3x3 {
-    if self == .sRGB || self == .linearSRGB { return Self._sRGBToXYZ.inverse }
-    if self == .displayP3 || self == .linearDisplayP3 { return Self._displayP3ToXYZ.inverse }
-    if self == .rec2020 { return Self._rec2020ToXYZ.inverse }
-    return rgbToXYZMatrix.inverse
+    switch storage {
+    case .sRGB, .linearSRGB: Self._xyzToSRGB
+    case .displayP3, .linearDisplayP3: Self._xyzToDisplayP3
+    case .rec2020: Self._xyzToRec2020
+    case .adobeRGB, .proPhotoRGB, .acescg, .custom: rgbToXYZMatrix.inverse
+    }
   }
 
   public var isLinear: Bool {
@@ -383,6 +534,10 @@ public struct RGBColorProfile: Hashable, Sendable, Codable, Identifiable {
     }
   }
 
+  private enum CodingKeys: String, CodingKey {
+    case name, primaries, whitePoint, transferFunction
+  }
+
   public init(from decoder: any Decoder) throws {
     let c = try decoder.container(keyedBy: CodingKeys.self)
     self.init(
@@ -392,88 +547,79 @@ public struct RGBColorProfile: Hashable, Sendable, Codable, Identifiable {
       transferFunction: try c.decode(TransferFunction.self, forKey: .transferFunction)
     )
   }
+
+  public func encode(to encoder: any Encoder) throws {
+    var c = encoder.container(keyedBy: CodingKeys.self)
+    try c.encode(name, forKey: .name)
+    try c.encode(primaries, forKey: .primaries)
+    try c.encode(whitePoint, forKey: .whitePoint)
+    try c.encode(transferFunction, forKey: .transferFunction)
+  }
+}
+
+extension RGBColorProfile: CustomReflectable {
+  /// Reflects the profile's definition, not its storage. Reflection-driven
+  /// consumers (canonical draw snapshots, memo comparison, debug printing)
+  /// see the same four fields whether the profile is built-in or custom.
+  public var customMirror: Mirror {
+    Mirror(
+      self,
+      children: [
+        "name": name,
+        "primaries": primaries,
+        "whitePoint": whitePoint,
+        "transferFunction": transferFunction,
+      ],
+      displayStyle: .struct
+    )
+  }
 }
 
 extension RGBColorProfile {
-  public static let sRGB = RGBColorProfile(
-    name: "sRGB",
-    primaries: RGBPrimaries(
-      red: Chromaticity(x: 0.64, y: 0.33),
-      green: Chromaticity(x: 0.30, y: 0.60),
-      blue: Chromaticity(x: 0.15, y: 0.06)
-    ),
-    whitePoint: .d65,
-    transferFunction: .sRGB
+  private static let sRGBPrimaries = RGBPrimaries(
+    red: Chromaticity(x: 0.64, y: 0.33),
+    green: Chromaticity(x: 0.30, y: 0.60),
+    blue: Chromaticity(x: 0.15, y: 0.06)
   )
 
-  public static let displayP3 = RGBColorProfile(
-    name: "Display P3",
-    primaries: RGBPrimaries(
-      red: Chromaticity(x: 0.680, y: 0.320),
-      green: Chromaticity(x: 0.265, y: 0.690),
-      blue: Chromaticity(x: 0.150, y: 0.060)
-    ),
-    whitePoint: .d65,
-    transferFunction: .sRGB
+  private static let displayP3Primaries = RGBPrimaries(
+    red: Chromaticity(x: 0.680, y: 0.320),
+    green: Chromaticity(x: 0.265, y: 0.690),
+    blue: Chromaticity(x: 0.150, y: 0.060)
   )
 
-  public static let adobeRGB = RGBColorProfile(
-    name: "Adobe RGB",
-    primaries: RGBPrimaries(
-      red: Chromaticity(x: 0.64, y: 0.33),
-      green: Chromaticity(x: 0.21, y: 0.71),
-      blue: Chromaticity(x: 0.15, y: 0.06)
-    ),
-    whitePoint: .d65,
-    transferFunction: .gamma(2.2)
+  private static let adobeRGBPrimaries = RGBPrimaries(
+    red: Chromaticity(x: 0.64, y: 0.33),
+    green: Chromaticity(x: 0.21, y: 0.71),
+    blue: Chromaticity(x: 0.15, y: 0.06)
   )
 
-  public static let rec2020 = RGBColorProfile(
-    name: "Rec. 2020",
-    primaries: RGBPrimaries(
-      red: Chromaticity(x: 0.708, y: 0.292),
-      green: Chromaticity(x: 0.170, y: 0.797),
-      blue: Chromaticity(x: 0.131, y: 0.046)
-    ),
-    whitePoint: .d65,
-    transferFunction: .rec2020
+  private static let rec2020Primaries = RGBPrimaries(
+    red: Chromaticity(x: 0.708, y: 0.292),
+    green: Chromaticity(x: 0.170, y: 0.797),
+    blue: Chromaticity(x: 0.131, y: 0.046)
   )
 
-  public static let proPhotoRGB = RGBColorProfile(
-    name: "ProPhoto RGB",
-    primaries: RGBPrimaries(
-      red: Chromaticity(x: 0.7347, y: 0.2653),
-      green: Chromaticity(x: 0.1596, y: 0.8404),
-      blue: Chromaticity(x: 0.0366, y: 0.0001)
-    ),
-    whitePoint: .d50,
-    transferFunction: .proPhotoRGB
+  private static let proPhotoRGBPrimaries = RGBPrimaries(
+    red: Chromaticity(x: 0.7347, y: 0.2653),
+    green: Chromaticity(x: 0.1596, y: 0.8404),
+    blue: Chromaticity(x: 0.0366, y: 0.0001)
   )
 
-  public static let acescg = RGBColorProfile(
-    name: "ACEScg",
-    primaries: RGBPrimaries(
-      red: Chromaticity(x: 0.713, y: 0.293),
-      green: Chromaticity(x: 0.165, y: 0.830),
-      blue: Chromaticity(x: 0.128, y: 0.044)
-    ),
-    whitePoint: .d60,
-    transferFunction: .linear
+  private static let acescgPrimaries = RGBPrimaries(
+    red: Chromaticity(x: 0.713, y: 0.293),
+    green: Chromaticity(x: 0.165, y: 0.830),
+    blue: Chromaticity(x: 0.128, y: 0.044)
   )
 
-  public static let linearSRGB = RGBColorProfile(
-    name: "Linear sRGB",
-    primaries: sRGB.primaries,
-    whitePoint: .d65,
-    transferFunction: .linear
-  )
-
-  public static let linearDisplayP3 = RGBColorProfile(
-    name: "Linear Display P3",
-    primaries: displayP3.primaries,
-    whitePoint: .d65,
-    transferFunction: .linear
-  )
+  public static let sRGB = RGBColorProfile(storage: .sRGB)
+  public static let displayP3 = RGBColorProfile(storage: .displayP3)
+  public static let adobeRGB = RGBColorProfile(storage: .adobeRGB)
+  public static let rec2020 = RGBColorProfile(storage: .rec2020)
+  public static let proPhotoRGB = RGBColorProfile(storage: .proPhotoRGB)
+  public static let acescg = RGBColorProfile(storage: .acescg)
+  public static let linearSRGB = RGBColorProfile(storage: .linearSRGB)
+  public static let linearDisplayP3 = RGBColorProfile(storage: .linearDisplayP3)
 }
 
 extension RGBColorProfile {
@@ -494,6 +640,10 @@ extension RGBColorProfile {
     m21: 0.2627002120112671, m22: 0.6779980715188708, m23: 0.05930171646986196,
     m31: 0.0, m32: 0.028072693049087428, m33: 1.0609850577107910
   )
+
+  internal static let _xyzToSRGB = _sRGBToXYZ.inverse
+  internal static let _xyzToDisplayP3 = _displayP3ToXYZ.inverse
+  internal static let _xyzToRec2020 = _rec2020ToXYZ.inverse
 
   internal static func builtIn(named name: String) -> RGBColorProfile? {
     var key = name.lowercased()

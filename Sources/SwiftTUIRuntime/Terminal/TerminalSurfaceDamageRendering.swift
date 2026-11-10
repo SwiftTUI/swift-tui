@@ -119,9 +119,12 @@ struct TerminalSurfaceDamageRenderer: Sendable {
       return
     }
 
+    var comparator = RasterCellRunComparator()
     var index = lowerBound
     while index < upperBound {
-      guard cell(at: index, in: previousRow) != cell(at: index, in: currentRow) else {
+      guard
+        !comparator.areEqual(cell(at: index, in: previousRow), cell(at: index, in: currentRow))
+      else {
         index += 1
         continue
       }
@@ -129,7 +132,7 @@ struct TerminalSurfaceDamageRenderer: Sendable {
       let rawStart = index
       index += 1
       while index < upperBound,
-        cell(at: index, in: previousRow) != cell(at: index, in: currentRow)
+        !comparator.areEqual(cell(at: index, in: previousRow), cell(at: index, in: currentRow))
       {
         index += 1
       }

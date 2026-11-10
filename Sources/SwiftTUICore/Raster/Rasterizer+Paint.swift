@@ -386,7 +386,8 @@ extension Rasterizer {
       dirtyRows: context.dirtyRows,
       dirtySpans: context.dirtySpans,
       visibleIdentities: &visibleIdentities,
-      presentationRecorder: nil,
+      // A layer's writes are not paint events of the destination surface.
+      presentationRecorder: .scratchOnly(),
       // A layer paints into its own cells, so its strokes merge with each
       // other and not with the strokes beneath the layer.
       lineArms: LineArmsTable()
@@ -429,7 +430,7 @@ extension Rasterizer {
         from: layer,
         into: &intermediate.cells,
         context: innerContext,
-        presentationRecorder: nil
+        presentationRecorder: .scratchOnly()
       )
       compositeLayer(
         intermediate,
@@ -493,14 +494,13 @@ extension Rasterizer {
           continue
         }
         let source = layer.cells[y][x]
-        guard source.spanWidth > 0, source != .empty else {
+        guard source.spanWidth > 0, !source.isEmpty else {
           continue
         }
         write(
           source.character,
           width: source.spanWidth,
-          style: source.style,
-          hyperlink: source.hyperlink,
+          attributes: source.attributes,
           atX: x,
           y: y,
           cells: &cells,
@@ -617,6 +617,8 @@ extension Rasterizer {
         let textWorkProbe = RasterWorkProbe.active()
         var textWork = RasterWorkCounters()
         defer { textWorkProbe?.record(textWork) }
+        let reusesResolvedStyle = textColorModesArePositionIndependent(colorModes)
+        var styleMemo = RasterTextStyleMemo()
         for lineIndex in lineRange {
           // Count actual traversal before a clean-row rejection. Output counts
           // alone would miss a regression that resumes walking hidden lines.
@@ -649,26 +651,26 @@ extension Rasterizer {
               continue
             }
 
-            let resolvedStyle = resolveTextStyle(
-              style,
-              foregroundMode: colorModes.foreground,
-              backgroundMode: colorModes.background,
+            let attributes = textAttributes(
+              for: style,
+              colorModes: colorModes,
+              run: nil,
+              hyperlink: nil,
+              reusingResolvedStyle: reusesResolvedStyle,
+              memo: &styleMemo,
               environment: environment,
               bounds: bounds,
-              sampleX: x,
-              sampleY: bounds.origin.y + lineIndex,
+              x: x,
+              y: bounds.origin.y + lineIndex,
               width: cluster.cellWidth,
-              currentCellBackground: currentCellBackground(
-                cells: cells,
-                x: x,
-                y: bounds.origin.y + lineIndex
-              )
+              cells: cells,
+              presentationRecorder: presentationRecorder
             )
 
             write(
               cluster.character,
               width: cluster.cellWidth,
-              style: resolvedStyle.isDefault ? nil : resolvedStyle,
+              attributes: attributes,
               atX: x,
               y: bounds.origin.y + lineIndex,
               cells: &cells,
@@ -710,6 +712,8 @@ extension Rasterizer {
         let textWorkProbe = RasterWorkProbe.active()
         var textWork = RasterWorkCounters()
         defer { textWorkProbe?.record(textWork) }
+        let reusesResolvedStyle = textColorModesArePositionIndependent(colorModes)
+        var styleMemo = RasterTextStyleMemo()
         for lineIndex in lineRange {
           // Count actual traversal before a clean-row rejection. Output counts
           // alone would miss a regression that resumes walking hidden lines.
@@ -736,26 +740,26 @@ extension Rasterizer {
               continue
             }
 
-            let resolvedStyle = resolveTextStyle(
-              style,
-              foregroundMode: colorModes.foreground,
-              backgroundMode: colorModes.background,
+            let attributes = textAttributes(
+              for: style,
+              colorModes: colorModes,
+              run: nil,
+              hyperlink: nil,
+              reusingResolvedStyle: reusesResolvedStyle,
+              memo: &styleMemo,
               environment: environment,
               bounds: bounds,
-              sampleX: x,
-              sampleY: bounds.origin.y + lineIndex,
+              x: x,
+              y: bounds.origin.y + lineIndex,
               width: cluster.cellWidth,
-              currentCellBackground: currentCellBackground(
-                cells: cells,
-                x: x,
-                y: bounds.origin.y + lineIndex
-              )
+              cells: cells,
+              presentationRecorder: presentationRecorder
             )
 
             write(
               cluster.character,
               width: cluster.cellWidth,
-              style: resolvedStyle.isDefault ? nil : resolvedStyle,
+              attributes: attributes,
               atX: x,
               y: bounds.origin.y + lineIndex,
               cells: &cells,
@@ -809,6 +813,8 @@ extension Rasterizer {
               bounds: bounds
             )
             let clusters = clusterize(run.content)
+            let reusesResolvedStyle = textColorModesArePositionIndependent(colorModes)
+            var styleMemo = RasterTextStyleMemo()
 
             for cluster in clusters {
               guard x + cluster.cellWidth <= bounds.maxX else {
@@ -825,26 +831,26 @@ extension Rasterizer {
                 continue
               }
 
-              let resolvedStyle = resolveTextStyle(
-                runStyle,
-                foregroundMode: colorModes.foreground,
-                backgroundMode: colorModes.background,
+              let attributes = textAttributes(
+                for: runStyle,
+                colorModes: colorModes,
+                run: nil,
+                hyperlink: nil,
+                reusingResolvedStyle: reusesResolvedStyle,
+                memo: &styleMemo,
                 environment: environment,
                 bounds: bounds,
-                sampleX: x,
-                sampleY: bounds.origin.y + lineIndex,
+                x: x,
+                y: bounds.origin.y + lineIndex,
                 width: cluster.cellWidth,
-                currentCellBackground: currentCellBackground(
-                  cells: cells,
-                  x: x,
-                  y: bounds.origin.y + lineIndex
-                )
+                cells: cells,
+                presentationRecorder: presentationRecorder
               )
 
               write(
                 cluster.character,
                 width: cluster.cellWidth,
-                style: resolvedStyle.isDefault ? nil : resolvedStyle,
+                attributes: attributes,
                 atX: x,
                 y: bounds.origin.y + lineIndex,
                 cells: &cells,
@@ -901,6 +907,9 @@ extension Rasterizer {
           environment: environment,
           bounds: bounds
         )
+        let runReusesResolvedStyle = runColorModes.map(textColorModesArePositionIndependent)
+        let defaultReusesResolvedStyle = textColorModesArePositionIndependent(defaultColorModes)
+        var styleMemo = RasterTextStyleMemo()
 
         // Visit visible lines using their original indices, so scrolling
         // does not shift their positions or the colors sampled for them.
@@ -945,27 +954,30 @@ extension Rasterizer {
               continue
             }
 
-            let resolvedStyle = resolveTextStyle(
-              run?.style ?? .init(),
-              foregroundMode: colorModes.foreground,
-              backgroundMode: colorModes.background,
+            // A cluster without a usable run paints with the default style;
+            // key those together, apart from every real run.
+            let memoRun = run == nil ? nil : cluster.runIndex
+            let attributes = textAttributes(
+              for: run?.style ?? .init(),
+              colorModes: colorModes,
+              run: memoRun,
+              hyperlink: run?.destination?.rawValue,
+              reusingResolvedStyle: memoRun.map { runReusesResolvedStyle[$0] }
+                ?? defaultReusesResolvedStyle,
+              memo: &styleMemo,
               environment: environment,
               bounds: bounds,
-              sampleX: x,
-              sampleY: bounds.origin.y + lineIndex,
+              x: x,
+              y: bounds.origin.y + lineIndex,
               width: cluster.cellWidth,
-              currentCellBackground: currentCellBackground(
-                cells: cells,
-                x: x,
-                y: bounds.origin.y + lineIndex
-              )
+              cells: cells,
+              presentationRecorder: presentationRecorder
             )
 
             write(
               cluster.character,
               width: cluster.cellWidth,
-              style: resolvedStyle.isDefault ? nil : resolvedStyle,
-              hyperlink: run?.destination?.rawValue,
+              attributes: attributes,
               atX: x,
               y: bounds.origin.y + lineIndex,
               cells: &cells,
@@ -1168,7 +1180,12 @@ extension Rasterizer {
               || leadX + span
                 > min(cells[y].count, effectiveClip.maxX)
             {
-              copied = RasterCell(character: " ", style: sourceCell.style)
+              copied = RasterCell(
+                character: " ",
+                attributes: sourceCell.hyperlink == nil
+                  ? sourceCell.attributes
+                  : RasterCellAttributes.make(style: sourceCell.style, hyperlink: nil)
+              )
             }
             if let leadX = copied.continuationLeadX {
               copied.continuationLeadX = bounds.origin.x + leadX
@@ -1180,8 +1197,7 @@ extension Rasterizer {
               write(
                 copied.character,
                 width: copied.spanWidth,
-                style: copied.style,
-                hyperlink: copied.hyperlink,
+                attributes: copied.attributes,
                 atX: x,
                 y: y,
                 cells: &cells,
@@ -1206,6 +1222,65 @@ extension Rasterizer {
         }
       }
     }
+  }
+
+  /// The attributes a text glyph is written with: its resolved style, with
+  /// the default style spelled as no style, and its hyperlink.
+  ///
+  /// `resolveTextStyle` is a pure function of the authored style, the colour
+  /// modes, the sample position and the background already in the cell. When
+  /// the colour modes ignore the sample position, cells of one run that sit
+  /// on the same underlying attributes resolve identically, so the run reuses
+  /// the attributes it resolved for the previous such cell.
+  private func textAttributes(
+    for style: TextStyle,
+    colorModes: (foreground: ResolvedShapeColorMode, background: ResolvedShapeColorMode?),
+    run: Int?,
+    hyperlink: String?,
+    reusingResolvedStyle: Bool,
+    memo: inout RasterTextStyleMemo,
+    environment: StyleEnvironmentSnapshot,
+    bounds: CellRect,
+    x: Int,
+    y: Int,
+    width: Int,
+    cells: [[RasterCell]],
+    presentationRecorder: RasterPresentationLayerRecorder?
+  ) -> RasterCellAttributes? {
+    let underlay: RasterCellAttributes? =
+      y >= 0 && y < cells.count && x >= 0 && x < cells[y].count ? cells[y][x].attributes : nil
+    if reusingResolvedStyle, let remembered = memo.attributes(run: run, underlay: underlay) {
+      return remembered
+    }
+    let resolvedStyle = resolveTextStyle(
+      style,
+      foregroundMode: colorModes.foreground,
+      backgroundMode: colorModes.background,
+      environment: environment,
+      bounds: bounds,
+      sampleX: x,
+      sampleY: y,
+      width: width,
+      currentCellBackground: underlay?.style?.backgroundColor
+    )
+    let style = resolvedStyle.isDefault ? nil : resolvedStyle
+    let attributes =
+      if let attributeMemo = presentationRecorder?.attributeMemo {
+        attributeMemo.attributes(style: style, hyperlink: hyperlink)
+      } else {
+        RasterCellAttributes.make(style: style, hyperlink: hyperlink)
+      }
+    if reusingResolvedStyle {
+      memo.record(run: run, underlay: underlay, resolved: attributes)
+    }
+    return attributes
+  }
+
+  private func textColorModesArePositionIndependent(
+    _ colorModes: (foreground: ResolvedShapeColorMode, background: ResolvedShapeColorMode?)
+  ) -> Bool {
+    colorModes.foreground.isPositionIndependent
+      && (colorModes.background?.isPositionIndependent ?? true)
   }
 
   private func applyingPostGroupBlend(

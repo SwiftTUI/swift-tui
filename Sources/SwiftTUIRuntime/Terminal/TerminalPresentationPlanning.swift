@@ -40,15 +40,17 @@ struct TerminalPresentationPlan: Sendable {
       guard
         spanUpdates.count == 1,
         let span = spanUpdates.first,
-        renderedBatch == span.renderedSpan,
         span.column == anchorColumn,
         span.column + span.cellsChanged >= surfaceWidth,
-        !span.renderedSpan.isEmpty
+        !span.renderedSpan.isEmpty,
+        // Every character is a space exactly when every byte is one.
+        span.renderedSpan.utf8.allSatisfy({ $0 == 0x20 }),
+        renderedBatch == span.renderedSpan
       else {
         return false
       }
 
-      return span.renderedSpan.allSatisfy { $0 == " " }
+      return true
     }
   }
 
@@ -351,7 +353,7 @@ struct TerminalPresentationPlanner {
       guard sourceRow >= band.origin.y, sourceRow < band.maxY,
         row < currentSurface.cells.count,
         sourceRow < previousSurface.cells.count,
-        Self.rowsShareStorage(currentSurface.cells[row], previousSurface.cells[sourceRow])
+        RasterCell.rowsShareStorage(currentSurface.cells[row], previousSurface.cells[sourceRow])
       else {
         continue
       }
@@ -486,28 +488,6 @@ struct TerminalPresentationPlanner {
         delta: dy
       )
     )
-  }
-
-  /// Whether two rows share their element storage — the R3.2c identity
-  /// currency. Same buffer means same cells with no compare; the blit
-  /// (R3.2b) *constructs* this identity by moving row buffers, and CoW
-  /// breaks it exactly where content was repainted. Equal-count empty rows
-  /// are trivially identical.
-  private static func rowsShareStorage(
-    _ currentRow: [RasterCell],
-    _ previousRow: [RasterCell]
-  ) -> Bool {
-    guard currentRow.count == previousRow.count else {
-      return false
-    }
-    guard !currentRow.isEmpty else {
-      return true
-    }
-    return currentRow.withUnsafeBufferPointer { current in
-      previousRow.withUnsafeBufferPointer { previous in
-        unsafe current.baseAddress == previous.baseAddress
-      }
-    }
   }
 
   /// Cells the damage hint would let the plain incremental diff repaint

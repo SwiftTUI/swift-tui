@@ -16,6 +16,13 @@ struct TerminalCellTextRenderer {
     /// the link even when its sanitized destination can be reused.
     fileprivate var lastRawHyperlink: String?
     fileprivate var lastSanitizedHyperlink: String?
+    /// The attributes object of the last cell that went through
+    /// `transitionRenderState`, while the state still reflects it. A run of
+    /// cells shares one object, so the next cell of the run skips the
+    /// transition on an identity compare, without reading the style or the
+    /// hyperlink. Cleared wherever `activeStyle` resets.
+    fileprivate var lastAttributes: RasterCellAttributes?
+    fileprivate var reflectsLastAttributes = false
 
     init() {}
   }
@@ -39,12 +46,17 @@ struct TerminalCellTextRenderer {
         continue
       }
 
-      transitionRenderState(
-        style: cell.style,
-        hyperlink: cell.hyperlink,
-        state: &state,
-        into: &result
-      )
+      let attributes = cell.attributes
+      if !state.reflectsLastAttributes || state.lastAttributes !== attributes {
+        transitionRenderState(
+          style: attributes?.style,
+          hyperlink: attributes?.hyperlink,
+          state: &state,
+          into: &result
+        )
+        state.lastAttributes = attributes
+        state.reflectsLastAttributes = true
+      }
       appendRenderedCharacter(for: cell, into: &result)
       renderedWidth += max(1, cell.spanWidth)
     }
@@ -65,6 +77,8 @@ struct TerminalCellTextRenderer {
       state.activeStyle = nil
       state.activeRawStyle = nil
     }
+    state.lastAttributes = nil
+    state.reflectsLastAttributes = false
   }
 
   /// Whether a cell at the end of a row writes nothing a full repaint must
@@ -197,6 +211,13 @@ struct TerminalCellTextRenderer {
     for cell: RasterCell,
     into result: inout String
   ) {
+    // Printable ASCII is the common case. It holds no control scalar, is one
+    // column wide, and degrades to itself, so it needs neither the sanitizer
+    // nor the degradation table.
+    if let ascii = singleASCIIByte(of: cell.character), ascii >= 0x20, ascii < 0x7F {
+      result.append(cell.character)
+      return
+    }
     let sanitizedCharacter = sanitizedTerminalCharacter(cell.character)
     if capabilityProfile.glyphLevel == .ascii {
       result += degradedASCIIText(

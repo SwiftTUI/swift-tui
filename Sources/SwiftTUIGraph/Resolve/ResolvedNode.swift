@@ -109,8 +109,8 @@ package struct ResolvedNode: Equatable, Sendable {
   }
   package var layoutMetadata: LayoutMetadata
   package var drawMetadata: DrawMetadata {
-    get { _boxedDrawMetadata.value }
-    set { _boxedDrawMetadata.value = newValue }
+    _read { yield _boxedDrawMetadata.value }
+    set { _boxedDrawMetadata = Boxed(newValue) }
   }
   package var _boxedDrawMetadata: Boxed<DrawMetadata>
   package var drawEffects: DrawEffects

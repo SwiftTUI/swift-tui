@@ -157,6 +157,19 @@ extension Rasterizer {
       return
     }
 
+    // A constant fill writes the same style into every cell it covers, so it
+    // shares one attributes object across the whole walk.
+    let constantFillAttributes: RasterCellAttributes? = constantColor.flatMap { color in
+      let resolvedStyle = ResolvedTextStyle(backgroundColor: color)
+      return resolvedStyle.isDefault
+        ? nil : RasterCellAttributes.make(style: resolvedStyle, hyperlink: nil)
+    }
+
+    // A full rectangle contains every cell of its own bounds, and the walk
+    // never leaves them, so the per-cell containment test cannot fail.
+    let containsEveryWalkedCell =
+      if case .rectangle = geometry, case .full = mode { true } else { false }
+
     let rowStart = max(walkRect.origin.x, 0)
     for y in walkRect.origin.y..<walkRect.maxY {
       // Per-row cull (D70): skips `shapeContains` and the per-cell colour
@@ -169,14 +182,15 @@ extension Rasterizer {
       while x < rowEnd {
         work.visitedCells += 1
         guard
-          shapeContains(
-            pointX: x,
-            pointY: y,
-            in: shapeBounds,
-            geometry: geometry,
-            fillMode: mode,
-            metrics: environment.cellPixelMetrics
-          )
+          containsEveryWalkedCell
+            || shapeContains(
+              pointX: x,
+              pointY: y,
+              in: shapeBounds,
+              geometry: geometry,
+              fillMode: mode,
+              metrics: environment.cellPixelMetrics
+            )
         else {
           x += 1
           continue
@@ -217,11 +231,10 @@ extension Rasterizer {
         if isTranslucent {
           if let color = constantColor, color.alpha > 0 {
             if let blendMode {
-              let resolvedStyle = ResolvedTextStyle(backgroundColor: color)
               work.blendedWrites += 1
               write(
                 " ",
-                style: resolvedStyle.isDefault ? nil : resolvedStyle,
+                attributes: constantFillAttributes,
                 atX: x,
                 y: y,
                 cells: &cells,
@@ -245,15 +258,14 @@ extension Rasterizer {
               )
             }
           }
-        } else if let constantColor {
+        } else if constantColor != nil {
           // Opaque constant fill: overwrite cell.
-          let resolvedStyle = ResolvedTextStyle(backgroundColor: constantColor)
           if blendMode != nil {
             work.blendedWrites += 1
           }
           write(
             " ",
-            style: resolvedStyle.isDefault ? nil : resolvedStyle,
+            attributes: constantFillAttributes,
             atX: x,
             y: y,
             cells: &cells,
@@ -1038,7 +1050,20 @@ extension Rasterizer {
       return
     }
     var cell = cells[y][x]
-    cell.style = (cell.style ?? .init()).tinted(with: overlay)
+    let underlay = cell.attributes
+    let memo = presentationRecorder?.attributeMemo
+    if let remembered = memo?.tint(underlay: underlay, color: overlay) {
+      cell.attributes = remembered
+    } else {
+      // A tint is a pure function of the cell's attributes and the colour, so
+      // a row tinted over one underlay shares one result.
+      let tinted = RasterCellAttributes.make(
+        style: (underlay?.style ?? .init()).tinted(with: overlay),
+        hyperlink: underlay?.hyperlink
+      )
+      memo?.recordTint(underlay: underlay, color: overlay, result: tinted)
+      cell.attributes = tinted
+    }
     cells[y][x] = cell
     presentationRecorder?.appendCellFragment(
       from: cells,

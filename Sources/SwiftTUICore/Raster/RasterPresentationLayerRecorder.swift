@@ -6,11 +6,30 @@ final class RasterPresentationLayerRecorder {
   /// paint event from an earlier frame, and extending it with current-frame
   /// content would misattribute paint recency in the diagnostic sidecar.
   private let retainedPrefixCount: Int
+  /// `false` for the scratch surface of an isolated compositing group, whose
+  /// writes are not paint events of the destination surface.
+  private let recordsLayers: Bool
+  /// The recorder is the one per-raster object every cell writer receives, so
+  /// it also carries the scratch that lets a run of cells share attributes.
+  let attributeMemo = RasterAttributeMemo()
 
   init(layers: [RasterPresentationLayer] = []) {
     self.layers = layers
     self.nextOrder = (layers.map(\.order).max() ?? -1) + 1
     self.retainedPrefixCount = layers.count
+    self.recordsLayers = true
+  }
+
+  private init(recordsLayers: Bool) {
+    self.layers = []
+    self.nextOrder = 0
+    self.retainedPrefixCount = 0
+    self.recordsLayers = recordsLayers
+  }
+
+  /// A recorder that keeps no layers and only lends its attribute scratch.
+  static func scratchOnly() -> RasterPresentationLayerRecorder {
+    RasterPresentationLayerRecorder(recordsLayers: false)
   }
 
   func appendCellFragment(
@@ -20,7 +39,7 @@ final class RasterPresentationLayerRecorder {
     width: Int,
     effects: [DrawEffect]
   ) {
-    guard y >= 0, y < cells.count else {
+    guard recordsLayers, y >= 0, y < cells.count else {
       return
     }
     let rowWidth = cells[y].count
@@ -83,7 +102,7 @@ final class RasterPresentationLayerRecorder {
     _ attachment: RasterImageAttachment,
     effects: [DrawEffect]
   ) {
-    guard attachment.visibleBounds.size.width > 0,
+    guard recordsLayers, attachment.visibleBounds.size.width > 0,
       attachment.visibleBounds.size.height > 0
     else {
       return

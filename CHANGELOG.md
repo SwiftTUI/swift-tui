@@ -8,6 +8,22 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
 
 ## [Unreleased]
 
+### Changed
+
+- Terminal frames rasterize, diff and encode faster, with unchanged output. A
+  raster cell is 32 bytes (was 656) and shares its resolved style and
+  hyperlink with the rest of its run, a built-in RGB colour profile is one
+  word (a `Color` is 40 bytes, was 137), and boxed node metadata is read
+  without a lock or a copy. On a full-screen text repaint, rasterization and
+  terminal encoding each take less than a fifth of the time they did
+  (STUI-1526).
+- `RasterCell.spanWidth` and `RasterCell.continuationLeadX` hold `Int32`-range
+  values, which covers every surface (at most 65,536 columns); a value outside
+  that range is held at the nearest representable one. `RGBColorProfile` now
+  declares `==`, `hash(into:)`, `encode(to:)` and `customMirror` explicitly,
+  and `RasterCell` declares `==` and `customMirror`; equality, hashing, coding
+  and reflection are unchanged (STUI-1526).
+
 ### Fixed
 
 - Deep styled composites no longer overflow the native frame-tail worker stack
