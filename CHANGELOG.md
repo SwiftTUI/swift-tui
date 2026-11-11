@@ -3,10 +3,18 @@
 All notable changes to SwiftTUI are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-SwiftTUI is pre-1.0: while the public surface is being proven, minor releases
-may make source-breaking API adjustments. Pin with `.upToNextMinor`.
+From 0.21.0 onward, supported public APIs and ratified SPI remain compatible
+until the next major release. Use `.upToNextMajor`; incompatible changes
+require 1.0.0. See [COMPATIBILITY.md](docs/COMPATIBILITY.md).
 
 ## [Unreleased]
+
+## [0.22.0] - 2026-11-10
+
+This is the first release under the stronger compatibility promise covering
+supported public APIs and ratified Host, Testing and StyleFixtures SPI through
+the rest of 0.x. Packages can release independently within compatible major
+ranges. Experimental tooling remains outside that promise.
 
 ### Changed
 
@@ -40,6 +48,17 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
   presentation and text input reach the screen 9-17% sooner (STUI-1527).
 
 ### Fixed
+
+- Sequential keyboard focus visits every authored focus-section descendant while
+  preserving List row grouping. TabView strip keys belong to the focused control.
+- Duplicate accessibility containers keep distinct identities, secure text rejects
+  selection-only guesses, and oversized accessibility metadata no longer drops
+  an otherwise valid visual frame.
+- State captures, task ownership, per-mount builder scopes, environment and
+  focused-value reuse survive the repaired lifecycle and layout paths.
+- Lazy viewport measurement, safe-area spacers, alpha weights, text transitions,
+  terminal graphics and reader input retain their expected behavior across the
+  reported regressions.
 
 - Deep styled composites no longer overflow the native frame-tail worker stack
   while checking retained phase reuse (STUI-1494).
