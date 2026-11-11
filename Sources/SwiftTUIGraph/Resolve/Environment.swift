@@ -66,11 +66,17 @@ private func typedEquatableValuesAreEqual<Value>(
 /// equality opens the original type and uses its declared semantics. Both
 /// reflected strings are computed on demand: reflection must never run on the
 /// per-write environment/preference hot path, only when diagnostics ask.
+///
+/// The value is boxed by its static type once, when it is written. A snapshot
+/// comparison reads every typed value of both snapshots, and one write is
+/// compared by the reuse door, the measurement cache and the placement cache,
+/// so the comparison is the hot side: it must not look a conformance up or
+/// cast the value. See ``makeTypedReuseValueStorage(_:)``.
 package struct TypedReuseValue: Sendable {
-  private let storage: TypedReuseValueStorage
+  private let storage: any TypedReuseValueStorage
 
   package init<Value: Sendable>(_ value: Value) {
-    storage = TypedReuseValueStorage(value)
+    storage = makeTypedReuseValueStorage(value)
   }
 
   package var debugValue: String {
@@ -93,40 +99,161 @@ package struct TypedReuseValue: Sendable {
   }
 }
 
-private final class TypedReuseValueStorage: Sendable {
-  private let valueType: ObjectIdentifier
-  private let declaredValueType: Any.Type
-  private let valueOperation: @Sendable () -> any Sendable
-  private let comparator: @Sendable (TypedReuseValueStorage) -> Bool
+private protocol TypedReuseValueStorage: AnyObject, Sendable {
+  var debugValue: String { get }
+  var valueTypeDescription: String { get }
 
-  init<Value: Sendable>(_ value: Value) {
-    valueType = ObjectIdentifier(Value.self)
-    declaredValueType = Value.self
-    valueOperation = { value }
-    comparator = { other in
-      guard other.valueType == ObjectIdentifier(Value.self),
-        let right = other.valueOperation() as? Value
-      else {
-        return false
-      }
-      return typedValuesAreEqualForReuse(value, right)
+  /// Whether `other` boxes the same static type and an equal value.
+  func isEqual(to other: any TypedReuseValueStorage) -> Bool
+  func value<Value>(as type: Value.Type) -> Value?
+}
+
+/// Boxes `value` with the comparison its static type proves.
+///
+/// ``typedValuesAreEqualForReuse(_:_:)`` decides how to compare two values by
+/// casting one of them to `any Equatable`, then to
+/// `any TypedReuseEqualityProviding`. For a struct or an enum those casts
+/// answer a question about the static type, so the answer is the same for
+/// every value of the type and can be taken once, here. Such a value gets a
+/// box that compares through the conformance directly.
+///
+/// A class instance and an existential keep the dynamic comparison: their
+/// dynamic type can conform where the static type does not, and the function
+/// above defines equality by the dynamic type.
+private func makeTypedReuseValueStorage<Value: Sendable>(
+  _ value: Value
+) -> any TypedReuseValueStorage {
+  if !(Value.self is AnyObject.Type) {
+    let boxer = ReuseValueBoxer<Value>()
+    if let equatable = boxer as? any EquatableReuseValueBoxing<Value> {
+      return equatable.equatableStorage(value)
     }
+    if let provider = boxer as? any ProvidedReuseValueBoxing<Value> {
+      return provider.providedStorage(value)
+    }
+  }
+  return DynamicReuseValueBox(value)
+}
+
+/// Opens `Subject: Equatable` from a type that is only known to be `Sendable`.
+///
+/// ``ReuseValueBoxer`` conforms exactly when its subject is `Equatable`, so a
+/// successful cast to this protocol hands back a function that is compiled
+/// against the conformance.
+private protocol EquatableReuseValueBoxing<Subject> {
+  associatedtype Subject: Sendable
+  func equatableStorage(_ value: Subject) -> any TypedReuseValueStorage
+}
+
+/// Opens `Subject: TypedReuseEqualityProviding`; see
+/// ``EquatableReuseValueBoxing``.
+private protocol ProvidedReuseValueBoxing<Subject> {
+  associatedtype Subject: Sendable
+  func providedStorage(_ value: Subject) -> any TypedReuseValueStorage
+}
+
+private struct ReuseValueBoxer<Subject: Sendable> {}
+
+extension ReuseValueBoxer: EquatableReuseValueBoxing where Subject: Equatable {
+  func equatableStorage(_ value: Subject) -> any TypedReuseValueStorage {
+    EquatableReuseValueBox(value)
+  }
+}
+
+extension ReuseValueBoxer: ProvidedReuseValueBoxing
+where Subject: TypedReuseEqualityProviding {
+  func providedStorage(_ value: Subject) -> any TypedReuseValueStorage {
+    ProvidedReuseValueBox(value)
+  }
+}
+
+/// A value-type value compared with its own `==`.
+private final class EquatableReuseValueBox<Value: Sendable & Equatable>:
+  TypedReuseValueStorage
+{
+  private let value: Value
+
+  init(_ value: Value) {
+    self.value = value
   }
 
   var debugValue: String {
-    String(reflecting: valueOperation())
+    String(reflecting: value)
   }
 
   var valueTypeDescription: String {
-    String(reflecting: declaredValueType)
+    String(reflecting: Value.self)
   }
 
-  func isEqual(to other: TypedReuseValueStorage) -> Bool {
-    comparator(other)
+  func isEqual(to other: any TypedReuseValueStorage) -> Bool {
+    guard let other = other as? EquatableReuseValueBox<Value> else {
+      return false
+    }
+    return value == other.value
   }
 
-  func value<Value>(as type: Value.Type) -> Value? {
-    valueOperation() as? Value
+  func value<Requested>(as type: Requested.Type) -> Requested? {
+    value as? Requested
+  }
+}
+
+/// A value-type value that is not `Equatable` and names its own reuse
+/// equality.
+private final class ProvidedReuseValueBox<Value: TypedReuseEqualityProviding>:
+  TypedReuseValueStorage
+{
+  private let value: Value
+
+  init(_ value: Value) {
+    self.value = value
+  }
+
+  var debugValue: String {
+    String(reflecting: value)
+  }
+
+  var valueTypeDescription: String {
+    String(reflecting: Value.self)
+  }
+
+  func isEqual(to other: any TypedReuseValueStorage) -> Bool {
+    guard let other = other as? ProvidedReuseValueBox<Value> else {
+      return false
+    }
+    return value.isEqualForReuse(to: other.value)
+  }
+
+  func value<Requested>(as type: Requested.Type) -> Requested? {
+    value as? Requested
+  }
+}
+
+/// A value whose comparison depends on its dynamic type, or that has no typed
+/// proof at all.
+private final class DynamicReuseValueBox<Value: Sendable>: TypedReuseValueStorage {
+  private let value: Value
+
+  init(_ value: Value) {
+    self.value = value
+  }
+
+  var debugValue: String {
+    String(reflecting: value)
+  }
+
+  var valueTypeDescription: String {
+    String(reflecting: Value.self)
+  }
+
+  func isEqual(to other: any TypedReuseValueStorage) -> Bool {
+    guard let other = other as? DynamicReuseValueBox<Value> else {
+      return false
+    }
+    return typedValuesAreEqualForReuse(value, other.value)
+  }
+
+  func value<Requested>(as type: Requested.Type) -> Requested? {
+    value as? Requested
   }
 }
 
@@ -331,6 +458,62 @@ public struct EnvironmentSnapshot: Sendable {
       names.append(key)
     }
     return names.sorted()
+  }
+}
+
+extension EnvironmentSnapshot {
+  /// Remembers which pairs of distinct snapshots one tree walk has already
+  /// proved equal.
+  ///
+  /// Two resolves of an unchanged view build separate snapshot objects that
+  /// compare equal, and every node below an environment write shares its
+  /// parent's snapshot. A walk that compares two such trees node by node would
+  /// repeat the same deep comparison — every typed value of both snapshots —
+  /// once per node. The memo keeps the last few proved pairs, so that
+  /// comparison runs once per pair of snapshots. A pair is identified by the
+  /// two storage objects, which both trees keep alive for the walk.
+  package struct EqualityMemo {
+    private struct Pair {
+      let lhs: ObjectIdentifier
+      let rhs: ObjectIdentifier
+    }
+
+    private var provedEqual: [Pair] = []
+    private var nextReplacement = 0
+    private static var capacity: Int { 4 }
+
+    package init() {}
+
+    /// `lhs == rhs`, compared deeply at most once per pair of snapshots.
+    @inline(__always)
+    package mutating func areEqual<Mode: ComparisonWorkMode>(
+      _ lhs: EnvironmentSnapshot,
+      _ rhs: EnvironmentSnapshot,
+      mode: Mode.Type,
+      work: inout ComparisonWork
+    ) -> Bool {
+      if lhs.storage === rhs.storage {
+        if Mode.isEnabled {
+          work.environmentSnapshots += 1
+          work.environmentSharedStorage += 1
+        }
+        return true
+      }
+      let pair = Pair(lhs: ObjectIdentifier(lhs.storage), rhs: ObjectIdentifier(rhs.storage))
+      for proved in provedEqual where proved.lhs == pair.lhs && proved.rhs == pair.rhs {
+        return true
+      }
+      guard lhs.isEqual(to: rhs, mode: mode, work: &work) else {
+        return false
+      }
+      if provedEqual.count < Self.capacity {
+        provedEqual.append(pair)
+      } else {
+        provedEqual[nextReplacement] = pair
+        nextReplacement = (nextReplacement + 1) % Self.capacity
+      }
+      return true
+    }
   }
 }
 

@@ -24,6 +24,21 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
   and `RasterCell` declares `==` and `customMirror`; equality, hashing, coding
   and reflection are unchanged (STUI-1526).
 
+- Scrolling a lazy stack, `List` or `Table` no longer resolves every row on
+  every frame. A lazy source was realized in full at the frame head whenever it
+  held up to four times the terminal's larger dimension in elements; it is now
+  realized in full only when it holds no more elements than the terminal's
+  smaller dimension, and otherwise realizes the visible band during layout, as
+  longer sources already did. A 300-block document in a 120x40 terminal goes
+  from 173 ms to about 30 ms between a wheel notch and its frame. Rows of such
+  a source that are out of view are no longer realized, so their `onAppear`
+  runs when they scroll into view (STUI-1527).
+- Frames spend less time outside layout and drawing: graph checkpoints share
+  each node's saved image instead of copying it, environment values compare
+  without dynamic casts, and the layout caches compare each pair of
+  environments once per tree walk. Tab switches, selection changes, sheet
+  presentation and text input reach the screen 9-17% sooner (STUI-1527).
+
 ### Fixed
 
 - Deep styled composites no longer overflow the native frame-tail worker stack

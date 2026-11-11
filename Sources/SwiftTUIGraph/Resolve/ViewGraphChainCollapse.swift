@@ -172,7 +172,7 @@ extension ViewGraph {
   }
 
   func adoptAbsorbedRuntimeRegistrations(from node: ViewNode) {
-    guard node.registeredHandlers.hasRuntimeRegistrations,
+    guard node.hasRuntimeRegistrations,
       let absorberID = nodeIDByIdentity[node.identity],
       absorberID != node.viewNodeID,
       let absorber = nodesByNodeID[absorberID]

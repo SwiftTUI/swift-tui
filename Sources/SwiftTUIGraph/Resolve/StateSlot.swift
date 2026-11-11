@@ -347,12 +347,18 @@ package struct AnyStateSlot {
     // A user-defined custom mirror can omit reference-bearing fields or
     // recursively yield itself. Standard-library and Foundation value
     // containers have trusted mirrors that expose their logical payloads
-    // (`UUID` publishes an empty struct mirror, `Date` its interval); every
-    // other custom mirror is conservatively ineligible for dormant storage.
-    // Foundation reference types never reach this rule: the metadata-kind
-    // check above already rejected them, and a Foundation struct whose mirror
-    // exposes a pointer or class still fails the leaf rules that follow.
-    if value is any CustomReflectable, !Self.hasTrustedMirrorModulePrefix(typeName) {
+    // (`UUID` publishes an empty struct mirror, `Date` its interval), and a
+    // framework value type that vouches for its own mirror
+    // (`CompleteValueMirroring`: a colour profile, a raster cell) is audited
+    // through it; every other custom mirror is conservatively ineligible for
+    // dormant storage. Foundation reference types never reach this rule: the
+    // metadata-kind check above already rejected them, and a Foundation struct
+    // whose mirror exposes a pointer or class still fails the leaf rules that
+    // follow.
+    if value is any CustomReflectable,
+      !(value is any CompleteValueMirroring),
+      !Self.hasTrustedMirrorModulePrefix(typeName)
+    {
       return false
     }
 

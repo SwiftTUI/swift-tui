@@ -28,7 +28,7 @@ package enum GraphCheckpointStore {
     taskDescriptors: ViewGraph.TaskDescriptorState,
     dependencyIndex: ViewGraph.DependencyIndex,
     frameCommit: ViewGraph.FrameCommitState,
-    nodeCheckpoints: [ViewNodeID: ViewNode.Checkpoint]
+    nodeCheckpoints: [ViewNodeID: ViewNode.CheckpointImage]
   ) -> ViewGraph.Checkpoint {
     ViewGraph.Checkpoint(
       root: root,

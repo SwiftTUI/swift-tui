@@ -4193,15 +4193,7 @@ package final class ViewGraph {
         identity == root || identity.isDescendant(of: root)
           || resolvedIdentity == root || resolvedIdentity.isDescendant(of: root)
       })
-        || node.registeredHandlers.pointer.handlerOwners.values.contains(where: {
-          $0.matchesAnySubtreeRoot(roots)
-        })
-        || node.registeredHandlers.pointer.hoverOwners.values.contains(where: {
-          $0.matchesAnySubtreeRoot(roots)
-        })
-        || node.registeredHandlers.pointer.wheelOwners.values.contains(where: {
-          $0.matchesAnySubtreeRoot(roots)
-        })
+        || node.hasPointerRegistrationOwner(matchingAnySubtreeRoot: roots)
       {
         // A style route wrapper resolves to a synthetic pointer identity
         // whose handlers belong to an ancestor control. Reset-root expansion

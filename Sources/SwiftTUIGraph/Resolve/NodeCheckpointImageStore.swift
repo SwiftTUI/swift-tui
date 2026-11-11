@@ -24,7 +24,7 @@
 @MainActor
 package struct NodeCheckpointImageStore {
   /// One image per live node, current as of ``capturedGenerations``' entry.
-  private var images: [ViewNodeID: ViewNode.Checkpoint] = [:]
+  private var images: [ViewNodeID: ViewNode.CheckpointImage] = [:]
   /// The node's checkpoint-mutation generation when its image was captured.
   /// Kept in lockstep with ``images`` (same key set). Deliberately separate
   /// from the image's own capture-metadata generation: after a restore the
@@ -54,15 +54,17 @@ package struct NodeCheckpointImageStore {
   /// The returned dictionary is the store's own storage — the checkpoint
   /// shares it copy-on-write, so an all-fresh capture allocates nothing and a
   /// capture with any refresh pays one storage duplication plus O(touched)
-  /// image builds.
+  /// image builds. The entries are shared ``ViewNode/CheckpointImage``
+  /// references, so that duplication retains each image rather than copying
+  /// it.
   package mutating func currentImages(
     of nodesByNodeID: [ViewNodeID: ViewNode]
-  ) -> [ViewNodeID: ViewNode.Checkpoint] {
+  ) -> [ViewNodeID: ViewNode.CheckpointImage] {
     for (viewNodeID, node) in nodesByNodeID
     where capturedOwnerLifetimeIDs[viewNodeID] != node.ownerLifetimeID
       || capturedGenerations[viewNodeID] != node.currentCheckpointMutationGeneration
     {
-      images[viewNodeID] = node.makeCheckpoint()
+      images[viewNodeID] = node.makeCheckpointImage()
       capturedGenerations[viewNodeID] = node.currentCheckpointMutationGeneration
       capturedOwnerLifetimeIDs[viewNodeID] = node.ownerLifetimeID
     }
@@ -84,7 +86,7 @@ package struct NodeCheckpointImageStore {
   /// a rewritten node pairs with that node's fresh post-restore generation,
   /// and an untouched (gate-skipped) node keeps its unchanged one.
   package mutating func adopt(
-    images: [ViewNodeID: ViewNode.Checkpoint],
+    images: [ViewNodeID: ViewNode.CheckpointImage],
     nodesByNodeID: [ViewNodeID: ViewNode]
   ) {
     // The lockstep invariant (`capturedGenerations` shares `images`' key set)

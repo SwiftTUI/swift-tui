@@ -133,6 +133,38 @@ package final class ViewNode {
     set { persistentState.lastHomedEntityIdentity = newValue }
   }
 
+  /// Whether this node has recorded any runtime registration.
+  ///
+  /// Reads the record where it is stored. `registeredHandlers` hands out a
+  /// copy of every family's storage, and the publication walks ask this of
+  /// every live node on every commit.
+  package var hasRuntimeRegistrations: Bool {
+    persistentState.registeredHandlers.hasRuntimeRegistrations
+  }
+
+  /// Whether this node has recorded an effect registration; read in place
+  /// like ``hasRuntimeRegistrations``.
+  package var hasEffectRegistrations: Bool {
+    persistentState.registeredHandlers.hasEffectRegistrations
+  }
+
+  /// Whether an owner of any pointer, hover or wheel handler this node
+  /// recorded lies under one of `roots`; read in place like
+  /// ``hasRuntimeRegistrations``.
+  package func hasPointerRegistrationOwner(
+    matchingAnySubtreeRoot roots: [Identity]
+  ) -> Bool {
+    persistentState.registeredHandlers.pointer.handlerOwners.values.contains(where: {
+      $0.matchesAnySubtreeRoot(roots)
+    })
+      || persistentState.registeredHandlers.pointer.hoverOwners.values.contains(where: {
+        $0.matchesAnySubtreeRoot(roots)
+      })
+      || persistentState.registeredHandlers.pointer.wheelOwners.values.contains(where: {
+        $0.matchesAnySubtreeRoot(roots)
+      })
+  }
+
   /// Records the entity this node currently homes — see
   /// ``PersistentState/lastHomedEntityIdentity`` for why the record outlives
   /// the route's release.
@@ -2033,7 +2065,7 @@ package final class ViewNode {
   package func runtimeRegistrationFingerprintEntry()
     -> RuntimeRegistrationNodeFingerprint?
   {
-    guard registeredHandlers.hasRuntimeRegistrations else {
+    guard hasRuntimeRegistrations else {
       return nil
     }
     return RuntimeRegistrationNodeFingerprint(
@@ -2071,7 +2103,7 @@ package final class ViewNode {
   /// rebuilds drop the interior's handlers and its committed tasks never
   /// start ("no task registration at commit").
   package func adoptRuntimeRegistrations(from departing: ViewNode) {
-    guard departing.registeredHandlers.hasRuntimeRegistrations else {
+    guard departing.hasRuntimeRegistrations else {
       return
     }
     recordRuntimeRegistrationMutation()
@@ -2089,7 +2121,7 @@ package final class ViewNode {
       to: viewNodeID
     )
     refreshCommittedHandlerInventory()
-    if registeredHandlers.hasEffectRegistrations {
+    if hasEffectRegistrations {
       noteEffectRegistrationOwnership()
     }
   }
@@ -2104,7 +2136,7 @@ package final class ViewNode {
     // exact disjunction of the families `restore(from:)` reads, so this is a
     // behavior-preserving no-op skip (mirrors the guard at
     // `runtimeRegistrationFingerprintEntry()`).
-    guard registeredHandlers.hasRuntimeRegistrations else {
+    guard hasRuntimeRegistrations else {
       return
     }
     // `visitedFrameID` is the restore's recency. Two live nodes can hold
@@ -2122,7 +2154,7 @@ package final class ViewNode {
     // effect registry's `restore` is already a no-op for empty handlers, so
     // this skip is behavior-preserving (mirrors the guard in
     // `restoreOwnRuntimeRegistrations`).
-    guard registeredHandlers.hasEffectRegistrations else {
+    guard hasEffectRegistrations else {
       return
     }
     registrations.restoreEffectRegistrations(from: registeredHandlers)
@@ -2457,6 +2489,38 @@ extension ViewNode {
     /// bumps them via the stored-property observers), which is what keeps
     /// "generation equal ⇒ state equal" sound across restore cycles.
     package var checkpointMutationGeneration: UInt64
+  }
+
+  /// One node's checkpoint, shared by reference.
+  ///
+  /// A graph checkpoint holds an image of every live node, and the frame
+  /// protocol copies, looks up and iterates those images several times per
+  /// frame: the persistent image store duplicates its dictionary whenever one
+  /// entry is refreshed, each restore reads every entry to compare generations,
+  /// and each discarded draft destroys its dictionaries. A ``Checkpoint`` is a
+  /// large value with dozens of reference-counted fields and four weak
+  /// references, so holding it inline made each of those steps cost that much
+  /// per node, changed or not. An image is immutable once captured; sharing it
+  /// reduces every one of those steps to a single retain or release.
+  package final class CheckpointImage {
+    package let checkpoint: Checkpoint
+
+    package init(_ checkpoint: Checkpoint) {
+      self.checkpoint = checkpoint
+    }
+
+    package var ownerLifetimeID: NodeOwnerLifetimeID {
+      checkpoint.ownerLifetimeID
+    }
+
+    /// The node's checkpoint-mutation generation when the image was captured.
+    package var checkpointMutationGeneration: UInt64 {
+      checkpoint.checkpointMutationGeneration
+    }
+  }
+
+  package func makeCheckpointImage() -> CheckpointImage {
+    CheckpointImage(makeCheckpoint())
   }
 
   package func makeCheckpoint() -> Checkpoint {

@@ -10,7 +10,7 @@ package enum ViewGraphRuntimeRegistrationRestorer {
     // large publication frontier. Equal identities retain the node-ID tie
     // break; equal display paths use Identity's component tie-break.
     let nodes = viewNodeIDs.compactMap { nodeID -> (node: ViewNode, path: String)? in
-      guard let node = nodesByNodeID[nodeID], node.registeredHandlers.hasRuntimeRegistrations else {
+      guard let node = nodesByNodeID[nodeID], node.hasRuntimeRegistrations else {
         return nil
       }
       return (node, node.identity.path)

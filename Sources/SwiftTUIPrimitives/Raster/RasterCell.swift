@@ -179,6 +179,10 @@ package struct RasterCellRunComparator {
   }
 }
 
+// The five reflected fields are the whole cell: the attributes object they
+// are read from is immutable and holds nothing else.
+extension RasterCell: CompleteValueMirroring {}
+
 extension RasterCell: CustomReflectable {
   /// Reflects the cell's public fields, not its storage, so reflection-driven
   /// output names the same five values whatever the cell shares.

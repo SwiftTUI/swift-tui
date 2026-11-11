@@ -2,10 +2,10 @@
 enum ViewGraphNodeCheckpointing {
   static func makeNodeCheckpoints(
     _ nodesByNodeID: [ViewNodeID: ViewNode]
-  ) -> [ViewNodeID: ViewNode.Checkpoint] {
+  ) -> [ViewNodeID: ViewNode.CheckpointImage] {
     Dictionary(
       uniqueKeysWithValues: nodesByNodeID.map { viewNodeID, node in
-        (viewNodeID, node.makeCheckpoint())
+        (viewNodeID, node.makeCheckpointImage())
       }
     )
   }
@@ -18,7 +18,7 @@ enum ViewGraphNodeCheckpointing {
   /// nodes actually rewritten.
   @discardableResult
   static func restoreNodeCheckpoints(
-    _ nodeCheckpoints: [ViewNodeID: ViewNode.Checkpoint],
+    _ nodeCheckpoints: [ViewNodeID: ViewNode.CheckpointImage],
     nodesByNodeID: [ViewNodeID: ViewNode]
   ) -> Int {
     var restoredNodeCount = 0
@@ -30,12 +30,13 @@ enum ViewGraphNodeCheckpointing {
         nodeCheckpoint.ownerLifetimeID == node.ownerLifetimeID,
         "Checkpoint raw node ID is occupied by a different owner lifetime"
       )
-      guard node.currentCheckpointMutationGeneration
-        != nodeCheckpoint.checkpointMutationGeneration
+      guard
+        node.currentCheckpointMutationGeneration
+          != nodeCheckpoint.checkpointMutationGeneration
       else {
         continue
       }
-      node.restoreCheckpoint(nodeCheckpoint)
+      node.restoreCheckpoint(nodeCheckpoint.checkpoint)
       restoredNodeCount += 1
     }
     return restoredNodeCount
@@ -48,7 +49,7 @@ enum ViewGraphNodeCheckpointing {
   /// wrongly in effect) skip it; only an unconditional rewrite can surface
   /// the divergence.
   static func restoreNodeCheckpointsUngated(
-    _ nodeCheckpoints: [ViewNodeID: ViewNode.Checkpoint],
+    _ nodeCheckpoints: [ViewNodeID: ViewNode.CheckpointImage],
     nodesByNodeID: [ViewNodeID: ViewNode]
   ) {
     for (viewNodeID, node) in nodesByNodeID {
@@ -59,7 +60,7 @@ enum ViewGraphNodeCheckpointing {
         nodeCheckpoint.ownerLifetimeID == node.ownerLifetimeID,
         "Checkpoint raw node ID is occupied by a different owner lifetime"
       )
-      node.restoreCheckpoint(nodeCheckpoint)
+      node.restoreCheckpoint(nodeCheckpoint.checkpoint)
     }
   }
 }

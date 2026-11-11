@@ -26,43 +26,61 @@ extension ResolvedNode {
     // worker's deliberately-small stack, and recursive equivalence previously
     // overflowed it before the cache could reject or accept the entry. Keep the
     // exact same field contract while moving the traversal storage to the heap.
-    var pending: [(Self, Self)] = [(self, other)]
+    //
+    // The walk compares each node where it is stored, in its sibling array,
+    // and copies only the two roots (into one-element runs). Pushing one pair
+    // of node values per visited node copied two nodes onto the stack and two
+    // more off it — a node is some 1.4 KB with dozens of reference-counted
+    // fields — and that copying, not the comparison, was a quarter of this
+    // function. Passing an array element to a helper copies it as well, so
+    // the fields are read through the subscripts.
+    var pending = [ResolvedSiblingRuns(lhs: [self], rhs: [other])]
+    var environments = EnvironmentSnapshot.EqualityMemo()
     var canRefreshWitness = true
-    while let (lhs, rhs) = pending.popLast() {
+    while let top = pending.indices.last {
+      let i = pending[top].nextIndex
+      let lhs = pending[top].lhs
+      let rhs = pending[top].rhs
+      guard i < lhs.count else {
+        pending.removeLast()
+        continue
+      }
+      pending[top].nextIndex = i + 1
       if Mode.isEnabled { work.measurementNodes += 1 }
       // Hosted collections carry their visible layout through measurement.
       // Reusing it also requires the same scroll anchor and painted chrome.
       let carriesCollectionLayout =
-        lhs.semanticMetadata.hostedCollectionContainer != nil
-        || rhs.semanticMetadata.hostedCollectionContainer != nil
-      if carriesCollectionLayout, lhs.drawPayload != rhs.drawPayload {
+        lhs[i].semanticMetadata.hostedCollectionContainer != nil
+        || rhs[i].semanticMetadata.hostedCollectionContainer != nil
+      if carriesCollectionLayout, lhs[i].drawPayload != rhs[i].drawPayload {
         return .init(isCompatible: false, canRefreshWitness: false)
       }
       guard
-        lhs.structuralPath == rhs.structuralPath,
-        lhs.kind == rhs.kind,
-        Self.typeDiscriminatorsCompatible(lhs.typeDiscriminator, rhs.typeDiscriminator),
-        lhs.environmentSnapshot.isEqual(to: rhs.environmentSnapshot, mode: mode, work: &work),
-        lhs.layoutBehavior.isEquivalentForMeasurement(to: rhs.layoutBehavior),
-        lhs.layoutMetadata == rhs.layoutMetadata,
+        lhs[i].structuralPath == rhs[i].structuralPath,
+        lhs[i].kind == rhs[i].kind,
+        Self.typeDiscriminatorsCompatible(lhs[i].typeDiscriminator, rhs[i].typeDiscriminator),
+        environments.areEqual(
+          lhs[i].environmentSnapshot, rhs[i].environmentSnapshot, mode: mode, work: &work),
+        lhs[i].layoutBehavior.isEquivalentForMeasurement(to: rhs[i].layoutBehavior),
+        lhs[i].layoutMetadata == rhs[i].layoutMetadata,
         // Alignment-guide closures are invisible to `layoutMetadata ==`; a
         // cached measured node would carry the previous capture's guides into
         // placement, so guide-carrying nodes never reuse cached measurements.
-        !lhs.layoutMetadata.hasExplicitAlignmentGuides,
-        lhs.layoutRealizedContent?.equivalenceSignature
-          == rhs.layoutRealizedContent?.equivalenceSignature,
-        lhs.drawPayload.isEquivalentForMeasurement(to: rhs.drawPayload),
-        lhs.intrinsicSize == rhs.intrinsicSize,
-        lhs.indexedChildSource?.measurementSignature
-          == rhs.indexedChildSource?.measurementSignature,
-        lhs.children.count == rhs.children.count
+        !lhs[i].layoutMetadata.hasExplicitAlignmentGuides,
+        lhs[i].layoutRealizedContent?.equivalenceSignature
+          == rhs[i].layoutRealizedContent?.equivalenceSignature,
+        lhs[i].drawPayload.isEquivalentForMeasurement(to: rhs[i].drawPayload),
+        lhs[i].intrinsicSize == rhs[i].intrinsicSize,
+        lhs[i].indexedChildSource?.measurementSignature
+          == rhs[i].indexedChildSource?.measurementSignature,
+        lhs[i].children.count == rhs[i].children.count
       else {
         return .init(isCompatible: false, canRefreshWitness: false)
       }
       canRefreshWitness =
-        canRefreshWitness && lhs.typeDiscriminator == rhs.typeDiscriminator
-      for index in lhs.children.indices.reversed() {
-        pending.append((lhs.children[index], rhs.children[index]))
+        canRefreshWitness && lhs[i].typeDiscriminator == rhs[i].typeDiscriminator
+      if !lhs[i].children.isEmpty {
+        pending.append(ResolvedSiblingRuns(lhs: lhs[i].children, rhs: rhs[i].children))
       }
     }
     return .init(isCompatible: true, canRefreshWitness: canRefreshWitness)
@@ -157,28 +175,41 @@ extension ResolvedNode {
     // makes every ancestor `.divergent`, and a `.geometryReusable` anywhere
     // poisons every ancestor to exactly `.geometryReusable`. So `.identical`
     // holds iff no node in the subtree ever diverged on metadata.
+    //
+    // Nodes are compared in their sibling arrays, as in
+    // `measurementEquivalence`.
     var sawMetadataDivergence = false
-    var pending: [(Self, Self)] = [(self, other)]
+    var pending = [ResolvedSiblingRuns(lhs: [self], rhs: [other])]
+    var environments = EnvironmentSnapshot.EqualityMemo()
 
-    while let (lhs, rhs) = pending.popLast() {
+    while let top = pending.indices.last {
+      let i = pending[top].nextIndex
+      let lhs = pending[top].lhs
+      let rhs = pending[top].rhs
+      guard i < lhs.count else {
+        pending.removeLast()
+        continue
+      }
+      pending[top].nextIndex = i + 1
       if Mode.isEnabled { work.placementNodes += 1 }
       guard
-        lhs.structuralPath == rhs.structuralPath,
-        lhs.kind == rhs.kind,
-        Self.typeDiscriminatorsCompatible(lhs.typeDiscriminator, rhs.typeDiscriminator),
-        lhs.environmentSnapshot.isEqual(to: rhs.environmentSnapshot, mode: mode, work: &work),
-        lhs.layoutBehavior.isEquivalentForPlacement(to: rhs.layoutBehavior),
-        lhs.layoutMetadata == rhs.layoutMetadata,
+        lhs[i].structuralPath == rhs[i].structuralPath,
+        lhs[i].kind == rhs[i].kind,
+        Self.typeDiscriminatorsCompatible(lhs[i].typeDiscriminator, rhs[i].typeDiscriminator),
+        environments.areEqual(
+          lhs[i].environmentSnapshot, rhs[i].environmentSnapshot, mode: mode, work: &work),
+        lhs[i].layoutBehavior.isEquivalentForPlacement(to: rhs[i].layoutBehavior),
+        lhs[i].layoutMetadata == rhs[i].layoutMetadata,
         // Alignment-guide closures are invisible to `layoutMetadata ==`; a
         // guide-carrying node can never prove its placement inputs unchanged.
-        !lhs.layoutMetadata.hasExplicitAlignmentGuides,
-        lhs.layoutRealizedContent?.equivalenceSignature
-          == rhs.layoutRealizedContent?.equivalenceSignature,
-        lhs.drawPayload == rhs.drawPayload,
-        lhs.intrinsicSize == rhs.intrinsicSize,
-        lhs.indexedChildSource?.measurementSignature
-          == rhs.indexedChildSource?.measurementSignature,
-        lhs.children.count == rhs.children.count
+        !lhs[i].layoutMetadata.hasExplicitAlignmentGuides,
+        lhs[i].layoutRealizedContent?.equivalenceSignature
+          == rhs[i].layoutRealizedContent?.equivalenceSignature,
+        lhs[i].drawPayload == rhs[i].drawPayload,
+        lhs[i].intrinsicSize == rhs[i].intrinsicSize,
+        lhs[i].indexedChildSource?.measurementSignature
+          == rhs[i].indexedChildSource?.measurementSignature,
+        lhs[i].children.count == rhs[i].children.count
       else {
         return .divergent
       }
@@ -189,23 +220,23 @@ extension ResolvedNode {
       // `semanticMetadata` / focus / `layoutBehavior`, all compared here.
       if !sawMetadataDivergence {
         sawMetadataDivergence =
-          lhs.identity != rhs.identity
-          || lhs.structuralEdgeRole != rhs.structuralEdgeRole
-          || lhs.entityIdentity != rhs.entityIdentity
-          || lhs.entityStructuralPath != rhs.entityStructuralPath
-          || lhs.declarationOwnerEdge != rhs.declarationOwnerEdge
-          || lhs.layoutBehavior != rhs.layoutBehavior
-          || lhs.drawMetadata != rhs.drawMetadata
-          || lhs.drawEffects != rhs.drawEffects
-          || lhs.surfaceComposition != rhs.surfaceComposition
-          || lhs.semanticMetadata != rhs.semanticMetadata
-          || lhs.lifecycleMetadata != rhs.lifecycleMetadata
-          || lhs.isTransient != rhs.isTransient
-          || lhs.matchedGeometry != rhs.matchedGeometry
+          lhs[i].identity != rhs[i].identity
+          || lhs[i].structuralEdgeRole != rhs[i].structuralEdgeRole
+          || lhs[i].entityIdentity != rhs[i].entityIdentity
+          || lhs[i].entityStructuralPath != rhs[i].entityStructuralPath
+          || lhs[i].declarationOwnerEdge != rhs[i].declarationOwnerEdge
+          || lhs[i].layoutBehavior != rhs[i].layoutBehavior
+          || lhs[i].drawMetadata != rhs[i].drawMetadata
+          || lhs[i].drawEffects != rhs[i].drawEffects
+          || lhs[i].surfaceComposition != rhs[i].surfaceComposition
+          || lhs[i].semanticMetadata != rhs[i].semanticMetadata
+          || lhs[i].lifecycleMetadata != rhs[i].lifecycleMetadata
+          || lhs[i].isTransient != rhs[i].isTransient
+          || lhs[i].matchedGeometry != rhs[i].matchedGeometry
       }
 
-      for index in lhs.children.indices.reversed() {
-        pending.append((lhs.children[index], rhs.children[index]))
+      if !lhs[i].children.isEmpty {
+        pending.append(ResolvedSiblingRuns(lhs: lhs[i].children, rhs: rhs[i].children))
       }
     }
 
@@ -475,4 +506,14 @@ extension ResolvedNode {
     }
     return true
   }
+}
+
+/// One run of sibling nodes from each of two trees, visited in step by the
+/// equivalence walks. Holding the two child arrays retains two buffers for the
+/// whole run; the walk then reads each node's fields through the array
+/// subscripts without copying the node.
+private struct ResolvedSiblingRuns {
+  let lhs: [ResolvedNode]
+  let rhs: [ResolvedNode]
+  var nextIndex = 0
 }

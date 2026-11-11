@@ -346,9 +346,12 @@ only in the visible range. Hosts and tests can observe these results:
   viewport and for observed negative spacing; a single element whose body
   expands without bound is realized in full. Opaque bodies or modifiers hiding
   a `ForEach` do not acquire structural transparency.
-- Some live lazy sources exceed the worker-snapshot element budget. Their frames
-  keep those sources live and run the frame tail on the main actor. They do not
-  pre-realize every element for worker offload.
+- The worker-snapshot element budget is the root proposal's smaller finite
+  dimension: the most elements a source can have and still fit the viewport
+  along either axis. Frames whose live lazy sources exceed it keep those sources
+  live and run the frame tail on the main actor. They do not pre-realize every
+  element for worker offload, because that costs time on every frame in
+  proportion to the source, and the windowed tail does not.
 
 ## Damage And Presentation
 

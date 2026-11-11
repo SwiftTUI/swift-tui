@@ -110,7 +110,7 @@ extension ViewGraph {
     package var taskDescriptors: TaskDescriptorState
     package var dependencyIndex: DependencyIndex
     package var frameCommit: FrameCommitState
-    package var nodeCheckpoints: [ViewNodeID: ViewNode.Checkpoint]
+    package var nodeCheckpoints: [ViewNodeID: ViewNode.CheckpointImage]
   }
 
   package struct StateMutationOverlay {

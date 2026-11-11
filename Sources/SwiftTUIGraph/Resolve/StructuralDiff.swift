@@ -20,6 +20,23 @@ package func diffChildren(
   old: [ChildDescriptor],
   new: [ChildDescriptor]
 ) -> [ChildDiffOp] {
+  // A re-resolved parent usually keeps its children. An unchanged list has an
+  // empty difference, so the general path below would emit exactly one
+  // `.matched` per position; say so directly instead of running the Myers
+  // diff and building a `CollectionDifference` to learn it.
+  if old.count == new.count, old.elementsEqual(new) {
+    return old.indices.map { .matched(oldIndex: $0, newIndex: $0) }
+  }
+  // A node resolved for the first time has no previous children, and one that
+  // emptied has no new ones. `CollectionDifference` iterates removals from the
+  // highest offset down and insertions from the lowest up; keep that order.
+  if old.isEmpty {
+    return new.indices.map { .inserted(newIndex: $0) }
+  }
+  if new.isEmpty {
+    return old.indices.reversed().map { .removed(oldIndex: $0) }
+  }
+
   let difference = new.difference(from: old).inferringMoves()
 
   var removedOldIndices: Set<Int> = []

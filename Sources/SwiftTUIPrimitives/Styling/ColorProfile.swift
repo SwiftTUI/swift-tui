@@ -557,6 +557,10 @@ public struct RGBColorProfile: Hashable, Sendable, Codable, Identifiable {
   }
 }
 
+// The four reflected fields are the whole profile: equality, hashing and
+// coding read nothing else, and a custom definition's storage is immutable.
+extension RGBColorProfile: CompleteValueMirroring {}
+
 extension RGBColorProfile: CustomReflectable {
   /// Reflects the profile's definition, not its storage. Reflection-driven
   /// consumers (canonical draw snapshots, memo comparison, debug printing)

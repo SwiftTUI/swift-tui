@@ -88,6 +88,51 @@ struct StructuralDiffTests {
     #expect(operations.count == 2)
   }
 
+  @Test("an empty side emits its operations in CollectionDifference order")
+  func emptySideKeepsCollectionDifferenceOrder() {
+    let descriptors: [ChildDescriptor] = [
+      keyedRow(id: 0, slot: 0),
+      keyedRow(id: 1, slot: 1),
+      keyedRow(id: 2, slot: 2),
+    ]
+
+    // Insertions from the lowest offset up; removals from the highest down.
+    #expect(
+      diffChildren(old: [], new: descriptors) == [
+        .inserted(newIndex: 0),
+        .inserted(newIndex: 1),
+        .inserted(newIndex: 2),
+      ]
+    )
+    #expect(
+      diffChildren(old: descriptors, new: []) == [
+        .removed(oldIndex: 2),
+        .removed(oldIndex: 1),
+        .removed(oldIndex: 0),
+      ]
+    )
+    #expect(diffChildren(old: [], new: []).isEmpty)
+  }
+
+  @Test("equal-length lists that differ still take the general diff")
+  func equalLengthListsThatDifferAreDiffed() {
+    let old: [ChildDescriptor] = [
+      keyedRow(id: 0, slot: 0),
+      keyedRow(id: 1, slot: 1),
+    ]
+    let new: [ChildDescriptor] = [
+      keyedRow(id: 0, slot: 0),
+      keyedRow(id: 2, slot: 1),
+    ]
+
+    let operations = diffChildren(old: old, new: new)
+
+    #expect(operations.contains(.matched(oldIndex: 0, newIndex: 0)))
+    #expect(operations.contains(.removed(oldIndex: 1)))
+    #expect(operations.contains(.inserted(newIndex: 1)))
+    #expect(operations.count == 3)
+  }
+
   @Test("stable ordering emits only matched operations")
   func stableOrderingEmitsOnlyMatches() {
     let descriptors: [ChildDescriptor] = [

@@ -82,17 +82,33 @@ extension FrameTailRenderer {
         <= Self.workerSnapshotElementBudget(for: input.proposal)
   }
 
-  /// Four times the root proposal's larger dimension: generous against a
-  /// windowed tail's per-source realization (viewport rows + overscan, a few
-  /// measure entries per frame), so small sources — where the snapshot is
-  /// cheap and offload genuinely wins — keep offloading unchanged.
+  /// The root proposal's smaller finite dimension: the most elements a lazy
+  /// source can have and still fit the viewport along either axis, since an
+  /// element takes at least one cell.
+  ///
+  /// The snapshot realizes every element on every frame, scrolled into view or
+  /// not, so its cost grows with the element count; a windowed tail realizes
+  /// the visible band and costs the same however long the source is. Up to
+  /// about one viewport of elements the two realize the same rows and the
+  /// snapshot also moves the tail off the main actor. Beyond that the snapshot
+  /// only adds work — measured on an 80x32 document at about 0.4 ms per
+  /// element per frame against a flat 17 ms for the windowed tail, which puts
+  /// the crossover near 35 elements. The snapshot runs in the animation
+  /// injection stage, outside the head-prepare timing, so read its cost from
+  /// input-to-commit latency or a profile, not from the phase columns.
   static func workerSnapshotElementBudget(for proposal: ProposedSize) -> Int {
-    let width: Int =
-      if case .finite(let value) = proposal.width { value } else { 0 }
-    let height: Int =
-      if case .finite(let value) = proposal.height { value } else { 0 }
-    let bound = max(width, height)
-    return bound > 0 ? 4 * bound : 256
+    let width: Int? =
+      if case .finite(let value) = proposal.width, value > 0 { value } else { nil }
+    let height: Int? =
+      if case .finite(let value) = proposal.height, value > 0 { value } else { nil }
+    switch (width, height) {
+    case (let width?, let height?):
+      return min(width, height)
+    case (let bound?, nil), (nil, let bound?):
+      return bound
+    case (nil, nil):
+      return 256
+    }
   }
 
   func needsPreparedGraphDuringLayout(

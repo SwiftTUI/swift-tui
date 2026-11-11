@@ -56,6 +56,37 @@ struct ViewGraphCheckpointRestoreTests {
     #expect(restored >= 1 && restored <= 3)
   }
 
+  @Test("an unchanged node keeps one shared image across captures")
+  func unchangedNodeSharesItsImageAcrossCaptures() throws {
+    let graph = ViewGraph()
+    let rootIdentity = testIdentity("Root")
+    let childIdentity = testIdentity("Root", "Child")
+    let siblingIdentity = testIdentity("Root", "Sibling")
+
+    _ = graph.applySnapshot(
+      ResolvedNode(
+        identity: rootIdentity,
+        kind: .root,
+        children: [
+          ResolvedNode(identity: childIdentity, kind: .view(.init("Child"))),
+          ResolvedNode(identity: siblingIdentity, kind: .view(.init("Sibling"))),
+        ]
+      )
+    )
+    let childID = try #require(graph.nodeIfExists(for: childIdentity)?.viewNodeID)
+    let siblingID = try #require(graph.nodeIfExists(for: siblingIdentity)?.viewNodeID)
+
+    let first = graph.makeCheckpoint()
+    updateNode(graph, identity: childIdentity, kind: .view(.init("ChildUpdated")))
+    let second = graph.makeCheckpoint()
+
+    #expect(first.nodeCheckpoints[siblingID] === second.nodeCheckpoints[siblingID])
+    #expect(first.nodeCheckpoints[childID] !== second.nodeCheckpoints[childID])
+    #expect(first.nodeCheckpoints[childID]?.checkpoint.committed.kind == .view(.init("Child")))
+    #expect(
+      second.nodeCheckpoints[childID]?.checkpoint.committed.kind == .view(.init("ChildUpdated")))
+  }
+
   @Test("the gating primitive skips generation-matched nodes and counts rewrites")
   func gatingSkipsGenerationMatchedNodes() {
     let idA = ViewNodeID(rawValue: 1)
@@ -115,7 +146,7 @@ struct ViewGraphCheckpointRestoreTests {
     // an unrelated replacement.
     let replacementImages = store.currentImages(of: [rawID: replacement])
     #expect(replacementImages[rawID]?.ownerLifetimeID == replacement.ownerLifetimeID)
-    #expect(replacementImages[rawID]?.committed.identity == replacement.identity)
+    #expect(replacementImages[rawID]?.checkpoint.committed.identity == replacement.identity)
   }
 
   @Test("gen-gated restore round-trips baseline and prepared state")

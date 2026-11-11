@@ -23,8 +23,15 @@ extension VerticalAlignment {
 @MainActor
 @Suite(.serialized)
 struct AsyncFrameTailRenderingTests {
-  @Test("interactive worker table retains widths when selection scrolls the widest row away")
-  func workerTableRetainsWidthsAcrossFrames() async throws {
+  // Forty rows are past the worker-snapshot budget of this ten-row terminal,
+  // so that table keeps a live source and lays out on the main actor; ten rows
+  // are within it, so that one is snapshotted for the worker. One row is out
+  // of view either way, and both sources must retain the width it set.
+  @Test(
+    "interactive table retains widths when selection scrolls the widest row away",
+    arguments: [(rowCount: 40, wideRow: 30), (rowCount: 10, wideRow: 9)]
+  )
+  func tableRetainsWidthsAcrossFrames(rowCount: Int, wideRow: Int) async throws {
     let identity = testIdentity("AsyncTableColumnWidths")
     let terminal = AsyncFrameTailTerminalHost(size: .init(width: 48, height: 10))
     let state = StateContainer(initialState: 0, invalidationIdentities: [identity])
@@ -40,10 +47,10 @@ struct AsyncFrameTailRenderingTests {
       proposal: terminal.proposal,
       viewBuilder: { selected, _ in
         Table(
-          0..<40, id: \.self, selection: .constant(Optional(selected)),
+          0..<rowCount, id: \.self, selection: .constant(Optional(selected)),
           columns: [.init("Value"), .init("Tail")]
         ) { row in
-          Text(row == 30 ? "wide-value-0000000" : "x")
+          Text(row == wideRow ? "wide-value-0000000" : "x")
           Text("t\(row)")
         }
       })
@@ -60,29 +67,41 @@ struct AsyncFrameTailRenderingTests {
       return header.distance(from: header.startIndex, to: position)
     }
     let initial = try await frame(selecting: 0)
-    let wide = try await frame(selecting: 30)
+    let wide = try await frame(selecting: wideRow)
     #expect(wide.contains("wide-value-0000000"))
     #expect(try tailOffset(wide) > tailOffset(initial))
     let narrow = try await frame(selecting: 0)
     #expect(!narrow.contains("wide-value-0000000"))
     #expect(try tailOffset(narrow) == tailOffset(wide))
-    #expect(try tailOffset(await frame(selecting: 30)) == tailOffset(wide))
+    #expect(try tailOffset(await frame(selecting: wideRow)) == tailOffset(wide))
   }
 
-  @Test("worker-snapshot element budget scales with the root bound, defaults unbounded")
-  func workerSnapshotElementBudgetScalesWithRootBound() {
-    // Proposal 2026-07-13-002 Stage 2.2b: past this budget the frame head
-    // keeps live lazy sources (no pre-realizing snapshot) and the tail runs
-    // on the main actor, where windowed measurement bounds the work.
+  @Test("worker-snapshot element budget is the viewport's smaller dimension")
+  func workerSnapshotElementBudgetIsTheSmallerViewportDimension() {
+    // Past this budget the frame head keeps live lazy sources (no
+    // pre-realizing snapshot) and the tail runs on the main actor, where
+    // windowed measurement bounds the work. A source within it cannot outgrow
+    // the viewport along either axis, so realizing all of it is no more than
+    // a windowed tail would realize.
     #expect(
       FrameTailRenderer.workerSnapshotElementBudget(
         for: ProposedSize(width: .finite(80), height: .finite(32))
-      ) == 320
+      ) == 32
     )
     #expect(
       FrameTailRenderer.workerSnapshotElementBudget(
         for: ProposedSize(width: .finite(40), height: .finite(120))
-      ) == 480
+      ) == 40
+    )
+    #expect(
+      FrameTailRenderer.workerSnapshotElementBudget(
+        for: ProposedSize(width: .finite(64), height: .unspecified)
+      ) == 64
+    )
+    #expect(
+      FrameTailRenderer.workerSnapshotElementBudget(
+        for: ProposedSize(width: .unspecified, height: .finite(24))
+      ) == 24
     )
     #expect(
       FrameTailRenderer.workerSnapshotElementBudget(
@@ -1391,8 +1410,10 @@ struct AsyncFrameTailRenderingTests {
     #expect(terminal.frames.last?.contains("column 1") == true)
   }
 
-  @Test("lazy indexed ScrollView content snapshots before worker layout")
+  @Test("lazy indexed ScrollView content that fits the viewport snapshots before worker layout")
   func lazyIndexedScrollViewContentSnapshotsBeforeWorkerLayout() async throws {
+    // Twelve rows against a twelve-row viewport: within the worker-snapshot
+    // budget, so the head realizes every row and the tail runs on the worker.
     let artifacts = await DefaultRenderer().renderAsync(
       ScrollView([.vertical]) {
         LazyVStack(alignment: .leading, spacing: 0) {
@@ -1402,7 +1423,7 @@ struct AsyncFrameTailRenderingTests {
         }
       },
       context: .init(identity: testIdentity("AsyncLazyIndexedScrollViewLayoutRoot")),
-      proposal: .init(width: 24, height: 4)
+      proposal: .init(width: 24, height: 12)
     )
     let workerTimings = try #require(artifacts.diagnostics.timing.workerTimings)
     let raster = artifacts.rasterSurface.lines.joined(separator: "\n")
@@ -1415,6 +1436,35 @@ struct AsyncFrameTailRenderingTests {
     #expect(workerTimings.layoutCompute != .zero)
     #expect(workerTimings.rasterCompute != .zero)
     #expect(raster.contains("lazy row 0"))
+  }
+
+  @Test("lazy indexed ScrollView content longer than the viewport stays live")
+  func lazyIndexedScrollViewContentLongerThanTheViewportStaysLive() async throws {
+    // The same twelve rows against a four-row viewport: past the budget, so
+    // the head does not realize the eight rows that are out of view. The
+    // source stays live and the main-actor tail realizes the visible band.
+    let artifacts = await DefaultRenderer().renderAsync(
+      ScrollView([.vertical]) {
+        LazyVStack(alignment: .leading, spacing: 0) {
+          ForEach(0..<12) { index in
+            Text("lazy row \(index)")
+          }
+        }
+      },
+      context: .init(identity: testIdentity("AsyncLazyIndexedScrollViewLiveLayoutRoot")),
+      proposal: .init(width: 24, height: 4)
+    )
+    let raster = artifacts.rasterSurface.lines.joined(separator: "\n")
+
+    let lazyStack = try #require(artifacts.resolvedTree.children.first)
+    let source = try #require(lazyStack.indexedChildSource)
+
+    #expect(!source.canRunOnWorker)
+    #expect(source.workerResolvedChildren == nil)
+    #expect(source.count == 12)
+    #expect(raster.contains("lazy row 0"))
+    #expect(raster.contains("lazy row 3"))
+    #expect(!raster.contains("lazy row 4"))
   }
 
   @Test("lazy indexed child with plain custom layout keeps layout on the worker")
