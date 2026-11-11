@@ -1,18 +1,19 @@
 # Migrating to SwiftTUI 0.21
 
 SwiftTUI 0.21 starts an explicit pre-1.0 compatibility policy. Supported public
-API and the documented Host, Testing and StyleFixtures SPI are protected within
-the 0.21.x line. Compatible fixes and additions may ship as patches; incompatible
-source or promised behavior changes require a new minor and migration guidance.
+API and the documented Host, Testing and StyleFixtures SPI are protected from
+the 0.21.0 floor through the rest of 0.x. Compatible fixes use patches and
+compatible features use minors. Incompatible source or promised behavior changes
+require 1.0.0, migration guidance and release qualification.
 The promise covers rebuilding source with the documented platform/toolchain set,
 not precompiled Swift ABI across toolchains. Unratified implementation SPI remains
 experimental. See [the compatibility policy](COMPATIBILITY.md).
 
 Each SwiftTUI repository has its own version. Reusable supported Swift libraries
 select a bounded framework line with `.upToNextMajor(from: "0.21.0")`, meaning
-`>= 0.21.0` and `< 0.22.0`. Do not substitute SwiftPM's broader `from:` requirement.
-Applications can retain exact tested selections. A new framework release does
-not require a matching Charts, host, application or site release.
+`>= 0.21.0` and `< 1.0.0`; SwiftPM's `from:` spelling is equivalent.
+Applications retain tested selections in their lockfiles. A new framework release
+does not require a matching Charts, host, application or site release.
 
 ## Source changes from 0.20.1
 
