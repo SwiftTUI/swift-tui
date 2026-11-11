@@ -252,6 +252,11 @@ run_part_core() {
     if is_flaky_only_suite "$suite"; then
       continue
     fi
+    # The loader and its integration suite are compiled only with DEBUG.
+    # The debug core lane owns this coverage; an optimized launch is empty.
+    if [ "$suite" = HotReloadLoaderTests ]; then
+      continue
+    fi
     release_test_serialized --filter "SwiftTUITests.$suite"
   done
 }

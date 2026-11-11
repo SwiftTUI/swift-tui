@@ -81,6 +81,12 @@ echo "All root Package.swift test targets are covered by Scripts/test_all.sh."
 # `SwiftTUITests.<Type>` prefix swift-testing puts on the fully qualified test
 # name (`SwiftTUITests.<Type>/<test>()`), which is what the regexes match.
 manifest=Scripts/data/runtime-shards.txt
+# Exercise the release selector without building. Its core and soak together
+# must retain every isolated suite that exists in the optimized configuration.
+release_launches=$(
+  sh Scripts/release_soundness_lane.sh --dry-run --part core
+  sh Scripts/release_soundness_lane.sh --dry-run --flaky-only
+)
 suite_names=$(mktemp "/tmp/swift-tui-runtime-suites.XXXXXX")
 manifest_rows=$(mktemp "/tmp/swift-tui-runtime-shards.XXXXXX")
 claims=$(mktemp "/tmp/swift-tui-runtime-claims.XXXXXX")
@@ -139,6 +145,19 @@ while IFS= read -r row; do
     fi
     if ! grep -Fq -- "--filter SwiftTUITests.$value" Scripts/test_all.sh; then
       >&2 echo "Isolated suite '$value' has no explicit core-lane launch in Scripts/test_all.sh."
+      census_failed=1
+    fi
+    if [ "$value" = HotReloadLoaderTests ]; then
+      if ! head -n 1 Tests/SwiftTUITests/HotReloadLoaderTests.swift | grep -Eq '^#if DEBUG &&'; then
+        >&2 echo "HotReloadLoaderTests is no longer Debug-only; review its release selection."
+        census_failed=1
+      fi
+      if printf '%s\n' "$release_launches" | grep -Fq -- "--filter SwiftTUITests.$value "; then
+        >&2 echo "Debug-only suite '$value' must not be selected by the release lane."
+        census_failed=1
+      fi
+    elif ! printf '%s\n' "$release_launches" | grep -Fq -- "--filter SwiftTUITests.$value "; then
+      >&2 echo "Isolated suite '$value' has no optimized core or soak launch."
       census_failed=1
     fi
     continue
