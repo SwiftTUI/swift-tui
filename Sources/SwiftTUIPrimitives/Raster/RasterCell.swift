@@ -14,10 +14,9 @@
 public struct RasterCell: Equatable, Sendable {
   public var character: Character
 
-  /// The style and hyperlink, or `nil` when the cell has neither.
+  /// Shared style, hyperlink and exceptional full-width column values.
   ///
-  /// A cell never references attributes that carry neither a style nor a
-  /// hyperlink, so `nil` is the only spelling of "unstyled, unlinked".
+  /// Ordinary unstyled, unlinked cells need no attributes object.
   package var attributes: RasterCellAttributes?
 
   private var storedSpanWidth: Int32
@@ -25,40 +24,63 @@ public struct RasterCell: Equatable, Sendable {
 
   /// The stored value that stands for "not a continuation cell".
   private static let noContinuationLead = Int32.min
+  private static let overflowContinuationLead = Int32.min + 1
 
   /// The number of columns the cell's glyph covers: `1` for a narrow glyph,
   /// the glyph's width on the lead cell of a wide glyph, and `0` on the
   /// continuation cells that follow it.
   ///
-  /// A surface is at most 65,536 columns wide; a value outside the `Int32`
-  /// range is held at the nearest representable count.
+  /// All `Int` values round-trip. Counts outside the inline range use shared
+  /// attributes storage without increasing the size of an ordinary cell.
   public var spanWidth: Int {
-    get { Int(storedSpanWidth) }
-    set { storedSpanWidth = Int32(clamping: newValue) }
+    get {
+      storedSpanWidth == .min
+        ? attributes?.spanWidthOverflow ?? Int(Int32.min) : Int(storedSpanWidth)
+    }
+    set {
+      attributes = Self.withCounts(
+        attributes, spanWidth: newValue, continuationLeadX: continuationLeadX)
+      storedSpanWidth = Int32(exactly: newValue) ?? .min
+    }
   }
 
   /// The column of the wide glyph this cell continues, or `nil` when the cell
   /// starts its own glyph.
   ///
-  /// A surface is at most 65,536 columns wide; a value outside the `Int32`
-  /// range is held at the nearest representable column.
+  /// All `Int` values, including the inline storage's reserved sentinels,
+  /// round-trip distinctly from `nil`.
   public var continuationLeadX: Int? {
     get {
-      storedContinuationLeadX == Self.noContinuationLead ? nil : Int(storedContinuationLeadX)
+      if storedContinuationLeadX == Self.noContinuationLead { return nil }
+      if storedContinuationLeadX == Self.overflowContinuationLead {
+        return attributes?.continuationLeadXOverflow
+      }
+      return Int(storedContinuationLeadX)
     }
-    set { storedContinuationLeadX = Self.storedLead(newValue) }
+    set {
+      attributes = Self.withCounts(attributes, spanWidth: spanWidth, continuationLeadX: newValue)
+      storedContinuationLeadX = Self.storedLead(newValue)
+    }
   }
 
   public var style: ResolvedTextStyle? {
     get { attributes?.style }
     set {
-      attributes = RasterCellAttributes.make(style: newValue, hyperlink: attributes?.hyperlink)
+      attributes = RasterCellAttributes.make(
+        style: newValue, hyperlink: attributes?.hyperlink,
+        spanWidthOverflow: attributes?.spanWidthOverflow,
+        continuationLeadXOverflow: attributes?.continuationLeadXOverflow)
     }
   }
 
   public var hyperlink: String? {
     get { attributes?.hyperlink }
-    set { attributes = RasterCellAttributes.make(style: attributes?.style, hyperlink: newValue) }
+    set {
+      attributes = RasterCellAttributes.make(
+        style: attributes?.style, hyperlink: newValue,
+        spanWidthOverflow: attributes?.spanWidthOverflow,
+        continuationLeadXOverflow: attributes?.continuationLeadXOverflow)
+    }
   }
 
   public init(
@@ -69,9 +91,12 @@ public struct RasterCell: Equatable, Sendable {
     hyperlink: String? = nil
   ) {
     self.character = character
-    self.storedSpanWidth = Int32(clamping: spanWidth)
+    self.storedSpanWidth = Int32(exactly: spanWidth) ?? .min
     self.storedContinuationLeadX = Self.storedLead(continuationLeadX)
-    self.attributes = RasterCellAttributes.make(style: style, hyperlink: hyperlink)
+    self.attributes = RasterCellAttributes.make(
+      style: style, hyperlink: hyperlink,
+      spanWidthOverflow: Self.spanOverflow(spanWidth),
+      continuationLeadXOverflow: Self.leadOverflow(continuationLeadX))
   }
 
   /// Creates a cell that shares `attributes` with the other cells of its run.
@@ -82,9 +107,10 @@ public struct RasterCell: Equatable, Sendable {
     attributes: RasterCellAttributes?
   ) {
     self.character = character
-    self.storedSpanWidth = Int32(clamping: spanWidth)
+    self.storedSpanWidth = Int32(exactly: spanWidth) ?? .min
     self.storedContinuationLeadX = Self.storedLead(continuationLeadX)
-    self.attributes = attributes
+    self.attributes = Self.withCounts(
+      attributes, spanWidth: spanWidth, continuationLeadX: continuationLeadX)
   }
 
   public static let empty = Self()
@@ -111,10 +137,37 @@ public struct RasterCell: Equatable, Sendable {
     guard let lead else {
       return noContinuationLead
     }
-    return max(Int32(clamping: lead), noContinuationLead + 1)
+    guard let value = Int32(exactly: lead), value > overflowContinuationLead else {
+      return overflowContinuationLead
+    }
+    return value
   }
 
-  /// Whether both cells have the same span width and continuation lead.
+  private static func spanOverflow(_ width: Int) -> Int? {
+    Int32(exactly: width) == nil ? width : nil
+  }
+
+  private static func leadOverflow(_ lead: Int?) -> Int? {
+    guard let lead else { return nil }
+    return storedLead(lead) == overflowContinuationLead ? lead : nil
+  }
+
+  private static func withCounts(
+    _ attributes: RasterCellAttributes?, spanWidth: Int, continuationLeadX: Int?
+  ) -> RasterCellAttributes? {
+    let spanOverflow = Self.spanOverflow(spanWidth)
+    let leadOverflow = Self.leadOverflow(continuationLeadX)
+    guard
+      attributes?.spanWidthOverflow != spanOverflow
+        || attributes?.continuationLeadXOverflow != leadOverflow
+    else { return attributes }
+    return RasterCellAttributes.make(
+      style: attributes?.style, hyperlink: attributes?.hyperlink,
+      spanWidthOverflow: spanOverflow, continuationLeadXOverflow: leadOverflow)
+  }
+
+  /// Whether both cells have the same inline count encodings. Exceptional
+  /// full-width values are compared by the attributes equality that follows.
   @inline(__always)
   fileprivate func hasSameSpan(as other: RasterCell) -> Bool {
     storedSpanWidth == other.storedSpanWidth
@@ -180,7 +233,7 @@ package struct RasterCellRunComparator {
 }
 
 // The five reflected fields are the whole cell: the attributes object they
-// are read from is immutable and holds nothing else.
+// are read from is immutable; exceptional counts are reflected as their values.
 extension RasterCell: CompleteValueMirroring {}
 
 extension RasterCell: CustomReflectable {
@@ -210,21 +263,35 @@ extension RasterCell: CustomReflectable {
 package final class RasterCellAttributes: Sendable {
   package let style: ResolvedTextStyle?
   package let hyperlink: String?
+  package let spanWidthOverflow: Int?
+  package let continuationLeadXOverflow: Int?
 
-  private init(style: ResolvedTextStyle?, hyperlink: String?) {
+  private init(
+    style: ResolvedTextStyle?, hyperlink: String?,
+    spanWidthOverflow: Int?, continuationLeadXOverflow: Int?
+  ) {
     self.style = style
     self.hyperlink = hyperlink
+    self.spanWidthOverflow = spanWidthOverflow
+    self.continuationLeadXOverflow = continuationLeadXOverflow
   }
 
-  /// Attributes for `style` and `hyperlink`, or `nil` when both are absent.
+  /// Shared values, or `nil` when no out-of-line storage is needed.
   package static func make(
     style: ResolvedTextStyle?,
-    hyperlink: String?
+    hyperlink: String?,
+    spanWidthOverflow: Int? = nil,
+    continuationLeadXOverflow: Int? = nil
   ) -> RasterCellAttributes? {
-    guard style != nil || hyperlink != nil else {
+    guard
+      style != nil || hyperlink != nil || spanWidthOverflow != nil
+        || continuationLeadXOverflow != nil
+    else {
       return nil
     }
-    return RasterCellAttributes(style: style, hyperlink: hyperlink)
+    return RasterCellAttributes(
+      style: style, hyperlink: hyperlink,
+      spanWidthOverflow: spanWidthOverflow, continuationLeadXOverflow: continuationLeadXOverflow)
   }
 
   /// Value equality with an identity fast path.
@@ -242,5 +309,7 @@ package final class RasterCellAttributes: Sendable {
       return false
     }
     return lhs.style == rhs.style && lhs.hyperlink == rhs.hyperlink
+      && lhs.spanWidthOverflow == rhs.spanWidthOverflow
+      && lhs.continuationLeadXOverflow == rhs.continuationLeadXOverflow
   }
 }

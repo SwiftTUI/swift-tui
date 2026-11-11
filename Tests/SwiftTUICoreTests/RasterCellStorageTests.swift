@@ -65,12 +65,53 @@ struct RasterCellStorageTests {
     #expect(cell.continuationLeadX == nil)
     #expect(!cell.isContinuation)
 
-    // Values no surface can hold stay ordered and never read as `nil`.
+    // The public value preserves even counts outside a rendered surface.
     cell.spanWidth = .max
-    #expect(cell.spanWidth == Int(Int32.max))
+    #expect(cell.spanWidth == .max)
     cell.continuationLeadX = .min
-    #expect(cell.continuationLeadX != nil)
+    #expect(cell.continuationLeadX == .min)
     #expect(cell.isContinuation)
+  }
+
+  @Test("full-width public counts retain the released value semantics")
+  func fullWidthCountsRoundTrip() {
+    let values = [
+      Int.min, Int(Int32.min) - 1, Int(Int32.min), Int(Int32.min) + 1,
+      -1, 0, 1, 65_536, Int(Int32.max), Int(Int32.max) + 1, Int.max,
+    ]
+    let style = ResolvedTextStyle(foregroundColor: .red)
+    for width in values {
+      for lead in values.map(Optional.some) + [nil] {
+        var cell = RasterCell(spanWidth: width, continuationLeadX: lead)
+        #expect(cell.spanWidth == width)
+        #expect(cell.continuationLeadX == lead)
+        #expect(cell.isContinuation == (lead != nil))
+        let original = cell
+        let shared = RasterCell(
+          character: " ", spanWidth: width, continuationLeadX: lead,
+          attributes: RasterCellAttributes.make(style: nil, hyperlink: nil))
+        #expect(shared == original)
+        let reset = RasterCell(character: " ", attributes: cell.attributes)
+        #expect(reset == .empty)
+        cell.style = style
+        cell.hyperlink = "https://example.com"
+        cell.style = nil
+        cell.hyperlink = nil
+        #expect(cell == original)
+        cell.spanWidth = 1
+        #expect(cell.continuationLeadX == lead)
+        cell.spanWidth = width
+        cell.continuationLeadX = nil
+        #expect(cell.spanWidth == width)
+        cell.continuationLeadX = lead
+        #expect(cell == original)
+        #expect(original.spanWidth == width)
+        #expect(original.continuationLeadX == lead)
+        cell.spanWidth = 1
+        cell.continuationLeadX = nil
+        #expect(cell == .empty)
+      }
+    }
   }
 
   @Test("equality is by value whether or not attributes are shared")
@@ -110,6 +151,14 @@ struct RasterCellStorageTests {
       RasterCell(character: "界", spanWidth: 2, style: blue),
       RasterCell(character: " ", spanWidth: 0, continuationLeadX: 3, style: blue),
       RasterCell(character: " ", spanWidth: 0, continuationLeadX: 4, style: blue),
+      RasterCell(spanWidth: .min),
+      RasterCell(spanWidth: .max),
+      RasterCell(spanWidth: .max - 1),
+      RasterCell(continuationLeadX: .min),
+      RasterCell(continuationLeadX: .max),
+      RasterCell(continuationLeadX: Int(Int32.min)),
+      RasterCell(continuationLeadX: Int(Int32.min) + 1),
+      RasterCell(spanWidth: .max, continuationLeadX: .min, style: blue),
     ]
     // One comparator across every pair, so remembered answers from earlier
     // pairs are exercised against later ones.

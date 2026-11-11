@@ -25,9 +25,9 @@ ranges. Experimental tooling remains outside that promise.
   without a lock or a copy. On a full-screen text repaint, rasterization and
   terminal encoding each take less than a fifth of the time they did
   (STUI-1526).
-- `RasterCell.spanWidth` and `RasterCell.continuationLeadX` hold `Int32`-range
-  values, which covers every surface (at most 65,536 columns); a value outside
-  that range is held at the nearest representable one. `RGBColorProfile` now
+- `RasterCell.spanWidth` and `RasterCell.continuationLeadX` preserve every `Int`
+  value, with exceptional counts stored out of line so ordinary cells stay
+  compact. `RGBColorProfile` now
   declares `==`, `hash(into:)`, `encode(to:)` and `customMirror` explicitly,
   and `RasterCell` declares `==` and `customMirror`; equality, hashing, coding
   and reflection are unchanged (STUI-1526).
