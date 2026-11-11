@@ -49,6 +49,9 @@ ranges. Experimental tooling remains outside that promise.
 
 ### Fixed
 
+- Fresh WASI consumers avoid Swift Collections 1.7.6, whose empty-deque
+  initialization traps with the supported Swift 6.4 WASI runtime. The dependency
+  remains compatible with 1.7.2 through 1.7.5.
 - Sequential keyboard focus visits every authored focus-section descendant while
   preserving List row grouping. TabView strip keys belong to the focused control.
 - Duplicate accessibility containers keep distinct identities, secure text rejects

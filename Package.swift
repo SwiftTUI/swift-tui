@@ -57,7 +57,9 @@ let packageDependencies: [Package.Dependency] = [
   ),
   .package(
     url: "https://github.com/apple/swift-collections.git",
-    from: "1.7.2"
+    // 1.7.6's immortal empty Deque calls a mismatched WASI runtime shim in
+    // Swift 6.4, trapping at startup. Keep fresh consumers on working patches.
+    "1.7.2"..<"1.7.6"
   ),
   .package(
     url: "https://github.com/apple/swift-async-algorithms.git",
