@@ -12,9 +12,9 @@ focus, gestures, and animation — the declarative model SwiftUI has proven —
 and the framework owns layout, input, drawing, and the terminal itself.
 
 > [!important]
-> **Public beta.** The API is still being proven out, and breaking changes might still occur.
+> **Public beta.** Supported public and ratified SPI contracts remain compatible throughout 0.x from 0.21.0. Breaking changes require 1.0.0.
 > All changes are documented in the [CHANGELOG](https://github.com/SwiftTUI/swift-tui/blob/main/CHANGELOG.md).  
-> Pin with `.upToNextMinor`.
+> Use `.upToNextMajor` for supported dependencies; see the [compatibility policy](docs/COMPATIBILITY.md).
 
 [<img width="586" height="473" alt="counter-demo" src="https://github.com/user-attachments/assets/189867e4-9938-4735-88a0-81ef9b53ae40" />](https://swifttui.sh/webexample/)
 <dl>
@@ -84,7 +84,7 @@ Add the package, depend on its `SwiftTUI` product, and `swift run`:
 
 ```swift
 // Package.swift
-.package(url: "https://github.com/SwiftTUI/swift-tui.git", .upToNextMinor(from: "0.21.0")),
+.package(url: "https://github.com/SwiftTUI/swift-tui.git", .upToNextMajor(from: "0.21.0")),
 // in your executable target:
 .product(name: "SwiftTUI", package: "swift-tui"),
 ```
@@ -221,5 +221,5 @@ See [LICENSE](LICENSE).
 
 ## Version compatibility
 
-See the [compatibility policy](docs/COMPATIBILITY.md) for supported minor lines,
+See the [compatibility policy](docs/COMPATIBILITY.md) for supported major lines,
 independent dependency adoption, and experimental interfaces.

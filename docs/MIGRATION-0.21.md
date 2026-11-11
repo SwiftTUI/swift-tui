@@ -9,7 +9,7 @@ not precompiled Swift ABI across toolchains. Unratified implementation SPI remai
 experimental. See [the compatibility policy](COMPATIBILITY.md).
 
 Each SwiftTUI repository has its own version. Reusable supported Swift libraries
-select a bounded framework line with `.upToNextMinor(from: "0.21.0")`, meaning
+select a bounded framework line with `.upToNextMajor(from: "0.21.0")`, meaning
 `>= 0.21.0` and `< 0.22.0`. Do not substitute SwiftPM's broader `from:` requirement.
 Applications can retain exact tested selections. A new framework release does
 not require a matching Charts, host, application or site release.
