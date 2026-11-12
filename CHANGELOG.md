@@ -9,6 +9,8 @@ require 1.0.0. See [COMPATIBILITY.md](docs/COMPATIBILITY.md).
 
 ## [Unreleased]
 
+## [0.22.2] - 2026-11-12
+
 ### Fixed
 
 - State a view declares belongs to the control that shows it. Two controls of
@@ -2972,7 +2974,8 @@ precomposition work (still images), cache hardening, and glyph-aware backdrops.
 See the GitHub releases for the full per-tag history:
 <https://github.com/SwiftTUI/swift-tui/releases>.
 
-[Unreleased]: https://github.com/SwiftTUI/swift-tui/compare/0.22.1...HEAD
+[Unreleased]: https://github.com/SwiftTUI/swift-tui/compare/0.22.2...HEAD
+[0.22.2]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.22.2
 [0.22.1]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.22.1
 [0.22.0]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.22.0
 [0.21.0]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.21.0
