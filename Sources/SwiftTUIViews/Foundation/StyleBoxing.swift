@@ -103,7 +103,7 @@ func styleValuesAreEqualForReuse<S: Sendable>(
 /// Resolves a style body through its own view node, keeping the enclosing
 /// control's authoring scope rebased onto that node.
 ///
-/// Both halves are load-bearing, and both were found by regression:
+/// All three parts are load-bearing, and each was found by regression:
 ///
 /// - **Its own node.** A value-only style child forces the graph to mint a
 ///   hollow, never-evaluated placeholder whose chrome interiors outlive their
@@ -115,6 +115,13 @@ func styleValuesAreEqualForReuse<S: Sendable>(
 ///   invalidation, stale retained reuse. This is the seam the `8ace32a5`
 ///   regression wedged on, where tab-hosted scroll panes silently lost
 ///   input-driven `@State` writes.
+/// - **Its own declarations on its own node.** The rebased scope still names
+///   the enclosing owner, and every control of one view shares that owner.
+///   A slot is keyed by declaration site alone, so state the style declares
+///   (in the style struct or in the view `makeBody` returns) must not bind
+///   there: two buttons with one style read and wrote one slot. The update
+///   pass and the capture-bind pass bind a container's own wrappers to the
+///   node it evaluates on (``declarationStorageOwner(for:)``).
 ///
 /// The resolve also opens the style's route ledger (`StyleRoute.swift`), so a
 /// route wrapper the body installs twice is reported once under

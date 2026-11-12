@@ -9,6 +9,26 @@ require 1.0.0. See [COMPATIBILITY.md](docs/COMPATIBILITY.md).
 
 ## [Unreleased]
 
+### Fixed
+
+- State a view declares belongs to the control that shows it. Two controls of
+  one view shared state in two cases. With the same style, they shared every
+  `@State`, `@FocusState` and `@GestureState` the style declared, in the style
+  value or in the view `makeBody` returned. With labels or content of one
+  view type (two buttons with the same custom label view, and likewise
+  toggles, labels, menus, pickers, sliders, labeled content and group boxes),
+  they shared that view's state. The second control read and wrote the first
+  one's value. Two views of one type under `if #available` shared state the
+  same way. That state also ends with its control now. It used to outlive the
+  control for as long as the enclosing view stayed mounted, and it starts
+  again from its initial value when the control is removed and inserted again
+  (STUI-1534).
+- `state.duplicateSlotClaim` is no longer reported for a single wrapper.
+  Opening a command palette reported its filter field's state as shared, and
+  so did any style body, or helper struct read from one, that updated without
+  the view enclosing it. Two instances that one evaluation binds to one slot
+  are still reported (STUI-1534).
+
 ## [0.22.1] - 2026-11-11
 
 ### Fixed

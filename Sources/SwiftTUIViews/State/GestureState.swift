@@ -402,14 +402,15 @@ public struct GestureState<Value> {
     // so resetToSeed always targets the construction-time value.
     let trueSeed = box.seedValue
 
-    if ViewNodeContext.current != nil,
+    if let evaluatingNode = ViewNodeContext.current,
       let viewNode = LiveViewGraphRegistry.node(for: storageOwner)
     {
       // Resolve-time claim bookkeeping (see `ViewNode.recordStateSlotClaim`).
       viewNode.recordStateSlotClaim(
         slotIdentifier,
         claimant: ObjectIdentifier(box),
-        wrapperDescription: "@GestureState<\(Value.self)>"
+        wrapperDescription: "@GestureState<\(Value.self)>",
+        evaluatingNode: evaluatingNode
       )
     }
 
@@ -483,7 +484,7 @@ extension GestureState: DynamicProperty {
     guard
       ViewNodeContext.current != nil,
       let context = AuthoringContextStorage.current,
-      let storageOwner = stateStorageOwner(for: context)
+      let storageOwner = declarationStorageOwnerHandle(for: context)
     else {
       return .unchanged
     }

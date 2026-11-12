@@ -30,6 +30,7 @@ package enum ViewNodeContext {
     _ node: ViewNode?,
     _ apply: () -> Result
   ) -> Result {
+    node?.openStateSlotClaimWindowIfIdle()
     if stackLeanResolveProfile {
       let saved = leanCurrent
       leanCurrent = node

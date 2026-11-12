@@ -1,7 +1,7 @@
 import Testing
 
 @testable import SwiftTUICore
-@testable import SwiftTUIRuntime
+@_spi(Runners) @testable import SwiftTUIRuntime
 @testable import SwiftTUIViews
 
 /// The duplicate-slot-claim diagnostic's window must open at the dynamic-
@@ -11,8 +11,17 @@ import Testing
 /// was then served from the memo layer left that claim behind; the next
 /// evaluation's (legitimately new) box collided with it and reported phantom
 /// sharing on ScrollView / TimelineView / popover-tip state in the gallery.
+///
+/// A claim can also land on a node from another node's evaluation: a wrapper
+/// the update pass never discovers (a helper struct that composes `@State`
+/// without conforming to `DynamicProperty`) binds when it is first read, on
+/// the owner the ambient scope names. A style's `makeBody` runs under the
+/// enclosing view's scope, so a control that re-resolves on its own claims on
+/// that view while the view opens no window. Each claim therefore records
+/// the evaluation that made it, and a record from an earlier evaluation is
+/// replaced rather than reported.
 @MainActor
-@Suite
+@Suite(.serialized)
 struct StateSlotClaimWindowTests {
   @Test("a reuse-served update pass leaves no stale slot claim for the next evaluation")
   func reuseServedUpdatePassLeavesNoStaleClaim() {
@@ -57,6 +66,100 @@ struct StateSlotClaimWindowTests {
       duplicateClaims(third).isEmpty,
       "a served update pass's claim leaked into the next evaluation: \(duplicateClaims(third))"
     )
+  }
+
+  @Test(
+    "a helper read by a control that re-resolves without its view leaves no stale claim",
+    arguments: [RuntimeRenderMode.sync, .async]
+  )
+  func loneControlReresolveLeavesNoStaleHelperClaim(mode: RuntimeRenderMode) async throws {
+    let harness = try await RuntimeIssueJourneyHarness.start(
+      named: "ClaimWindowHelperRoot", mode: mode, showing: "helper page"
+    ) {
+      ClaimWindowHelperShell()
+    }
+    defer { harness.stop() }
+
+    // Each focus move re-resolves the styled button alone. Its style builds
+    // a fresh helper, whose state binds on the enclosing view.
+    for _ in 0..<2 {
+      try harness.click("Styled")
+      try await harness.waitForScreen("the focused styled button") {
+        $0.contains("Styled focused 0")
+      }
+      try harness.click("Plain")
+      try await harness.waitForScreen("the idle styled button") {
+        $0.contains("Styled idle 0")
+      }
+    }
+    try await harness.finish()
+
+    #expect(
+      harness.duplicateSlotClaims.isEmpty,
+      "one helper was reported as two sharing a slot: \(harness.duplicateSlotClaims)")
+  }
+
+  @Test("two controls whose style holds a helper still report the slot they share")
+  func controlsSharingOneHelperSlotStillReport() {
+    let snapshot = DefaultRenderer().render(
+      ClaimWindowSharingControls(),
+      context: .init(identity: testIdentity("ClaimWindowSharingControls"))
+    )
+
+    // Both helpers bind on the enclosing view, inside one evaluation of it:
+    // two wrapper instances on one slot, which is what the diagnostic is for.
+    #expect(
+      snapshot.diagnostics.runtime.issues.contains { $0.typedCode == .State.duplicateSlotClaim },
+      "two helper instances share one slot of the view that declares both controls"
+    )
+  }
+}
+
+/// Composes `@State` without conforming to `DynamicProperty`, so the update
+/// pass never discovers it: its state binds on first read, by declaration
+/// site, on the owner the ambient scope names.
+@MainActor
+private struct ClaimWindowHelper {
+  @State var value = 0
+}
+
+private struct ClaimWindowHelperStyle: ButtonStyle {
+  @MainActor
+  func makeBody(configuration: ButtonStyleConfiguration) -> some View {
+    let helper = ClaimWindowHelper()
+    return Text("Styled \(configuration.isFocused ? "focused" : "idle") \(helper.value)")
+  }
+}
+
+private struct ClaimWindowHelperShell: View {
+  var body: some View {
+    VStack(alignment: .leading, spacing: 1) {
+      Text("helper page")
+      Button("Styled") {}.buttonStyle(ClaimWindowHelperStyle())
+      Button("Plain") {}
+    }
+  }
+}
+
+/// Holds its helper for as long as the style value lives, so two styled
+/// controls of one view present two live helper instances at once. A helper
+/// built inside `makeBody` is freed when the body returns, and the next one
+/// can take its address and pass for the same claimant.
+@MainActor
+private struct ClaimWindowStoredHelperStyle: ButtonStyle {
+  let helper = ClaimWindowHelper()
+
+  func makeBody(configuration: ButtonStyleConfiguration) -> some View {
+    Text("Stored \(helper.value)")
+  }
+}
+
+private struct ClaimWindowSharingControls: View {
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("First") {}.buttonStyle(ClaimWindowStoredHelperStyle())
+      Button("Second") {}.buttonStyle(ClaimWindowStoredHelperStyle())
+    }
   }
 }
 

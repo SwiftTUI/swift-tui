@@ -250,6 +250,9 @@ the owning module remains unchanged.
   writes owner or service routes into the exact container copy the body
   consumes. State keeps its same-graph identity refresh adapter; focus and
   gesture locations use exact lifetimes and re-resolve graph storage on access.
+  A container's own wrappers bind to the node it evaluates on, also when its
+  body runs under an enclosing owner's scope (a style body, an authored label
+  or content slot, an availability-gated payload).
   Focused-value readers consult their declaring graph's live provider, with a
   captured snapshot fallback. Environment readers distinguish evaluation,
   explicit handler invocation, and declaration snapshots. The task-local
@@ -388,6 +391,9 @@ declaration. `Collections/CollectionStyleValidation.swift` validates List,
 Table, and Outline presentations before they reach layout and draw.
 Body-producing families share its body resolver; styles with dynamic properties
 use a prepared concrete working copy under the body's rebased authoring scope.
+That scope names the enclosing control's owner for captured state and
+registrations. State the style itself declares binds to the style body's own
+node, so each styled control keeps its own copy.
 
 Framework environment keys explicitly conform to `FrameworkEnvironmentKey`.
 Only keys qualified for tracked resolve-time consumption adopt

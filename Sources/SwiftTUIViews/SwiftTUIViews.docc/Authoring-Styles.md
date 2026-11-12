@@ -82,7 +82,11 @@ already formatted for the primitive's `Int` or `Double` storage.
 `Sendable` value types: a class cannot conform. A style may store dynamic
 properties (`@State`, `@Environment`, custom wrappers); they are prepared before
 `makeBody` runs, and each styled control owns its own copy of that state even
-when several controls inherit the same environment style value.
+when several controls inherit the same environment style value. The same holds
+for state a view returned from `makeBody` declares, and for state the view in
+a captured slot such as ``ButtonStyleConfiguration/label`` declares. That
+state lives as long as the styled control stays mounted and starts again from
+its initial value when the control is removed and inserted again.
 
 ### Menus, groups, and palettes
 

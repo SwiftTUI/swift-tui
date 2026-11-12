@@ -44,6 +44,11 @@ package struct ScopedBuilder<Output: View>: PrimitiveView, IterativeResolvableVi
     // capture-bind pass runs — a resolvable output forwarded here without its
     // own `resolveView` still binds its `@State` ownership before its
     // `resolveElements` evaluates.
+    //
+    // The captured scope names the view that authored the output, for the
+    // state that view captured. The output's own declarations bind to the
+    // node evaluating this builder (`declarationStorageOwner(for:)`): the
+    // authoring view is shared by every slot it fills.
     withAuthoringContext(effectiveAuthoringContext) {
       resolveViewElementsWork(output, in: context)
     }

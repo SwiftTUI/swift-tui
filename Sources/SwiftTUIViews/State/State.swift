@@ -507,6 +507,9 @@ public struct State<Value> {
         observeOwnerKind(of: refreshed, storageOwner: storageOwner)
         return refreshed
       }
+      if let declared = declaredLocation(besides: storageOwner) {
+        return declared
+      }
       let location = makeLocation(
         for: context,
         storageOwner: storageOwner
@@ -551,6 +554,31 @@ public struct State<Value> {
     }
     StateCaptureCensus.record(.ladderExactOwner)
     return location
+  }
+
+  /// The location this copy's container declared, when the ambient scope names
+  /// a different owner that never bound this wrapper.
+  ///
+  /// The bind pass writes the declaring node into the copy a body consumes. A
+  /// body can run under a scope that names another owner: a style body and
+  /// an authored label keep the enclosing view's scope, and a closure can
+  /// run inside another node's evaluation. The ambient owner serves the
+  /// wrappers it bound itself. For any other bound copy, minting a slot on
+  /// the ambient owner would fork the state from the one the declaring node
+  /// holds, so the copy resolves to its declaring node while that node lives
+  /// in the resolving graph. A copy the bind pass never saw has no declaring
+  /// node and keeps the ambient mint.
+  private func declaredLocation(
+    besides ambientOwner: StateStorageOwner
+  ) -> DynamicStateLocation<Value>? {
+    guard let capture, capture.owner != ambientOwner,
+      liveAuthoringOwnerNode(stateOwnerHandle: capture.owner) != nil
+    else {
+      return nil
+    }
+    let declared = location(for: capture.owner, path: capture.path)
+    observeOwnerKind(of: declared, storageOwner: capture.owner)
+    return declared
   }
 
   /// An in-body access runs inside its owner's evaluation, so the owner node's
@@ -640,14 +668,15 @@ public struct State<Value> {
           }
         }
       }
-      if ViewNodeContext.current != nil {
+      if let evaluatingNode = ViewNodeContext.current {
         // Resolve-time claim bookkeeping: a second distinct box claiming
         // this slot identity in one evaluation is the silent-sharing
         // signature (see `ViewNode.recordStateSlotClaim`).
         viewNode.recordStateSlotClaim(
           StateSlotIdentifier(ordinal: box.currentOrdinal, path: path),
           claimant: ObjectIdentifier(box),
-          wrapperDescription: "@State<\(Value.self)>"
+          wrapperDescription: "@State<\(Value.self)>",
+          evaluatingNode: evaluatingNode
         )
       }
     }
@@ -887,7 +916,7 @@ extension State: DynamicProperty {
     guard
       ViewNodeContext.current != nil,
       let context = AuthoringContextStorage.current,
-      let storageOwner = stateStorageOwner(for: context)
+      let storageOwner = declarationStorageOwnerHandle(for: context)
     else {
       return .unchanged
     }

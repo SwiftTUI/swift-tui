@@ -129,6 +129,73 @@ package func stateStorageOwner(
   context.stateOwnerHandle ?? context.viewNode?.stateOwnerHandle
 }
 
+/// The node a container's own dynamic properties declare their storage on,
+/// and the identity a capture of that storage refreshes toward.
+package struct DeclarationStorageOwner {
+  package var handle: StateStorageOwner
+  package var identity: Identity
+}
+
+/// The owner a container's own dynamic properties declare their storage on:
+/// the node the container evaluates on.
+///
+/// A scope normally names that node as its state owner, and the two agree.
+/// They part when a body runs under an enclosing view's scope:
+///
+/// - A scope rebased onto another node keeps naming the enclosing owner: a
+///   style body, a scoped `AnyView` payload, a layout-realized root.
+/// - A reinstalled capture of that scope names no node at all: an authored
+///   label or content slot, whose root view evaluates on the slot's node
+///   without a scope of its own.
+///
+/// The scope names the enclosing owner so that state the enclosing view
+/// captured and the handlers it registered stay where they were. The
+/// container's own declarations still belong to the node evaluating it. The
+/// enclosing owner is shared by every container its view hosts and a slot is
+/// keyed by declaration site alone, so declaring there gave every styled
+/// control of one view, and every label of one view type, the same slot.
+///
+/// Both passes that bind a declaration read this: the update pass, which
+/// binds the wrapper's box, and the capture-bind pass, which binds the copy.
+@MainActor
+package func declarationStorageOwner(
+  for context: AuthoringContext
+) -> DeclarationStorageOwner? {
+  if let hosted = hostedDeclaringNode(for: context) {
+    return DeclarationStorageOwner(handle: hosted.handle, identity: hosted.node.identity)
+  }
+  return stateStorageOwner(for: context).map {
+    DeclarationStorageOwner(handle: $0, identity: context.viewIdentity)
+  }
+}
+
+/// ``declarationStorageOwner(for:)`` without the refresh identity, for the
+/// wrappers that bind a slot and need nothing else. It runs for every
+/// wrapper of every view, so it avoids copying an identity it would drop.
+@MainActor
+package func declarationStorageOwnerHandle(
+  for context: AuthoringContext
+) -> StateStorageOwner? {
+  hostedDeclaringNode(for: context)?.handle ?? stateStorageOwner(for: context)
+}
+
+/// The node evaluating the container, when it is not the owner the scope
+/// names. The common case is that the scope names the evaluating node, so
+/// the lifetimes are compared before the node is asked for its handle, which
+/// costs a graph lookup.
+@MainActor
+private func hostedDeclaringNode(
+  for context: AuthoringContext
+) -> (node: SwiftTUICore.ViewNode, handle: StateOwnerHandle)? {
+  guard let node = context.viewNode ?? ViewNodeContext.current,
+    node.ownerLifetimeID != context.stateOwnerHandle?.ownerLifetime,
+    let handle = node.stateOwnerHandle
+  else {
+    return nil
+  }
+  return (node, handle)
+}
+
 /// Resolves the live owner node an authoring context names, for property
 /// wrappers whose accesses run outside any resolve pass (a `.task` loop, a
 /// gesture or action callback). During a resolve pass the enclosing graph is

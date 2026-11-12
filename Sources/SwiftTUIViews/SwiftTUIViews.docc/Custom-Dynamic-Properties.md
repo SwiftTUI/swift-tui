@@ -44,7 +44,11 @@ framework qualifies each inner slot with the property's discovered position.
 A plain helper struct that composes `@State` *without* conforming keeps the
 legacy behavior: every instance's inner slot collapses onto the wrapper's
 own declaration site, so instances silently share storage (the runtime
-reports a `state.duplicateSlotClaim` runtime issue when this happens).
+reports a `state.duplicateSlotClaim` runtime issue when one evaluation binds
+two instances to one slot). Such a helper binds where it is first read:
+usually on the view whose body is running. Inside a style (in `makeBody` or
+in a view it returns) and inside a control's label, it binds on the view that
+declares the control, so every control of that view shares it.
 If those declarations have incompatible value types, the first slot stays
 intact: the incompatible declaration reads its seed and its writes are
 ignored with the same diagnostic. Conform the helper to `DynamicProperty`

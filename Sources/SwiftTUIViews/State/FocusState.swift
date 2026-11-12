@@ -411,13 +411,14 @@ public struct FocusState<Value: Equatable> {
       requestGeneration: seedSnapshot.requestGeneration
     )
 
-    if ViewNodeContext.current != nil,
+    if let evaluatingNode = ViewNodeContext.current,
       let viewNode = liveAuthoringOwnerNode(stateOwnerHandle: owner)
     {
       viewNode.recordStateSlotClaim(
         slotIdentifier,
         claimant: ObjectIdentifier(box),
-        wrapperDescription: "@FocusState<\(Value.self)>"
+        wrapperDescription: "@FocusState<\(Value.self)>",
+        evaluatingNode: evaluatingNode
       )
     }
 
@@ -621,16 +622,17 @@ extension FocusState: DynamicProperty {
     guard
       ViewNodeContext.current != nil,
       let context = currentAuthoringContext(),
-      let owner = stateStorageOwner(for: context)
+      let declaration = declarationStorageOwner(for: context)
     else {
       return .unchanged
     }
+    let owner = declaration.handle
     let location = makeLocation(owner: owner, path: path)
     box.remember(location, for: owner, path: path)
     location.prime()
     let snapshot = location.bookkeepingSnapshot()
     let clearValue = box.clearValue
-    let identity = context.viewIdentity
+    let identity = declaration.identity
     ViewNodeContext.current?.recordFocusBindingSource(
       .init(
         identity: identity, bindingKey: location.bindingKey, domain: focusDomain,

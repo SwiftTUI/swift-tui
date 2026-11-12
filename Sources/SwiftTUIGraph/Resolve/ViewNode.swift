@@ -260,6 +260,7 @@ package final class ViewNode {
     // pass made collides with the next evaluation's (legitimately new) box —
     // one container per evaluation, reported as two wrappers sharing a slot.
     stateSlotClaimantsThisEvaluation.removeAll(keepingCapacity: true)
+    stateSlotClaimWindow &+= 1
   }
 
   private func reconcileDynamicPropertyLeases() {
@@ -471,6 +472,7 @@ package final class ViewNode {
       nextTaskModifierOrdinal = 0
       nextValueAnimationModifierOrdinal = 0
       stateSlotClaimantsThisEvaluation.removeAll(keepingCapacity: true)
+      stateSlotClaimWindow &+= 1
     }
     evaluationDepth += 1
   }
@@ -614,8 +616,34 @@ package final class ViewNode {
   /// bypass the discovery pass — reports a ``RuntimeIssue`` instead of
   /// nothing. Same-box re-claims (every re-access re-makes the location)
   /// are the normal path and stay silent.
+  ///
+  /// Each record names the evaluation that made it
+  /// (``StateSlotClaimRecord``), and a claim is compared only with a record
+  /// of its own evaluation. The resets at this node's own window openings
+  /// keep the table small; they are not what makes a record stale. A claim
+  /// can reach this table from another node's evaluation, which opens no
+  /// window here: a body-time claim made under an enclosing scope, from a
+  /// row, a style body or a layout-realized closure.
   private var stateSlotClaimantsThisEvaluation: [StateSlotIdentifier: StateSlotClaimRecord] =
     [:]
+
+  /// Counts this node's evaluation windows: one for each dynamic-property
+  /// update pass, each outermost body evaluation, and each time the node is
+  /// installed as the current node while it is idle (a layout-realized
+  /// closure, a producer replay). It only grows. A checkpoint carries the
+  /// value but restoring one never writes it back, so for one node lifetime
+  /// two equal values always name one window.
+  private var stateSlotClaimWindow: UInt64 = 0
+
+  /// Opens a claim window for work that runs on this node outside its update
+  /// pass and its body evaluation. ``ViewNodeContext`` calls this for every
+  /// installation, so any scope in which a wrapper can claim a slot has
+  /// opened a window first.
+  package func openStateSlotClaimWindowIfIdle() {
+    if evaluationDepth == 0 {
+      stateSlotClaimWindow &+= 1
+    }
+  }
 
   /// Whether this node hosts authored dynamic-property state: a materialized
   /// slot, or a slot claim any update pass has recorded on it. The update
@@ -636,22 +664,34 @@ package final class ViewNode {
     !stateSlots.isEmpty || persistentState.hostsAuthoredStateClaims
   }
 
+  /// Records that `claimant` bound `identifier` on this node.
+  ///
+  /// The claim belongs to the evaluation that makes it. `evaluatingNode` is
+  /// the node installed as current: this owner, unless the wrapper was read
+  /// under an enclosing scope from another node's evaluation.
   package func recordStateSlotClaim(
     _ identifier: StateSlotIdentifier,
     claimant: ObjectIdentifier,
-    wrapperDescription: String
+    wrapperDescription: String,
+    evaluatingNode: ViewNode
   ) {
     if !persistentState.hostsAuthoredStateClaims {
       persistentState.hostsAuthoredStateClaims = true
     }
-    guard let existing = stateSlotClaimantsThisEvaluation[identifier] else {
-      stateSlotClaimantsThisEvaluation[identifier] = StateSlotClaimRecord(
-        claimant: claimant,
-        wrapperDescription: wrapperDescription
-      )
-      return
-    }
-    guard existing.claimant != claimant else {
+    let claim = StateSlotClaimRecord(
+      claimant: claimant,
+      wrapperDescription: wrapperDescription,
+      evaluatingNode: evaluatingNode.ownerLifetimeID,
+      evaluatingNodeWindow: evaluatingNode.stateSlotClaimWindow,
+      ownerWindow: isEvaluating ? stateSlotClaimWindow : nil
+    )
+    guard let existing = stateSlotClaimantsThisEvaluation[identifier],
+      existing.claimant != claimant,
+      claim.sharesEvaluation(with: existing)
+    else {
+      // No earlier claim, the same wrapper again, or a record an earlier
+      // evaluation left behind: this claim is the current one.
+      stateSlotClaimantsThisEvaluation[identifier] = claim
       return
     }
     // The wrapper descriptions classify the collision at a glance: two
@@ -2475,9 +2515,14 @@ extension ViewNode {
     package var exactIdentityOccurrenceTally: [Identity: [StructuralPath: Int]]
     package var exactIdentityOccurrenceTallyFrameID: UInt64
     /// Evaluation-scoped duplicate-slot-claim scratch. Restoring a stale image
-    /// is self-healing: `beginEvaluation` resets it at outermost depth before
-    /// any post-restore re-resolve records claims.
+    /// is harmless: each record names its evaluation window, and a claim made
+    /// after the restore belongs to a later window, which no record carries.
     package var stateSlotClaimantsThisEvaluation: [StateSlotIdentifier: StateSlotClaimRecord]
+    /// Capture metadata, not restored state: the node's evaluation-window
+    /// count when this image was taken. ``restoreCheckpoint(_:)`` never
+    /// writes it back. The live count only grows, which is what keeps a
+    /// record's window from ever naming a later evaluation.
+    package var stateSlotClaimWindow: UInt64
     /// Derived memoization (see the live property): entries are
     /// content-verified at adoption, so restoring an older image is safe —
     /// a mismatched entry misses and re-mints.
@@ -2544,6 +2589,7 @@ extension ViewNode {
       exactIdentityOccurrenceTally: exactIdentityOccurrenceTally,
       exactIdentityOccurrenceTallyFrameID: exactIdentityOccurrenceTallyFrameID,
       stateSlotClaimantsThisEvaluation: stateSlotClaimantsThisEvaluation,
+      stateSlotClaimWindow: stateSlotClaimWindow,
       retainedIndexedChildSourceArtifactsByRoot: retainedIndexedChildSourceArtifactsByRoot,
       checkpointMutationGeneration: checkpointMutationGeneration
     )
@@ -2643,12 +2689,53 @@ extension ViewNode {
 /// so the duplicate-claim diagnostic can name both parties — which is what
 /// classifies a collision as an app-side composed wrapper versus two
 /// framework primitives routed through one node.
+///
+/// The record also names the evaluation that made the claim. Two claims are
+/// compared only when one evaluation made both, so a record left by an
+/// earlier evaluation is replaced, never reported. That holds whichever
+/// node the claim lands on, and does not depend on that node having reset
+/// its table in between.
 package struct StateSlotClaimRecord: Sendable, Equatable {
   package var claimant: ObjectIdentifier
   package var wrapperDescription: String
+  /// The node whose evaluation made the claim, and that node's evaluation
+  /// window at the time.
+  package var evaluatingNode: NodeOwnerLifetimeID
+  package var evaluatingNodeWindow: UInt64
+  /// The owning node's evaluation window, when the claim was made while the
+  /// owner's own body evaluation was under way; `nil` when the owner was
+  /// idle. For a claim the owner makes in its own body it equals
+  /// `evaluatingNodeWindow`.
+  package var ownerWindow: UInt64?
 
-  package init(claimant: ObjectIdentifier, wrapperDescription: String) {
+  package init(
+    claimant: ObjectIdentifier,
+    wrapperDescription: String,
+    evaluatingNode: NodeOwnerLifetimeID,
+    evaluatingNodeWindow: UInt64,
+    ownerWindow: UInt64?
+  ) {
     self.claimant = claimant
     self.wrapperDescription = wrapperDescription
+    self.evaluatingNode = evaluatingNode
+    self.evaluatingNodeWindow = evaluatingNodeWindow
+    self.ownerWindow = ownerWindow
+  }
+
+  /// Whether one evaluation made both this claim and `earlier`.
+  ///
+  /// One node's claims share an evaluation when they share its window. Two
+  /// nodes' claims on one owner share an evaluation only inside a single
+  /// body evaluation of that owner, which is what spans both: two containers
+  /// the owner's body hosts. Outside it nothing ties the two together, and
+  /// the earlier node may no longer be mounted.
+  package func sharesEvaluation(with earlier: StateSlotClaimRecord) -> Bool {
+    if evaluatingNode == earlier.evaluatingNode {
+      return evaluatingNodeWindow == earlier.evaluatingNodeWindow
+    }
+    guard let ownerWindow, let earlierOwnerWindow = earlier.ownerWindow else {
+      return false
+    }
+    return ownerWindow == earlierOwnerWindow
   }
 }

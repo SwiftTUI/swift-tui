@@ -148,10 +148,11 @@ package enum DynamicPropertyCaptureBindPlanCache {
 /// `dynamicPropertyAuthoringContext(for:current:viewNode:)` — the same
 /// function `withDynamicPropertyUpdateScope` applies inside every
 /// resolvable's `resolveElements` — so the capture and the update pass's box
-/// binding can never disagree: a same-node ambient scope (a rebased style
-/// override, a body-result container sharing its author's node) keeps that
-/// scope's owner, and any other shape resolves to the currently evaluating
-/// node's own scope.
+/// binding can never disagree: a same-node ambient scope (a body-result
+/// container sharing its author's node) keeps that scope, and any other
+/// shape resolves to the currently evaluating node's own scope. Either way
+/// the container's own declarations bind to the node it evaluates on
+/// (``declarationStorageOwner(for:)``).
 @MainActor
 package func bindingResolvableDynamicPropertyCaptures<V>(
   _ view: V,
@@ -219,9 +220,10 @@ package func bindingBodyDynamicPropertyCaptures<V: View>(
 
 /// Capture and box binding must name the same owner, or capture-served reads
 /// would route past the slot resolve-time writes land in — so the binding is
-/// derived from the exact authoring scope the caller's wrappers bind under.
-/// The refresh identity is the scope's authored view identity (the owner
-/// node's), not the local resolve identity, so a capture bound through a
+/// derived from the exact authoring scope the caller's wrappers bind under,
+/// through the one owner rule both passes share
+/// (``declarationStorageOwner(for:)``). The refresh identity is the owner
+/// node's, not the local resolve identity, so a capture bound through a
 /// reinstalled ambient scope refreshes toward its true author. Whether the
 /// owner is a snapshot owner is the predicate the graph-slot setter's seed
 /// mirror applies at write time — the live owner node has no invalidator —
@@ -231,10 +233,11 @@ private func rootCaptureBinding(
   for scope: AuthoringContext?, environment: EnvironmentValues
 ) -> DynamicPropertyCaptureContext {
   let slot = scope.flatMap { scope -> StateCaptureBinding? in
-    guard let owner = stateStorageOwner(for: scope) else { return nil }
+    guard let declaration = declarationStorageOwner(for: scope) else { return nil }
+    let owner = declaration.handle
     let ownerNode = LiveViewGraphRegistry.node(for: owner)
     return StateCaptureBinding(
-      owner: owner, identity: scope.viewIdentity,
+      owner: owner, identity: declaration.identity,
       graphScope: graphScopeID(for: scope) ?? owner.graphScope, path: .root,
       isSnapshotOwner: ownerNode != nil && ownerNode?.invalidator == nil)
   }
