@@ -351,11 +351,17 @@ struct DefaultRendererFrameTailCoordinator: Sendable {
     cancellationToken: FrameTailJobCancellationToken?
   ) async -> AsyncLatePreferenceReconciliationOutput {
     guard frameTailRenderer.needsPreparedGraphDuringLayout(draft.frameTailInput) else {
+      // Layout needs no graph here, so the head stays suspended across it and
+      // a queued pass stays cancellable. The reconcile between passes does
+      // resolve into the graph, so each one makes the prepared state live for
+      // its own duration. The first runs after a completed layout pass, when
+      // the job has started and the head can no longer be discarded.
       return await renderLayoutResolvingLatePreferencesAsync(
         draft.frameTailInput,
         clock: draft.clock,
         cancellationToken: cancellationToken,
-        animationController: draft.animationDraft.controller
+        animationController: draft.animationDraft.controller,
+        suspendedHead: draft.transaction
       )
     }
 
@@ -393,15 +399,19 @@ struct DefaultRendererFrameTailCoordinator: Sendable {
     return layoutResult
   }
 
-  /// - Parameter preparedGraph: The head whose prepared graph is live for this
-  ///   stage, if any; it is suspended across every offloaded pass.
+  /// - Parameters:
+  ///   - preparedGraph: The head whose prepared graph is live for this
+  ///     stage, if any; it is suspended across every offloaded pass.
+  ///   - suspendedHead: The head that stays suspended for this stage, if any;
+  ///     each reconcile makes its prepared state live while it runs.
   @MainActor
   private func renderLayoutResolvingLatePreferencesAsync(
     _ initialInput: FrameTailInput,
     clock: ContinuousClock?,
     cancellationToken: FrameTailJobCancellationToken?,
     animationController: AnimationController,
-    preparedGraph: FrameHeadTransaction? = nil
+    preparedGraph: FrameHeadTransaction? = nil,
+    suspendedHead: FrameHeadTransaction? = nil
   ) async -> AsyncLatePreferenceReconciliationOutput {
     await LatePreferenceReconciliationStage(
       policy: latePreferenceReconciliationPolicy,
@@ -409,6 +419,12 @@ struct DefaultRendererFrameTailCoordinator: Sendable {
         var presented = canonical
         animationController.reapplyCurrentResolvedPresentation(to: &presented)
         return presented
+      },
+      onFrameGraph: { reconcile in
+        guard let suspendedHead else {
+          return reconcile()
+        }
+        return suspendedHead.withPreparedStateLive(reconcile)
       }
     ).runAsync(
       initialInput: initialInput,

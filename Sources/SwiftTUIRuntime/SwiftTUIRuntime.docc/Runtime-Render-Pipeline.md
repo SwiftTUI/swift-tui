@@ -149,6 +149,16 @@ tail reads the effective tree. If reconciliation changes the required inputs,
 the renderer reruns the relevant stage work instead of publishing inconsistent
 artifacts.
 
+Reconciliation resolves views: a toolbar scope rebuilds its strip from the
+items its content contributes and refreshes the action each item runs. That
+work must reach the graph the frame commits. The one-shot renderer reconciles
+in place. An abortable frame keeps its head suspended, with the committed graph
+live, while a layout pass runs; `FrameHeadTransaction.withPreparedStateLive`
+then makes the prepared state live for each reconcile and records what it did
+into the prepared checkpoint. A frame whose layout realizes content keeps the
+prepared state live for the whole stage. A head whose baseline went stale skips
+the reconcile, because the frame is skipped without touching live state.
+
 ### Fused Frame Tail
 
 The fused frame tail is the performance node that normally computes:

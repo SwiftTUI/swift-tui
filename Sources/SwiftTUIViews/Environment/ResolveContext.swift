@@ -856,9 +856,10 @@ extension ResolveContext {
     package var suppressesStructuralLifecycle: Bool
     /// True while resolving a synthesized subtree whose values can change
     /// without creating a tracked invalidation for every descendant. Set at
-    /// presentation, preference-derived overlay/background, tab-body, and
-    /// trigger-leaf seams and inherited by every derived context. Both reuse
-    /// layers stand down until those values resolve and commit fresh.
+    /// presentation, preference-derived overlay/background, toolbar-strip,
+    /// tab-body, and trigger-leaf seams and inherited by every derived
+    /// context. Both reuse layers stand down until those values resolve and
+    /// commit fresh.
     package var withinChurnedSubtree: Bool
     /// Focus/press environment keys written by an authored `.environment` /
     /// `.transformEnvironment` modifier in this context's scope. Set by

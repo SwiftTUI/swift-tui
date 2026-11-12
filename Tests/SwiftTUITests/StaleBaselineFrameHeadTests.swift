@@ -82,18 +82,45 @@ struct StaleBaselineFrameHeadTests {
     scaffold.renderer.abortPreparedFrameHeadForCancellationTesting(draft)
     #expect(scaffold.renderer.viewGraph.debugTotalStateSnapshot() == before)
   }
+
+  // Late-preference reconciliation resolves a toolbar strip into the graph
+  // between the tail's layout passes. On a stale head that work would land
+  // in the sibling's committed graph, built from the stale frame's items, and
+  // a stale head is discarded without a restore — nothing would undo it.
+  @Test("a stale-baseline frame tail does not reconcile a toolbar into the sibling commit")
+  func staleBaselineTailSkipsLatePreferenceReconciliation() async throws {
+    let scaffold = try StaleBaselineScaffold { value in
+      StaleBaselineToolbarProbe(value: value)
+    }
+
+    let draft = scaffold.prepareHead()
+    try scaffold.commitSibling(value: 1)
+    #expect(scaffold.terminal.frames.last?.contains("Item 1") == true)
+    let committed = scaffold.renderer.viewGraph.debugTotalStateSnapshot()
+
+    let skipped = await scaffold.renderer.resolveCompletedFrameCandidateForTesting(draft)
+    #expect(skipped, "a stale-baseline completed frame was committed or dropped")
+    #expect(
+      scaffold.renderer.viewGraph.debugTotalStateSnapshot() == committed,
+      "a stale-baseline frame tail reconciled its toolbar into live graph state"
+    )
+
+    try scaffold.render()
+    #expect(scaffold.terminal.frames.last?.contains("Item 1") == true)
+    #expect(scaffold.terminal.frames.last?.contains("Item 0") == false)
+  }
 }
 
 // MARK: - Scaffold
 
 @MainActor
-private struct StaleBaselineScaffold {
+private struct StaleBaselineScaffold<Content: View> {
   let rootIdentity = testIdentity("StaleBaselineFrameHeadRoot")
   let terminal = StaleBaselineTerminalHost()
   let renderer = DefaultRenderer()
-  let runLoop: RunLoop<Int, Text>
+  let runLoop: RunLoop<Int, Content>
 
-  init() throws {
+  init(content: @escaping @MainActor (Int) -> Content) throws {
     let focusTracker = FocusTracker(invalidationIdentities: [rootIdentity])
     runLoop = RunLoop(
       rootIdentity: rootIdentity,
@@ -108,7 +135,7 @@ private struct StaleBaselineScaffold {
       focusTracker: focusTracker,
       proposal: terminal.proposal,
       viewBuilder: { value, _ in
-        Text("value \(value)")
+        content(value)
       }
     )
     focusTracker.invalidator = runLoop.scheduler
@@ -153,6 +180,62 @@ private struct StaleBaselineScaffold {
       current = value
     }
     try render()
+  }
+}
+
+extension StaleBaselineScaffold where Content == Text {
+  init() throws {
+    try self.init { value in
+      Text("value \(value)")
+    }
+  }
+}
+
+/// A toolbar scope whose one item changes with the state value, so the strip
+/// a stale head would reconcile differs from the one the sibling committed.
+///
+/// The content nests custom layouts past the frame-tail worker's engine
+/// re-entry budget. That keeps the tail on the main actor, where the
+/// non-cancellable layout stage this suite drives runs late-preference
+/// reconciliation; a tree it can offload skips the reconcile on that path.
+private struct StaleBaselineToolbarProbe: View {
+  let value: Int
+
+  var body: some View {
+    StaleBaselinePassthroughLayout {
+      StaleBaselinePassthroughLayout {
+        StaleBaselinePassthroughLayout {
+          Text("value \(value)")
+        }
+      }
+    }
+    .toolbarItem(.init(title: "Item \(value)", action: {}))
+    .panel(id: "stale-baseline-toolbar")
+    .toolbar()
+  }
+}
+
+private struct StaleBaselinePassthroughLayout: Layout {
+  func sizeThatFits(
+    proposal: ProposedViewSize,
+    subviews: LayoutSubviews,
+    cache _: inout Void
+  ) -> LayoutSize {
+    subviews.first?.sizeThatFits(proposal) ?? .zero
+  }
+
+  func placeSubviews(
+    in bounds: LayoutRect,
+    proposal _: ProposedViewSize,
+    subviews: LayoutSubviews,
+    cache _: inout Void
+  ) {
+    for subview in subviews {
+      subview.place(
+        at: bounds.origin,
+        proposal: .init(width: bounds.size.width, height: bounds.size.height)
+      )
+    }
   }
 }
 

@@ -242,6 +242,39 @@ package final class FrameHeadTransaction {
     graphDraft.recordPreparedCheckpoint(from: viewGraph)
   }
 
+  /// Runs `work` with this head's prepared state live and keeps what it did:
+  /// the prepared state is materialized, `work` runs, its graph effects join
+  /// the prepared checkpoint, and the committed baseline is live again on
+  /// return. `work` must not suspend, so no other main-actor work observes
+  /// the uncommitted graph.
+  ///
+  /// For graph work that runs after the head while the head is suspended
+  /// (late-preference reconciliation in the asynchronous frame tail). Run
+  /// against the baseline instead, that work resolves against the previous
+  /// frame's graph and resolve inputs, and the commit's restore of the
+  /// prepared checkpoint then discards every node, handler record and queued
+  /// publication it produced.
+  ///
+  /// Returns `nil` without running `work` when a sibling frame committed
+  /// after this head's baseline was captured: a stale head is skipped without
+  /// touching live state, and neither checkpoint may be restored over the
+  /// sibling's commit. A one-shot head has no checkpoints and no suspension,
+  /// so `work` runs in place.
+  package func withPreparedStateLive<Result>(_ work: () -> Result) -> Result? {
+    precondition(!didCommit && !didDiscard)
+    guard checkpoints != nil else {
+      return work()
+    }
+    guard !baselineIsStale else {
+      return nil
+    }
+    materializePreparedState()
+    let result = work()
+    recordPreparedGraphState()
+    suspendPreparedState()
+    return result
+  }
+
   package func suspendPreparedState() {
     precondition(!didCommit && !didDiscard)
     guard let checkpoints else {

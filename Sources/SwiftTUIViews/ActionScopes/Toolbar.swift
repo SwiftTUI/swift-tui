@@ -150,11 +150,27 @@ package struct LatePreferenceReconciliationOutput {
   }
 }
 
+/// Reconciles every late-preference consumer in `root`.
+///
+/// Reconciling resolves views: it mints and updates graph nodes, records
+/// handler registrations on them and stores the strip cache. `onFrameGraph`
+/// runs that work, and is called only when `root` hosts a consumer, so a
+/// caller whose live graph is not the frame's own (the asynchronous frame
+/// tail, suspended back to the committed baseline) can make the frame's
+/// graph live for exactly the reconcile. It returns `nil` to skip the
+/// reconcile, which leaves `root` as resolved.
 @MainActor
 package func reconcileLatePreferenceConsumers(
-  in root: ResolvedNode
+  in root: ResolvedNode,
+  onFrameGraph: (() -> LatePreferenceReconciliationOutput) -> LatePreferenceReconciliationOutput? =
+    { $0() }
 ) -> LatePreferenceReconciliationOutput {
-  reconcileToolbarHosts(in: root)
+  let unreconciled = LatePreferenceReconciliationOutput(
+    resolved: root, changed: false, requiresRelayout: false)
+  guard root.containsToolbarLatePreferenceHost else {
+    return unreconciled
+  }
+  return onFrameGraph { reconcileToolbarHosts(in: root) } ?? unreconciled
 }
 
 @MainActor
@@ -422,11 +438,25 @@ private func resolvedToolbarItemsStripWork(
       ResolvedToolbarStrip(
         node: nil, itemSetChanged: previous != nil && previous != emptySignature))
   }
+  // The strip derives from the content's toolbar-item preference fold — data
+  // the invalidation tracker does not see — and it resolves beside the host's
+  // content, outside every invalidation cone its contributors form. A fresh
+  // resolve means the strip cache below could not vouch for the committed
+  // strip (first frame, a changed item set or style, environment or
+  // transaction drift, suppressed reuse), so both node-level reuse layers
+  // must stand down for it. Value-blind retained reuse otherwise serves the
+  // strip's interior from the previous item set: the screen shows the new
+  // items while each slot's graph node keeps its old `ToolbarItemButton`,
+  // and that button re-registers the old item's action the next time it
+  // re-evaluates on its own (a press), so a click runs a neighboring item.
+  var freshStripContext = context
+  freshStripContext.withinChurnedSubtree = true
+
   guard let signature = ToolbarStripSignature(items: items, style: style) else {
     // No reuse signature (a custom layout without measurement/placement
     // signatures): the strip resolves fresh every frame and carries no
     // comparable item-set identity — never re-arm the host follow-up here.
-    return ToolbarItemsStrip(items: items, style: style).resolveWork(in: context).map {
+    return ToolbarItemsStrip(items: items, style: style).resolveWork(in: freshStripContext).map {
       ResolvedToolbarStrip(node: $0, itemSetChanged: false)
     }
   }
@@ -479,7 +509,8 @@ private func resolvedToolbarItemsStripWork(
     }
   }
 
-  return ToolbarItemsStrip(items: items, style: style).resolveWork(in: context).map { resolved in
+  return ToolbarItemsStrip(items: items, style: style).resolveWork(in: freshStripContext).map {
+    resolved in
     context.viewGraph?.storeResolvedNodeReuseCache(
       namespace: .toolbarStrip,
       owner: context.identity,
@@ -640,21 +671,15 @@ private struct ToolbarContentNode: PrimitiveView, ResolvableView {
 
   func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
     // The hosted children are values captured from the frame's resolve, not
-    // re-resolved here — a capture-host injection. The late-preference
-    // reconcile applies this wrapper while the async frame protocol has the
-    // prepared graph suspended back to baseline, so the captured stamps can
-    // pair against superseded live nodes. Withdraw the stamp claims at every
-    // level so the apply's restamping walk stays on the slow (verifying)
-    // path instead of fast-skipping over foreign stamps.
-    var injectedChildren = children
-    for index in injectedChildren.indices {
-      injectedChildren[index].withdrawSubtreeRuntimeNodeIDStampsRecursively()
-    }
+    // re-resolved here — a capture-host injection. Every reconcile runs
+    // against the graph that resolve wrote (the asynchronous tail makes the
+    // prepared state live around it), so the captured stamps name the live
+    // nodes and the apply's restamping walk may fast-skip them.
     return [
       ResolvedNode(
         identity: context.identity,
         kind: .view(.toolbarContent),
-        children: injectedChildren,
+        children: children,
         environmentSnapshot: context.environment,
         transactionSnapshot: context.transaction,
         layoutBehavior: layoutBehavior

@@ -42,17 +42,37 @@ private enum LatePreferenceReconciliationStep {
 /// Loop-bearing stage that reconciles preferences emitted by realized
 /// layout-realized content before semantics, draw, raster, and commit.
 struct LatePreferenceReconciliationStage {
+  /// Runs one reconcile with the frame's own graph live, or returns `nil` to
+  /// skip it. See ``reconcileLatePreferenceConsumers(in:onFrameGraph:)``.
+  typealias FrameGraphScope =
+    @MainActor (() -> LatePreferenceReconciliationOutput) -> LatePreferenceReconciliationOutput?
+
   var policy: LatePreferenceReconciliationPolicy
   /// Purely reapplies presentation values already sampled by the animation
   /// stage. It must not advance curves or mutate animation bookkeeping.
   var projectResolvedPresentation: @MainActor (ResolvedNode) -> ResolvedNode
+  /// Reconciling resolves views into the graph, so it must run against the
+  /// graph this frame commits. The default runs in place: right for the
+  /// one-shot renderer and for an asynchronous stage that keeps its prepared
+  /// graph live. An asynchronous stage suspended back to the committed
+  /// baseline supplies ``FrameHeadTransaction/withPreparedStateLive(_:)``.
+  var onFrameGraph: FrameGraphScope
 
   init(
     policy: LatePreferenceReconciliationPolicy,
-    projectResolvedPresentation: @escaping @MainActor (ResolvedNode) -> ResolvedNode = { $0 }
+    projectResolvedPresentation: @escaping @MainActor (ResolvedNode) -> ResolvedNode = { $0 },
+    onFrameGraph: @escaping FrameGraphScope = { $0() }
   ) {
     self.policy = policy
     self.projectResolvedPresentation = projectResolvedPresentation
+    self.onFrameGraph = onFrameGraph
+  }
+
+  @MainActor
+  private func reconcileConsumers(
+    in resolved: ResolvedNode
+  ) -> LatePreferenceReconciliationOutput {
+    reconcileLatePreferenceConsumers(in: resolved, onFrameGraph: onFrameGraph)
   }
 
   @MainActor
@@ -187,7 +207,7 @@ struct LatePreferenceReconciliationStage {
     let realizations = input.layoutPassContext.layoutDependentRealizationsByIdentity
     let canonicalRealized = input.canonicalResolved.applyingLayoutDependentRealizations(
       realizations)
-    let reconciliation = reconcileLatePreferenceConsumers(in: canonicalRealized)
+    let reconciliation = reconcileConsumers(in: canonicalRealized)
     let presented = projectResolvedPresentation(reconciliation.resolved)
     let runtimeIssues = layoutRuntimeIssues(input: input, resolved: presented)
 
@@ -235,7 +255,7 @@ struct LatePreferenceReconciliationStage {
     let realized = input.canonicalResolved.applyingLayoutDependentRealizations(
       input.layoutPassContext.layoutDependentRealizationsByIdentity
     )
-    let reconciliation = reconcileLatePreferenceConsumers(in: realized)
+    let reconciliation = reconcileConsumers(in: realized)
     let presented = projectResolvedPresentation(reconciliation.resolved)
     if !reconciliation.requiresRelayout {
       var finalInput = input
@@ -275,7 +295,7 @@ struct LatePreferenceReconciliationStage {
     let realized = input.canonicalResolved.applyingLayoutDependentRealizations(
       input.layoutPassContext.layoutDependentRealizationsByIdentity
     )
-    let reconciliation = reconcileLatePreferenceConsumers(in: realized)
+    let reconciliation = reconcileConsumers(in: realized)
     let presented = projectResolvedPresentation(reconciliation.resolved)
     if !reconciliation.requiresRelayout {
       var finalInput = input
@@ -320,7 +340,7 @@ struct LatePreferenceReconciliationStage {
     let realized = input.canonicalResolved.applyingLayoutDependentRealizations(
       input.layoutPassContext.layoutDependentRealizationsByIdentity
     )
-    let reconciliation = reconcileLatePreferenceConsumers(in: realized)
+    let reconciliation = reconcileConsumers(in: realized)
     let presented = projectResolvedPresentation(reconciliation.resolved)
     var finalInput = input
     finalInput.canonicalResolved = reconciliation.resolved

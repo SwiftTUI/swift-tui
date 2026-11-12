@@ -358,9 +358,10 @@ is never exempt. This keeps evaluation connected to every real reader while
 preventing a near-root control from blanketing an unrelated content subtree.
 
 `withinChurnedSubtree` handles a different proof gap. Presentation-entry
-changes, preference-derived overlays/backgrounds, tab bodies, trigger leaves,
-and similar values synthesized during resolve can change descendants without
-creating a tracked invalidation for those descendants. The marker is inherited
+changes, preference-derived overlays/backgrounds, freshly resolved toolbar
+strips, tab bodies, trigger leaves, and similar values synthesized during
+resolve can change descendants without creating a tracked invalidation for
+those descendants. The marker is inherited
 by every derived `ResolveContext`. The reuse door declines both layers until it
 resolves and commits the fresh values. This stand-down is
 orthogonal to focus/press suppression: a node must pass both policies.
