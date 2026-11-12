@@ -84,7 +84,7 @@ Add the package, depend on its `SwiftTUI` product, and `swift run`:
 
 ```swift
 // Package.swift
-.package(url: "https://github.com/SwiftTUI/swift-tui.git", .upToNextMajor(from: "0.22.0")),
+.package(url: "https://github.com/SwiftTUI/swift-tui.git", .upToNextMajor(from: "0.22.1")),
 // in your executable target:
 .product(name: "SwiftTUI", package: "swift-tui"),
 ```

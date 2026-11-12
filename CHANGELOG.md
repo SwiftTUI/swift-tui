@@ -9,6 +9,19 @@ require 1.0.0. See [COMPATIBILITY.md](docs/COMPATIBILITY.md).
 
 ## [Unreleased]
 
+## [0.22.1] - 2026-11-11
+
+### Fixed
+
+- A toolbar item runs its own action after the strip's item set changes. In
+  the asynchronous render modes, which are the default, a click could run a
+  neighbouring item instead: after a tab switch put the tab's item ahead of
+  the scope's own, the first slot kept the previous item's button (STUI-1532).
+- A toolbar item runs the action its view authored last. In the asynchronous
+  render modes, an action captured again when only the contributing view
+  updated never reached the strip, which kept running the earlier closure
+  (STUI-1532).
+
 ## [0.22.0] - 2026-11-10
 
 This is the first release under the stronger compatibility promise covering
@@ -2939,7 +2952,9 @@ precomposition work (still images), cache hardening, and glyph-aware backdrops.
 See the GitHub releases for the full per-tag history:
 <https://github.com/SwiftTUI/swift-tui/releases>.
 
-[Unreleased]: https://github.com/SwiftTUI/swift-tui/compare/0.21.0...HEAD
+[Unreleased]: https://github.com/SwiftTUI/swift-tui/compare/0.22.1...HEAD
+[0.22.1]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.22.1
+[0.22.0]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.22.0
 [0.21.0]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.21.0
 [0.20.1]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.20.1
 [0.20.0]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.20.0
