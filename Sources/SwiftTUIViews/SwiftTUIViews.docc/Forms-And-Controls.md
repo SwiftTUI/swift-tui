@@ -14,7 +14,9 @@ moves focus forward in layout order and wraps; Shift-Tab moves backward.
 Return or Space activates the focused control. Arrow keys go to the
 focused control first — a slider claims Left/Right, a picker claims its
 selection keys — and an unclaimed arrow key moves focus directionally
-instead. App-level shortcuts layer on top of this; see
+instead on controls that participate in directional navigation;
+activation-only controls such as buttons keep focus on a declined arrow
+(see <doc:Focus>). App-level shortcuts layer on top of this; see
 <doc:Commands-And-Key-Input>.
 
 ## Start with a button
