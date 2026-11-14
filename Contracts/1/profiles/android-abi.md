@@ -45,6 +45,17 @@ An unknown library with conflicting C signatures is outside that legacy contract
 | request resync | Optional; borrowed UTF-8 JSON. Returns 1 for admitted repair, otherwise 0. Invalidates an older prepared frame. Missing operation leaves recovery pending until an incidental full frame. |
 | accessibility action | Optional; owning main thread. Borrowed complete UTF-8 action record. 1 means queued ingress, not runtime acceptance; the correlated response carries the eventual result. 0 means rejected/unsupported ingress. |
 | diagnostics | Optional, packed executor counters; diagnostic only, never a compatibility decision. |
+| copy open link | Optional; independent from frame delivery. Same query/copy convention as the clipboard, over a first-in, first-out queue: a successful copy removes exactly the oldest destination, so the caller repeats the query/copy pair until zero. The payload is the destination's UTF-8 bytes as authored; the caller owns URI validation and dispatch. The first call, a size query included, registers the caller as the link dispatcher. Zero means nothing pending or an invalid handle. |
+
+A destination enters the open-link queue only when the runtime's default
+open-link action runs: an activated enabled link, or authored code that calls
+the default action. A custom action and a disabled link never enqueue. Until a
+caller has registered through `copy open link`, the default action reports
+`false` and retains nothing, which is also the complete behavior of a library
+that lacks the operation. After registration, the action's `true` reports an
+accepted request, not an opened destination. The queue holds at most 16
+destinations of at most 8192 bytes each; a request beyond either bound is
+refused with `false`. Starting a new scene run discards undelivered requests.
 
 Copy and repair operations synchronize their host-owned state. Callers still
 serialize lifecycle and destruction with all handle use; a handle lookup is not

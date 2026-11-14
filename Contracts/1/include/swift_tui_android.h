@@ -17,6 +17,7 @@ extern "C" {
 #define SWIFT_TUI_ANDROID_OP_ACCESSIBILITY (1u << 2)
 #define SWIFT_TUI_ANDROID_OP_CLIPBOARD (1u << 3)
 #define SWIFT_TUI_ANDROID_OP_DIAGNOSTICS (1u << 4)
+#define SWIFT_TUI_ANDROID_OP_OPEN_LINK (1u << 5)
 
 typedef int64_t swift_tui_android_handle;
 typedef struct swift_tui_android_abi_info {
@@ -61,6 +62,8 @@ int32_t swift_tui_android_accessibility_action(swift_tui_android_handle handle,
 int32_t swift_tui_android_copy_clipboard_text(swift_tui_android_handle handle,
                                              uint8_t *buffer, int32_t capacity);
 int64_t swift_tui_android_diag(void);
+int32_t swift_tui_android_copy_open_link(swift_tui_android_handle handle,
+                                         uint8_t *buffer, int32_t capacity);
 
 #ifdef __cplusplus
 }

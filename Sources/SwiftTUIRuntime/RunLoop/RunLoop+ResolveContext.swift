@@ -42,7 +42,8 @@ extension RunLoop {
       runtimeConfiguration.cursorFollowsFocus
       || usesTerminalCursorForTextInput
     if effectiveEnvironmentValues.openLinkAction.isPlaceholder {
-      effectiveEnvironmentValues.openLinkAction = systemOpenLinkAction()
+      effectiveEnvironmentValues.openLinkAction = systemOpenLinkAction(
+        presentingOn: presentationSurface)
     }
     if effectiveEnvironmentValues.requestTermination.isPlaceholder {
       effectiveEnvironmentValues.requestTermination = runtimeRequestTerminationAction()

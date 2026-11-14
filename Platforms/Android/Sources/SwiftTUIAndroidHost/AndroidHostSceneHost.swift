@@ -51,6 +51,14 @@ private struct AndroidHostSceneHostState: Sendable {
   // from the runtime). Drained exactly once when the client copies it across
   // the ABI, so a system clipboard write happens per copy rather than per poll.
   var pendingClipboardText: String?
+  // Destinations the runtime's default open-link action asked the host to
+  // open, in request order. Links are events, not state: each one is delivered
+  // exactly once across the ABI, so none is replaced by a later request.
+  var pendingLinkDestinations: [String] = []
+  // Set by the client's first link poll. A client that never polls (a host
+  // AAR that predates the operation) keeps the earlier behavior: the default
+  // action reports `false` and retains nothing.
+  var hasLinkConsumer = false
 }
 
 private final class AndroidHostSceneHostStateBox: Sendable {
@@ -131,6 +139,8 @@ private final class AndroidHostSceneHostStateBox: Sendable {
       state.hasPendingDamage = false
       state.latestEncodingErrorDescription = nil
       state.lastErrorDescription = nil
+      // A request the previous run never delivered must not open in this one.
+      state.pendingLinkDestinations.removeAll()
     }
   }
 
@@ -378,6 +388,56 @@ private final class AndroidHostSceneHostStateBox: Sendable {
       return bytes.count
     }
   }
+
+  /// More undelivered requests than taps, key presses and authored calls
+  /// produce between two client polls. The next request is refused.
+  private static let pendingLinkLimit = 16
+  /// The Kotlin URI policy treats a longer destination as malformed; refusing
+  /// it here keeps it off the ABI.
+  private static let linkDestinationByteLimit = 8192
+
+  /// Queues a destination for the client. `false` means nothing will open:
+  /// no client polls link requests, the destination is empty or over the
+  /// byte limit, or the queue is full.
+  func recordOpenLink(
+    _ destination: String
+  ) -> Bool {
+    guard !destination.isEmpty, destination.utf8.count <= Self.linkDestinationByteLimit else {
+      return false
+    }
+    return state.withLock { state in
+      guard state.hasLinkConsumer, state.pendingLinkDestinations.count < Self.pendingLinkLimit
+      else {
+        return false
+      }
+      state.pendingLinkDestinations.append(destination)
+      return true
+    }
+  }
+
+  /// Copies the oldest pending link destination as UTF-8 into `outBuffer`,
+  /// removing it on a successful copy. A `nil` buffer or an undersized
+  /// `capacity` is a size query that removes nothing, so the two-call ABI
+  /// handshake delivers each request exactly once. Every call, a size query
+  /// included, registers the client as a link consumer.
+  func copyPendingLinkBytes(
+    to outBuffer: UnsafeMutablePointer<UInt8>?,
+    capacity: Int
+  ) -> Int {
+    state.withLock { state in
+      state.hasLinkConsumer = true
+      guard let destination = state.pendingLinkDestinations.first else {
+        return 0
+      }
+      let bytes = Array(destination.utf8)
+      guard let outBuffer = unsafe outBuffer, capacity >= bytes.count else {
+        return bytes.count
+      }
+      unsafe outBuffer.update(from: bytes, count: bytes.count)
+      state.pendingLinkDestinations.removeFirst()
+      return bytes.count
+    }
+  }
 }
 
 public final class AndroidHostSceneHost {
@@ -434,6 +494,12 @@ public final class AndroidHostSceneHost {
       cellPixelSize: nil,
       pointerInputCapabilities: Self.pointerInputCapabilities(metrics: nil)
     )
+    // The runtime decides what a link activation is — a custom
+    // `OpenLinkAction` and a disabled link never arrive here — and the Kotlin
+    // host owns the Android dispatch. See `copyPendingOpenLink`.
+    surface.setLinkOpener { destination in
+      state.recordOpenLink(destination.rawValue)
+    }
     let session = try HostedSceneSession(
       for: app,
       sceneID: selectedSceneID,
@@ -713,6 +779,15 @@ public final class AndroidHostSceneHost {
     unsafe state.copyPendingClipboardBytes(to: outBuffer, capacity: capacity)
   }
 
+  /// Drains the oldest link destination the runtime's default open-link action
+  /// requested, as UTF-8 bytes. The client polls this across the ABI and
+  /// dispatches each destination once under its own URI policy.
+  package func copyPendingOpenLink(
+    to outBuffer: UnsafeMutablePointer<UInt8>?,
+    capacity: Int
+  ) -> Int {
+    unsafe state.copyPendingLinkBytes(to: outBuffer, capacity: capacity)
+  }
 }
 
 extension AndroidHostSceneHost: Sendable {}

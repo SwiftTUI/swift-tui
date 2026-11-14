@@ -28,6 +28,7 @@ public final class HostedRasterSurface:
   private let clipboardWriter: (@MainActor @Sendable (String) -> Bool)?
 
   @MainActor private var clipboardReader: (@MainActor @Sendable () -> String?)?
+  @MainActor private var linkOpener: (@MainActor @Sendable (LinkDestination) -> Bool)?
 
   public let capabilityProfile: TerminalCapabilityProfile
 
@@ -203,6 +204,14 @@ public final class HostedRasterSurface:
     clipboardReader?()
   }
 
+  /// Routes the runtime's default open-link action to the host. A custom
+  /// `OpenLinkAction` and a disabled link never reach `opener`. Hosts that
+  /// install none keep the process-level system opener.
+  @MainActor
+  package func setLinkOpener(_ opener: @escaping @MainActor @Sendable (LinkDestination) -> Bool) {
+    linkOpener = opener
+  }
+
   @_spi(Testing) @_spi(Runners) public func waitForFrame(
     matching predicate: @escaping @Sendable (SemanticHostFrame) -> Bool = { _ in true }
   ) async -> SemanticHostFrame {
@@ -338,5 +347,16 @@ extension HostedRasterSurface: SemanticHostFramePresentationSurface {
       for: frame.raster,
       damage: frame.rasterDamage
     )
+  }
+}
+
+extension HostedRasterSurface: LinkOpeningPresentationSurface {
+  @MainActor package var opensLinksInHost: Bool {
+    linkOpener != nil
+  }
+
+  @MainActor
+  package func openLinkInHost(_ destination: LinkDestination) -> Bool {
+    linkOpener?(destination) ?? false
   }
 }

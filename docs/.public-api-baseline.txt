@@ -36,6 +36,7 @@ SwiftTUIAndroidHost.AndroidHostStyle.renderStyle
 SwiftTUIAndroidHost.swift_tui_android_accessibility_action(_:_:_:)
 SwiftTUIAndroidHost.swift_tui_android_copy_clipboard_text(_:_:_:)
 SwiftTUIAndroidHost.swift_tui_android_copy_latest_frame(_:_:_:)
+SwiftTUIAndroidHost.swift_tui_android_copy_open_link(_:_:_:)
 SwiftTUIAndroidHost.swift_tui_android_declare_capabilities(_:_:_:)
 SwiftTUIAndroidHost.swift_tui_android_destroy(_:)
 SwiftTUIAndroidHost.swift_tui_android_diag()

@@ -1171,9 +1171,22 @@ value-setting requests; host adapters must connect their native callbacks. (The 
 `swift-tui-examples/AndroidGallery` app embeds `GalleryView()` in a Compose
 host: styled cells, embedded images, damage-aware row repaints over a retained
 bitmap, a transparent TalkBack semantics overlay, hardware keys, the soft
-keyboard, touch, wheel scrolling, hyperlinks, and the system clipboard
-(app-requested clipboard writes return through the JNI/C ABI).
+keyboard, touch, wheel scrolling, link activation, and the system clipboard
+(app-requested clipboard writes and link destinations return through the
+JNI/C ABI).
 
+- **Android opens links in the Kotlin host, under a scheme allow-list.**
+  *Provisional.* The runtime decides the activation, so a custom
+  `OpenLinkAction` runs in Swift and a disabled link opens nothing. The
+  default `\.openLinkAction` queues the destination for the Kotlin host
+  instead of opening it in-process, and its `true` reports the queued request,
+  not an opened destination. The host dispatches `http`, `https`, `mailto`
+  and `tel` destinations and refuses the rest unless the embedding app widens
+  its policy. A hyperlink cell that no `Link` owns does not activate. A host
+  AAR that predates the operation never drains the queue: the action then
+  reports `false` and that AAR opens the hyperlink under a tap without
+  consulting the runtime. Connected TalkBack activation of a link is not
+  established.
 - **Android accessibility focus and IME composition are one-way.** *Gap.*
   Runtime focus reaches TalkBack, but TalkBack-originated focus traversal is
   not fed back into the runtime, and full IME pre-edit/marked-text

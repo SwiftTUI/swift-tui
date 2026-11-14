@@ -5,7 +5,7 @@ import Testing
   @Test func queryAndEveryShortCopyRespectCallerCapacity() {
     #expect(swift_tui_android_get_abi_info(nil, 0) == 32)
     #expect(swift_tui_android_get_abi_info(nil, Int32.max) == 32)
-    let expected: [UInt8] = [32, 1, 0, 64, 32, 64, 31, 0].flatMap {
+    let expected: [UInt8] = [32, 1, 0, 64, 32, 64, 63, 0].flatMap {
       [UInt8($0), 0, 0, 0]
     }
     for capacity in -1...40 {

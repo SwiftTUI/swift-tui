@@ -56,12 +56,14 @@ previous runtime commit.
 hosts. The exported `swift_tui_android_*` C entry points let the JNI bridge
 start, stop, destroy, tick, resize, and send input. They also let the bridge
 declare wire capabilities, copy the latest frame, and drain app-requested
-clipboard text.
+clipboard text and link destinations.
 
-Frame and clipboard copies use a two-call contract: a nil or undersized output
-buffer reports the required UTF-8 byte count without consuming the value. A
-large-enough buffer copies the value. A successful copy drains clipboard text.
-Frame bytes stay cached until the client consumes a newer sequence.
+Frame, clipboard and link copies use a two-call contract: a nil or undersized
+output buffer reports the required UTF-8 byte count without consuming the
+value. A large-enough buffer copies the value. A successful copy drains
+clipboard text, or the oldest queued link destination. Frame bytes stay cached
+until the client consumes a newer sequence. <doc:Hosting-On-Android> describes
+when a link destination is queued.
 
 The Android render poll also drives the Swift main-actor executor so ready
 runtime continuations, tasks, and animation wakes make progress on the host

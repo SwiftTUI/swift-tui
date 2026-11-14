@@ -48,3 +48,23 @@ value reports command validity and queuing, while `accessibilityActionResponse`
 in the next frame reports runtime acceptance or rejection. Commands never pass
 through the terminal keyboard parser. Older host libraries lack the symbol;
 the Android JNI adapter then returns unsupported.
+
+### Links
+
+The runtime decides what a link activation is, and the Android side performs
+the dispatch. When the default `\.openLinkAction` runs — the runtime activated
+an enabled `Link` by tap, key or semantic action, or authored code called the
+action — the host queues the destination. The Kotlin host drains that queue
+through `swift_tui_android_copy_open_link`, one destination per size-then-copy
+pair, and opens each one once under its own URI policy. A custom
+`OpenLinkAction` runs in Swift and a disabled link registers no action, so
+neither reaches the queue.
+
+The action's `true` means the request was queued, not that a destination
+opened: the Kotlin host can still refuse the scheme or find no app to handle
+it. The action returns `false`, and keeps nothing, for an empty destination,
+one longer than 8192 UTF-8 bytes, a seventeenth undelivered request, and
+whenever no client has polled the operation. That last case is a host AAR that
+predates it, which opens the hyperlink under a tap by itself instead. The
+[`swift-tui-android` link reference](https://github.com/SwiftTUI/swift-tui-android/blob/main/docs/LINKS.md)
+defines both routes, the allowed schemes and the outcomes.

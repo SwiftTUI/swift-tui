@@ -9,6 +9,16 @@ require 1.0.0. See [COMPATIBILITY.md](docs/COMPATIBILITY.md).
 
 ## [Unreleased]
 
+### Added
+
+- The Android host delivers link activations to the Kotlin host. The default
+  `\.openLinkAction` queues the destination and the new optional
+  `swift_tui_android_copy_open_link` operation (ABI 1, operation bit 5) drains
+  it, so a tap, a key activation or an authored call opens a link, a custom
+  `OpenLinkAction` and a disabled link open nothing, and one activation
+  dispatches once. With a host AAR that never polls the operation the action
+  still reports `false`, as before (STUI-365).
+
 ## [0.22.2] - 2026-11-12
 
 ### Fixed

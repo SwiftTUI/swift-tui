@@ -16,6 +16,18 @@ import SwiftTUIViews
   import CRT
 #endif
 
+/// A presentation surface whose host opens links for the runtime's default
+/// open-link action, instead of this process spawning a platform opener.
+package protocol LinkOpeningPresentationSurface: AnyObject {
+  /// Whether the host installed an opener. Without one the default action
+  /// keeps using the process-level system opener.
+  @MainActor var opensLinksInHost: Bool { get }
+
+  /// Hands `destination` to the host. The result reports whether the host
+  /// accepted the request, which need not mean a destination opened.
+  @MainActor func openLinkInHost(_ destination: LinkDestination) -> Bool
+}
+
 package func systemOpenLinkAction() -> OpenLinkAction {
   OpenLinkAction(
     snapshotLabel: "OpenLinkAction.systemDefault",
@@ -23,6 +35,31 @@ package func systemOpenLinkAction() -> OpenLinkAction {
     usesHostDefault: true,
     handler: openLinkInSystem
   )
+}
+
+/// The default open-link action for a run loop presenting on `surface`. A
+/// surface with a host opener receives the destination; every other surface
+/// keeps the process-level system opener. Both are the same host-default
+/// action to authored code: a custom `OpenLinkAction` replaces either.
+@MainActor
+package func systemOpenLinkAction(
+  presentingOn surface: any PresentationSurfaceMetricsProvider
+) -> OpenLinkAction {
+  guard let surface = surface as? any LinkOpeningPresentationSurface,
+    surface.opensLinksInHost
+  else {
+    return systemOpenLinkAction()
+  }
+  return OpenLinkAction(
+    snapshotLabel: "OpenLinkAction.systemDefault",
+    isPlaceholder: false,
+    usesHostDefault: true
+  ) { [weak surface] destination in
+    guard !destination.isEmpty, let surface else {
+      return false
+    }
+    return surface.openLinkInHost(destination)
+  }
 }
 
 package func openLinkInSystem(

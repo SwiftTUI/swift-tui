@@ -255,3 +255,26 @@ public func swift_tui_android_copy_clipboard_text(
   )
   return Int32(clamping: needed)
 }
+
+/// Copies the oldest link destination the runtime asked the host to open, as
+/// UTF-8 without a terminating NUL. Same query/copy convention as the
+/// clipboard: a null or undersized buffer reports the byte count and removes
+/// nothing; a successful copy removes that one request. Zero means none is
+/// pending. The first call registers the client as the link dispatcher; until
+/// then the default open-link action reports `false`.
+@_cdecl("swift_tui_android_copy_open_link")
+public func swift_tui_android_copy_open_link(
+  _ handle: Int64,
+  _ outBuffer: UnsafeMutablePointer<UInt8>?,
+  _ capacity: Int32
+) -> Int32 {
+  guard let host = AndroidHostHandleRegistry.host(for: handle) else {
+    return 0
+  }
+
+  let needed = unsafe host.copyPendingOpenLink(
+    to: outBuffer,
+    capacity: max(0, Int(capacity))
+  )
+  return Int32(clamping: needed)
+}
