@@ -50,7 +50,15 @@ private struct AndroidHostSceneHostState: Sendable {
   // Latest clipboard-write requested by the running app (an `onClipboardWrite`
   // from the runtime). Drained exactly once when the client copies it across
   // the ABI, so a system clipboard write happens per copy rather than per poll.
+  // An empty string is a pending write too: the app asked to clear the
+  // clipboard, which is distinct from `nil`, "nothing pending".
   var pendingClipboardText: String?
+  // Whether the client has called the ABI 1.1 take operation, the only one
+  // that can report an empty pending write. The 1.0 size/copy convention
+  // returns 0 for both "nothing pending" and "empty text", so a client that
+  // never takes would be told an empty write succeeded and then never deliver
+  // it. Empty writes are admitted only once this is set (STUI-732).
+  var clientTakesClipboardText = false
   // Destinations the runtime's default open-link action asked the host to
   // open, in request order. Links are events, not state: each one is delivered
   // exactly once across the ABI, so none is replaced by a later request.
@@ -354,16 +362,24 @@ private final class AndroidHostSceneHostStateBox: Sendable {
     }
   }
 
+  /// Records the app's latest clipboard write, replacing any write the client
+  /// has not drained yet. The result is admission: `true` only for a write the
+  /// client can deliver.
+  ///
+  /// An empty write clears the clipboard. It is admitted, and replaces pending
+  /// text, only for a client that takes clipboard text (see
+  /// `takePendingClipboardBytes`). For a client limited to the 1.0 size/copy
+  /// convention it is refused and leaves pending text untouched, because that
+  /// convention cannot tell a 0-byte payload from "nothing pending".
   func recordClipboardWrite(
     _ text: String
   ) -> Bool {
-    // An empty write carries nothing to deliver; ignore it so a size query can
-    // never report a 0-byte payload that looks like "nothing pending".
-    guard !text.isEmpty, text.utf8.count <= HostWireBudget.recordBytes else { return false }
-    state.withLock { state in
+    guard text.utf8.count <= HostWireBudget.recordBytes else { return false }
+    return state.withLock { state in
+      guard !text.isEmpty || state.clientTakesClipboardText else { return false }
       state.pendingClipboardText = text
+      return true
     }
-    return true
   }
 
   /// Copies the pending clipboard text as UTF-8 into `outBuffer`, draining it on
@@ -371,22 +387,50 @@ private final class AndroidHostSceneHostStateBox: Sendable {
   /// undersized `capacity` is a size query that reports the byte count without
   /// draining, so the two-call (size-then-copy) ABI handshake delivers a copy
   /// exactly once.
+  ///
+  /// This is the ABI 1.0 convention: 0 means "nothing pending". An empty
+  /// pending write, which exists only for a client that also takes, is neither
+  /// reported nor drained here, so this call can never drop one silently.
   func copyPendingClipboardBytes(
     to outBuffer: UnsafeMutablePointer<UInt8>?,
     capacity: Int
   ) -> Int {
     state.withLock { state in
-      guard let text = state.pendingClipboardText else {
-        return 0
-      }
-      let bytes = Array(text.utf8)
-      guard let outBuffer = unsafe outBuffer, capacity >= bytes.count else {
-        return bytes.count
-      }
-      unsafe outBuffer.update(from: bytes, count: bytes.count)
-      state.pendingClipboardText = nil
+      guard state.pendingClipboardText?.isEmpty == false else { return 0 }
+      return unsafe Self.drainClipboard(&state, to: outBuffer, capacity: capacity) ?? 0
+    }
+  }
+
+  /// The ABI 1.1 convention: `nil` when no write is pending, otherwise the
+  /// pending text's UTF-8 byte count, which is 0 for an empty write. A non-`nil`
+  /// buffer with enough capacity copies the text and drains it; an empty text
+  /// needs no capacity. Any call marks the client as one that can observe an
+  /// empty write, which is what lets `recordClipboardWrite` admit one.
+  func takePendingClipboardBytes(
+    to outBuffer: UnsafeMutablePointer<UInt8>?,
+    capacity: Int
+  ) -> Int? {
+    state.withLock { state in
+      state.clientTakesClipboardText = true
+      return unsafe Self.drainClipboard(&state, to: outBuffer, capacity: capacity)
+    }
+  }
+
+  private static func drainClipboard(
+    _ state: inout AndroidHostSceneHostState,
+    to outBuffer: UnsafeMutablePointer<UInt8>?,
+    capacity: Int
+  ) -> Int? {
+    guard let text = state.pendingClipboardText else {
+      return nil
+    }
+    let bytes = Array(text.utf8)
+    guard let outBuffer = unsafe outBuffer, capacity >= bytes.count else {
       return bytes.count
     }
+    unsafe outBuffer.update(from: bytes, count: bytes.count)
+    state.pendingClipboardText = nil
+    return bytes.count
   }
 
   /// More undelivered requests than taps, key presses and authored calls
@@ -772,11 +816,31 @@ public final class AndroidHostSceneHost {
 
   /// Drains the latest app-requested clipboard text as UTF-8 bytes. The client
   /// polls this across the ABI and forwards the bytes to the system clipboard.
+  ///
+  /// A result of 0 means nothing is pending. This call neither reports nor
+  /// drains an empty write; a client that delivers empty text polls
+  /// ``takePendingClipboardText(to:capacity:)`` instead.
   public func copyPendingClipboardText(
     to outBuffer: UnsafeMutablePointer<UInt8>?,
     capacity: Int
   ) -> Int {
     unsafe state.copyPendingClipboardBytes(to: outBuffer, capacity: capacity)
+  }
+
+  /// Drains the latest app-requested clipboard text as UTF-8 bytes, telling an
+  /// empty write from no write.
+  ///
+  /// Returns `nil` when nothing is pending. Otherwise returns the text's UTF-8
+  /// byte count, which is 0 when the app asked to clear the clipboard. A `nil`
+  /// or undersized buffer is a size query; a large-enough buffer copies the
+  /// text and drains it. The first call tells the host that this client
+  /// delivers empty text: until then an empty write is refused rather than
+  /// admitted and never delivered.
+  public func takePendingClipboardText(
+    to outBuffer: UnsafeMutablePointer<UInt8>?,
+    capacity: Int
+  ) -> Int? {
+    unsafe state.takePendingClipboardBytes(to: outBuffer, capacity: capacity)
   }
 
   /// Drains the oldest link destination the runtime's default open-link action

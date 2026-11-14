@@ -48,9 +48,9 @@ public enum AndroidHostHandleRegistry {
 // go through `withCheckedMainActorAccess` (F50), whose
 // `MainActor.preconditionIsolated` is release-checked: `HostMainExecutor`
 // implements `checkIsolated` via `pthread_equal`, so a wrong-thread call
-// traps loudly with an attributable accessor name instead. The two copy_*
-// entry points and install/diag need no bridge (nonisolated Mutex-guarded
-// state or pump-local work).
+// traps loudly with an attributable accessor name instead. The copy_* and
+// take_* entry points and install/diag need no bridge (nonisolated
+// Mutex-guarded state or pump-local work).
 @_cdecl("swift_tui_android_start")
 public func swift_tui_android_start(
   _ handle: Int64
@@ -253,6 +253,27 @@ public func swift_tui_android_copy_clipboard_text(
     to: outBuffer,
     capacity: max(0, Int(capacity))
   )
+  return Int32(clamping: needed)
+}
+
+/// Clipboard drain that tells an empty write from no write (ABI 1.1, operation
+/// bit 6). Returns -1 when nothing is pending or the handle is invalid;
+/// otherwise the pending text's UTF-8 byte count, 0 for an empty write. See
+/// `Contracts/1/include/swift_tui_android.h`.
+@_cdecl("swift_tui_android_take_clipboard_text")
+public func swift_tui_android_take_clipboard_text(
+  _ handle: Int64,
+  _ outBuffer: UnsafeMutablePointer<UInt8>?,
+  _ capacity: Int32
+) -> Int32 {
+  guard let host = AndroidHostHandleRegistry.host(for: handle),
+    let needed = unsafe host.takePendingClipboardText(
+      to: outBuffer,
+      capacity: max(0, Int(capacity))
+    )
+  else {
+    return -1
+  }
   return Int32(clamping: needed)
 }
 

@@ -9,7 +9,9 @@ public func swift_tui_android_get_abi_info(
 ) -> Int32 {
   // Eight little-endian uint32_t fields. Writing bytes avoids alignment and
   // Swift-struct-layout assumptions at this C boundary. Append-only within ABI 1.
-  let fields: [UInt32] = [32, 1, 0, 64, 32, 64, 63, 0]
+  // Minor 1 adds operation bits 5 and 6, `swift_tui_android_copy_open_link`
+  // and `swift_tui_android_take_clipboard_text`.
+  let fields: [UInt32] = [32, 1, 1, 64, 32, 64, 127, 0]
   let required: Int32 = 32
   guard let outBuffer = unsafe outBuffer, capacity > 0 else { return required }
   for offset in 0..<Int(min(capacity, required)) {

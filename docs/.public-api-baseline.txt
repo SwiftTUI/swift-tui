@@ -27,6 +27,7 @@ SwiftTUIAndroidHost.AndroidHostSceneHost.start()
 SwiftTUIAndroidHost.AndroidHostSceneHost.stop()
 SwiftTUIAndroidHost.AndroidHostSceneHost.surface
 SwiftTUIAndroidHost.AndroidHostSceneHost.surfaceSize
+SwiftTUIAndroidHost.AndroidHostSceneHost.takePendingClipboardText(to:capacity:)
 SwiftTUIAndroidHost.AndroidHostSceneHost.tick()
 SwiftTUIAndroidHost.AndroidHostStyle
 SwiftTUIAndroidHost.AndroidHostStyle.default
@@ -47,6 +48,7 @@ SwiftTUIAndroidHost.swift_tui_android_resize(_:_:_:_:_:)
 SwiftTUIAndroidHost.swift_tui_android_send_input(_:_:_:)
 SwiftTUIAndroidHost.swift_tui_android_start(_:)
 SwiftTUIAndroidHost.swift_tui_android_stop(_:)
+SwiftTUIAndroidHost.swift_tui_android_take_clipboard_text(_:_:_:)
 SwiftTUIAndroidHost.swift_tui_android_tick(_:)
 SwiftTUIAnimatedImage.AnimatedGIF
 SwiftTUIAnimatedImage.AnimatedGIF.decode(contentsOf:)

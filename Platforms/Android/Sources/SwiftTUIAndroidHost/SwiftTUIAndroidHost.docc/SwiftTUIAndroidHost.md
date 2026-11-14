@@ -65,6 +65,17 @@ clipboard text, or the oldest queued link destination. Frame bytes stay cached
 until the client consumes a newer sequence. <doc:Hosting-On-Android> describes
 when a link destination is queued.
 
+The host keeps the app's latest clipboard write until the client drains it.
+Two operations drain that write. `swift_tui_android_copy_clipboard_text`
+returns 0 when nothing is pending, so it cannot report an empty write and
+leaves one in place.
+`swift_tui_android_take_clipboard_text`, added in ABI 1 minor 1, returns -1
+when nothing is pending and 0 for an empty write, which is how an app clears
+the clipboard. The host admits an empty write, replacing any text not yet
+drained, only after the client's first take call on that handle. Until then,
+and for a client that only copies, `clipboardWriteAction("")` returns `false`
+and pending text is left as it was: the write could not be delivered.
+
 The Android render poll also drives the Swift main-actor executor so ready
 runtime continuations, tasks, and animation wakes make progress on the host
 main thread. Current behavior gaps are contributor-facing and tracked in the

@@ -95,11 +95,15 @@
 
     @Test func setA968ClipboardKeepsTheLatestNonemptyWriteAcrossAQuery() throws {
       // Hypothesis: a size query pins stale clipboard content or an empty write erases a deliverable later update.
+      // Since STUI-732 this pins the ABI 1.0 caller only. Such a caller reads 0 as "nothing
+      // pending" and could never deliver an empty write, so the write is refused and the
+      // pending text stays. A caller that takes clipboard text gets the empty write instead;
+      // AndroidHostSceneHostTests covers that.
       let host = try makeHost()
       try host.surface.writeClipboard("old")
       #expect(unsafe host.copyPendingClipboardText(to: nil, capacity: 0) == 3)
       try host.surface.writeClipboard("newer payload")
-      try host.surface.writeClipboard("")
+      #expect(try host.surface.writeClipboard("") == false)
       var oldCapacity = [UInt8](repeating: 0xA5, count: 3)
       let needed = oldCapacity.withUnsafeMutableBufferPointer { buffer in
         unsafe host.copyPendingClipboardText(to: buffer.baseAddress, capacity: buffer.count)

@@ -569,6 +569,145 @@
     #expect(swift_tui_android_copy_clipboard_text(handle, nil, 0) == 0)
   }
 
+  // STUI-732: an empty write clears the clipboard. A client that takes
+  // clipboard text can tell it from "nothing pending", so the host admits it
+  // and lets it replace text that has not been drained yet.
+  @MainActor
+  @Test
+  func android_host_empty_clipboard_write_replaces_pending_text_before_the_drain() throws {
+    let host = try AndroidHostSceneHost(app: AndroidHostTestApp())
+    #expect((unsafe host.takePendingClipboardText(to: nil, capacity: 0)) == nil)
+
+    #expect(try host.surface.writeClipboard("secret"))
+    #expect((unsafe host.takePendingClipboardText(to: nil, capacity: 0)) == 6)
+    #expect(try host.surface.writeClipboard(""))
+
+    // The empty write is what is pending now: 0 bytes, not "nothing".
+    #expect((unsafe host.takePendingClipboardText(to: nil, capacity: 0)) == 0)
+    var bytes = [UInt8](repeating: 0xA5, count: 6)
+    let copied = bytes.withUnsafeMutableBufferPointer { buffer in
+      unsafe host.takePendingClipboardText(to: buffer.baseAddress, capacity: buffer.count)
+    }
+    #expect(copied == 0)
+    #expect(bytes == [UInt8](repeating: 0xA5, count: 6))
+
+    // Delivered exactly once, and the replaced text never surfaces.
+    #expect((unsafe host.takePendingClipboardText(to: nil, capacity: 0)) == nil)
+    #expect((unsafe host.copyPendingClipboardText(to: nil, capacity: 0)) == 0)
+  }
+
+  @MainActor
+  @Test
+  func android_host_empty_clipboard_write_alone_is_delivered_once() throws {
+    let host = try AndroidHostSceneHost(app: AndroidHostTestApp())
+    #expect((unsafe host.takePendingClipboardText(to: nil, capacity: 0)) == nil)
+
+    #expect(try host.surface.writeClipboard(""))
+    // A size query reports the empty write without draining it.
+    #expect((unsafe host.takePendingClipboardText(to: nil, capacity: 0)) == 0)
+    #expect((unsafe host.takePendingClipboardText(to: nil, capacity: 0)) == 0)
+
+    // The 1.0 copy operation cannot report an empty write, so it must not
+    // drain one either, even when handed a buffer.
+    var legacy: UInt8 = 0xA5
+    let legacyCopied = withUnsafeMutablePointer(to: &legacy) { pointer in
+      unsafe host.copyPendingClipboardText(to: pointer, capacity: 1)
+    }
+    #expect(legacyCopied == 0)
+    #expect(legacy == 0xA5)
+    #expect((unsafe host.takePendingClipboardText(to: nil, capacity: 0)) == 0)
+
+    // An empty text needs no capacity: any non-nil buffer drains it.
+    var byte: UInt8 = 0xA5
+    let copied = withUnsafeMutablePointer(to: &byte) { pointer in
+      unsafe host.takePendingClipboardText(to: pointer, capacity: 0)
+    }
+    #expect(copied == 0)
+    #expect(byte == 0xA5)
+    #expect((unsafe host.takePendingClipboardText(to: nil, capacity: 0)) == nil)
+
+    // A later non-empty write still flows through the same slot.
+    #expect(try host.surface.writeClipboard("next"))
+    #expect((unsafe host.takePendingClipboardText(to: nil, capacity: 0)) == 4)
+  }
+
+  // A client limited to the ABI 1.0 size/copy convention reads 0 as "nothing
+  // pending" and would never deliver an empty write, so the host must not
+  // report success for one.
+  @MainActor
+  @Test
+  func android_host_refuses_an_empty_clipboard_write_until_the_client_takes() throws {
+    let host = try AndroidHostSceneHost(app: AndroidHostTestApp())
+
+    #expect(try host.surface.writeClipboard("") == false)
+    #expect(try host.surface.writeClipboard("kept"))
+    #expect(try host.surface.writeClipboard("") == false)
+    #expect((unsafe host.copyPendingClipboardText(to: nil, capacity: 0)) == 4)
+
+    // The first take is the declaration; it leaves the pending text alone.
+    #expect((unsafe host.takePendingClipboardText(to: nil, capacity: 0)) == 4)
+    #expect(try host.surface.writeClipboard(""))
+    #expect((unsafe host.takePendingClipboardText(to: nil, capacity: 0)) == 0)
+  }
+
+  @MainActor
+  @Test
+  func android_host_abi_take_tells_an_empty_write_from_nothing_pending() throws {
+    let host = try AndroidHostSceneHost(app: AndroidHostTestApp())
+    let handle = AndroidHostHandleRegistry.register(host)
+    var destroyed = false
+    defer {
+      if !destroyed { swift_tui_android_destroy(handle) }
+    }
+
+    #expect(swift_tui_android_take_clipboard_text(handle, nil, 0) == -1)
+    #expect(swift_tui_android_take_clipboard_text(handle &+ 1_000_000, nil, 0) == -1)
+
+    // Non-empty text keeps the size/copy convention of the 1.0 operation.
+    #expect(try host.surface.writeClipboard("héllo\nwörld"))
+    let expected = Array("héllo\nwörld".utf8)
+    #expect(swift_tui_android_take_clipboard_text(handle, nil, 0) == Int32(expected.count))
+    var bytes = [UInt8](repeating: 0xA5, count: expected.count)
+    let undersized = bytes.withUnsafeMutableBufferPointer { buffer in
+      unsafe swift_tui_android_take_clipboard_text(
+        handle, buffer.baseAddress, Int32(expected.count - 1))
+    }
+    #expect(undersized == Int32(expected.count))
+    #expect(bytes == [UInt8](repeating: 0xA5, count: expected.count))
+    let copied = bytes.withUnsafeMutableBufferPointer { buffer in
+      unsafe swift_tui_android_take_clipboard_text(
+        handle, buffer.baseAddress, Int32(buffer.count))
+    }
+    #expect(copied == Int32(expected.count))
+    #expect(bytes == expected)
+    #expect(swift_tui_android_take_clipboard_text(handle, nil, 0) == -1)
+
+    // A non-empty write followed by an empty one before the drain delivers the
+    // empty value; a negative capacity is a zero capacity.
+    #expect(try host.surface.writeClipboard("stale"))
+    #expect(try host.surface.writeClipboard(""))
+    #expect(swift_tui_android_take_clipboard_text(handle, nil, 0) == 0)
+    #expect(swift_tui_android_copy_clipboard_text(handle, nil, 0) == 0)
+    var byte: UInt8 = 0xA5
+    let drained = withUnsafeMutablePointer(to: &byte) { pointer in
+      unsafe swift_tui_android_take_clipboard_text(handle, pointer, -1)
+    }
+    #expect(drained == 0)
+    #expect(byte == 0xA5)
+    #expect(swift_tui_android_take_clipboard_text(handle, nil, 0) == -1)
+
+    // A write still pending when the handle is destroyed, and one that arrives
+    // afterwards, are unreachable: nothing escapes a disposed host.
+    #expect(try host.surface.writeClipboard("pending at destroy"))
+    swift_tui_android_destroy(handle)
+    destroyed = true
+    #expect(swift_tui_android_take_clipboard_text(handle, nil, 0) == -1)
+    #expect(swift_tui_android_copy_clipboard_text(handle, nil, 0) == 0)
+    #expect(try host.surface.writeClipboard("after destroy"))
+    #expect(swift_tui_android_take_clipboard_text(handle, nil, 0) == -1)
+    #expect(swift_tui_android_copy_clipboard_text(handle, nil, 0) == 0)
+  }
+
   @MainActor
   @Test
   func android_host_tick_abi_is_safe_and_does_not_disturb_frames() async throws {

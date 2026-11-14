@@ -10,14 +10,16 @@ extern "C" {
 /* ABI 1 uses fixed-width values on little-endian Android arm64/x86_64.
  * Wire capabilities are independent of these native operation bits. */
 #define SWIFT_TUI_ANDROID_ABI_MAJOR 1u
-#define SWIFT_TUI_ANDROID_ABI_MINOR 0u
+#define SWIFT_TUI_ANDROID_ABI_MINOR 1u
 #define SWIFT_TUI_ANDROID_ABI_INFO_BYTES 32u
 #define SWIFT_TUI_ANDROID_OP_CAPABILITIES (1u << 0)
 #define SWIFT_TUI_ANDROID_OP_RESYNC (1u << 1)
 #define SWIFT_TUI_ANDROID_OP_ACCESSIBILITY (1u << 2)
 #define SWIFT_TUI_ANDROID_OP_CLIPBOARD (1u << 3)
 #define SWIFT_TUI_ANDROID_OP_DIAGNOSTICS (1u << 4)
+/* Minor 1. */
 #define SWIFT_TUI_ANDROID_OP_OPEN_LINK (1u << 5)
+#define SWIFT_TUI_ANDROID_OP_CLIPBOARD_TAKE (1u << 6)
 
 typedef int64_t swift_tui_android_handle;
 typedef struct swift_tui_android_abi_info {
@@ -61,7 +63,19 @@ int32_t swift_tui_android_accessibility_action(swift_tui_android_handle handle,
                                               const uint8_t *bytes, int32_t count);
 int32_t swift_tui_android_copy_clipboard_text(swift_tui_android_handle handle,
                                              uint8_t *buffer, int32_t capacity);
+/* Minor 1. Returns -1 when no clipboard write is pending, otherwise the UTF-8
+ * byte count of the pending text: 0 is a pending empty write, which
+ * copy_clipboard_text neither reports nor drains. A null or undersized buffer
+ * is a query; a large-enough buffer copies and drains, and an empty text needs
+ * no capacity. The host admits an empty write only after the first call on
+ * that handle. */
+int32_t swift_tui_android_take_clipboard_text(swift_tui_android_handle handle,
+                                             uint8_t *buffer, int32_t capacity);
 int64_t swift_tui_android_diag(void);
+/* Minor 1. Same query/copy convention as copy_clipboard_text, over a queue of
+ * link destinations: a successful copy removes the oldest one, and 0 means
+ * none is pending. The host queues a destination only after the first call on
+ * that handle. */
 int32_t swift_tui_android_copy_open_link(swift_tui_android_handle handle,
                                          uint8_t *buffer, int32_t capacity);
 

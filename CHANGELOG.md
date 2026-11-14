@@ -18,6 +18,22 @@ require 1.0.0. See [COMPATIBILITY.md](docs/COMPATIBILITY.md).
   `OpenLinkAction` and a disabled link open nothing, and one activation
   dispatches once. With a host AAR that never polls the operation the action
   still reports `false`, as before (STUI-365).
+- The Android host's native ABI has an optional operation,
+  `swift_tui_android_take_clipboard_text`, with
+  `AndroidHostSceneHost.takePendingClipboardText(to:capacity:)` behind it. It
+  reports "nothing pending" as -1, so a byte count of 0 is an empty clipboard
+  write. The ABI descriptor reports minor 1, which covers this operation
+  (bit 6) and `swift_tui_android_copy_open_link` (bit 5). Clients of ABI 1.0
+  are unaffected (STUI-732).
+
+### Fixed
+
+- An app's empty clipboard write on Android is delivered, and replaces text
+  the client has not drained yet, for a client that takes clipboard text.
+  Before, the write was refused and the earlier text was delivered. A client
+  that only calls `swift_tui_android_copy_clipboard_text` cannot observe an
+  empty write, so for it the write is still refused and `clipboardWriteAction`
+  returns `false` (STUI-732).
 
 ## [0.22.2] - 2026-11-12
 
