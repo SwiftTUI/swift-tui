@@ -1216,17 +1216,20 @@ JNI/C ABI).
 - **No multi-document, share-sheet, or drag-and-drop file intake on Android.**
   *Gap.* Selecting several documents, `ACTION_SEND` intake and platform
   drag-and-drop do not reach the runtime drop path.
-- **Android runtime acceptance is not closed.** *Gap.* A connected arm64
-  emulator/device instrumentation journey exists for the public Compose,
-  JNI, and NDK host. The current candidate has not passed its state-changing
-  repaint, tab-retention, and device-alpha acceptance, and connected runtime
-  smoke is not a stable CI gate. `AndroidGallery` assembly and the NDK-free
-  Kotlin JVM tests do not close that acceptance.
-- **No `x86_64` Android packaging.** *Gap.* The framework, including the
-  vendored `swift-png`/`JPEG` image path, cross-compiles for
-  `x86_64-unknown-linux-android28` (the earlier `swift-png` SIMD build
-  blocker was replaced by a scalar reimplementation), but `arm64-v8a` is the
-  only ABI the `AndroidGallery` example currently packages.
+- **The Android connected journey is not a CI gate.** *Gap.* The connected
+  journey for the public Compose, JNI, and NDK host passes on an API 36 arm64
+  emulator against the published host: first frame, touch and hardware-key
+  input, a state-changing repaint, tab retention, and image alpha. It runs
+  from a dispatch-only workflow that has not run on a hosted runner. No
+  physical-device or TalkBack acceptance exists. `AndroidGallery` assembly
+  and the NDK-free Kotlin JVM tests are not device evidence.
+- **Android `x86_64` packaging has not run on a device.** *Gap.* The
+  framework, including the vendored `swift-png`/`JPEG` image path,
+  cross-compiles for `x86_64-unknown-linux-android28` (the earlier `swift-png`
+  SIMD build blocker was replaced by a scalar reimplementation). The host AAR
+  and Gradle plugin can package that ABI beside `arm64-v8a`, and the payload
+  passes its ELF checks, but no `x86_64` host has been launched.
+  `AndroidGallery` packages `arm64-v8a` only.
 
 ## Terminal-program embedding
 
