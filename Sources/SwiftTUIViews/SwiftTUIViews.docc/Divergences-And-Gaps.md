@@ -1191,8 +1191,19 @@ JNI/C ABI).
   Runtime focus reaches TalkBack, but TalkBack-originated focus traversal is
   not fed back into the runtime, and full IME pre-edit/marked-text
   composition (beyond committed text) is not implemented.
-- **No Android content URI import.** *Gap.* SAF / `content://` ingestion into
-  the runtime drop path is not implemented.
+- **Android content URI import is one picker route, delivered as a paste.**
+  *Provisional.* The Android host library (`swift-tui-android`) imports one
+  `content://` document from the system document picker: it copies the document
+  into a bounded, host-owned cache file and sends that file's path over the
+  existing input channel as the `file://` paste a terminal emits for a dropped
+  file. `.dropDestination` therefore receives a real path, never a content
+  URI, and the framework needs no Android-specific drop entry point. The copy
+  lives until the host is destroyed. As with a terminal drop, the host does not
+  learn whether a destination consumed the path, and an unclaimed path falls
+  through to text paste.
+- **No multi-document, share-sheet, or drag-and-drop file intake on Android.**
+  *Gap.* Selecting several documents, `ACTION_SEND` intake and platform
+  drag-and-drop do not reach the runtime drop path.
 - **Android runtime acceptance is not closed.** *Gap.* A connected arm64
   emulator/device instrumentation journey exists for the public Compose,
   JNI, and NDK host. The current candidate has not passed its state-changing

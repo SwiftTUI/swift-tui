@@ -90,4 +90,26 @@ struct DroppedPathParsingTests {
     // Current behavior — lock it in so we don't regress silently.
     #expect(parseDroppedPaths("'/not/closed") == [DroppedPath("/not/closed")])
   }
+
+  /// The Android host delivers an imported document as one `file://` URL with
+  /// every byte outside the RFC 3986 unreserved set (and `/`) percent-encoded.
+  /// The same vector is pinned on the encoding side by swift-tui-android's
+  /// `SwiftTUIInputTest`; the two must agree byte for byte.
+  @Test("Android document import drop decodes to the exact imported path")
+  func androidDocumentImportDrop() {
+    let pasted =
+      "file:///data/user/0/app/cache/swifttui-imports/s/1/"
+      + "it%27s%20%E5%86%99%E7%9C%9F%20100%25%20%5Ca%5C%20%22q%22.png"
+    #expect(
+      parseDroppedPaths(pasted) == [
+        DroppedPath(
+          #"/data/user/0/app/cache/swifttui-imports/s/1/it's 写真 100% \a\ "q".png"#)
+      ])
+    // Escaped whitespace and control bytes stay inside the one path: nothing
+    // in the encoded form can split the token.
+    #expect(
+      parseDroppedPaths("file:///a%20b%09c%0Ad%1Be%F0%9F%98%80") == [
+        DroppedPath("/a b\tc\nd\u{1B}e😀")
+      ])
+  }
 }
