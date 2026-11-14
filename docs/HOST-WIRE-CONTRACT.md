@@ -88,6 +88,14 @@ newline. Malformed or unknown controls are dropped. They are not terminal
 input. The `accessibility` record format is documented in
 [ACCESSIBILITY.md](ACCESSIBILITY.md).
 
+The host-managed Android path has one more ingress that this stream parser
+does not accept: a `textInput` record on the optional
+`swift_tui_android_text_input` ABI operation, carrying an input method's
+full-state edit of the focused text control. It adds no frame field and no
+capability bit: the host reads the already-emitted `value`, `textSelection`
+and `accessibilityActionResponse`. See
+[Android input-method editing](ACCESSIBILITY.md#android-input-method-editing).
+
 A pointer record is
 `mouse:<kind>:<x>:<y>:<button>:<deltaX>:<deltaY>:<modifiers>`; the
 `mouseGeometry` and `mouseViewport` forms below prefix revisions to the same
@@ -888,6 +896,7 @@ The principal Swift sources for this contract are:
 - `Sources/SwiftTUIRuntime/Terminal/HostWireBudget.swift`
 - `Sources/SwiftTUIRuntime/Terminal/WebSurfaceFrameEncoder.swift`
 - `Sources/SwiftTUIRuntime/Terminal/WebSurfaceImageEncoder.swift`
+- `Sources/SwiftTUIRuntime/Input/TextInputEditWire.swift`
 - `Platforms/WASI/Sources/WASISurfaceBridge/WebSurfaceInputParser.swift`
 - `Platforms/WASI/Sources/WASISurfaceBridge/WebSurfaceTransport.swift`
 - `Platforms/WebHost/Sources/SwiftTUIWebHost/WebSocketSurfaceTransport.swift`

@@ -1187,10 +1187,22 @@ JNI/C ABI).
   reports `false` and that AAR opens the hyperlink under a tap without
   consulting the runtime. Connected TalkBack activation of a link is not
   established.
-- **Android accessibility focus and IME composition are one-way.** *Gap.*
+- **Android accessibility focus is one-way.** *Gap.*
   Runtime focus reaches TalkBack, but TalkBack-originated focus traversal is
-  not fed back into the runtime, and full IME pre-edit/marked-text
-  composition (beyond committed text) is not implemented.
+  not fed back into the runtime.
+- **Android IME composition covers `TextField` and `TextEditor`.** *Provisional.*
+  When the host AAR and the Swift host library both carry the `textInput`
+  operation, the invisible editor mirrors the focused control and sends each
+  input-method edit whole: text, directed UTF-16 selection and composing
+  range. The runtime draws the composing range underlined and commits it on
+  focus loss and on any other edit of the control. `SecureField`, a control
+  hidden from accessibility, and either side of an older AAR/library pair
+  keep committed-text byte input, where pre-edit text is sent as typed. An
+  input-method edit made in the same frame poll as an application rewrite of
+  the bound text overwrites that rewrite. The connected journey drives the
+  platform `InputConnection` from instrumentation and types on Gboard's Latin
+  layout, which commits each key; no input method that marks pre-edit text
+  (Chinese, Japanese, Korean) has been run on a device.
 - **Android content URI import is one picker route, delivered as a paste.**
   *Provisional.* The Android host library (`swift-tui-android`) imports one
   `content://` document from the system document picker: it copies the document

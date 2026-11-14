@@ -82,6 +82,10 @@ extension RunLoop {
         return reason
       }
     case .input(let inputEvent):
+      // Before: focus may have moved since the last event (a programmatic
+      // focus change settles in a frame). After: this event may have moved it.
+      finishTextCompositionIfFocusMoved()
+      defer { finishTextCompositionIfFocusMoved() }
       switch inputEvent {
       case .key(let keyPress):
         scheduler.requestInput()

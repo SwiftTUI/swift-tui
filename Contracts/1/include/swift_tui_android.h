@@ -20,6 +20,7 @@ extern "C" {
 /* Minor 1. */
 #define SWIFT_TUI_ANDROID_OP_OPEN_LINK (1u << 5)
 #define SWIFT_TUI_ANDROID_OP_CLIPBOARD_TAKE (1u << 6)
+#define SWIFT_TUI_ANDROID_OP_TEXT_INPUT (1u << 7)
 
 typedef int64_t swift_tui_android_handle;
 typedef struct swift_tui_android_abi_info {
@@ -78,6 +79,11 @@ int64_t swift_tui_android_diag(void);
  * that handle. */
 int32_t swift_tui_android_copy_open_link(swift_tui_android_handle handle,
                                          uint8_t *buffer, int32_t capacity);
+/* Minor 1. One complete UTF-8 input-method edit record: the focused editor's
+ * whole text, directed UTF-16 selection and composing range. See
+ * profiles/android-abi.md. */
+int32_t swift_tui_android_text_input(swift_tui_android_handle handle,
+                                     const uint8_t *bytes, int32_t count);
 
 #ifdef __cplusplus
 }

@@ -21,6 +21,28 @@ package func registerTextInputBinding(
   intake.registerAction(
     identity: context.identity,
     accessibilityHandler: { action in
+      // A host input method mirrors this control and sends its whole editing
+      // state, marked range included. It is not an assistive replacement.
+      if case .editText(let edit) = action, let inputMethod = edit.inputMethod {
+        // The runtime never publishes a secure value, so no host can mirror
+        // one; a full-state edit would replace text the host never saw.
+        guard !traits.isSecure else { return .unsupported }
+        let command: TextInputCommand
+        if inputMethod.finishesComposition {
+          command = .finishComposition
+        } else {
+          guard traits.isMultiline || !edit.text.contains(where: \.isNewline),
+            let state = textInputMethodState(for: edit, composition: inputMethod.composition)
+          else { return .invalidValue }
+          command = .setEditingState(
+            text: edit.text, selection: state.selection, composingRange: state.composingRange)
+        }
+        return applyTextInputCommand(
+          command, binding: binding, value: value, traits: traits, layout: layout,
+          clipboardWriteAction: context.environmentValues.clipboardWriteAction,
+          clipboardReadAction: context.environmentValues.clipboardReadAction)
+          ? .changed : .unchanged
+      }
       // Selection-only requests carry expected text. A secure control must not
       // compare that guess with its binding, including through direct dispatch.
       if traits.isSecure, action.kind == .selectText { return .unsupported }
@@ -106,6 +128,11 @@ package func registerTextInputBinding(
       traits.submitBehavior == .submit,
       let submitAction
     {
+      // Submit commits a composition first: the action must not run while
+      // the submitted text is still marked as replaceable.
+      if value.wrappedValue.composingRange != nil {
+        value.wrappedValue.composingRange = nil
+      }
       submitAction()
       return true
     }
@@ -302,6 +329,32 @@ private func ctrlTextInputCommand(
   default:
     return nil
   }
+}
+
+/// A host input method's UTF-16 selection and marked range as grapheme
+/// offsets. An offset inside a grapheme snaps rather than rejecting the edit:
+/// a selection endpoint and the end of the marked range to the grapheme's
+/// end, the start of the marked range to its start, so a marked combining
+/// mark or surrogate marks the whole user-perceived character. Offsets
+/// outside the text reject the edit.
+private func textInputMethodState(
+  for edit: AccessibilityTextEdit,
+  composition: Range<Int>?
+) -> (selection: TextSelection, composingRange: TextRange?)? {
+  let map = TextInputUTF16Map(edit.text)
+  guard let anchor = map.offset(utf16: edit.anchor, rounding: .up),
+    let head = map.offset(utf16: edit.head, rounding: .up)
+  else { return nil }
+  var composingRange: TextRange?
+  if let composition {
+    guard let lower = map.offset(utf16: composition.lowerBound, rounding: .down),
+      let upper = map.offset(utf16: composition.upperBound, rounding: .up)
+    else { return nil }
+    if lower < upper {
+      composingRange = TextRange(lowerBound: lower, upperBound: upper)
+    }
+  }
+  return (TextSelection(anchor: anchor, head: head), composingRange)
 }
 
 /// Browser offsets must name complete grapheme boundaries in the shared editor.

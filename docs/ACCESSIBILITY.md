@@ -253,6 +253,30 @@ mutate its replacement. These source contracts do not establish actual reader
 text-unit navigation or universal browser undo support.
 
 
+### Android input-method editing
+
+The Android host's invisible editor mirrors the focused nonsecure text control.
+It is seeded from the node's `value` and `textSelection` and adopts them again
+whenever they differ from its own state and no edit is unacknowledged. Each
+input-method edit is one full-state `textInput` record on the optional
+`swift_tui_android_text_input` operation
+([Android ABI profile](../Contracts/1/profiles/android-abi.md)): the target,
+the complete text, the directed UTF-16 selection and the composing range. The
+shared WASI/WebSocket input parser does not accept this record.
+
+In the runtime the record is an `editText` request with package-only
+input-method state, so target lifetime, modal scope, enablement, read-only
+refusal and the correlated acknowledgement follow the rules above. Two things
+differ from an assistive `editText`. An offset inside a grapheme snaps to that
+grapheme instead of rejecting the edit: a selection endpoint and the end of
+the composing range to its end, the start of the composing range to its start.
+And the control keeps the composing range in its editing state, drawing it
+underlined while it has keyboard focus. The application binding holds the
+composing text while it is marked; committing it unmarks it and writes nothing.
+Any other edit of the control, a key it handles (Return included, before the
+submit action runs) and loss of keyboard focus commit the range. Secure
+controls refuse the record, because their text was never published to mirror.
+
 ## Correlated input admission
 
 Accessibility request IDs admit one through twenty ASCII decimal digits within

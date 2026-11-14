@@ -4,7 +4,7 @@
   "profile": "swifttui.host-wire/1",
   "minimumReader": "full-v1-v2",
   "schemaDialect": "https://json-schema.org/draft/2020-12/schema",
-  "contentSHA256": "cb92947a1e35a2e34d74d5779a0cec7beb8acca7903cb92d06ba333f0c0293c4",
+  "contentSHA256": "e2a901129c311e132196163bbd3b7d3d45a8565ae87304ae4bfc3d3293e103ee",
   "files": {
     "README.md": {
       "sha256": "b32803c21d7c0aad46916194c191fdaebadba024e4c8872924aed4d3ce451ade",
@@ -67,12 +67,12 @@
       "bytes": 2661
     },
     "include/swift_tui_android.h": {
-      "sha256": "b0374ca3eb9b74c9c2801c68973416bcd673ec2b14d54d667c0072fbcb16469b",
-      "bytes": 4591
+      "sha256": "f405c20e6cd3a0a57f5b95af02310dee762721ee1839b032798ab6ae05c9c87b",
+      "bytes": 4961
     },
     "profiles/android-abi.md": {
-      "sha256": "41cab03c302bb9117d7ca368f91c058898affd0312f61282abc5c0274c7f4a24",
-      "bytes": 7626
+      "sha256": "20246b39dbb0ef1f48e672c3b82761ad26ca1c282a7dc0930ae6779c961cda02",
+      "bytes": 9839
     },
     "profiles/companion.md": {
       "sha256": "427bd23594eac055b8e60e020e7bea529b3bee34b99e733eb13ecb90ea6f36a2",
@@ -119,8 +119,8 @@
       "bytes": 180
     },
     "swift/inventory.jsonl": {
-      "sha256": "f35134bdad5db55fd008c8136c9d6f23a95300fe605a23198de705c0aedfc39e",
-      "bytes": 3337690
+      "sha256": "2f1c07fc5e28d88969bdbb9ea9454b0c5d1491cf64c0dccd169b21f84ad77861",
+      "bytes": 3338145
     }
   },
   "runner": "conformance/run.py",

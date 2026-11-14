@@ -90,6 +90,17 @@ extension RunLoop {
       outcome =
         command.perform(in: localScrollPositionRegistry, identity: identity) ? .changed : .unchanged
     }
+    if case .editText(let edit) = request.action, let inputMethod = edit.inputMethod,
+      outcome == .changed || outcome == .unchanged
+    {
+      // An applied input-method edit says whether its control now holds a
+      // marked range. Rejected edits leave the previous composition alone.
+      if inputMethod.composition != nil, !inputMethod.finishesComposition {
+        textCompositionIdentity = identity
+      } else if textCompositionIdentity == identity {
+        textCompositionIdentity = nil
+      }
+    }
     switch outcome {
     case .changed:
       scheduler.requestInput()
@@ -99,6 +110,27 @@ extension RunLoop {
     case .unchanged: return .accepted
     case .invalidValue: return .invalidValue
     case .unsupported: return .unsupported
+    }
+  }
+}
+
+extension RunLoop {
+  /// Focus loss commits a composition: the marked text stays and is unmarked.
+  /// No host message can be relied on for this (the host may be older, gone,
+  /// or the control out of its reach), so the run loop retires the mark when
+  /// it sees keyboard focus somewhere other than the composing control.
+  package func finishTextCompositionIfFocusMoved() {
+    guard let identity = textCompositionIdentity,
+      focusTracker.currentFocusIdentity != identity
+    else { return }
+    textCompositionIdentity = nil
+    let before = schedulerInvalidationRequestGeneration()
+    let outcome = localActionRegistry.dispatchAccessibility(
+      identity: identity, action: .editText(.finishingComposition))
+    if outcome == .changed {
+      scheduler.requestInput()
+      recordFollowUpInvalidation(
+        for: identity, schedulerInvalidationGenerationBeforeDispatch: before)
     }
   }
 }

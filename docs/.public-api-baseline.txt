@@ -49,6 +49,7 @@ SwiftTUIAndroidHost.swift_tui_android_send_input(_:_:_:)
 SwiftTUIAndroidHost.swift_tui_android_start(_:)
 SwiftTUIAndroidHost.swift_tui_android_stop(_:)
 SwiftTUIAndroidHost.swift_tui_android_take_clipboard_text(_:_:_:)
+SwiftTUIAndroidHost.swift_tui_android_text_input(_:_:_:)
 SwiftTUIAndroidHost.swift_tui_android_tick(_:)
 SwiftTUIAnimatedImage.AnimatedGIF
 SwiftTUIAnimatedImage.AnimatedGIF.decode(contentsOf:)

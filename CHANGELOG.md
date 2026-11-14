@@ -25,6 +25,12 @@ require 1.0.0. See [COMPATIBILITY.md](docs/COMPATIBILITY.md).
   write. The ABI descriptor reports minor 1, which covers this operation
   (bit 6) and `swift_tui_android_copy_open_link` (bit 5). Clients of ABI 1.0
   are unaffected (STUI-732).
+- The Android host accepts input-method edits with their composing range. The
+  optional `swift_tui_android_text_input` operation (ABI 1 minor 1, operation
+  bit 7) takes the focused text control's whole text, directed UTF-16
+  selection and composing range, and `TextField` and `TextEditor` draw
+  composing text underlined until it is committed. Hosts that send only bytes,
+  and `SecureField`, behave as before (STUI-135).
 
 ### Fixed
 

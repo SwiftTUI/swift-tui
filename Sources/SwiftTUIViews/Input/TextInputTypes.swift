@@ -102,6 +102,12 @@ package struct TextInputValue: Equatable, Sendable {
       anchor: min(selection.anchor, clampedRange.upperBound),
       head: min(selection.head, clampedRange.upperBound)
     )
+    // A marked range that no longer names text is not a composition.
+    if let composing = composingRange?.clamped(to: upperBound), !composing.isEmpty {
+      copy.composingRange = composing
+    } else {
+      copy.composingRange = nil
+    }
     return copy
   }
 }
@@ -174,6 +180,12 @@ package enum TextInputCommand: Equatable, Sendable {
   case copySelection
   case cutSelection
   case pasteClipboard
+  /// Replaces the whole editing state with a host input method's: its text,
+  /// directed selection, and marked range. Every other command retires the
+  /// marked range before it applies.
+  case setEditingState(text: String, selection: TextSelection, composingRange: TextRange?)
+  /// Keeps the marked text and unmarks it.
+  case finishComposition
 }
 
 package struct TextInputMutation: Equatable, Sendable {

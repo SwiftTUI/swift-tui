@@ -14,9 +14,9 @@ query. A smaller positive buffer receives exactly that many prefix bytes; a
 larger buffer receives only 32 bytes. The return value is always the producer's
 complete size. Future ABI-1 descriptors append fields; older callers ignore
 the tail. A short producer prefix is incompatible with this reader. Minor
-revisions add optional operations only: minor 1 adds copy open link and take
-clipboard. Callers detect an operation by its bit, never by the minor number,
-and ignore bits they do not know.
+revisions add optional operations only: minor 1 adds copy open link, take
+clipboard and text input. Callers detect an operation by its bit, never by the
+minor number, and ignore bits they do not know.
 
 The loader resolves the required and optional table once before publishing JNI
 methods. Required: install executor, application factory, start, tick, stop,
@@ -50,6 +50,7 @@ An unknown library with conflicting C signatures is outside that legacy contract
 | accessibility action | Optional; owning main thread. Borrowed complete UTF-8 action record. 1 means queued ingress, not runtime acceptance; the correlated response carries the eventual result. 0 means rejected/unsupported ingress. |
 | diagnostics | Optional, packed executor counters; diagnostic only, never a compatibility decision. |
 | copy open link | Optional, minor 1; independent from frame delivery. Same query/copy convention as the clipboard, over a first-in, first-out queue: a successful copy removes exactly the oldest destination, so the caller repeats the query/copy pair until zero. The payload is the destination's UTF-8 bytes as authored; the caller owns URI validation and dispatch. The first call, a size query included, registers the caller as the link dispatcher. Zero means nothing pending or an invalid handle. |
+| text input | Optional, minor 1 (`SWIFT_TUI_ANDROID_OP_TEXT_INPUT`, bit 7); owning main thread. Borrowed complete UTF-8 input-method edit record (below). 1 means queued ingress; the correlated action response carries runtime acceptance. 0 means rejected ingress. A host that never calls it, or a library without it, keeps committed-text byte input unchanged. |
 
 A destination enters the open-link queue only when the runtime's default
 open-link action runs: an activated enabled link, or authored code that calls
@@ -67,6 +68,39 @@ clipboard on that handle. For every other caller the write is refused and the
 application's write action reports failure, as in minor 0: the copy clipboard
 result cannot distinguish an empty text from no text, so such a caller would
 never deliver it. A caller that takes should make its first call before start.
+
+### Input-method edit record
+
+A host editor that mirrors the focused text control sends its whole state
+after each input-method edit:
+
+```text
+0x1E "textInput:" requestID ":" target ":" text ":" anchor ":" head ":"
+     compositionStart ":" compositionEnd "\n"
+```
+
+`requestID` is 1-20 ASCII decimal digits within UInt64, from the same ordered
+counter as accessibility action requests. `target` is the focused node's
+published `actionTarget`; `text` is the editor's complete text. Both are
+percent-encoded UTF-8, so a colon, LF or RS cannot split the record. `anchor`
+and `head` are the directed selection and `compositionStart`/`compositionEnd`
+the composing (marked) range, all decimal UTF-16 code-unit offsets into
+`text`; `-1:-1` means nothing is composing. The runtime translates code units
+to its grapheme offsets: an offset inside a grapheme moves a selection
+endpoint or the end of the composing range to the grapheme's end and the start
+of the composing range to its start. An offset beyond the text, a line break
+for a single-line control, a secure control, and a stale, disabled, read-only
+or out-of-scope target refuse the whole edit without a state change.
+
+The record replaces the control's text, selection and composing range. The
+runtime owns committed text and selection and publishes them on the control's
+accessibility node (`value`, `textSelection`); the host adopts them whenever
+they differ from its editor and it has no unacknowledged edit. The frame's
+`accessibilityActionResponse.requestID` is the watermark of the last processed
+request, so a frame below the host's last edit ID is older than that edit.
+Committing changes no text: the marked text is unmarked. A composing range
+ends when the input method sends `-1:-1`, when the runtime applies any other
+edit to the control, and when keyboard focus leaves it.
 
 Copy and repair operations synchronize their host-owned state. Callers still
 serialize lifecycle and destruction with all handle use; a handle lookup is not

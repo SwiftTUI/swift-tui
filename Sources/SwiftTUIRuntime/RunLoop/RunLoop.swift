@@ -182,6 +182,10 @@ public final class RunLoop<State: Equatable & Sendable, Content: View>:
   /// on every presented semantic host frame. Scoped to one host geometry
   /// session: `reconcileHostGeometry(_:)` clears it when the session changes.
   package var latestAccessibilityActionResponse: AccessibilityActionResponse?
+  /// The control whose text a host input method currently marks as composing.
+  /// A composition belongs to keyboard focus: once focus is elsewhere,
+  /// `finishTextCompositionIfFocusMoved()` commits it.
+  package var textCompositionIdentity: Identity?
   /// Arrival envelopes of inputs dispatched since the last frame acquisition
   /// whose dispatch asked the scheduler for work (see
   /// ``handle(_:arrival:)``). Transferred into the frame at acquisition and

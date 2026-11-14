@@ -56,7 +56,7 @@ package enum AccessibilityActionWire {
     return .init(target: target, action: action, requestID: requestID)
   }
 
-  private static func percentDecodedString(
+  package static func percentDecodedString(
     _ text: String
   ) -> String? {
     var bytes: [UInt8] = []

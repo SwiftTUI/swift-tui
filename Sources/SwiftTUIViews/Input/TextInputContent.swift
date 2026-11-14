@@ -45,7 +45,7 @@ package struct TextInputContent: View, Sendable {
   }
 
   private var renderedText: Text {
-    guard displayRuns.contains(where: \.isSelected) else {
+    guard displayRuns.contains(where: { $0.isSelected || $0.isComposing }) else {
       return Text(displayText)
     }
 
@@ -54,10 +54,19 @@ package struct TextInputContent: View, Sendable {
       guard !run.text.isEmpty else {
         return nil
       }
-
-      return run.isSelected
-        ? .text(Text(run.text).reverse())
-        : .literal(run.text)
+      guard run.isSelected || run.isComposing else {
+        return .literal(run.text)
+      }
+      // Marked text is underlined, the platform convention for pre-edit
+      // text; a selection or caret inside it still reverses.
+      var text = Text(run.text)
+      if run.isComposing {
+        text = text.underline()
+      }
+      if run.isSelected {
+        text = text.reverse()
+      }
+      return .text(text)
     }
     return Text(richContent)
   }

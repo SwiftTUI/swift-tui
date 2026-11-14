@@ -807,6 +807,21 @@ public final class AndroidHostSceneHost {
     return true
   }
 
+  /// Queues one complete RS/newline-framed input-method edit record: the whole
+  /// text of the focused editor after the edit, its directed UTF-16 selection
+  /// and its composing range (see `TextInputEditWire`). The return value
+  /// reports ingress admission; the next frame's action response carries the
+  /// runtime's acceptance. A stopped run refuses new edits.
+  @MainActor
+  package func sendTextInput(_ bytes: [UInt8]) -> Bool {
+    guard acceptsInput, bytes.first == 0x1E, bytes.last == 0x0A,
+      let command = String(validating: bytes.dropFirst().dropLast(), as: UTF8.self),
+      let request = TextInputEditWire.parseCommand(command)
+    else { return false }
+    session.send(.accessibility(request))
+    return true
+  }
+
   public func copyLatestFrameBytes(
     to outBuffer: UnsafeMutablePointer<UInt8>?,
     capacity: Int

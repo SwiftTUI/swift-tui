@@ -31,7 +31,7 @@ For products, supported imports, and re-export reachability, see [PUBLIC_MODULE_
 | `SwiftTUIWASI` | 3 | 9 |
 | `SwiftTUIWebHost` | 3 | 17 |
 | `SwiftTUIWebHostCLI` | 2 | 8 |
-| `SwiftTUIAndroidHost` | 19 | 48 |
+| `SwiftTUIAndroidHost` | 20 | 49 |
 | `SwiftTUICore` | 43 | 296 |
 | `SwiftTUIPrimitives` | 176 | 1582 |
 | `SwiftTUIGraph` | 78 | 592 |
@@ -632,7 +632,7 @@ For products, supported imports, and re-export reachability, see [PUBLIC_MODULE_
 
 ## SwiftTUIAndroidHost
 
-### Canonical surface (19)
+### Canonical surface (20)
 
 - `AndroidHostHandleRegistry` — enum — 3 members
 - `AndroidHostSceneHost` — class — 22 members
@@ -652,6 +652,7 @@ For products, supported imports, and re-export reachability, see [PUBLIC_MODULE_
 - `swift_tui_android_start(_:)` — func
 - `swift_tui_android_stop(_:)` — func
 - `swift_tui_android_take_clipboard_text(_:_:_:)` — func
+- `swift_tui_android_text_input(_:_:_:)` — func
 - `swift_tui_android_tick(_:)` — func
 
 ## SwiftTUICore

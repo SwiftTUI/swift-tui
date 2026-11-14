@@ -68,3 +68,17 @@ whenever no client has polled the operation. That last case is a host AAR that
 predates it, which opens the hyperlink under a tap by itself instead. The
 [`swift-tui-android` link reference](https://github.com/SwiftTUI/swift-tui-android/blob/main/docs/LINKS.md)
 defines both routes, the allowed schemes and the outcomes.
+
+### Input-method edits
+
+`swift_tui_android_text_input` accepts one complete UTF-8 RS/newline-framed
+`textInput` record: the focused text control's action target, its whole text
+after an input-method edit, the directed selection and the composing range.
+Offsets are UTF-16 code units; `-1:-1` means nothing is composing. Call it on
+the host main thread. The return value reports record validity and queuing,
+and `accessibilityActionResponse` in the next frame reports whether the
+runtime applied the edit. The runtime draws the composing range underlined and
+commits it when the control loses keyboard focus or is edited any other way.
+A host that never calls the operation keeps today's byte input, and a secure
+field always does. Older host libraries lack the symbol; the Android JNI
+adapter then reports the operation as unsupported and stays on byte input.

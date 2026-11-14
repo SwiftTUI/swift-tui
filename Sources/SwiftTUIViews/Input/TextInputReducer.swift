@@ -22,11 +22,13 @@ package struct TextInputReducer: Sendable {
     case .setSelection(let selection):
       var next = value
       next.selection = selection
+      next.composingRange = nil
       next.preferredVisualColumn = nil
       return TextInputMutation(value: next.clampingSelection(), shouldRequestFrame: true)
     case .selectAll:
       var next = value
       next.selection = TextSelection(anchor: TextOffset(0), head: TextOffset(value.text.count))
+      next.composingRange = nil
       next.preferredVisualColumn = nil
       return TextInputMutation(value: next, shouldRequestFrame: next != value)
     case .copySelection:
@@ -35,6 +37,18 @@ package struct TextInputReducer: Sendable {
       return cutSelection(in: value, traits: traits)
     case .pasteClipboard:
       return TextInputMutation(value: value)
+    case .setEditingState(let text, let selection, let composingRange):
+      // The host's state is whole: nothing of the previous value survives,
+      // so text outside the edited range is exactly the text the host kept.
+      let next = TextInputValue(
+        text: text, selection: selection, composingRange: composingRange
+      ).clampingSelection()
+      return TextInputMutation(
+        value: next, shouldWriteBinding: text != value.text, shouldRequestFrame: next != value)
+    case .finishComposition:
+      var next = value
+      next.composingRange = nil
+      return TextInputMutation(value: next, shouldRequestFrame: next != value)
     }
   }
 
@@ -270,6 +284,8 @@ package struct TextInputReducer: Sendable {
       selecting
       ? TextSelection(anchor: value.selection.anchor, head: target)
       : .caret(at: target)
+    // Moving the caret commits a composition, as a native editor does.
+    next.composingRange = nil
     next.preferredVisualColumn = preferredVisualColumn
     return TextInputMutation(value: next, shouldRequestFrame: next != value)
   }

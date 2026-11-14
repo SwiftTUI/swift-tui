@@ -185,6 +185,26 @@ public func swift_tui_android_accessibility_action(
   }
 }
 
+/// Queues a complete UTF-8 input-method edit record: the focused editor's
+/// whole text, directed UTF-16 selection and composing range. Returns 1 for
+/// valid ingress; the runtime's acceptance is correlated in the next frame's
+/// action response. Hosts that never call it keep the byte-input behaviour.
+@_cdecl("swift_tui_android_text_input")
+public func swift_tui_android_text_input(
+  _ handle: Int64,
+  _ bytes: UnsafePointer<UInt8>?,
+  _ count: Int32
+) -> Int32 {
+  guard let host = AndroidHostHandleRegistry.host(for: handle),
+    let bytes = unsafe bytes,
+    count > 0, Int(count) <= HostWireBudget.recordBytes
+  else { return 0 }
+  let payload = unsafe Array(UnsafeBufferPointer(start: bytes, count: Int(count)))
+  return withCheckedMainActorAccess("swift_tui_android_text_input") {
+    host.sendTextInput(payload) ? 1 : 0
+  }
+}
+
 @_cdecl("swift_tui_android_declare_capabilities")
 public func swift_tui_android_declare_capabilities(
   _ handle: Int64,

@@ -5,9 +5,9 @@ import Testing
   @Test func queryAndEveryShortCopyRespectCallerCapacity() {
     #expect(swift_tui_android_get_abi_info(nil, 0) == 32)
     #expect(swift_tui_android_get_abi_info(nil, Int32.max) == 32)
-    // Minor 1 advertises operation bits 5 and 6: copy open link (STUI-365)
-    // and take clipboard (STUI-732).
-    let expected: [UInt8] = [32, 1, 1, 64, 32, 64, 127, 0].flatMap {
+    // Minor 1 advertises operation bits 5, 6 and 7: copy open link (STUI-365),
+    // take clipboard (STUI-732) and text input (STUI-135).
+    let expected: [UInt8] = [32, 1, 1, 64, 32, 64, 255, 0].flatMap {
       [UInt8($0), 0, 0, 0]
     }
     for capacity in -1...40 {

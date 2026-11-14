@@ -5,6 +5,68 @@ package struct TextInputLineMetric: Equatable, Sendable {
   package var column: Int
 }
 
+/// Which grapheme boundary a UTF-16 offset inside a grapheme snaps to.
+package enum TextInputUTF16Rounding: Sendable {
+  case down
+  case up
+}
+
+/// The grapheme boundaries of one string as UTF-16 offsets: the explicit
+/// translation between a host editor's code units and the runtime's
+/// `Character` offsets. `boundaries[i]` is the UTF-16 offset before the `i`th
+/// `Character`; the last element is the string's UTF-16 length.
+package struct TextInputUTF16Map: Sendable {
+  package let boundaries: [Int]
+
+  package init(_ text: String) {
+    var boundaries = [0]
+    boundaries.reserveCapacity(text.utf16.count + 1)
+    var units = 0
+    for character in text {
+      units += character.utf16.count
+      boundaries.append(units)
+    }
+    self.boundaries = boundaries
+  }
+
+  /// The UTF-16 length of the string.
+  package var utf16Count: Int {
+    boundaries[boundaries.count - 1]
+  }
+
+  /// The `Character` offset for a UTF-16 offset. An offset inside a grapheme
+  /// (between surrogates, before a combining mark, inside a joined emoji or a
+  /// CR LF) snaps to that grapheme's start or end. `nil` when out of range.
+  package func offset(
+    utf16 offset: Int,
+    rounding: TextInputUTF16Rounding
+  ) -> TextOffset? {
+    guard offset >= 0, offset <= utf16Count else {
+      return nil
+    }
+    // The first boundary at or after the offset.
+    var low = 0
+    var high = boundaries.count - 1
+    while low < high {
+      let middle = (low + high) / 2
+      if boundaries[middle] < offset {
+        low = middle + 1
+      } else {
+        high = middle
+      }
+    }
+    if boundaries[low] == offset || rounding == .up {
+      return TextOffset(low)
+    }
+    return TextOffset(low - 1)
+  }
+
+  /// The UTF-16 offset before the `Character` at `offset`, clamped.
+  package func utf16Offset(for offset: TextOffset) -> Int {
+    boundaries[min(offset.rawValue, boundaries.count - 1)]
+  }
+}
+
 package enum TextInputStringMetrics {
   package static func clampedOffset(
     _ offset: TextOffset,

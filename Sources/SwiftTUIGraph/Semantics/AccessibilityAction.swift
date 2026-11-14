@@ -53,12 +53,46 @@ public struct AccessibilityTextEdit: Equatable, Sendable {
   public let anchor: Int
   /// The moving end of the selection in UTF-16 code units.
   public let head: Int
+  /// Input-method state from a host editor that mirrors this control. `nil`
+  /// for an ordinary assistive edit, which keeps its strict offset rule.
+  package let inputMethod: TextInputMethodEdit?
 
   /// Creates an edit. Controls reject out-of-range and split-grapheme offsets.
   public init(text: String, anchor: Int, head: Int) {
     self.text = text
     self.anchor = anchor
     self.head = head
+    inputMethod = nil
+  }
+
+  /// Creates an input-method edit. Offsets inside a grapheme snap to its
+  /// bounds instead of rejecting the edit; out-of-range offsets still reject.
+  package init(text: String, anchor: Int, head: Int, inputMethod: TextInputMethodEdit) {
+    self.text = text
+    self.anchor = anchor
+    self.head = head
+    self.inputMethod = inputMethod
+  }
+
+  /// Asks a control to keep its marked text and unmark it. The run loop sends
+  /// this when keyboard focus leaves a control during a composition.
+  package static let finishingComposition = AccessibilityTextEdit(
+    text: "", anchor: 0, head: 0, inputMethod: .init(composition: nil, finishesComposition: true))
+}
+
+/// The composing (marked, pre-edit) state a host input method reports with a
+/// full-state text edit. The host owns it; the runtime draws and retires it.
+package struct TextInputMethodEdit: Equatable, Sendable {
+  /// The marked range in UTF-16 code units of the edit's text. `nil` when the
+  /// input method is not composing: the edit's text is committed text.
+  package var composition: Range<Int>?
+  /// Unmark the control's current text and ignore the edit's text and
+  /// selection. Never sent by a host.
+  package var finishesComposition: Bool
+
+  package init(composition: Range<Int>?, finishesComposition: Bool = false) {
+    self.composition = composition
+    self.finishesComposition = finishesComposition
   }
 }
 
