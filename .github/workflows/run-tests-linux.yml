@@ -5,7 +5,8 @@ name: Repo Gate
 # consumers verify revision, toolchain, platform, architecture and checkout path.
 # The required Linux repo gate checks every job and the merged soundness ledger.
 # Shard membership lives only in Scripts/data/runtime-shards.txt; policy checks
-# require every suite to be selected exactly once. WASI builds independently.
+# require every suite to be selected exactly once. The WASI and Android
+# cross-compiles build independently; the required gate checks both.
 # The container tag tracks .swift-version and is checked by prepare_ci_container.
 
 on:
@@ -510,6 +511,88 @@ jobs:
             --swift-sdk "swift-${SWIFT_VERSION}-RELEASE_wasm" \
             --target SwiftTUIWASI
 
+  # Cross-compiles the Android host on every push/PR. No other lane builds
+  # `#if os(Android)` code: the Linux and macOS lanes compile SwiftTUIAndroidHost
+  # for the host, and the swift-tui-android gate runs Kotlin JVM tests without a
+  # Swift toolchain, so an Android-only break would ship behind green checks.
+  #
+  # The toolchain comes from the image, as in the other lanes. The image does
+  # not carry the Swift SDK for Android or an NDK (an unpacked NDK is 2.3 GB
+  # that six other jobs would pull for nothing), so this job installs both,
+  # pinned by URL and SHA-256 in Scripts/lib/android_cross_compile_pins.sh.
+  # The gate script then links the SDK's sysroot to the NDK through the
+  # bundle's own setup script and compiles with --target, which is exactly the
+  # SwiftTUIAndroidHost closure. Missing tooling fails the lane; nothing here
+  # skips. APK packaging and device runs are not part of it.
+  #
+  # timeout-minutes is also the gate's step_watchdog_deadline_seconds: a
+  # compile that goes silent is dumped and killed after at most 430 s, well
+  # inside the cap, instead of ending the job with no evidence. SYS_PTRACE
+  # lets that dump attach gdb, as in the other watched lanes.
+  android-cross-compile:
+    name: Android cross-compile
+    runs-on: ubuntu-24.04
+    container:
+      image: ghcr.io/swifttui/swift-tui-linux:swift-6.4.0
+      options: --cap-add=SYS_PTRACE
+    timeout-minutes: 30
+    env:
+      # As in the WASI lane: this job does not go through Scripts/test_all.sh,
+      # so an Android-only warning must be turned into an error here.
+      SWIFTTUI_WARNINGS_AS_ERRORS: "1"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Prepare container environment
+        shell: bash
+        run: Scripts/prepare_ci_container.sh
+
+      # Only the two downloaded archives are cached, never an installed tool:
+      # every run installs from scratch, and the install script verifies each
+      # archive against its pinned SHA-256 whether it was restored or fetched.
+      - name: Cache Android tool archives
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/swifttui-android-archives
+          key: android-cross-compile-archives-${{ hashFiles('Scripts/lib/android_cross_compile_pins.sh') }}
+
+      - name: Install the pinned Swift SDK for Android and Android NDK
+        shell: bash
+        run: Scripts/install_android_cross_compile_tools.sh
+
+      # The contract: arm64-v8a is the packaged ABI, built the way `swift build`
+      # builds on the pinned toolchain.
+      - name: Cross-compile SwiftTUIAndroidHost for aarch64-unknown-linux-android28
+        shell: bash
+        run: Scripts/check_android_cross_compile.sh --triple aarch64-unknown-linux-android28
+
+      # The same triple the way the Android Gradle plugin builds it. SwiftPM's
+      # native engine is the one that reads the SDK's linked ndk-sysroot; an
+      # unlinked one fails here with "'semaphore.h' file not found".
+      - name: Cross-compile for aarch64-unknown-linux-android28 with the native build engine
+        shell: bash
+        run: Scripts/check_android_cross_compile.sh --triple aarch64-unknown-linux-android28 --build-system native
+
+      # A separate step so a red verdict names the architecture. This keeps the
+      # documented x86_64 cross-compile true; no x86_64 ABI is packaged.
+      - name: Cross-compile SwiftTUIAndroidHost for x86_64-unknown-linux-android28
+        shell: bash
+        run: Scripts/check_android_cross_compile.sh --triple x86_64-unknown-linux-android28
+
+      # The environment record, the install and sysroot-setup output, and each
+      # triple's build log and verdict. Uploaded on failure too: the exact
+      # error text is the evidence.
+      - name: Upload Android cross-compile evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: android-cross-compile-evidence
+          path: .build/android-cross-compile
+          if-no-files-found: error
+          retention-days: 14
+
   # The branch-protection target. Its name must stay "Linux repo gate".
   #
   # `if: always() && !contains(needs.*.result, 'cancelled')`: when a newer
@@ -530,6 +613,7 @@ jobs:
       - core
       - runtime
       - wasi-cross-compile
+      - android-cross-compile
     if: always() && !contains(needs.*.result, 'cancelled')
     timeout-minutes: 10
 

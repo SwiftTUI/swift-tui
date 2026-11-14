@@ -235,6 +235,13 @@ run_repo_policy_phase() {
   run_repo_policy_check \
     "$mode" \
     "$repo_root" \
+    "Test Android cross-compile gate failure propagation" \
+    "sh Scripts/check_android_cross_compile_gate.sh" \
+    sh Scripts/check_android_cross_compile_gate.sh
+
+  run_repo_policy_check \
+    "$mode" \
+    "$repo_root" \
     "Check concurrency-safety policies" \
     "./Scripts/check_concurrency_safety_policies.sh" \
     ./Scripts/check_concurrency_safety_policies.sh
