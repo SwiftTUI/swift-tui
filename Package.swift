@@ -39,6 +39,40 @@ let warningSwiftSettings: [PackageDescription.SwiftSetting] =
 let warningCSettings: [PackageDescription.CSetting] =
   warningsAsErrors ? [.treatAllWarnings(as: .error)] : []
 
+// The Release Soundness Lane compiles SwiftTUITests per file, in batches,
+// rather than as one whole module (`SWIFTTUI_RELEASE_TESTS_PER_FILE=1`, set
+// by Scripts/release_soundness_lane.sh; STUI-1539).
+//
+// A release build type-checks a whole module in ONE compiler process, and the
+// Swift 6.4.0 compiler re-sorts its source-buffer table after every macro
+// expansion (`SourceManager::findBufferContainingLocInternal`), so that
+// process's type-checking time grows with the square of the module's macro
+// uses. SwiftTUITests holds about 26,000 `#expect`/`#require` uses. Its one
+// process took 28 to 46 minutes on the hosted runner when it finished, and
+// the kernel killed it for memory in three of the ten release builds of 14
+// and 15 November 2026; reproduced, it held 14.6 GiB when a 15 GiB container
+// killed it. Per file, no process sees more than one batch's expansions, and
+// the whole bundle builds inside 5.0 GiB. The framework targets keep their
+// whole-module release build: the lane observes THEIR release-only arms, and
+// the test module's cross-file optimization was never part of what it
+// measures.
+//
+// Opt-in because Swift Build, the default build system, plans a release
+// target as whole-module from its own setting and fails the target when a
+// flag contradicts that. The flag is usable only with `--build-system
+// native`, which the lane passes; a plain `swift build -c release
+// --build-tests` is unaffected.
+// swift-tui-org/docs/swift-tui/KNOWN-TEST-FLAKES.md entry 26 has the record.
+let releaseTestsPerFile =
+  ProcessInfo.processInfo.environment["SWIFTTUI_RELEASE_TESTS_PER_FILE"] == "1"
+
+let perFileReleaseSwiftSettings: [PackageDescription.SwiftSetting] =
+  releaseTestsPerFile
+  ? [
+    .unsafeFlags(
+      ["-no-whole-module-optimization", "-enable-batch-mode"], .when(configuration: .release))
+  ] : []
+
 let packagePlatforms: [SupportedPlatform]? = {
   if !explicitPlatforms {
     return nil
@@ -574,7 +608,7 @@ let package = Package(
         "Accessibility/README.md",
         "Fixtures",
       ],
-      swiftSettings: swiftSettings(),
+      swiftSettings: swiftSettings() + perFileReleaseSwiftSettings,
       linkerSettings: [
         // Debug reload images resolve against the test executable's sole
         // framework copy, just like swifttui-dev's initial application link.

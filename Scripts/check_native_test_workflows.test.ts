@@ -102,3 +102,92 @@ for (const name of ["run-tests-linux", "macos-gate"]) {
     });
   });
 }
+
+// The release lane transfers one release build to every part. A part that
+// builds for itself, restores a foreign bundle, or drops out of the matrix
+// would still report green, so the DAG and the transfer are pinned here.
+describe("release-soundness", () => {
+  const workflow = parse(readFileSync(new URL("../.github/workflows/release-soundness.yml", import.meta.url), "utf8"));
+  const jobs = workflow.jobs;
+  const build = jobs["release-build"];
+  const parts = jobs["release-soundness"];
+  const race = jobs["race-checks"];
+  const archiveName = "release-tests-linux-amd64";
+  const runs = (job: any, needle: string) => job.steps.filter((s: any) => s.run?.includes(needle));
+  test("builds release once and publishes the release-kind bundle", () => {
+    expect(build.steps.filter((s: any) => s.run === "Scripts/build_ci_release_test_bundle.sh")).toHaveLength(1);
+    expect(runs(build, "ci_test_bundle.py pack --kind release")).toHaveLength(1);
+    expect(build.steps.find((s: any) => s.uses?.startsWith("actions/upload-artifact") && s.with.name === archiveName)?.with.path).toBe("ci-test-bundle.tar.gz");
+    // The memory record is the build's only diagnostic when the compiler is killed.
+    const record = build.steps.find((s: any) => s.with?.name === "release-build-record");
+    expect(record.if).toBe("always()");
+    expect(record.with.path).toBe(".build/ci-release-build");
+    const wrapper = readFileSync(new URL("build_ci_release_test_bundle.sh", import.meta.url), "utf8");
+    expect(wrapper).toContain("sh ./Scripts/release_soundness_lane.sh --build-only");
+    expect(wrapper).toContain('record_root=${SWIFTTUI_RELEASE_BUILD_RECORD_ROOT:-.build/ci-release-build}');
+  });
+  test("every part restores that bundle and never builds", () => {
+    expect(parts.needs).toContain("release-build");
+    expect(parts.container.image).toBe(build.container.image);
+    expect(parts.container.options).toContain("SYS_PTRACE");
+    expect(parts.steps.find((s: any) => s.uses?.startsWith("actions/download-artifact"))?.with.name).toBe(archiveName);
+    expect(runs(parts, "tar -xzf ci-test-bundle.tar.gz")).toHaveLength(1);
+    expect(runs(parts, 'release_soundness_lane.sh --prebuilt --part "$PART"')).toHaveLength(1);
+    expect(runs(parts, "release_soundness_lane.sh --prebuilt --flaky-only")).toHaveLength(1);
+    for (const step of parts.steps.filter((s: any) => s.run?.includes("release_soundness_lane.sh"))) {
+      expect(step.run).toContain("--prebuilt");
+    }
+    expect(parts.steps.some((s: any) => s.uses?.startsWith("actions/cache"))).toBe(false);
+  });
+  test("the parts are core plus every manifest shard, and the record counts them", () => {
+    const shards = readFileSync(new URL("data/runtime-shards.txt", import.meta.url), "utf8")
+      .split("\n").filter((row) => /^[A-Za-z0-9_-]+\|/.test(row) && !row.startsWith("isolated|"))
+      .map((row) => row.split("|")[0]);
+    expect(shards.length).toBeGreaterThan(0);
+    expect(parts.strategy.matrix.part).toEqual(["core", ...shards]);
+    expect(parts.strategy["fail-fast"]).toBe(false);
+    expect(runs(jobs.record, `"$count" -ne ${shards.length + 1}`)).toHaveLength(1);
+    expect(jobs.record.needs).toEqual(["changes", "release-soundness", "race-checks"]);
+  });
+  test("the race variant keeps its own build: its flag changes the build signature", () => {
+    expect(race.needs).toBe("changes");
+    expect(runs(race, "release_soundness_lane.sh --race-checks")).toHaveLength(1);
+    expect(runs(race, "--prebuilt")).toHaveLength(0);
+    const refused = spawnSync("sh", ["Scripts/release_soundness_lane.sh", "--dry-run", "--prebuilt", "--race-checks"], {
+      cwd: new URL("..", import.meta.url), encoding: "utf8",
+    });
+    expect(refused.status).toBe(2);
+    expect(refused.stderr).toContain("--prebuilt cannot be combined with --race-checks");
+  });
+  test("a prebuilt part verifies the release bundle before its first launch", () => {
+    const dryRun = spawnSync("sh", ["Scripts/release_soundness_lane.sh", "--dry-run", "--prebuilt", "--part", "core"], {
+      cwd: new URL("..", import.meta.url), encoding: "utf8",
+    });
+    expect(dryRun.status).toBe(0);
+    const lines = dryRun.stdout.split("\n").filter((line) => line.startsWith("==> "));
+    expect(lines[0]).toBe("==> python3 Scripts/ci_test_bundle.py verify --kind release");
+    expect(lines.some((line) => line.includes(" swift build "))).toBe(false);
+    expect(lines.length).toBeGreaterThan(1);
+    for (const line of lines.slice(1)) {
+      expect(line).toContain(" swift test --build-system native -c release --skip-build ");
+    }
+  });
+  // The bundle is built per file with the native build system. A launch that
+  // named another build system would look for its products in another layout.
+  test("the build and every launch name the same build system and per-file test compile", () => {
+    const lane = readFileSync(new URL("release_soundness_lane.sh", import.meta.url), "utf8");
+    expect(lane).toContain("SWIFTTUI_RELEASE_TESTS_PER_FILE=1 && export SWIFTTUI_RELEASE_TESTS_PER_FILE");
+    const dryRun = spawnSync("sh", ["Scripts/release_soundness_lane.sh", "--dry-run"], {
+      cwd: new URL("..", import.meta.url), encoding: "utf8",
+    });
+    expect(dryRun.status).toBe(0);
+    const lines = dryRun.stdout.split("\n").filter((line) => line.startsWith("==> "));
+    expect(lines[0]).toContain(" swift build --build-system native -c release --build-tests -Xswiftc -enable-testing");
+    expect(lines.filter((line) => line.includes(" swift build "))).toHaveLength(1);
+    for (const line of lines) expect(line).toContain(" --build-system native -c release ");
+    const manifest = readFileSync(new URL("../Package.swift", import.meta.url), "utf8");
+    expect(manifest).toContain('environment["SWIFTTUI_RELEASE_TESTS_PER_FILE"] == "1"');
+    expect(manifest).toContain('["-no-whole-module-optimization", "-enable-batch-mode"], .when(configuration: .release)');
+    expect(manifest).toContain("swiftSettings: swiftSettings() + perFileReleaseSwiftSettings,");
+  });
+});

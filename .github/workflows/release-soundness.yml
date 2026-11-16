@@ -16,12 +16,19 @@ name: Release Soundness Lane
 # the rows of Scripts/data/runtime-shards.txt — plus the actor data-race
 # variant, every one in the swift-tui-linux image with gdb and SYS_PTRACE so
 # the per-launch silence watchdog can dump a wedge instead of burning the
-# cap. Each job builds release once and runs its launches with --skip-build;
-# `record` merges the parts' soundness traces, scans them once against the
-# exact-count ledger, and only then records the verdict. Until this the lane
-# ran all of SwiftTUITests in ONE parallel `swift test` — ~1,600 tests in
-# flight on a four-vCPU runner — and had not been green since 2026-08-04
-# (flake register entry 20 records the two failure shapes).
+# cap. `release-build` builds release ONCE per run and publishes the
+# exact-revision bundle; every part restores it and runs its launches with
+# --skip-build. `record` merges the parts' soundness traces, scans them once
+# against the exact-count ledger, and only then records the verdict. Before
+# 2026-08-31 the lane ran all of SwiftTUITests in ONE parallel `swift test` —
+# ~1,600 tests in flight on a four-vCPU runner — and had not been green since
+# 2026-08-04 (flake register entry 20 records the two failure shapes).
+#
+# Build once (since 2026-11-15), as the Repo Gate has since STUI-1412. Until
+# then each part compiled the identical release bundle for itself, so the one
+# build had four chances per run to fail and four runners were spent on one
+# result (flake register entry 26). The race variant's flag changes the build
+# signature, so that job alone still builds for itself.
 
 on:
   pull_request:
@@ -62,8 +69,8 @@ env:
   # the 75-minute cap the test jobs carry: worst-case kill of a silent launch
   # = 600 idle + 300 busy grace + 10 kill grace = 910 s, and the
   # livelock-while-printing backstop at 2400 s fits too. The release build
-  # runs outside the watchdog (its whole-module test compile is silent for
-  # ten-plus minutes while busy); the job cap bounds it.
+  # runs outside the watchdog (a whole-module compile prints nothing while it
+  # is busy); its job's cap bounds it.
   SWIFTTUI_TEST_STEP_TIMEOUT_SECONDS: "600"
   SWIFTTUI_TEST_STEP_BUSY_GRACE_SECONDS: "300"
   SWIFTTUI_TEST_STEP_ABSOLUTE_TIMEOUT_SECONDS: "2400"
@@ -88,26 +95,24 @@ jobs:
         with:
           lane: release-soundness
 
-  release-soundness:
-    name: Release soundness (${{ matrix.part }})
+  # The one release build of the run. The wrapper keeps a memory record of
+  # it, retained below whether the build passes or fails: a compiler process
+  # the kernel kills for memory leaves no diagnostic of its own (STUI-1539).
+  release-build:
+    name: Build release tests
     runs-on: ubuntu-24.04
     container:
       # Tracks .swift-version — bump together (Scripts/prepare_ci_container.sh
       # fails loud on drift).
       image: ghcr.io/swifttui/swift-tui-linux:swift-6.4.0
-      # The step watchdog's hang diagnostics attach gdb to a process that is
-      # not its descendant; yama ptrace_scope=1 refuses that without the
-      # capability, and the default container capability set omits it.
       options: --cap-add=SYS_PTRACE
     needs: changes
     if: needs.changes.outputs.changed == 'true'
-    timeout-minutes: 75
-    strategy:
-      fail-fast: false
-      matrix:
-        # `core` plus the shard ids of Scripts/data/runtime-shards.txt, in
-        # the manifest's order. Adding a shard row means adding it here.
-        part: [core, A, B, C]
+    # In this image with four CPUs the per-file build took 8.3 minutes and
+    # packaging 15 seconds (2026-11-15, arm64). It has not yet run on a hosted
+    # runner, where the whole-module build it replaces took 55 to 69 minutes
+    # (runs 43153599569 and 43364371621). Tighten this from hosted runs.
+    timeout-minutes: 60
 
     steps:
       - name: Checkout
@@ -126,6 +131,69 @@ jobs:
           key: ${{ runner.os }}-amd64-swiftpm-lane-${{ hashFiles('Package.resolved') }}
           restore-keys: |
             ${{ runner.os }}-amd64-swiftpm-lane-
+
+      - name: Build release test bundle once
+        shell: bash
+        run: Scripts/build_ci_release_test_bundle.sh
+
+      - name: Retain release build record
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-build-record
+          path: .build/ci-release-build
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Package exact-revision release test bundle
+        run: python3 Scripts/ci_test_bundle.py pack --kind release
+
+      - name: Upload release test bundle
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-tests-linux-amd64
+          path: ci-test-bundle.tar.gz
+          compression-level: 0
+          retention-days: 1
+
+  release-soundness:
+    name: Release soundness (${{ matrix.part }})
+    runs-on: ubuntu-24.04
+    container:
+      # The build job's image: the bundle's receipt names the toolchain and
+      # the workspace path, and verification refuses any other.
+      image: ghcr.io/swifttui/swift-tui-linux:swift-6.4.0
+      # The step watchdog's hang diagnostics attach gdb to a process that is
+      # not its descendant; yama ptrace_scope=1 refuses that without the
+      # capability, and the default container capability set omits it.
+      options: --cap-add=SYS_PTRACE
+    needs:
+      - changes
+      - release-build
+    if: needs.changes.outputs.changed == 'true'
+    timeout-minutes: 75
+    strategy:
+      fail-fast: false
+      matrix:
+        # `core` plus the shard ids of Scripts/data/runtime-shards.txt, in
+        # the manifest's order. Adding a shard row means adding it here.
+        part: [core, A, B, C]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Prepare container environment
+        shell: bash
+        run: Scripts/prepare_ci_container.sh
+
+      - name: Download release test bundle
+        uses: actions/download-artifact@v8
+        with:
+          name: release-tests-linux-amd64
+
+      - name: Restore release test bundle
+        run: tar -xzf ci-test-bundle.tar.gz && rm ci-test-bundle.tar.gz
 
       # Present in images built after 2026-08-25; installed here until then.
       # Root in the container has no sudo.
@@ -147,14 +215,14 @@ jobs:
           PART: ${{ matrix.part }}
         run: |
           set -euo pipefail
-          sh ./Scripts/release_soundness_lane.sh --part "$PART"
+          sh ./Scripts/release_soundness_lane.sh --prebuilt --part "$PART"
 
-      # The core part's build is the one this step reuses (same flags, so
-      # `swift build` is a no-op and every launch is `--skip-build`).
+      # The same restored bundle: the soak verifies it again and every launch
+      # is `--skip-build`.
       - name: Release runtime soak
         if: matrix.part == 'core'
         shell: bash
-        run: bash Scripts/run_release_soak.sh
+        run: bash Scripts/run_release_soak.sh sh ./Scripts/release_soundness_lane.sh --prebuilt --flaky-only
 
       - name: Upload release soak diagnostics
         if: always() && matrix.part == 'core'
@@ -191,10 +259,10 @@ jobs:
       options: --cap-add=SYS_PTRACE
     needs: changes
     if: needs.changes.outputs.changed == 'true' && (github.event_name != 'workflow_dispatch' || inputs.run_race_checks)
-    # The flag changes the build signature, so this job compiles every test
-    # target a second time, and the single whole-module SwiftTUITests compile
-    # dominates it. At 0d1cc221 that build alone ran past the old 60-minute
-    # cap on the hosted runner twice, where it had taken 44 minutes at 5fbcb1c8.
+    # The flag changes the build signature, so this job compiles every target
+    # a second time. The cap dates from the whole-module SwiftTUITests compile,
+    # which took this build to 83 of its 90 minutes (run 43364371621); that
+    # compile is per file since STUI-1539. Tighten this from hosted runs.
     timeout-minutes: 90
     env:
       SWIFTTUI_TEST_STEP_WATCHDOG_DEADLINE_SECONDS: "5400"

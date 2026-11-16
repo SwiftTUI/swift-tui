@@ -50,16 +50,31 @@
 #                      failure is gating; diagnose its actual signature.
 #   --race-checks      stress + reconciliation subset rebuilt with
 #                      -enable-actor-data-race-checks, serialized.
+#   --build-only       the release build every other mode starts with, and
+#                      nothing else. CI's build job runs this once per
+#                      workflow run (Scripts/build_ci_release_test_bundle.sh)
+#                      so the build's flags stay spelled in this file alone.
 #   --dry-run          print every swift invocation instead of running it
 #                      (composes with any mode above).
+#   --prebuilt         verify the exact-revision release bundle the workflow
+#                      restored (Scripts/ci_test_bundle.py verify --kind
+#                      release) instead of building. Composes with the default
+#                      mode, --part and --flaky-only. --race-checks cannot use
+#                      it: that flag changes the build signature, so its
+#                      binaries are a different build.
 #
 # Every mode builds once (`swift build -c release --build-tests`) and runs
-# its launches with `--skip-build`. That keeps the 15-25 minute release build
-# outside the per-launch watchdog: its whole-module compile of the test
-# targets prints nothing for ten minutes or more while very busy, which is
-# exactly the shape the watchdog would otherwise have to be widened to
-# tolerate — and a widened watchdog is one that no longer fires inside the
-# job cap for the stall it exists to catch.
+# its launches with `--skip-build`. That keeps the release build outside the
+# per-launch watchdog: a whole-module compile prints nothing for minutes
+# while very busy, which is exactly the shape the watchdog would otherwise
+# have to be widened to tolerate — and a widened watchdog is one that no
+# longer fires inside the job cap for the stall it exists to catch.
+#
+# In CI the build happens once per workflow run, in its own job, and every
+# part restores that bundle with --prebuilt. Until 2026-11-15 each of the four
+# parts compiled the identical release bundle for itself: four chances per run
+# for the one build to fail, and four runners spent on one result.
+# swift-tui-org/docs/swift-tui/KNOWN-TEST-FLAKES.md entry 26 has the record.
 
 set -eu
 
@@ -70,6 +85,17 @@ SWIFT="swift"
 if command -v swiftly >/dev/null 2>&1; then
   SWIFT="swiftly run swift"
 fi
+
+# SwiftTUITests is compiled per file, in batches, instead of as one whole
+# module (Package.swift reads SWIFTTUI_RELEASE_TESTS_PER_FILE and explains
+# the compiler behaviour). The framework targets keep their whole-module
+# release build; those are what this lane observes. Swift Build, the default
+# build system, cannot compile one release target per file, so every
+# invocation names the native build system — the Repo Gate's build system
+# (Scripts/test_all.sh). Build and test launches must agree on it: they look
+# for the products in different layouts.
+SWIFTTUI_RELEASE_TESTS_PER_FILE=1 && export SWIFTTUI_RELEASE_TESTS_PER_FILE
+BUILD_SYSTEM="--build-system native"
 
 SWIFTTUI_SOUNDNESS_PROBE=1 && export SWIFTTUI_SOUNDNESS_PROBE
 SWIFTTUI_SOUNDNESS_PROBE_SAMPLE=1 && export SWIFTTUI_SOUNDNESS_PROBE_SAMPLE
@@ -106,17 +132,21 @@ ISOLATED_ASYNC_SUITES="AsyncLifecycleGenerationTests AsyncFrameTailRenderingTest
 
 usage_error() {
   >&2 echo "$1"
-  >&2 echo "usage: Scripts/release_soundness_lane.sh [--dry-run] [--part core|<shard> | --flaky-only | --race-checks]"
+  >&2 echo "usage: Scripts/release_soundness_lane.sh [--dry-run] [--prebuilt] [--part core|<shard> | --flaky-only | --race-checks | --build-only]"
   exit 2
 }
 
 mode=""
 part=""
 dry_run=0
+prebuilt=0
 while [ "$#" -gt 0 ]; do
   case "$1" in
   --dry-run)
     dry_run=1
+    ;;
+  --prebuilt)
+    prebuilt=1
     ;;
   --part)
     [ "$#" -ge 2 ] || usage_error "--part requires a value (core or a shard id)"
@@ -130,7 +160,7 @@ while [ "$#" -gt 0 ]; do
     mode=--part
     part=${1#--part=}
     ;;
-  --flaky-only | --race-checks)
+  --flaky-only | --race-checks | --build-only)
     [ -z "$mode" ] || usage_error "only one mode may be given"
     mode=$1
     ;;
@@ -141,10 +171,22 @@ while [ "$#" -gt 0 ]; do
   shift
 done
 
+if [ "$prebuilt" -eq 1 ]; then
+  case "$mode" in
+  --race-checks)
+    usage_error "--prebuilt cannot be combined with --race-checks: its flag changes the build signature"
+    ;;
+  --build-only)
+    usage_error "--prebuilt cannot be combined with --build-only"
+    ;;
+  esac
+fi
+
 case "$mode" in
 "") mode_slug=default ;;
 --flaky-only) mode_slug=flaky-only ;;
 --race-checks) mode_slug=race-checks ;;
+--build-only) mode_slug=build-only ;;
 --part)
   if [ "$part" != core ] && [ -z "$(manifest_shard_regex "$part")" ]; then
     usage_error "unknown part: $part (expected core or one of: $(manifest_shard_ids | tr '\n' ' '))"
@@ -159,7 +201,7 @@ fi
 
 soundness_trace_root=${SWIFTTUI_SOUNDNESS_TRACE_ROOT:-"$repo_root/.build/soundness-trace/release-$mode_slug"}
 lane_log_root=${SWIFTTUI_RELEASE_LANE_LOG_ROOT:-"$repo_root/.build/release-soundness-logs/$mode_slug"}
-if [ "$dry_run" -eq 0 ]; then
+if [ "$dry_run" -eq 0 ] && [ "$mode" != --build-only ]; then
   for root in "$soundness_trace_root" "$lane_log_root"; do
     if [ -d "$root" ]; then
       find "$root" -type f -name '*.log' -delete
@@ -175,13 +217,25 @@ last_launch_log=""
 # test targets needs; `swift build` has no such switch and in release leaves it
 # off, so the build carries `-enable-testing` itself. The lane has therefore
 # always run release-with-testability; only the spelling moved.
+#
+# With --prebuilt the binaries were built by this same function in the
+# workflow's build job. The receipt binds them to this revision, toolchain,
+# architecture and workspace path, so nothing stale or foreign can be run.
 release_build() {
-  echo "==> $SWIFT build -c release --build-tests -Xswiftc -enable-testing $*"
+  if [ "$prebuilt" -eq 1 ]; then
+    echo "==> python3 Scripts/ci_test_bundle.py verify --kind release"
+    if [ "$dry_run" -eq 1 ]; then
+      return 0
+    fi
+    python3 Scripts/ci_test_bundle.py verify --kind release
+    return 0
+  fi
+  echo "==> $SWIFT build $BUILD_SYSTEM -c release --build-tests -Xswiftc -enable-testing $*"
   if [ "$dry_run" -eq 1 ]; then
     return 0
   fi
   # shellcheck disable=SC2086
-  $SWIFT build -c release --build-tests -Xswiftc -enable-testing "$@"
+  $SWIFT build $BUILD_SYSTEM -c release --build-tests -Xswiftc -enable-testing "$@"
 }
 
 # One `swift test` launch under the watchdog. The trace file is created up
@@ -194,14 +248,14 @@ release_test() {
   last_launch_log=$lane_log_root/invocation-$release_test_index.log
   status_file=$lane_log_root/invocation-$release_test_index.status
   timeout_file=$lane_log_root/invocation-$release_test_index.timeout
-  echo "==> $SWIFT test -c release --skip-build $*"
+  echo "==> $SWIFT test $BUILD_SYSTEM -c release --skip-build $*"
   if [ "$dry_run" -eq 1 ]; then
     return 0
   fi
   : >"$SWIFTTUI_SOUNDNESS_PROBE_TRACE_FILE"
   # shellcheck disable=SC2086
   if run_logged_command "$last_launch_log" "$status_file" "$timeout_file" \
-    $SWIFT test -c release --skip-build "$@"; then
+    $SWIFT test $BUILD_SYSTEM -c release --skip-build "$@"; then
     rm -f "$status_file" "$timeout_file"
     return 0
   fi
@@ -276,6 +330,11 @@ run_part_shard() {
 }
 
 case "$mode" in
+--build-only)
+  release_build
+  echo "release soundness lane ($mode_label) built"
+  exit 0
+  ;;
 --flaky-only)
   release_build
   # Flake #1's prescribed dynamic pursuit (swift-tui-org/docs/swift-tui/KNOWN-TEST-FLAKES.md): all
