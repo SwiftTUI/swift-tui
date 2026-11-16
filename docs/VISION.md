@@ -76,8 +76,6 @@ structured value metadata rather than an arbitrary label view tree.
 
 - Pixel-precise, media-heavy layout. SwiftTUI targets the cell grid, with
   Braille and half-block subpixel tricks, not arbitrary pixel composition.
-- Host-native input methods (IME / composition) inside SwiftTUI's own text
-  inputs.
 - A general retained navigation controller. Navigation is binding-driven.
 
 ## Where this leads
