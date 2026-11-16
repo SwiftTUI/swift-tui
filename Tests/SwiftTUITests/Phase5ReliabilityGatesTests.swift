@@ -86,6 +86,11 @@ private final class Phase5PresentationHarness {
   ) throws -> Phase5PresentationFrame {
     let artifacts = renderer.render(view, context: context)
     let presentation = try host.present(artifacts.rasterSurface)
+    // The host writes on its own queue and the latest frame wins: a present
+    // that arrives before the writer takes the previous frame supersedes it,
+    // and must then repaint what that frame would have written. Settle the
+    // writer so the next render is planned against this frame (STUI-1540).
+    try host.drainPendingPresentation()
     return .init(diagnostics: artifacts.diagnostics, presentation: presentation)
   }
 }
@@ -104,8 +109,6 @@ private final class Phase5PresentationController: TerminalControlling {
   func windowSize(of _: Int32) throws -> CellSize {
     .init(width: 16, height: 2)
   }
-
-
 
   func write(_: String, to _: Int32) throws {}
 
