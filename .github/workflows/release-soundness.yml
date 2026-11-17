@@ -66,15 +66,17 @@ env:
   # every expectation still has to hold.
   SWIFTTUI_TEST_TIMEOUT_SCALE: "4"
   # Per-launch silence watchdog (Scripts/lib/step_watchdog.sh), sized with
-  # the 75-minute cap the test jobs carry: worst-case kill of a silent launch
+  # the 50-minute cap the part jobs carry: worst-case kill of a silent launch
   # = 600 idle + 300 busy grace + 10 kill grace = 910 s, and the
-  # livelock-while-printing backstop at 2400 s fits too. The release build
-  # runs outside the watchdog (a whole-module compile prints nothing while it
-  # is busy); its job's cap bounds it.
+  # livelock-while-printing backstop at 2400 s fits too. The parts restore
+  # their bundle, so both bounds can fire inside the cap. While each part
+  # built for itself the build took 55 to 69 of its 75 minutes, and neither
+  # bound could. The release build runs outside the watchdog (a whole-module
+  # compile prints nothing while it is busy); its job's cap bounds it.
   SWIFTTUI_TEST_STEP_TIMEOUT_SECONDS: "600"
   SWIFTTUI_TEST_STEP_BUSY_GRACE_SECONDS: "300"
   SWIFTTUI_TEST_STEP_ABSOLUTE_TIMEOUT_SECONDS: "2400"
-  SWIFTTUI_TEST_STEP_WATCHDOG_DEADLINE_SECONDS: "4500"
+  SWIFTTUI_TEST_STEP_WATCHDOG_DEADLINE_SECONDS: "3000"
   SWIFTTUI_HANG_DIAGNOSTICS: "1"
 
 jobs:
@@ -108,10 +110,10 @@ jobs:
       options: --cap-add=SYS_PTRACE
     needs: changes
     if: needs.changes.outputs.changed == 'true'
-    # In this image with four CPUs the per-file build took 8.3 minutes and
-    # packaging 15 seconds (2026-11-15, arm64). It has not yet run on a hosted
-    # runner, where the whole-module build it replaces took 55 to 69 minutes
-    # (runs 43153599569 and 43364371621). Tighten this from hosted runs.
+    # The job took 33.8 and 34.1 minutes on the hosted runner (runs
+    # 43945363284 and 44015903471): 32.5 minutes of build, half a minute of
+    # packaging. The whole-module build it replaces took 55 to 69 minutes in
+    # every part (runs 43153599569 and 43364371621).
     timeout-minutes: 60
 
     steps:
@@ -171,7 +173,11 @@ jobs:
       - changes
       - release-build
     if: needs.changes.outputs.changed == 'true'
-    timeout-minutes: 75
+    # A part took 3.2 to 6.6 minutes on the hosted runner (runs 43945363284
+    # and 44015903471). The cap is the 2400 s backstop plus restore and setup;
+    # SWIFTTUI_TEST_STEP_WATCHDOG_DEADLINE_SECONDS above is this cap in
+    # seconds.
+    timeout-minutes: 50
     strategy:
       fail-fast: false
       matrix:
@@ -260,9 +266,11 @@ jobs:
     needs: changes
     if: needs.changes.outputs.changed == 'true' && (github.event_name != 'workflow_dispatch' || inputs.run_race_checks)
     # The flag changes the build signature, so this job compiles every target
-    # a second time. The cap dates from the whole-module SwiftTUITests compile,
-    # which took this build to 83 of its 90 minutes (run 43364371621); that
-    # compile is per file since STUI-1539. Tighten this from hosted runs.
+    # a second time, outside the watchdog. The job took 23.5 and 33.5 minutes
+    # on the hosted runner (runs 44015903471 and 43945363284), almost all of
+    # it build. The cap leaves the 2400 s backstop room to fire after a build
+    # of that length; with the whole-module SwiftTUITests compile the build
+    # alone took 83 of the 90 minutes (run 43364371621).
     timeout-minutes: 90
     env:
       SWIFTTUI_TEST_STEP_WATCHDOG_DEADLINE_SECONDS: "5400"

@@ -172,6 +172,25 @@ describe("release-soundness", () => {
       expect(line).toContain(" swift test --build-system native -c release --skip-build ");
     }
   });
+  // The watchdog validates its bounds against a deadline that is supposed to
+  // be the job's cap. A cap lowered without its deadline leaves a watchdog
+  // that cannot fire inside the job (Scripts/lib/step_watchdog.sh).
+  test("each watchdog deadline is its job's cap, and the bounds fit inside it", () => {
+    const seconds = (value: string) => Number.parseInt(value, 10);
+    const partDeadline = seconds(workflow.env.SWIFTTUI_TEST_STEP_WATCHDOG_DEADLINE_SECONDS);
+    const raceDeadline = seconds(race.env.SWIFTTUI_TEST_STEP_WATCHDOG_DEADLINE_SECONDS);
+    expect(partDeadline).toBe(parts["timeout-minutes"] * 60);
+    expect(raceDeadline).toBe(race["timeout-minutes"] * 60);
+    const idle = seconds(workflow.env.SWIFTTUI_TEST_STEP_TIMEOUT_SECONDS);
+    const busy = seconds(workflow.env.SWIFTTUI_TEST_STEP_BUSY_GRACE_SECONDS);
+    const absolute = seconds(workflow.env.SWIFTTUI_TEST_STEP_ABSOLUTE_TIMEOUT_SECONDS);
+    for (const deadline of [partDeadline, raceDeadline]) {
+      expect(idle + busy + 10).toBeLessThan(deadline);
+      expect(absolute + 10).toBeLessThan(deadline);
+    }
+    // The parts no longer build: a cap sized for a build would hide a hang.
+    expect(parts["timeout-minutes"]).toBeLessThan(build["timeout-minutes"]);
+  });
   // The bundle is built per file with the native build system. A launch that
   // named another build system would look for its products in another layout.
   test("the build and every launch name the same build system and per-file test compile", () => {
