@@ -126,6 +126,21 @@ struct RuntimeRenderPipeline: Sendable {
     head draft: FrameHeadDraft,
     handlers: OneShotRenderStageHandlers
   ) -> RenderExecutionResult {
+    // The stages after the head still resolve views: layout realizes
+    // geometry-dependent content, late-preference reconciliation resolves its
+    // hosts, and a lazy source is snapshotted for the worker. A view or a
+    // modifier that conforms to `Animatable` there reads the data it
+    // presents from the frame's draft, as it does in the head.
+    AnimatableValueStorage.withSink(draft.animationDraft.controller) {
+      runOneShotStages(head: draft, handlers: handlers)
+    }
+  }
+
+  @MainActor
+  private func runOneShotStages(
+    head draft: FrameHeadDraft,
+    handlers: OneShotRenderStageHandlers
+  ) -> RenderExecutionResult {
     var currentDraft = draft
     var reconciledLayout: ReconciledFrameTailLayout?
     var tail: FrameTailOutput?
@@ -178,6 +193,18 @@ struct RuntimeRenderPipeline: Sendable {
   /// and its precondition vocabulary exist once.
   @MainActor
   func renderAsync<Layout, Outcome>(
+    head draft: FrameHeadDraft,
+    handlers: AsyncRenderStageHandlers<Layout, Outcome>
+  ) async -> RenderExecutionOutcome<Outcome> {
+    // See ``renderOneShot(head:handlers:)``: the frame's draft answers every
+    // main-actor resolve of the frame.
+    await AnimatableValueStorage.withSink(draft.animationDraft.controller) {
+      await runAsyncStages(head: draft, handlers: handlers)
+    }
+  }
+
+  @MainActor
+  private func runAsyncStages<Layout, Outcome>(
     head draft: FrameHeadDraft,
     handlers: AsyncRenderStageHandlers<Layout, Outcome>
   ) async -> RenderExecutionOutcome<Outcome> {

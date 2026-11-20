@@ -82,6 +82,54 @@ extension AnimationController {
     }
   }
 
+  /// What the controller keeps for the views and view modifiers that conform
+  /// to `Animatable` (`AnimatableValueSite`).
+  ///
+  /// The animations themselves are entries of the active-animation map with
+  /// a `.value` key, so they are swept, superseded and counted like every
+  /// other animation. This struct holds what an animation does not: the
+  /// target each site last resolved with, which is where the next change
+  /// starts from, and the sample each animation in flight presents on the
+  /// frame being prepared. It is part of the checkpoint, so a frame draft
+  /// that is dropped takes its records with it.
+  package struct ValueSiteState: Sendable {
+    /// The `animatableData` each site last resolved with as its target.
+    /// Records of sites that left the tree are pruned when the resolved tree
+    /// is processed.
+    package var targets: [AnimationKey: AnyAnimatable] = [:]
+    /// The graph node that evaluates each site, when one does. A site's
+    /// identity is the one its view resolves at. A view whose body root is a
+    /// conditional or a lone `Group` commits its branch's node in its place,
+    /// so that identity is not in the resolved tree while the view is. The
+    /// node says the site is still there, and the head asks the graph which
+    /// identity the node now answers to.
+    package var ownerNodeIDs: [AnimationKey: ViewNodeID] = [:]
+    /// The data each value animation in flight presents on this frame: the
+    /// head's one evaluation of its curve, or its first value when it
+    /// started during this frame's resolve. Every resolve of the site in
+    /// the frame reads the same entry.
+    package var samples: [AnimationKey: AnyAnimatable] = [:]
+    /// The identities whose bodies run on this frame because a value
+    /// animation ticked: the owners the head invalidated. Such a body runs
+    /// for the tick alone, so its output takes this frame's transaction and
+    /// not one an ancestor was resolved under on an earlier frame.
+    package var tickedOwners: Set<Identity> = []
+    /// The instant of the frame being prepared, set when the head ticks the
+    /// value animations. A value animation that starts during resolve
+    /// starts at this instant.
+    package var frameInstant: MonotonicInstant?
+
+    package init() {}
+
+    package mutating func reset() {
+      targets.removeAll(keepingCapacity: true)
+      ownerNodeIDs.removeAll(keepingCapacity: true)
+      samples.removeAll(keepingCapacity: true)
+      tickedOwners.removeAll(keepingCapacity: true)
+      frameInstant = nil
+    }
+  }
+
   /// The already-sampled resolved-tree presentation for one animation tick.
   ///
   /// Late-preference reconciliation may rebuild the canonical resolved tree

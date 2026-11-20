@@ -111,6 +111,20 @@ struct ResolveContextStorageTotalityTests {
       notCarriedReason:
         "one-shot by design: the cursor resets at every identity boundary"
     ),
+    "animatableSiteOrdinalCursor": notEquated(
+      "documented Equatable exclusion: the per-identity position of the next "
+        + "Animatable site must never gate reuse",
+      carried: false,
+      notCarriedReason:
+        "one-shot by design: the cursor resets at every identity boundary"
+    ),
+    "animatableDataPresentedByEnclosure": notEquated(
+      "one-shot mark for the resolve of one view (see the field doc); it must "
+        + "never gate reuse",
+      carried: false,
+      notCarriedReason:
+        "one-shot by design: a structural derivation must not hand the mark to another view"
+    ),
     "propagated": notEquated(
       "compared member-by-member through the forwarding names; see propagatedMembers"
     ),

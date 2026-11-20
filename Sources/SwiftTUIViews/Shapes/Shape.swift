@@ -94,16 +94,16 @@ extension Shape {
   }
 
   package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
-    [
+    var payload = ShapePayload(
+      geometry: fillGeometry,
+      insetAmount: insetAmount,
+      operation: .fill(style: nil, mode: .full)
+    )
+    payload.animatableShape = animatableShapeProvider(fills: true)
+    return [
       resolveLeafNode(
         kindName: resolvedShapeKind,
-        drawPayload: .shape(
-          .init(
-            geometry: fillGeometry,
-            insetAmount: insetAmount,
-            operation: .fill(style: nil, mode: .full)
-          )
-        ),
+        drawPayload: .shape(payload),
         in: context
       )
     ]

@@ -114,3 +114,16 @@ extension Shape {
 extension TrimmedShape: WrappedShapeKind {
   package var baseShapeKind: ViewKind { base.resolvedShapeKind }
 }
+
+/// A trim of a shape that conforms to `Animatable` animates as that shape
+/// does. The trim interval is not part of the animated data: on a stroke it
+/// animates on its own, and on a fill it does not animate.
+extension TrimmedShape: AnimatableShapeForwarding {
+  package static var forwardedShapeType: Any.Type { Base.self }
+
+  package var forwardedShape: any Shape { base }
+
+  package func replacingForwardedShape(_ shape: any Shape) -> (any Shape)? {
+    (shape as? Base).map { TrimmedShape(base: $0, from: from, to: to) }
+  }
+}

@@ -32,8 +32,11 @@ The reflexes transfer, even where a signature narrows.
 - **Lifecycle and reaction.** `onChange(of:initial:)` with modern
   semantics, `task(_:)` and `task(id:)` including the `.userInitiated`
   priority default, and the `disabled(_:)` AND-down cascade.
-- **Animation.** `withAnimation`, `Transaction`, `Animatable`, and
-  transitions on insertion and removal.
+- **Animation.** `withAnimation`, `Transaction`, and transitions on
+  insertion and removal. A view, a view modifier or a shape that conforms to
+  `Animatable` is evaluated with interpolated `animatableData` on every
+  frame, as in SwiftUI, with the two differences under "Modern-only,
+  portable data flow" below.
 - **Presentation shapes.** `sheet`, `fullScreenCover`, `alert`, and
   `confirmationDialog` take the initializer shapes you know, and `ButtonRole`
   carries the same case set.
@@ -95,6 +98,32 @@ final class DeployModel {  // implicitly Sendable
   var builds: [Build] = []
 }
 ```
+
+The same strictness reaches `Animatable`. `View` and `ViewModifier` are
+main-actor protocols, so a conforming type is isolated to the main actor,
+while `Animatable` is a nonisolated, `Sendable` protocol. A type that is
+both declares `animatableData` as `nonisolated`. The property then reads and
+writes stored properties that are `Sendable`, which numbers are:
+
+```swift
+struct Fade: ViewModifier, Animatable {
+  var progress: Double
+
+  nonisolated var animatableData: Double {
+    get { progress }
+    set { progress = newValue }
+  }
+
+  func body(content: Content) -> some View {
+    content.opacity(progress)
+  }
+}
+```
+
+A shape is written the same way, and has to say that it animates: `Shape`
+does not refine `Animatable` here, so a shape opts in by adding the
+conformance. Without it the shape's path morphs point by point. See
+<doc:Animating-Views>.
 
 ### Keyboard-first interaction
 
@@ -217,7 +246,7 @@ current status of each.
 | `Color` vocabulary: `alpha:` not `opacity:`, `mixed(with:amount:method:)` not `mix(with:by:)`, no `Color.accentColor` | Prefer semantic roles (`.primary`, `.secondary`, `.tint`) resolved through the host theme; they are the intended currency |
 | No `ScenePhase` | None; a session is one full-canvas scene |
 | Scale transitions and matched size changes use placed bounds and clipping rather than re-layout or bitmap scaling | Expect whole-cell steps; content keeps its destination layout while the interpolated frame clips it |
-| A custom `Transition` body animates on insertion and on removal, but the departing view's tasks, `onDisappear` and state end when the removal starts, a view only one phase has does not cross-fade, and a custom `Animatable` inside a body shows its destination value at once | Keep the same views in every phase and change their modifiers. Do not rely on `onDisappear` to mark the end of a removal: use the completion of `withAnimation`. Build the body from interpolating modifiers (`opacity`, `clipShape`, `offset`, styles) |
+| A custom `Transition` body animates on insertion and on removal, but the departing view's tasks, `onDisappear` and state end when the removal starts, a view only one phase has does not cross-fade, and a custom `Animatable` view or modifier inside a body shows its destination value at once | Keep the same views in every phase and change their modifiers. Do not rely on `onDisappear` to mark the end of a removal: use the completion of `withAnimation`. Build the body from interpolating modifiers (`opacity`, `clipShape`, `offset`, styles); a `clipShape` of a shape that conforms to `Animatable` is evaluated on every frame |
 | Lazy stacks estimate unseen content | Compose static fragments and multiple `ForEach` sources directly; default spacing is exact between realized neighbors. Body-dependent empty rows and negative spacing can require exhaustive work |
 | Path morphing requires matching ordered element kinds; clipping samples cell centers | Use `Angle`, `Path.addArc`, `Path.interpolated(to:progress:)`, and `clipShape(_:)`; see <doc:Shapes> |
 

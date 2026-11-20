@@ -4,7 +4,7 @@
   "profile": "swifttui.host-wire/1",
   "minimumReader": "full-v1-v2",
   "schemaDialect": "https://json-schema.org/draft/2020-12/schema",
-  "contentSHA256": "215c60d4fb463a82eaffd58542f3413ea58c01b20fc3cfbf025bf25026f9e4a7",
+  "contentSHA256": "f5c5a078fd067a0dba85e6d254e23446f51b5ce74a8a49351448c7ea843b9713",
   "files": {
     "README.md": {
       "sha256": "b32803c21d7c0aad46916194c191fdaebadba024e4c8872924aed4d3ce451ade",
@@ -119,8 +119,8 @@
       "bytes": 180
     },
     "swift/inventory.jsonl": {
-      "sha256": "a4f9f81d78e1997115857e5190e7e5bed8eff9d1680b992c7bc2e34c520c968b",
-      "bytes": 3375759
+      "sha256": "665a485c3257d4018836c6c810f101c969c071b12ae68508efd7386176021439",
+      "bytes": 3376486
     }
   },
   "runner": "conformance/run.py",

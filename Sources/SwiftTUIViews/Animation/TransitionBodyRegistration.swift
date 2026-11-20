@@ -74,9 +74,16 @@ package struct TransitionBodyRegistration: Sendable {
   /// the body registers nothing with the animation controller. The ambient
   /// view node and authoring context are cleared, so a dynamic property
   /// cannot find the node of whatever was evaluating when this was called.
+  ///
+  /// A view or a modifier of the body that conforms to `Animatable` asks
+  /// `valueSink` for the data to evaluate with. With `nil`, the default, it
+  /// evaluates with the data the phase wrote. Each such site has the name it
+  /// has in the live tree, the host's identity and its position there, so a
+  /// caller can answer a site with the sample of that site's animation.
   @MainActor
   package func resolve(
     phase: TransitionPhase,
+    valueSink: (any AnimatableValueSink)? = nil,
     contentSize: @escaping @MainActor (Identity) -> CellSize = { _ in .zero }
   ) -> TransitionPhaseTree {
     let recorder = TransitionStandInRecorder()
@@ -97,10 +104,17 @@ package struct TransitionBodyRegistration: Sendable {
     let roots = TransitionRegistrationStorage.$currentTaskSink.withValue(nil) {
       AnimationRegistrationStorage.$currentTaskSink.withValue(nil) {
         AnimationCompletionStorage.$currentTaskSink.withValue(nil) {
-          ViewNodeContext.withCurrentValue(nil) {
-            withAuthoringContext(nil) {
-              TransitionPhaseScratchScope.$isActive.withValue(true) {
-                box.resolveElementsWork(content: standIn, phase: phase, in: context).run()
+          // The caller's value sink, or none: whatever sink the frame
+          // bound around this call is not the body's. With none, a view or
+          // a modifier of the body that conforms to `Animatable` evaluates
+          // with the data the phase wrote, and the live controller learns
+          // nothing of this resolve.
+          AnimatableValueStorage.withSink(valueSink) {
+            ViewNodeContext.withCurrentValue(nil) {
+              withAuthoringContext(nil) {
+                TransitionPhaseScratchScope.$isActive.withValue(true) {
+                  box.resolveElementsWork(content: standIn, phase: phase, in: context).run()
+                }
               }
             }
           }
@@ -274,6 +288,10 @@ extension ResolveContext {
     detached.forceRootEvaluation = false
     detached.entityHosting = false
     detached.valueAnimationOrdinalCursor = 0
+    // `animatableSiteOrdinalCursor` stays as the host resolved with it: an
+    // `Animatable` site of the body has to get the same position here as in
+    // the live tree, so the two name one animation.
+    detached.animatableDataPresentedByEnclosure = false
     return detached
   }
 }

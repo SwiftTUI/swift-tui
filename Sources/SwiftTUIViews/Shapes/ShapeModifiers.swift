@@ -9,7 +9,8 @@ extension Shape {
       kindName: resolvedShapeKind,
       geometry: fillGeometry,
       insetAmount: insetAmount,
-      operation: .fill(style: AnyShapeStyle(style), mode: .full)
+      operation: .fill(style: AnyShapeStyle(style), mode: .full),
+      animatableShape: animatableShapeProvider(fills: true)
     )
   }
 
@@ -23,7 +24,8 @@ extension Shape {
       kindName: resolvedShapeKind,
       geometry: fillGeometry,
       insetAmount: insetAmount,
-      operation: .fill(style: nil, mode: .full)
+      operation: .fill(style: nil, mode: .full),
+      animatableShape: animatableShapeProvider(fills: true)
     )
   }
 }
@@ -95,7 +97,8 @@ extension Shape {
         strokeStyle: strokeStyle.trimmed(to: strokeTrim),
         strokeBorder: false,
         backgroundStyle: backgroundStyle
-      )
+      ),
+      animatableShape: animatableShapeProvider(fills: false)
     )
   }
 
@@ -112,7 +115,8 @@ extension Shape {
         strokeStyle: strokeStyle.trimmed(to: strokeTrim),
         strokeBorder: false,
         backgroundStyle: backgroundStyle
-      )
+      ),
+      animatableShape: animatableShapeProvider(fills: false)
     )
   }
 }
@@ -188,7 +192,8 @@ extension InsettableShape {
         strokeStyle: strokeStyle.trimmed(to: strokeTrim),
         strokeBorder: true,
         backgroundStyle: backgroundStyle
-      )
+      ),
+      animatableShape: animatableShapeProvider(fills: false)
     )
   }
 
@@ -205,7 +210,8 @@ extension InsettableShape {
         strokeStyle: strokeStyle.trimmed(to: strokeTrim),
         strokeBorder: true,
         backgroundStyle: backgroundStyle
-      )
+      ),
+      animatableShape: animatableShapeProvider(fills: false)
     )
   }
 }

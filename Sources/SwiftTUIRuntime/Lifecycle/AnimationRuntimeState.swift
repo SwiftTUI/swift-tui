@@ -36,6 +36,24 @@ package enum AnimationKind: Sendable {
     properties: MatchedGeometryProperties,
     anchor: UnitPoint
   )
+  /// The `animatableData` of a view or a view modifier that conforms to
+  /// `Animatable` (boxed in an `AnimatableDataBox`). The frame head samples
+  /// it once a frame and invalidates the owner, whose body then evaluates
+  /// with the sample. Nothing is written to the resolved or the placed tree.
+  case value(from: AnyAnimatable, to: AnyAnimatable)
+}
+
+extension AnimationKind {
+  /// The two ends of a kind that interpolates one value between them: a
+  /// property slot or the data of an `Animatable` view or modifier.
+  package var endpoints: (from: AnyAnimatable, to: AnyAnimatable)? {
+    switch self {
+    case .property(let from, let to), .value(let from, let to):
+      (from, to)
+    case .insertionOffset, .insertionScale, .matchedGeometry:
+      nil
+    }
+  }
 }
 
 /// An animation currently in flight for one ``AnimationKey``.

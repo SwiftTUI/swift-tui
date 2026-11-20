@@ -59,6 +59,11 @@ public struct ShapePayload: Equatable, Sendable {
   public var geometry: ShapeGeometry
   public var insetAmount: Int
   public var operation: ShapeOperation
+  /// The data of a shape that conforms to `Animatable`, and the way from
+  /// data back to geometry. `nil` for every other shape. ``geometry`` always
+  /// holds the geometry to draw; the animation controller writes each
+  /// sample's geometry there.
+  package var animatableShape: AnimatableShapeProvider? = nil
 
   public init(
     geometry: ShapeGeometry,

@@ -8,9 +8,11 @@ import SwiftTUICore
 // They are file-internal rather than `private` so the coordinator can reach
 // them across files.
 
-/// Installs the animation, transition, and completion task sinks for the
-/// duration of `operation`, so registrations made while resolving a draft
-/// route to the draft's controller.
+/// Installs the animation, transition, completion, and animatable-value task
+/// sinks for the duration of `operation`, so registrations made while
+/// resolving a draft route to the draft's controller, and a view or a
+/// modifier that conforms to `Animatable` reads the data it presents from
+/// the same draft.
 @MainActor
 func withAnimationDraftSinks<Result>(
   _ animationDraft: AnimationFrameDraft,
@@ -20,7 +22,9 @@ func withAnimationDraftSinks<Result>(
   return AnimationRegistrationStorage.$currentTaskSink.withValue(controller) {
     TransitionRegistrationStorage.$currentTaskSink.withValue(controller) {
       AnimationCompletionStorage.$currentTaskSink.withValue(controller) {
-        operation()
+        AnimatableValueStorage.withSink(controller) {
+          operation()
+        }
       }
     }
   }

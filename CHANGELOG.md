@@ -114,6 +114,33 @@ require 1.0.0. See [COMPATIBILITY.md](docs/COMPATIBILITY.md).
   snap. A `withAnimation` completion waits for the transition's own animation.
   `withAnimation(nil)` and Reduce Motion still disable the transition
   (STUI-1543).
+- A view or a view modifier that conforms to `Animatable` is evaluated on
+  every frame of an animation. When its `animatableData` changes inside
+  `withAnimation`, or under `animation(_:value:)`, its body runs with the
+  interpolated data for each frame and with the new data at the end. A new
+  target in flight continues from the current sample, and a spring keeps its
+  velocity and delivers values beyond its two ends. Only the conformer's own
+  subtree is evaluated again. When a view and the modifier on it both
+  conform, the `ModifiedContent` animates as one value (STUI-1546).
+- A shape that conforms to `Animatable` has `path(in:)` evaluated with
+  interpolated data on every frame, in `fill`, `stroke`, `strokeBorder` and
+  `clipShape`, without evaluating any view. A trim or an inset of such a
+  shape animates with it. This also holds for the `clipShape` of a custom
+  `Transition` body, on insertion and on removal (STUI-1546).
+- A type that conforms to `Animatable` and has nothing to animate needs no
+  `animatableData`: the property has a default for `EmptyAnimatableData`, as
+  in SwiftUI (STUI-1546).
+
+### Changed
+
+- Existing `Animatable` conformers now animate where they snapped. A view
+  or a view modifier that conforms to `Animatable` used to be evaluated
+  once, with its new data, when that data changed inside an animation; a
+  shape that conforms used to morph its path point by point. Both now
+  receive every interpolated sample. To keep the earlier behavior, remove
+  the `Animatable` conformance from a type that should not be evaluated per
+  frame. A change with no animation, and every change under Reduce Motion,
+  still evaluates the conformer once (STUI-1546).
 
 ### Fixed
 

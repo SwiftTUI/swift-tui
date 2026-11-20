@@ -821,6 +821,21 @@ are omitted even when SwiftUI exposes a corresponding API.
   incompatible topology snaps to the target. Empty and collapsed paths retain
   their authored topology. `interpolated(to:progress:)` exposes the same rule
   with clamped progress and exact endpoints.
+- **`Shape` does not refine `Animatable`; a shape opts in.** *Provisional.*
+  In SwiftUI every `Shape` is `Animatable`. Here `Shape` refines `View` only,
+  and a shape whose `path(in:)` should be evaluated for each frame of an
+  animation adds the `Animatable` conformance itself, with a `nonisolated`
+  `animatableData`. `fill`, `stroke`, `strokeBorder` and `clipShape` look
+  the conformance up when they are applied, and such a shape is then
+  evaluated with interpolated data on every frame. A shape without the
+  conformance morphs as the entry above describes. Three things follow.
+  Generic code constrained to `Shape` cannot use `animatableData`. The
+  shapes that `trim(from:to:)` and `inset(by:)` return are not `Animatable`
+  themselves; they animate as the shape they wrap does, and neither the trim
+  interval nor the inset is part of the animated data. The built-in shapes
+  do not conform, so a corner radius changes at once. Making `Shape` refine
+  `Animatable` would change the requirements of a protocol the compatibility
+  policy protects, so it is not done within a major version.
 - **Custom shapes stretch; built-ins inscribe.** *Ratified.* A custom
   `path(in:)` shape fills its frame, while `Circle` stays round by inscribing
   the short axis; both are recorded as consequences of the cell grid, together with
@@ -888,6 +903,30 @@ are omitted even when SwiftUI exposes a corresponding API.
   `Transaction.tracksVelocity` seed the next spring on the same value.
   `SWIFTTUI_ANIMATION_VELOCITY=0` restores the at-rest restart for one
   release.
+- **A custom `Animatable` view or modifier animates by running its body
+  again.** *Ratified.* When the `animatableData` of a view or a view modifier
+  changes inside an animation, SwiftTUI interpolates the data and evaluates
+  the conformer's body on every frame with the sample, as SwiftUI does. The
+  terminal-specific part is the cost: each sample evaluates the body and
+  every view it builds, a modifier's content included, though no view
+  outside that subtree. What the body writes for a sample is applied as it
+  is. The differences from SwiftUI are these. `animatableData` is declared
+  `nonisolated` on a view or a modifier, which are main-actor types (one more
+  member of the narrowing class above). `AnimatableModifier`,
+  `GeometryEffect` and the `@Animatable` macro are not provided: conform a
+  `ViewModifier` to `Animatable` and write `animatableData` by hand. A
+  spring delivers values beyond the two ends of the animation, as in
+  SwiftUI, and the body receives them unclamped. On the frame where a new
+  animation reaches a value that is already animating, the properties the
+  body writes hold their previous value for that one frame, while the data
+  itself continues without a step. A `transaction(_:)` modifier that sets an
+  animation for every update, applied above the conformer, animates what the
+  body writes for each sample as well, so the result trails the data; scope
+  such a modifier with `animation(_:value:)` or `transaction(value:_:)`
+  instead. A conformer inside the rows of a lazy stack gets its new value at
+  once, as every animated change there does (STUI-1376), and one inside a
+  custom `Transition` body does too (STUI-1546, in the transition entry
+  below).
 - **Scoped `body:` forms include environment-carried foreground and tint.**
   *Ratified.* `View.animation(_:body:)` and `View.transaction(_:body:)`
   scope the transaction to modifiers that create a node (`offset`,
@@ -913,7 +952,10 @@ are omitted even when SwiftUI exposes a corresponding API.
   *The remaining gap.* A custom `Animatable` view or modifier inside a body is
   not driven per frame yet. It shows its destination value at once: the
   `identity` value on insertion and the `didDisappear` value on removal
-  (STUI-1546). Everything else in this entry is how transitions work.
+  (STUI-1546). A shape that conforms to `Animatable` is a value the engine
+  interpolates, so a body's `clipShape` of such a shape is evaluated on every
+  frame of an insertion and of a removal. Everything else in this entry is
+  how transitions work.
   *Insertion.* When a view with a custom body is inserted under an animation,
   it appears through the body of `willAppear` and moves to the body of
   `identity`, as in SwiftUI. The rendered view tree is the `identity` body
@@ -923,8 +965,8 @@ are omitted even when SwiftUI exposes a corresponding API.
   views of the content that inherit them), shape fill and stroke styles
   (`background(_:)` with a style is one), border styles, padding, offset,
   position, frame width and height, the path of a shape and of a `clipShape`
-  when both phases have the same path elements, a stroke's dash phase, and a
-  stroke's trim. A `Text` under a `contentTransition` rolls from the
+  when both phases have the same path elements, the data of a shape that
+  conforms to `Animatable`, a stroke's dash phase, and a stroke's trim. A `Text` under a `contentTransition` rolls from the
   `willAppear` string, as it does for any change. A value the engine cannot
   interpolate (a blend mode, a text attribute, a string with no content
   transition, an environment value, a modifier that is present in one phase

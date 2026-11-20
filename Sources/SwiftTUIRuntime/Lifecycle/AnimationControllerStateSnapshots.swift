@@ -12,6 +12,7 @@ extension AnimationController {
     package var batchCompletion: BatchCompletionState
     package var frameHead: FrameHeadTransactionState
     package var completionLedger: CompletionLedger
+    package var valueSites: ValueSiteState
     package var activeAnimations: [AnimationKey: ActiveAnimation]
     package var removingNodes: [ViewNodeID: RemovalEntry]
     package var currentResolvedPresentationProjection: ResolvedPresentationProjection

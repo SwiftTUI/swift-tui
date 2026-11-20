@@ -21,6 +21,17 @@ public protocol Animatable: Sendable {
   var animatableData: AnimatableData { get set }
 }
 
+extension Animatable where AnimatableData == EmptyAnimatableData {
+  /// The data of a type that has nothing to animate.
+  ///
+  /// A type that conforms to `Animatable` and declares no `animatableData`
+  /// gets this one, as in SwiftUI. Nothing animates for such a type.
+  public var animatableData: EmptyAnimatableData {
+    get { EmptyAnimatableData() }
+    set {}
+  }
+}
+
 // MARK: - EmptyAnimatableData
 
 /// Placeholder for types that declare `Animatable` conformance but have
@@ -168,5 +179,23 @@ extension AnimatablePair: Animatable {
   public var animatableData: AnimatablePair<First, Second> {
     get { self }
     set { self = newValue }
+  }
+}
+
+// MARK: - AnimatableDataBox
+
+/// The `animatableData` of a view or a view modifier, as a value the
+/// animation controller can hold.
+///
+/// A view is neither `Equatable` nor something the controller can store, but
+/// its data is a `VectorArithmetic` value, which is both `Equatable` and
+/// `Sendable`. The box makes that data `Animatable` in its own right, so the
+/// controller interpolates it and carries its velocity across a retarget with
+/// the machinery it has for every other animated value.
+package struct AnimatableDataBox<Data: VectorArithmetic>: Animatable, Equatable, Sendable {
+  package var animatableData: Data
+
+  package init(_ data: Data) {
+    animatableData = data
   }
 }

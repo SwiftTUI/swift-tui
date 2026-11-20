@@ -714,6 +714,21 @@ the main actor before the frame tail, the same file lays the tree out at the
 frozen rect and puts the frozen placed content under each stand-in, so the
 tail receives a finished placed overlay.
 
+A view or a view modifier that conforms to `Animatable` is found where a
+body is about to be evaluated (`Foundation/ViewResolutionWork.swift`), with
+one cached lookup per view type (`Animation/AnimatableSiteResolution.swift`).
+The resolver names the site by its identity and its position there, and asks
+the frame's animation controller, through `AnimatableValueSink`
+(`SwiftTUIGraph/Animation/AnimationContextStorage.swift`), for the data the
+body evaluates with. The controller keeps the last target of each site and a
+value animation per site in flight. The frame head samples each value
+animation once, before resolve, and adds its owner to the frame's
+invalidation set, so only that body runs again. A shape that conforms to
+`Animatable` does not go through resolve: its modifier records the shape's
+data beside the geometry (`SwiftTUIPrimitives/Animation/AnimatableShapeValue.swift`),
+the data is an animated slot of the node, and each sample is turned back into
+geometry by the shape, on the main actor, when the controller takes it.
+
 `resolve` reuses unchanged work in two ways. **Retained reuse** skips a subtree
 that is separate from the frame's invalidation. **Memoized-body reuse** is on by
 default. It can also skip a subtree under an invalidated ancestor when all of

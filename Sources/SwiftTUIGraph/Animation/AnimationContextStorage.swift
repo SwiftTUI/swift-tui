@@ -191,3 +191,92 @@ package enum TransitionRegistrationStorage {
     }
   }
 }
+
+/// One place in the view tree whose `animatableData` the animation system
+/// may animate: a view, or a modifier in a modifier chain, that conforms to
+/// `Animatable`.
+///
+/// Several sites can resolve at one identity: a view and the modifiers
+/// around it share their identity. `ordinal` is the site's outer-first
+/// position among them, so the pair is stable from one resolve to the next.
+package struct AnimatableValueSite: Hashable, Sendable {
+  package var identity: Identity
+  package var ordinal: Int
+
+  package init(identity: Identity, ordinal: Int) {
+    self.identity = identity
+    self.ordinal = ordinal
+  }
+}
+
+/// Sink the View layer asks for the `animatableData` a site presents on the
+/// current frame.
+///
+/// The resolver passes the data the author wrote, which is the site's
+/// target, and the transaction the site resolves under. The sink returns the
+/// data the body evaluates with: the target when nothing animates, or the
+/// sample of the animation toward it. With no sink bound a site evaluates
+/// with its target.
+///
+/// `ownerNodeID` is the graph node that evaluates the site, when there is
+/// one. The site's identity is the one its view resolves at, which is not
+/// always an identity of the resolved tree: a view whose body root is a
+/// conditional or a lone `Group` commits its branch's node in its place. The
+/// node tells the sink that such a site is still there, and which identity
+/// to invalidate for it.
+@MainActor
+package protocol AnimatableValueSink: AnyObject, Sendable {
+  func presentedAnimatableData<Data: VectorArithmetic>(
+    for target: Data,
+    at site: AnimatableValueSite,
+    ownerNodeID: ViewNodeID?,
+    transaction: TransactionSnapshot,
+    reducesMotion: Bool
+  ) -> Data
+}
+
+extension AnimatableValueSink {
+  /// The pull of a site that no graph node evaluates.
+  package func presentedAnimatableData<Data: VectorArithmetic>(
+    for target: Data,
+    at site: AnimatableValueSite,
+    transaction: TransactionSnapshot,
+    reducesMotion: Bool
+  ) -> Data {
+    presentedAnimatableData(
+      for: target,
+      at: site,
+      ownerNodeID: nil,
+      transaction: transaction,
+      reducesMotion: reducesMotion
+    )
+  }
+}
+
+@MainActor
+package enum AnimatableValueStorage {
+  @TaskLocal package static var currentTaskSink: (any AnimatableValueSink)?
+
+  /// The task-local sink, exclusively, as for the other animation sinks.
+  package static var effectiveSink: (any AnimatableValueSink)? {
+    currentTaskSink
+  }
+
+  package static func withSink<Result>(
+    _ sink: (any AnimatableValueSink)?,
+    operation: () async throws -> Result
+  ) async rethrows -> Result {
+    try await $currentTaskSink.withValue(sink) {
+      try await operation()
+    }
+  }
+
+  package static func withSink<Result>(
+    _ sink: (any AnimatableValueSink)?,
+    operation: () throws -> Result
+  ) rethrows -> Result {
+    try $currentTaskSink.withValue(sink) {
+      try operation()
+    }
+  }
+}

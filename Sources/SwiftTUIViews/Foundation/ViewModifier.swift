@@ -46,6 +46,15 @@ extension ViewModifier where Body == Never {
 package struct ModifierContentInputs<Base: View> {
   package let base: Base
   package let authoringScope: CapturedSubviewScope?
+  /// True when the `ModifiedContent` this content belongs to animates as a
+  /// whole, so the base already holds the `animatableData` to present and is
+  /// not an animation site of its own.
+  package var baseAnimatableDataIsPresented = false
+
+  package init(base: Base, authoringScope: CapturedSubviewScope?) {
+    self.base = base
+    self.authoringScope = authoringScope
+  }
 
   private func applyAuthoringContext<Result>(
     _ body: () -> Result
@@ -100,6 +109,17 @@ package struct ModifierContentInputs<Base: View> {
   }
 
   private func contentResolveContext(
+    in context: ResolveContext
+  ) -> ResolveContext {
+    guard baseAnimatableDataIsPresented else {
+      return dynamicPropertyContentContext(in: context)
+    }
+    var contentContext = dynamicPropertyContentContext(in: context)
+    contentContext.animatableDataPresentedByEnclosure = true
+    return contentContext
+  }
+
+  private func dynamicPropertyContentContext(
     in context: ResolveContext
   ) -> ResolveContext {
     if let prepared = preparedDynamicPropertyContext(in: context) {
@@ -299,16 +319,18 @@ public struct ViewModifierContent<Modifier: ViewModifier>: PrimitiveView, Iterat
 
   package init<Base: View>(
     base: Base,
-    authoringScope: CapturedSubviewScope?
+    authoringScope: CapturedSubviewScope?,
+    baseAnimatableDataIsPresented: Bool = false
   ) {
-    let inputs = ModifierContentInputs(
+    var inputs = ModifierContentInputs(
       base: base,
       authoringScope: authoringScope
     )
-    resolveElementsClosure = { context in
+    inputs.baseAnimatableDataIsPresented = baseAnimatableDataIsPresented
+    resolveElementsClosure = { [inputs] context in
       inputs.resolveElementsWork(in: context)
     }
-    updateDynamicPropertiesClosure = { context in
+    updateDynamicPropertiesClosure = { [inputs] context in
       inputs.prepareDynamicProperties(in: context)
     }
   }
@@ -356,12 +378,21 @@ extension ModifiedContent: View where Content: View, Modifier: ViewModifier {
     // pass never claims (the outer walk excludes fields 0/1 for the same
     // reason).
     let bound = bindingForwardedDynamicPropertyCaptures(modifier)
+    // A `ModifiedContent` whose content and modifier both conform to
+    // `Animatable` animates as one value: the resolver wrote the presented
+    // data into this copy, content included, so the content is not a second
+    // animation site.
+    let carrier = ViewModifierContent<Modifier>(
+      base: content,
+      authoringScope: authoringScope,
+      baseAnimatableDataIsPresented: AnimatableSiteDetection.kind(of: Self.self) == .view
+    )
     #if DEBUG
       return withBodyChangeScope(bound, kind: .modifier) {
-        bound.body(content: ViewModifierContent(base: content, authoringScope: authoringScope))
+        bound.body(content: carrier)
       }
     #else
-      return bound.body(content: ViewModifierContent(base: content, authoringScope: authoringScope))
+      return bound.body(content: carrier)
     #endif
   }
 }

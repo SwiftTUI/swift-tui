@@ -3,10 +3,18 @@ package struct DrawMetadata: Equatable, Sendable {
   package struct ShapeClip: Equatable, Sendable {
     package var geometry: ShapeGeometry
     package var insetAmount: Int
+    /// The data of a clip shape that conforms to `Animatable`, as
+    /// ``ShapePayload/animatableShape`` carries it for a fill or a stroke.
+    package var animatableShape: AnimatableShapeProvider?
 
-    package init(geometry: ShapeGeometry, insetAmount: Int) {
+    package init(
+      geometry: ShapeGeometry,
+      insetAmount: Int,
+      animatableShape: AnimatableShapeProvider? = nil
+    ) {
       self.geometry = geometry
       self.insetAmount = insetAmount
+      self.animatableShape = animatableShape
     }
   }
   /// List-specific styling preferences carried by draw metadata.

@@ -43,6 +43,19 @@ package struct AnyAnimatable: Equatable, Sendable {
     box.unwrap(as: T.self)
   }
 
+  /// The wrapped value as `T`, where `T` can be a protocol the value conforms
+  /// to. For a value whose concrete type the caller cannot name, such as the
+  /// generic data of an `Animatable` shape.
+  package func unwrapConforming<T>(to _: T.Type) -> T? {
+    box.unwrap(as: T.self)
+  }
+
+  /// Whether `other` wraps a value of the same concrete type, so the two can
+  /// interpolate.
+  package func wrapsSameType(as other: AnyAnimatable) -> Bool {
+    box.hasSameType(as: other.box)
+  }
+
   package func interpolated(
     to other: AnyAnimatable,
     progress: Double
@@ -98,6 +111,7 @@ private func animatableStructureDiffers<T>(_ lhs: T, _ rhs: T) -> Bool {
 
 private protocol _AnyAnimatableBox: Sendable {
   func isEqual(to other: any _AnyAnimatableBox) -> Bool
+  func hasSameType(as other: any _AnyAnimatableBox) -> Bool
   func unwrap<T>(as _: T.Type) -> T?
   func interpolated(
     to other: any _AnyAnimatableBox,
@@ -120,6 +134,10 @@ private struct _AnimatableBox<T: Animatable & Equatable & Sendable>: _AnyAnimata
   func isEqual(to other: any _AnyAnimatableBox) -> Bool {
     guard let other = other as? _AnimatableBox<T> else { return false }
     return value == other.value
+  }
+
+  func hasSameType(as other: any _AnyAnimatableBox) -> Bool {
+    other is _AnimatableBox<T>
   }
 
   func unwrap<U>(as _: U.Type) -> U? {
@@ -186,7 +204,11 @@ private struct _AnimatableBox<T: Animatable & Equatable & Sendable>: _AnyAnimata
     delta -= fromData
     delta.scale(by: t)
     fromData += delta
-    var result = value
+    // The sample is a copy of the origin with the interpolated data. A value
+    // that carries more than its data takes the rest from its destination
+    // (`DestinationStructuredAnimatable`): the shape an `Animatable` shape's
+    // data is evaluated with is the one the view now holds.
+    var result = value is any DestinationStructuredAnimatable ? other.value : value
     result.animatableData = fromData
     return AnyAnimatable(result)
   }

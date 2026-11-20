@@ -281,6 +281,12 @@ struct DefaultRendererFrameHeadCoordinator {
       from: resolveContext,
       proposal: proposal
     )
+    invalidateValueAnimationOwners(
+      in: &resolveInputs,
+      contentRootIdentity: resolveContext.identity,
+      frameInstant: frameInstant,
+      animationController: animationController
+    )
     let rawInvalidatedIdentities = resolveInputs.invalidatedIdentities
     translatePresentationPortalInvalidations(
       in: &resolveInputs,
@@ -302,6 +308,39 @@ struct DefaultRendererFrameHeadCoordinator {
     frameInputs.store(resolveInputs)
     resolveContext.frameInputs = frameInputs
     return resolveInputs
+  }
+
+  /// Ticks the data of `Animatable` views and modifiers and makes their
+  /// owners part of this frame's invalidation.
+  ///
+  /// The controller samples each value animation once for the frame and
+  /// names the identities whose bodies read the samples. They join the
+  /// invalidation set before it is stored and before graph evaluation, so
+  /// the dirty-frontier plan evaluates only those bodies, and retained
+  /// layout, extraction reuse and raster damage see them as changed. An
+  /// owner is invalidated like a state reader: its identity goes through the
+  /// portal translation that follows, and the root's forces a root pass.
+  private func invalidateValueAnimationOwners(
+    in resolveInputs: inout FrameResolveInputs,
+    contentRootIdentity: Identity,
+    frameInstant: MonotonicInstant,
+    animationController: AnimationController
+  ) {
+    let viewGraph = viewGraph
+    let owners = animationController.beginValueSiteFrame(at: frameInstant) { viewNodeID in
+      viewGraph.nodeForViewNodeID(viewNodeID).map { viewGraph.stateReaderIdentity(of: $0) }
+    }
+    guard !owners.isEmpty, !owners.isSubset(of: resolveInputs.invalidatedIdentities) else {
+      return
+    }
+    let invalidated = resolveInputs.invalidatedIdentities.union(owners)
+    resolveInputs.invalidatedIdentities = invalidated
+    resolveInputs.invalidationSummary = .init(invalidatedIdentities: invalidated)
+    guard resolveInputs.usesSelectiveEvaluation, invalidated.contains(contentRootIdentity) else {
+      return
+    }
+    resolveInputs.usesSelectiveEvaluation = false
+    resolveInputs.selectiveEvaluationDisabledReasons.append(.rootInvalidated)
   }
 
   private func translatePresentationPortalInvalidations(

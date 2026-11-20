@@ -33,19 +33,31 @@ public struct InsetShape<Base: InsettableShape>: InsettableShape, ResolvableView
   }
 
   package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
-    [
+    var payload = ShapePayload(
+      geometry: geometry,
+      insetAmount: insetAmount,
+      operation: .fill(style: nil, mode: .full)
+    )
+    payload.animatableShape = animatableShapeProvider(fills: false)
+    return [
       resolveLeafNode(
         kindName: resolvedShapeKind,
-        drawPayload: .shape(
-          .init(
-            geometry: geometry,
-            insetAmount: insetAmount,
-            operation: .fill(style: nil, mode: .full)
-          )
-        ),
+        drawPayload: .shape(payload),
         in: context
       )
     ]
+  }
+}
+
+/// An inset of a shape that conforms to `Animatable` animates as that shape
+/// does. The inset amount is a whole number of cells and does not animate.
+extension InsetShape: AnimatableShapeForwarding {
+  package static var forwardedShapeType: Any.Type { Base.self }
+
+  package var forwardedShape: any Shape { base }
+
+  package func replacingForwardedShape(_ shape: any Shape) -> (any Shape)? {
+    (shape as? Base).map { InsetShape(base: $0, amount: amount) }
   }
 }
 

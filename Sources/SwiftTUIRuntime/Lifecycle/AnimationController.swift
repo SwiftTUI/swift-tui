@@ -20,6 +20,9 @@ package final class AnimationController: Sendable {
   /// registrations an async task can grow between frames; carried across an
   /// in-flight publish as a unit. See ``CompletionLedger``.
   private var completionLedger = CompletionLedger()
+  /// Targets and per-frame samples of the `Animatable` views and modifiers
+  /// (`AnimatableValueSite`). See ``ValueSiteState``.
+  private var valueSites = ValueSiteState()
 
   private var activeAnimations: [AnimationKey: ActiveAnimation] = [:]
   private var removingNodes: [ViewNodeID: RemovalEntry] = [:]
@@ -341,6 +344,7 @@ package final class AnimationController: Sendable {
       batchCompletion: batchCompletion,
       frameHead: frameHead,
       completionLedger: completionLedger,
+      valueSites: valueSites,
       activeAnimations: activeAnimations,
       removingNodes: removingNodes,
       currentResolvedPresentationProjection: currentResolvedPresentationProjection,
@@ -357,6 +361,7 @@ package final class AnimationController: Sendable {
     batchCompletion = checkpoint.batchCompletion
     frameHead = checkpoint.frameHead
     completionLedger = checkpoint.completionLedger
+    valueSites = checkpoint.valueSites
     activeAnimations = checkpoint.activeAnimations
     removingNodes = checkpoint.removingNodes
     currentResolvedPresentationProjection = checkpoint.currentResolvedPresentationProjection
@@ -634,7 +639,7 @@ package final class AnimationController: Sendable {
       switch animation.kind {
       case .insertionOffset, .insertionScale, .matchedGeometry:
         true
-      case .property:
+      case .property, .value:
         false
       }
     }
@@ -664,7 +669,9 @@ package final class AnimationController: Sendable {
         .shapePath,
         .clipShapePaths,
         .textRoll,
-        .tintShapeStyle:
+        .tintShapeStyle,
+        .shapeData,
+        .clipShapeData:
         return false
       }
     }
@@ -678,8 +685,12 @@ package final class AnimationController: Sendable {
   /// The slot stays draw-only (it never needs layout); only elision consults
   /// this. A mask whose destination encloses no area reveals nothing and keeps
   /// elision (STUI-1318).
+  ///
+  /// A mask of an `Animatable` shape always counts: its shape decides what
+  /// each sample covers, so no end value proves the samples stay empty.
   package var hasRevealingClipMaskAnimation: Bool {
     activeAnimations.contains { key, animation in
+      if case .property(.clipShapeData) = key.scope { return true }
       guard key.scope == .property(.clipShapePaths),
         case .property(_, let destination) = animation.kind
       else { return false }
@@ -688,11 +699,53 @@ package final class AnimationController: Sendable {
     }
   }
 
-  /// Whether some in-flight property animation makes the previous frame's
-  /// drawn identities unable to justify eliding a deadline frame: a
-  /// layout-affecting slot or a revealing clip mask.
+  /// Whether the data of some `Animatable` view or modifier is animating.
+  ///
+  /// Such an animation writes nothing to the tree. Its owner's body runs
+  /// again with each sample, and what that body produces is not known before
+  /// it runs: it reports no redraw identities, and the previous frame's
+  /// drawn identities say nothing about the next one. A deadline frame that
+  /// carries it is therefore never elided.
+  package var hasValueAnimation: Bool {
+    activeAnimations.keys.contains { $0.isValue }
+  }
+
+  /// Whether some in-flight animation makes the previous frame's drawn
+  /// identities unable to justify eliding a deadline frame: a
+  /// layout-affecting slot, a revealing clip mask, or the data of an
+  /// `Animatable` view or modifier.
   package var blocksOffscreenFrameElision: Bool {
-    hasLayoutAffectingPropertyAnimation || hasRevealingClipMaskAnimation
+    hasLayoutAffectingPropertyAnimation || hasRevealingClipMaskAnimation || hasValueAnimation
+  }
+
+  /// Number of value animations in flight: the animations of the data of
+  /// `Animatable` views and modifiers. Test hook.
+  package var activeValueAnimationCount: Int {
+    activeAnimations.keys.lazy.filter(\.isValue).count
+  }
+
+  /// The sites whose value animation is in flight at `identity`, by
+  /// position. Test hook, and the listing a removal needs to take over the
+  /// value animations of the views it keeps drawing.
+  package func valueAnimationSites(forIdentity identity: Identity) -> [AnimatableValueSite] {
+    activeAnimations.keys.compactMap { key in
+      guard key.identity == identity, case .value(let ordinal) = key.scope else { return nil }
+      return AnimatableValueSite(identity: identity, ordinal: ordinal)
+    }.sorted { $0.ordinal < $1.ordinal }
+  }
+
+  /// The sites that have resolved at `identity` and are still in the tree,
+  /// by position, animating or not. Test hook.
+  package func valueSites(forIdentity identity: Identity) -> [AnimatableValueSite] {
+    valueSites.targets.keys.compactMap { key in
+      guard key.identity == identity, case .value(let ordinal) = key.scope else { return nil }
+      return AnimatableValueSite(identity: identity, ordinal: ordinal)
+    }.sorted { $0.ordinal < $1.ordinal }
+  }
+
+  /// Number of sites the controller holds a target for. Test hook.
+  package var valueSiteCount: Int {
+    valueSites.targets.count
   }
 
   /// Number of insertion-offset animations currently in flight.
@@ -1223,6 +1276,12 @@ package final class AnimationController: Sendable {
     }
     var finishedBoxes: Set<AnimationBox> = []
     for key in Array(activeAnimations.keys) {
+      // A value animation is not ended here. Its site ends it when it
+      // resolves under the policy, and presents its target in the same
+      // step (`presentedValue`, `settlesAnimationInFlight`). Removing the
+      // entry here would leave the body at the sample it last ran with, and
+      // nothing would evaluate it again.
+      guard !key.isValue else { continue }
       guard let entry = activeAnimations[key], isReduced(entry.resolvedIdentity ?? key.identity)
       else { continue }
       activeAnimations.removeValue(forKey: key)
@@ -1882,10 +1941,18 @@ package final class AnimationController: Sendable {
     // The values of a transition body in its removal are still animating,
     // for the removal that owns them.
     let removalBodyOwners = removalBodyOwners
+    // A value animation belongs to the view at its site. That view's
+    // identity can be absent from the tree while its node is in it (see
+    // ``ValueSiteState/ownerNodeIDs``).
+    let valueSiteIsLive = { [valueSites] (key: AnimationKey) -> Bool in
+      newIdentities.contains(key.identity)
+        || valueSites.ownerNodeIDs[key].map(newLiveNodeIDs.contains) == true
+    }
     let departedKeys = activeAnimations.keys.filter { key in
       !newIdentities.contains(key.identity)
         && !exitOverlayIdentities.contains(key.identity)
         && removalBodyOwners[key.identity] == nil
+        && !(key.isValue && valueSiteIsLive(key))
         && !(previousFrame.realizedPresentationTargets[key] != nil
           && previousFrame.realizedPresentationOwners[key.identity].map {
             newIdentities.contains($0)
@@ -1914,6 +1981,18 @@ package final class AnimationController: Sendable {
     }
     if !slotVelocitySamplers.isEmpty {
       slotVelocitySamplers = slotVelocitySamplers.filter { newIdentities.contains($0.key.identity) }
+    }
+    // The target an `Animatable` view or modifier last resolved with belongs
+    // to the view at that identity. One that left the tree takes its record
+    // with it, so a view that later appears there starts from its own
+    // value and not from an old one.
+    if !valueSites.targets.isEmpty {
+      valueSites.targets = valueSites.targets.filter { valueSiteIsLive($0.key) }
+      if !valueSites.ownerNodeIDs.isEmpty {
+        valueSites.ownerNodeIDs = valueSites.ownerNodeIDs.filter {
+          valueSites.targets[$0.key] != nil
+        }
+      }
     }
 
     // A policy change is meaningful even when the authored target value did
@@ -2567,11 +2646,21 @@ package final class AnimationController: Sendable {
     // A scoped modifier's placeholder (`restoresOuter`) inherits from the
     // nearest scope root's effective transaction — the transaction outside
     // the scope — instead of from its scoped resolved parent.
+    //
+    // The owner of a value animation that ticked this frame is a third case.
+    // Its body ran for the tick, and an ancestor that was resolved on an
+    // earlier frame still carries that frame's request in its snapshot. The
+    // owner must not inherit it: every sample would then start a property
+    // animation on whatever the body produced, on top of the value
+    // animation. It takes what its own resolve had: its stamp, the segment
+    // that covers it, or the frame's base transaction.
     let frameSegment = transactionPlan.segment(for: node.identity)
+    let isTickedValueOwner =
+      !valueSites.tickedOwners.isEmpty && valueSites.tickedOwners.contains(node.identity)
     let transaction =
       node.transactionSnapshot.scopeRole == .restoresOuter
       ? (scopeOuterTransaction ?? transaction)
-      : transaction
+      : isTickedValueOwner ? transactionPlan.base : transaction
     var effectiveTransaction = Self.effectiveTransaction(
       of: node.transactionSnapshot, frameSegment: frameSegment, inherited: transaction)
 
@@ -2610,12 +2699,26 @@ package final class AnimationController: Sendable {
     // STUI-1325), so that slot animates under the transaction where the
     // modifier was applied.
     if !node.transactionSnapshot.customValues.isEmpty {
-      for (slot, key) in Self.drawMetadataScopeKeys {
+      for (scopedSlot, key) in Self.drawMetadataScopeKeys {
         guard
           let scope = node.transactionSnapshot.customValues[key]?.unwrap(
-            as: ScopedStyleAnimationIntent.self),
-          snapshot[slot] != nil || previous?[slot] != nil
+            as: ScopedStyleAnimationIntent.self)
         else { continue }
+        // The slots the scope governs on this node: the one it names and,
+        // for a clip, the data of each mask of an `Animatable` shape, which
+        // is a clip as well.
+        var slots: [AnimatableSlot] = []
+        if snapshot[scopedSlot] != nil || previous?[scopedSlot] != nil {
+          slots.append(scopedSlot)
+        }
+        if scopedSlot == .clipShapePaths {
+          var maskSlots = Set(snapshot.values.keys.filter(\.isClipShapeData))
+          if let previous {
+            maskSlots.formUnion(previous.values.keys.filter(\.isClipShapeData))
+          }
+          slots.append(contentsOf: maskSlots)
+        }
+        guard !slots.isEmpty else { continue }
         var scopeSnapshot = node.transactionSnapshot
         scopeSnapshot.animationRequest = scope.request
         scopeSnapshot.animationBatchID = scope.batchID
@@ -2626,8 +2729,11 @@ package final class AnimationController: Sendable {
         let request =
           reducesMotion || scopeTransaction.animationRequest == .inherit
           ? AnimationRequest.disabled : scopeTransaction.animationRequest
-        styleIntents[slot] = ScopedStyleAnimationIntent(
+        let intent = ScopedStyleAnimationIntent(
           isScoped: true, request: request, batchID: scopeTransaction.animationBatchID)
+        for slot in slots {
+          styleIntents[slot] = intent
+        }
       }
     }
     if let previous {
@@ -2821,61 +2927,23 @@ package final class AnimationController: Sendable {
       let effectiveFrom: AnyAnimatable
       var carriedCustomState = AnimationState()
       var initialVelocity: Double?
-      let velocityChannelEnabled = AnimationVelocityConfiguration.isEnabled
       if let existing = activeAnimations[key],
         let sampled = sampleAdvancingCustomState(existing, at: timestamp)
       {
         effectiveFrom = sampled.value
-        let outgoing = registeredAnimations[existing.animationBox]
-        let incoming = registeredAnimations[box]
-        let elapsed = existing.startTime.duration(to: timestamp)
-        if outgoing?.isCustomCurve == true || incoming?.isCustomCurve == true {
-          // Custom-curve retarget handoff.  Carry the sample-advanced custom
-          // state into the replacement so a retargeting custom curve keeps
-          // its per-key bookkeeping instead of resetting to an empty buffer
-          // (011); query the outgoing curve's velocity hook (013); consult
-          // the incoming curve's merge policy against the previously
-          // registered animation (012).
-          carriedCustomState = sampled.state
-          _ = outgoing?.velocity(elapsed: elapsed, state: sampled.state)
-          if let incoming, let outgoing {
-            _ = incoming.shouldMerge(
-              previous: outgoing,
-              elapsed: elapsed,
-              state: &carriedCustomState
-            )
-          }
-        } else if velocityChannelEnabled,
-          case .property(let oldFrom, let oldTo) = existing.kind,
-          let outgoing,
-          let progressVelocity = outgoing.velocity(
-            elapsed: elapsed,
-            state: sampled.state,
-            initialVelocity: existing.initialVelocity
-          ),
-          let projection = AnyAnimatable.progressProjection(
-            of: (from: oldFrom, to: oldTo),
-            onto: (from: effectiveFrom, to: current)
-          )
-        {
-          // Built-in retarget continuity (T4): the outgoing curve's progress
-          // velocity along its own axis, re-expressed along the new segment's
-          // axis so the replacement spring continues instead of restarting
-          // at rest. Clamped to zero when the new axis is degenerate.
-          let seeded = progressVelocity * projection
-          initialVelocity = seeded.isFinite && abs(seeded) > 1e-6 ? seeded : nil
-        }
+        (carriedCustomState, initialVelocity) = retargetHandoff(
+          from: existing,
+          sampledState: sampled.state,
+          origin: effectiveFrom,
+          target: current,
+          incomingBox: box,
+          at: timestamp
+        )
         releaseBatch(existing.batchID, logicalAlreadyReleased: existing.isLogicallyReleased)
       } else {
         effectiveFrom = previous
-        if velocityChannelEnabled,
-          let sampler = slotVelocitySamplers[key],
-          let sampled = sampler.progressVelocity(from: previous, to: current, at: timestamp),
-          abs(sampled) > 1e-6
-        {
-          // The preceding `tracksVelocity` writes release into this spring.
-          initialVelocity = sampled
-        }
+        initialVelocity = sampledReleaseVelocity(
+          at: key, from: previous, to: current, at: timestamp)
       }
       slotVelocitySamplers.removeValue(forKey: key)
 
@@ -2890,6 +2958,378 @@ package final class AnimationController: Sendable {
         initialVelocity: initialVelocity
       )
     }
+  }
+
+  /// What an animation that interrupts `existing` takes over from it: the
+  /// custom state to carry and the velocity to start with. Shared by the
+  /// property slots and by the data of `Animatable` views and modifiers.
+  ///
+  /// `sampledState` is `existing`'s custom state after its evaluation at
+  /// `timestamp`. `origin` is the value that evaluation gave, where the
+  /// replacement starts, and `target` is where it goes.
+  private func retargetHandoff(
+    from existing: ActiveAnimation,
+    sampledState: AnimationState,
+    origin: AnyAnimatable,
+    target: AnyAnimatable,
+    incomingBox: AnimationBox,
+    at timestamp: MonotonicInstant
+  ) -> (customState: AnimationState, initialVelocity: Double?) {
+    var carriedCustomState = AnimationState()
+    var initialVelocity: Double?
+    let outgoing = registeredAnimations[existing.animationBox]
+    let incoming = registeredAnimations[incomingBox]
+    let elapsed = existing.startTime.duration(to: timestamp)
+    if outgoing?.isCustomCurve == true || incoming?.isCustomCurve == true {
+      // Custom-curve retarget handoff.  Carry the sample-advanced custom
+      // state into the replacement so a retargeting custom curve keeps
+      // its per-key bookkeeping instead of resetting to an empty buffer
+      // (011); query the outgoing curve's velocity hook (013); consult
+      // the incoming curve's merge policy against the previously
+      // registered animation (012).
+      carriedCustomState = sampledState
+      _ = outgoing?.velocity(elapsed: elapsed, state: sampledState)
+      if let incoming, let outgoing {
+        _ = incoming.shouldMerge(
+          previous: outgoing,
+          elapsed: elapsed,
+          state: &carriedCustomState
+        )
+      }
+    } else if AnimationVelocityConfiguration.isEnabled,
+      let ends = existing.kind.endpoints,
+      let outgoing,
+      let progressVelocity = outgoing.velocity(
+        elapsed: elapsed,
+        state: sampledState,
+        initialVelocity: existing.initialVelocity
+      ),
+      let projection = AnyAnimatable.progressProjection(
+        of: (from: ends.from, to: ends.to),
+        onto: (from: origin, to: target)
+      )
+    {
+      // Built-in retarget continuity (T4): the outgoing curve's progress
+      // velocity along its own axis, re-expressed along the new segment's
+      // axis so the replacement spring continues instead of restarting
+      // at rest. Clamped to zero when the new axis is degenerate.
+      let seeded = progressVelocity * projection
+      initialVelocity = seeded.isFinite && abs(seeded) > 1e-6 ? seeded : nil
+    }
+    return (carriedCustomState, initialVelocity)
+  }
+
+  /// The velocity the preceding `tracksVelocity` writes at `key` release
+  /// into an animation that starts from rest there, or `nil`.
+  private func sampledReleaseVelocity(
+    at key: AnimationKey,
+    from origin: AnyAnimatable,
+    to target: AnyAnimatable,
+    at timestamp: MonotonicInstant
+  ) -> Double? {
+    guard AnimationVelocityConfiguration.isEnabled,
+      let sampler = slotVelocitySamplers[key],
+      let sampled = sampler.progressVelocity(from: origin, to: target, at: timestamp),
+      abs(sampled) > 1e-6
+    else {
+      return nil
+    }
+    return sampled
+  }
+
+  // MARK: - Animatable views and modifiers
+
+  /// Begins the frame at `timestamp` for the data of `Animatable` views and
+  /// modifiers, before the frame resolves.
+  ///
+  /// Each value animation in flight is evaluated here, once, and its sample
+  /// is kept for the frame: the owner's body reads it when it resolves (the
+  /// `presentedValue` entry below). The
+  /// returned identities are the owners. The caller adds them to the frame's
+  /// invalidation set, so only those bodies run again and the frame tail
+  /// treats them as changed. An animation that ends here has no sample left
+  /// and is still returned once, so its body runs at the target.
+  ///
+  /// With no animation in flight this stores the instant and returns.
+  ///
+  /// `currentIdentity` answers which identity a graph node is indexed at
+  /// now. An owner is named by that identity when its node has one: a view
+  /// whose body root is a conditional is indexed at its branch.
+  package func beginValueSiteFrame(
+    at timestamp: MonotonicInstant,
+    currentIdentity: (ViewNodeID) -> Identity? = { _ in nil }
+  ) -> Set<Identity> {
+    valueSites.frameInstant = timestamp
+    if !valueSites.samples.isEmpty {
+      valueSites.samples.removeAll(keepingCapacity: true)
+    }
+    if !valueSites.tickedOwners.isEmpty {
+      valueSites.tickedOwners.removeAll(keepingCapacity: true)
+    }
+    guard !activeAnimations.isEmpty else {
+      return []
+    }
+    var owners: Set<Identity> = []
+    var keysToRemove: [AnimationKey] = []
+    var completedBatches: [CompletedBatchRelease] = []
+    var logicallyCompletedBatches: [AnimationBatchID] = []
+    var completedAnimationBoxes: Set<AnimationBox> = []
+    // The shared step reports what it would redraw. A value animation
+    // redraws through its owner's invalidation instead.
+    var unusedRedrawIdentities: Set<Identity> = []
+    for (key, animation) in activeAnimations {
+      guard case .value(let from, let to) = animation.kind else { continue }
+      owners.insert(valueSites.ownerNodeIDs[key].flatMap(currentIdentity) ?? key.identity)
+      switch advancePropertyAnimationStep(
+        key: key,
+        animation: animation,
+        at: timestamp,
+        keysToRemove: &keysToRemove,
+        completedBatches: &completedBatches,
+        logicallyCompletedBatches: &logicallyCompletedBatches,
+        completedAnimationBoxes: &completedAnimationBoxes,
+        redrawIdentities: &unusedRedrawIdentities
+      ) {
+      case .unregistered, .completed:
+        // No sample: the site resolves with its target.
+        break
+      case .progressed(let progress):
+        valueSites.samples[key] = AnimationPropertyValueApplication.interpolate(
+          from: from, to: to, progress: progress)
+      }
+    }
+    guard !owners.isEmpty else {
+      return []
+    }
+    for key in keysToRemove {
+      activeAnimations.removeValue(forKey: key)
+    }
+    for batchID in logicallyCompletedBatches {
+      releaseLogicalBatch(batchID)
+    }
+    for release in completedBatches {
+      releaseBatch(release.batchID, logicalAlreadyReleased: release.logicalAlreadyReleased)
+    }
+    pruneCompletedAnimationRegistrations(completedAnimationBoxes)
+    valueSites.tickedOwners = owners
+    return owners
+  }
+
+  /// The data the site at `key` evaluates its body with on this frame, given
+  /// the data the author wrote for it (`target`) and the animation request
+  /// of the transaction it resolves under.
+  ///
+  /// - The site's first resolve records the target and returns it.
+  /// - An unchanged target returns this frame's sample while the animation
+  ///   toward it is in flight, and the target otherwise. The read changes
+  ///   nothing, so every resolve of the site in one frame agrees.
+  /// - A target that changed under `.animate` starts an animation from the
+  ///   old target, or retargets the one in flight from this frame's sample
+  ///   with its velocity. Both return where the animation starts: the body's
+  ///   output on a start frame is what it was, so no property animation
+  ///   starts beside the value animation.
+  /// - A target that changed under `.inherit` or `.disabled` (no animated
+  ///   transaction, `withAnimation(nil)`, a disabled transaction, reduced
+  ///   motion, the stable-output policy) ends any animation and returns the
+  ///   target.
+  /// - With `settlesAnimationInFlight`, an unchanged target ends the
+  ///   animation toward it and returns the target. The site resolves under
+  ///   reduced motion or the stable-output policy, which turned on while the
+  ///   animation ran. The animation has to end here, where the body is being
+  ///   evaluated: ended anywhere else, the body would keep the sample it last
+  ///   ran with. A transaction that only disables animations does not do
+  ///   this. It says how a change is applied, and nothing changed.
+  package func presentedValue(
+    for target: AnyAnimatable,
+    at key: AnimationKey,
+    request: AnimationRequest,
+    batchID: AnimationBatchID?,
+    tracksVelocity: Bool = false,
+    settlesAnimationInFlight: Bool = false
+  ) -> AnyAnimatable {
+    guard let previousTarget = valueSites.targets[key],
+      previousTarget.wrapsSameType(as: target)
+    else {
+      // Nothing to animate from: the site's first resolve, or a value of
+      // another type where a different view used to be.
+      valueSites.targets[key] = target
+      endValueAnimation(at: key)
+      slotVelocitySamplers.removeValue(forKey: key)
+      return target
+    }
+    guard previousTarget != target else {
+      guard activeAnimations[key] != nil else { return target }
+      if settlesAnimationInFlight {
+        endValueAnimation(at: key)
+        return target
+      }
+      return valueSites.samples[key] ?? target
+    }
+    valueSites.targets[key] = target
+
+    guard case .animate(let box) = request, let timestamp = valueSites.frameInstant else {
+      endValueAnimation(at: key)
+      // A `tracksVelocity` write is sampled, as a slot's is, so a spring
+      // that later starts here continues the motion of the writes.
+      if tracksVelocity, AnimationVelocityConfiguration.isEnabled,
+        let timestamp = valueSites.frameInstant
+      {
+        var sampler = slotVelocitySamplers[key] ?? SlotVelocitySampler()
+        sampler.record(target, at: timestamp)
+        slotVelocitySamplers[key] = sampler
+      }
+      return target
+    }
+    // The transaction can carry a curve no sink registered (see
+    // ``processResolvedTree``, which recovers it too, but after resolve).
+    if registeredAnimations[box] == nil, let animation = box.unwrap(as: Animation.self) {
+      registeredAnimations[box] = animation
+    }
+
+    let origin: AnyAnimatable
+    var carriedCustomState = AnimationState()
+    var initialVelocity: Double?
+    if let existing = activeAnimations.removeValue(forKey: key) {
+      // This frame's sample is the head's one evaluation of the curve in
+      // flight, and the custom state it advanced is already stored.
+      origin = valueSites.samples[key] ?? existing.kind.endpoints?.to ?? previousTarget
+      (carriedCustomState, initialVelocity) = retargetHandoff(
+        from: existing,
+        sampledState: existing.customState,
+        origin: origin,
+        target: target,
+        incomingBox: box,
+        at: timestamp
+      )
+      releaseBatch(existing.batchID, logicalAlreadyReleased: existing.isLogicallyReleased)
+    } else {
+      origin = previousTarget
+      initialVelocity = sampledReleaseVelocity(
+        at: key, from: previousTarget, to: target, at: timestamp)
+    }
+    slotVelocitySamplers.removeValue(forKey: key)
+    return startValueAnimation(
+      at: key,
+      from: origin,
+      to: target,
+      animationBox: box,
+      batchID: batchID,
+      customState: carriedCustomState,
+      initialVelocity: initialVelocity,
+      at: timestamp
+    )
+  }
+
+  /// Starts the value animation of `site` from `origin` toward `target` on
+  /// the frame being prepared, in place of whatever the site had.
+  ///
+  /// This is the way to animate a site from a value its body never resolved
+  /// with: a view inserted under a transition starts from the data of
+  /// another phase. The site's next resolve with `target` reads the origin
+  /// as this frame's sample. Returns `false`, and starts nothing, when no
+  /// frame has begun or the curve is not registered.
+  @discardableResult
+  package func beginValueAnimation(
+    at site: AnimatableValueSite,
+    from origin: AnyAnimatable,
+    to target: AnyAnimatable,
+    animationBox box: AnimationBox,
+    batchID: AnimationBatchID?
+  ) -> Bool {
+    let key = AnimationKey(site: site)
+    guard let timestamp = valueSites.frameInstant, origin.wrapsSameType(as: target) else {
+      return false
+    }
+    if registeredAnimations[box] == nil, let animation = box.unwrap(as: Animation.self) {
+      registeredAnimations[box] = animation
+    }
+    guard registeredAnimations[box] != nil else {
+      return false
+    }
+    valueSites.targets[key] = target
+    endValueAnimation(at: key)
+    slotVelocitySamplers.removeValue(forKey: key)
+    startValueAnimation(
+      at: key,
+      from: origin,
+      to: target,
+      animationBox: box,
+      batchID: batchID,
+      customState: AnimationState(),
+      initialVelocity: nil,
+      at: timestamp
+    )
+    return true
+  }
+
+  /// The boxed form of `data` that the value-animation entry points take.
+  package static func boxedAnimatableData<Data: VectorArithmetic>(_ data: Data) -> AnyAnimatable {
+    AnyAnimatable(AnimatableDataBox(data))
+  }
+
+  /// The data this frame's resolve of `site` presents while its animation is
+  /// in flight, or `nil` when none is. Test hook.
+  package func valueAnimationSample(at site: AnimatableValueSite) -> AnyAnimatable? {
+    let key = AnimationKey(site: site)
+    guard activeAnimations[key] != nil else { return nil }
+    return valueSites.samples[key]
+  }
+
+  /// The velocity the value animation of `site` was released with, in
+  /// progress units per second, or `nil` when it started at rest or none is
+  /// in flight. Test hook.
+  package func valueAnimationInitialVelocity(at site: AnimatableValueSite) -> Double? {
+    activeAnimations[AnimationKey(site: site)]?.initialVelocity
+  }
+
+  /// Puts a new value animation at `key` and returns its first value. The
+  /// curve is evaluated once, at its start, as a property animation's is on
+  /// the frame that creates it: a curve with no extent is over at once, and
+  /// the site then resolves with its target.
+  @discardableResult
+  private func startValueAnimation(
+    at key: AnimationKey,
+    from origin: AnyAnimatable,
+    to target: AnyAnimatable,
+    animationBox box: AnimationBox,
+    batchID: AnimationBatchID?,
+    customState: AnimationState,
+    initialVelocity: Double?,
+    at timestamp: MonotonicInstant
+  ) -> AnyAnimatable {
+    guard let animation = registeredAnimations[box] else {
+      valueSites.samples.removeValue(forKey: key)
+      return target
+    }
+    var state = customState
+    guard
+      let progress = animation.evaluate(
+        elapsed: .zero, state: &state, initialVelocity: initialVelocity)
+    else {
+      valueSites.samples.removeValue(forKey: key)
+      return target
+    }
+    retainBatch(batchID)
+    activeAnimations[key] = ActiveAnimation(
+      kind: .value(from: origin, to: target),
+      animationBox: box,
+      startTime: timestamp,
+      customState: state,
+      batchID: batchID,
+      initialVelocity: initialVelocity
+    )
+    let sample = AnimationPropertyValueApplication.interpolate(
+      from: origin, to: target, progress: progress)
+    valueSites.samples[key] = sample
+    return sample
+  }
+
+  /// Ends the value animation at `key`, if one is in flight, releasing the
+  /// batch it retained so its completion can fire.
+  private func endValueAnimation(at key: AnimationKey) {
+    valueSites.samples.removeValue(forKey: key)
+    guard let entry = activeAnimations.removeValue(forKey: key) else { return }
+    releaseBatch(entry.batchID, logicalAlreadyReleased: entry.isLogicallyReleased)
   }
 
   /// The number of slots currently holding `tracksVelocity` samples. Test hook.
@@ -3216,10 +3656,14 @@ package final class AnimationController: Sendable {
           case .unregistered:
             break
           case .completed:
-            removalBodySamples[owner, default: [:]][key.identity, default: [:]][slot] = to
+            removalBodySamples[owner, default: [:]][key.identity, default: [:]][slot] =
+              AnimationPropertyValueApplication.presentationValue(of: to, for: slot)
           case .progressed(let progress):
             removalBodySamples[owner, default: [:]][key.identity, default: [:]][slot] =
-              AnimationPropertyValueApplication.interpolate(from: from, to: to, progress: progress)
+              AnimationPropertyValueApplication.presentationValue(
+                of: AnimationPropertyValueApplication.interpolate(
+                  from: from, to: to, progress: progress),
+                for: slot)
             latestDeadline = timestamp.advanced(by: frameInterval)
             hasPendingWork = true
           }
@@ -3247,20 +3691,25 @@ package final class AnimationController: Sendable {
           continue
         case .completed:
           // Animation complete — snap to final value; the step purged it.
+          let value = AnimationPropertyValueApplication.presentationValue(of: to, for: slot)
           if let ownerViewNodeID = animation.ownerViewNodeID {
-            interpolatedByNodeID[ownerViewNodeID, default: [:]][slot] = to
+            interpolatedByNodeID[ownerViewNodeID, default: [:]][slot] = value
             interpolatedIdentityByNodeID[ownerViewNodeID] =
               animation.resolvedIdentity ?? key.identity
           } else {
-            interpolatedByIdentity[key.identity, default: [:]][slot] = to
+            interpolatedByIdentity[key.identity, default: [:]][slot] = value
           }
           continue
         case .progressed(let progress):
-          let value = AnimationPropertyValueApplication.interpolate(
-            from: from,
-            to: to,
-            progress: progress
-          )
+          // The data of an `Animatable` shape becomes geometry here, on the
+          // main actor, once for this sample.
+          let value = AnimationPropertyValueApplication.presentationValue(
+            of: AnimationPropertyValueApplication.interpolate(
+              from: from,
+              to: to,
+              progress: progress
+            ),
+            for: slot)
           if let ownerViewNodeID = animation.ownerViewNodeID {
             interpolatedByNodeID[ownerViewNodeID, default: [:]][slot] = value
             interpolatedIdentityByNodeID[ownerViewNodeID] =
@@ -3287,6 +3736,18 @@ package final class AnimationController: Sendable {
           latestDeadline = timestamp.advanced(by: frameInterval)
         }
         redrawIdentities.insert(key.identity)
+
+      case .value:
+        // The frame head sampled this curve before resolve
+        // (``beginValueSiteFrame(at:)``), and the owner's body has run with
+        // the sample. Nothing is written here and nothing is evaluated a
+        // second time. The owner is in the frame's invalidation set, so no
+        // redraw identity is reported for it. Only the next tick is asked
+        // for.
+        hasPendingWork = true
+        if latestDeadline == timestamp {
+          latestDeadline = timestamp.advanced(by: frameInterval)
+        }
       }
     }
 
@@ -3607,6 +4068,7 @@ package final class AnimationController: Sendable {
     transitions.reset()
     batchCompletion.reset()
     completionLedger.reset()
+    valueSites.reset()
     frameHead.reset()
     activeAnimations.removeAll(keepingCapacity: true)
     removingNodes.removeAll(keepingCapacity: true)
@@ -3721,6 +4183,36 @@ extension AnimationController: AnimationCompletionSink {
     completions[batchID, default: []].append(
       AnimationCompletionRegistration(barrier: barrier, closure: closure)
     )
+  }
+}
+
+extension AnimationController: AnimatableValueSink {
+  /// The resolver's entry: boxes the site's data so it interpolates like
+  /// every other animated value, and unboxes what the site presents.
+  package func presentedAnimatableData<Data: VectorArithmetic>(
+    for target: Data,
+    at site: AnimatableValueSite,
+    ownerNodeID: ViewNodeID?,
+    transaction: TransactionSnapshot,
+    reducesMotion: Bool
+  ) -> Data {
+    let key = AnimationKey(site: site)
+    if let ownerNodeID {
+      if valueSites.ownerNodeIDs[key] != ownerNodeID {
+        valueSites.ownerNodeIDs[key] = ownerNodeID
+      }
+    } else if valueSites.ownerNodeIDs[key] != nil {
+      valueSites.ownerNodeIDs.removeValue(forKey: key)
+    }
+    let presented = presentedValue(
+      for: AnyAnimatable(AnimatableDataBox(target)),
+      at: key,
+      request: reducesMotion ? .disabled : transaction.animationRequest,
+      batchID: transaction.animationBatchID,
+      tracksVelocity: transaction.tracksVelocity,
+      settlesAnimationInFlight: reducesMotion
+    )
+    return presented.unwrap(as: AnimatableDataBox<Data>.self)?.animatableData ?? target
   }
 }
 

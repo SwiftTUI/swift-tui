@@ -33,7 +33,7 @@ For products, supported imports, and re-export reachability, see [PUBLIC_MODULE_
 | `SwiftTUIWebHostCLI` | 2 | 8 |
 | `SwiftTUIAndroidHost` | 20 | 49 |
 | `SwiftTUICore` | 43 | 296 |
-| `SwiftTUIPrimitives` | 176 | 1582 |
+| `SwiftTUIPrimitives` | 176 | 1583 |
 | `SwiftTUIGraph` | 78 | 598 |
 | `SwiftTUIPTYCPrimitives` | 0 | 0 |
 | `SwiftTUIPlatformIO` | 1 | 19 |
@@ -737,7 +737,7 @@ For products, supported imports, and re-export reachability, see [PUBLIC_MODULE_
 - `AlignmentID` — protocol — 1 member
 - `Angle` — struct — 8 members
 - `AngularGradient` — struct — 15 members
-- `Animatable` — protocol — 2 members
+- `Animatable` — protocol — 3 members
 - `AnimatableArray` — struct — 10 members
 - `AnimatablePair` — struct — 12 members
 - `AnyID` — struct — 2 members

@@ -1169,6 +1169,7 @@ SwiftTUIPrimitives.AngularGradient.startAngle
 SwiftTUIPrimitives.Animatable
 SwiftTUIPrimitives.Animatable.AnimatableData
 SwiftTUIPrimitives.Animatable.animatableData
+SwiftTUIPrimitives.Animatable.animatableData
 SwiftTUIPrimitives.AnimatableArray
 SwiftTUIPrimitives.AnimatableArray.+(_:_:)
 SwiftTUIPrimitives.AnimatableArray.+=(_:_:)

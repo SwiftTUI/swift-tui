@@ -86,6 +86,19 @@ public struct ResolveContext: Equatable, Sendable {
   /// Deliberately excluded from ``ResolveContext``'s `Equatable` conformance
   /// so it never gates reuse.
   package var valueAnimationOrdinalCursor: Int = 0
+  /// Outer-first position of the next `Animatable` view or modifier that
+  /// resolves at this identity; with the identity it names the site whose
+  /// `animatableData` the animation controller animates
+  /// (`AnimatableValueSite`). Like ``valueAnimationOrdinalCursor`` it is a
+  /// direct field: it resets at every identity boundary, a chain's copy of
+  /// the context carries it forward, and it is excluded from `Equatable`.
+  package var animatableSiteOrdinalCursor: Int = 0
+  /// True for the resolve of a view whose `animatableData` an enclosing
+  /// `ModifiedContent` already presents as part of its own. The view is then
+  /// not a site: the outermost conformer animates the whole value. One-shot,
+  /// consumed where the view's elements resolve, and excluded from
+  /// `Equatable`.
+  package var animatableDataPresentedByEnclosure: Bool = false
 
   /// Runtime registries and lowering seams propagated unchanged from a parent
   /// context to its `child` / `replacingIdentity` derivations. Grouping them in

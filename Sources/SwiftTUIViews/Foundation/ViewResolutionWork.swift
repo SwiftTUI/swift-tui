@@ -263,22 +263,62 @@ package func resolveViewElementsWork<V: View>(
   _ view: V, in context: ResolveContext
 ) -> ResolveWork<[ResolvedNode]> {
   .deferred {
-    if let resolvable = view as? any ResolvableView {
-      let bound: Any = bindingResolvableDynamicPropertyCaptures(view, in: context)
-      return ((bound as? any ResolvableView) ?? resolvable).makeResolveWork(in: context)
+    // An enclosing `ModifiedContent` that animates as a whole has already
+    // written this view's `animatableData`. The mark is for this view alone,
+    // so it stops here whatever the view turns out to be.
+    guard context.animatableDataPresentedByEnclosure else {
+      return resolveViewElements(view, in: context, isAnimatableSite: true)
     }
-    let bound = bindingBodyDynamicPropertyCaptures(view, in: context)
-    let authoring = currentAuthoringContext() ?? makeAuthoringContext(for: context)
-    return withAuthoringContext(authoring) {
-      #if DEBUG
-        let body = withBodyChangeScope(bound, kind: .view) {
-          context.trackingObservableAccess { bound.body }
-        }
-      #else
-        let body = context.trackingObservableAccess { bound.body }
-      #endif
-      return resolveViewElementsWork(body, in: context)
-    }
+    var context = context
+    context.animatableDataPresentedByEnclosure = false
+    return resolveViewElements(view, in: context, isAnimatableSite: false)
+  }
+}
+
+/// Resolves a view to its elements: a primitive through its own resolve work,
+/// a composed view through its body.
+///
+/// This is the one place a `View.body` is evaluated, so it is where a view or
+/// a modifier that conforms to `Animatable` gets the data to evaluate with
+/// (`AnimatableSiteResolver`). A type that does not conform pays one cached
+/// lookup.
+@MainActor
+private func resolveViewElements<V: View>(
+  _ view: V,
+  in context: ResolveContext,
+  isAnimatableSite: Bool
+) -> ResolveWork<[ResolvedNode]> {
+  if let resolvable = view as? any ResolvableView {
+    let bound: Any = bindingResolvableDynamicPropertyCaptures(view, in: context)
+    return ((bound as? any ResolvableView) ?? resolvable).makeResolveWork(in: context)
+  }
+  let bound = bindingBodyDynamicPropertyCaptures(view, in: context)
+  let siteKind = isAnimatableSite ? AnimatableSiteDetection.kind(of: V.self) : .none
+  if case .none = siteKind {
+    return resolveBodyElements(of: bound, in: context)
+  }
+  // Only the copy the body consumes takes the presented data. The caller's
+  // value, which the reuse door, the memo witness and the stored evaluator
+  // hold, stays the one the author wrote.
+  let site = AnimatableSiteResolver.presenting(bound, kind: siteKind, in: context)
+  return resolveBodyElements(of: site.view, in: site.bodyContext)
+}
+
+@MainActor
+private func resolveBodyElements<V: View>(
+  of bound: V,
+  in context: ResolveContext
+) -> ResolveWork<[ResolvedNode]> {
+  let authoring = currentAuthoringContext() ?? makeAuthoringContext(for: context)
+  return withAuthoringContext(authoring) {
+    #if DEBUG
+      let body = withBodyChangeScope(bound, kind: .view) {
+        context.trackingObservableAccess { bound.body }
+      }
+    #else
+      let body = context.trackingObservableAccess { bound.body }
+    #endif
+    return resolveViewElementsWork(body, in: context)
   }
 }
 

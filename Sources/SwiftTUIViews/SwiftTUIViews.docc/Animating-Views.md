@@ -132,6 +132,124 @@ the closure. These styles keep their scoped timing when they flow into the
 wrapped view. A closer style modifier on the wrapped view still overrides
 the inherited style and uses the outer transaction.
 
+## Animate Your Own Views, Modifiers And Shapes
+
+The framework interpolates the values it knows: an opacity, an offset, a
+color. For anything else, conform a view, a view modifier or a shape to
+`Animatable` and expose the value as `animatableData`. While an animation
+runs, SwiftTUI evaluates the conformer again on every frame with interpolated
+data, so anything you can compute from a number animates: how many
+characters of a line are typed, which cells of a dissolve are shown, how far
+a wedge has opened.
+
+```swift
+struct Typewriter: View, Animatable {
+  var text: String
+  var revealed: Double
+
+  nonisolated var animatableData: Double {
+    get { revealed }
+    set { revealed = newValue }
+  }
+
+  var body: some View {
+    Text(String(text.prefix(max(0, Int(revealed.rounded())))))
+  }
+}
+
+struct Greeting: View {
+  @State private var typed = false
+  private let line = "Hello, terminal."
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 1) {
+      Typewriter(text: line, revealed: typed ? Double(line.count) : 0)
+      Button("Type") {
+        withAnimation(.linear(duration: .milliseconds(1200))) { typed.toggle() }
+      }
+    }
+  }
+}
+```
+
+`body` runs once for each frame of the animation, with `revealed` moving
+from its old value to its new one, and once more at exactly the new value.
+The same holds for a modifier's `body(content:)`. ``withAnimation(_:_:)`` and
+``View/animation(_:value:)`` both drive it, and the completion of
+`withAnimation` fires when the value arrives. Use `AnimatablePair` to animate
+two values together.
+
+A few rules follow from how this works:
+
+- **Declare `animatableData` as `nonisolated`.** A view and a modifier are
+  main-actor types, and `Animatable` is not. The property reads and writes
+  stored properties that are `Sendable`, as numbers are. See
+  <doc:Coming-From-SwiftUI>.
+- **A spring gives you values beyond your two ends.** A spring with bounce
+  passes its target and comes back, so a value that goes from 0 to 1 is also
+  1.08 for a few frames, and can drop below 0 on the way back. The body gets
+  the values as they are. Clamp what must stay in range, as `Typewriter`
+  does with `max` and `prefix`.
+- **A change with no animation evaluates the body once.** A plain state
+  write, `withAnimation(nil)`, a transaction that disables animations, and
+  reduce motion all give the body its new value at once. Reduce motion that
+  turns on while an animation runs ends it: the body gets its new value on
+  that frame.
+- **A new target in flight continues from the value on screen.** The
+  animation toward the new target starts from the current sample, and a
+  spring keeps its velocity.
+- **When a view and the modifier on it both conform, they animate as one
+  value.** `Gauge(level: x).modifier(Fade(progress: y))` is a
+  ``ModifiedContent`` whose `animatableData` pairs the two.
+- **A type with nothing to animate needs no `animatableData`.** A conformer
+  whose data is `EmptyAnimatableData` gets the property for free and starts
+  no animation.
+
+A shape animates the same way. Conform it to `Animatable` and its
+`path(in:)` is evaluated with interpolated data on every frame, wherever the
+shape is used: in ``Shape/fill(_:)``, in a stroke, and in
+``View/clipShape(_:)``. A trim or an inset of such a shape animates with it.
+
+```swift
+struct Wedge: Shape, Animatable {
+  var open: Double
+
+  nonisolated var animatableData: Double {
+    get { open }
+    set { open = newValue }
+  }
+
+  func path(in rect: Rect) -> Path {
+    Path(Rect(
+      origin: rect.origin,
+      size: Size(width: rect.size.width * open * open, height: rect.size.height)))
+  }
+}
+
+Text(report).clipShape(Wedge(open: isOpen ? 1 : 0))
+```
+
+A shape that does not conform keeps the earlier behavior: its path morphs
+point by point between the old outline and the new one, when the two have
+the same elements. `Wedge` without the conformance would open at a constant
+rate. With it, the shape decides what each frame looks like.
+
+The two forms cost differently, and on a terminal the difference shows:
+
+- An `Animatable` view or modifier evaluates its body, and every view that
+  body builds, about thirty times a second for the length of the animation.
+  For a modifier that includes the content it wraps. Only that subtree runs
+  again: the views beside it and above it are not evaluated. Keep such a
+  view small, and put it on the content that changes rather than around a
+  whole screen.
+- An `Animatable` shape costs one call of `path(in:)` a frame and evaluates
+  no view at all. So do the modifiers the framework interpolates itself,
+  such as `opacity`, `offset`, `padding`, `frame`, and the styles.
+
+Prefer an `Animatable` shape, or the interpolating modifiers, for large
+content. A view inside the rows of a lazy stack is evaluated while the stack
+lays out, and does not animate this way yet: it gets its new value at once.
+
 ## Transitions On Insertion And Removal
 
 ``View/transition(_:)-(AnyTransition)`` describes how a view enters and
@@ -322,8 +440,9 @@ Text("Saved!")
 
 > Important: A custom `Animatable` view or modifier inside a body is not
 > driven on every frame yet. It shows its destination value at once. Build a
-> body from the modifiers listed above until that lands. See
-> <doc:Divergences-And-Gaps>.
+> body from the modifiers listed above, or clip it with a shape that
+> conforms to `Animatable`, which is evaluated on every frame of the
+> transition. See <doc:Divergences-And-Gaps>.
 
 ## Roll A Number When It Changes
 

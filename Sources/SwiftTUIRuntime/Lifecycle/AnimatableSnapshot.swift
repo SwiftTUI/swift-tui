@@ -73,7 +73,12 @@ package struct AnimatableSnapshot: Sendable {
     // paint time — in that case the .foregroundShapeStyle extraction
     // above already covers it.
     if case .shape(let shapePayload) = node.drawPayload {
-      if let path = shapePayload.geometry.morphablePath {
+      // A shape that conforms to `Animatable` animates its data, and each
+      // sample is evaluated by the shape. Any other custom path morphs point
+      // by point.
+      if let provider = shapePayload.animatableShape {
+        snapshot[.shapeData] = Self.erase(provider.value)
+      } else if let path = shapePayload.geometry.morphablePath {
         snapshot[.shapePath] = AnyAnimatable(path)
       }
       switch shapePayload.operation {
@@ -90,8 +95,18 @@ package struct AnimatableSnapshot: Sendable {
 
     // `clipShape` masks carry the same geometry as fills (STUI-1218), so a
     // custom-path mask morphs exactly as the fill of that shape does.
-    if let clips = ClipMaskPaths(node.drawMetadata.shapeClips) {
-      snapshot[.clipShapePaths] = AnyAnimatable(clips)
+    // A mask of an `Animatable` shape animates that shape's data instead,
+    // one slot per mask position.
+    let shapeClips = node.drawMetadata.shapeClips
+    if !shapeClips.isEmpty {
+      if let clips = ClipMaskPaths(shapeClips) {
+        snapshot[.clipShapePaths] = AnyAnimatable(clips)
+      }
+      for (index, clip) in shapeClips.enumerated() {
+        if let provider = clip.animatableShape {
+          snapshot[.clipShapeData(index)] = Self.erase(provider.value)
+        }
+      }
     }
 
     // A dashed stroke animates its phase, which is how a marching-ants border
@@ -178,6 +193,12 @@ package struct AnimatableSnapshot: Sendable {
     self[.opacity]?.unwrap(as: Double.self)
   }
 
+  /// Boxes the data of an `Animatable` shape under its concrete type, so two
+  /// values of one shape type interpolate.
+  private static func erase<Value: AnimatableShapeValue>(_ value: Value) -> AnyAnimatable {
+    AnyAnimatable(value)
+  }
+
   /// The stroke style a node draws with, from whichever of the three places
   /// carries it: a border keeps its join and dash in the draw metadata, and a
   /// shape stroke and a rule keep theirs in the draw payload.
@@ -207,18 +228,14 @@ package struct AnimatableSnapshot: Sendable {
     } else if case .shape(let payload) = node.drawPayload,
       case .stroke(let style, _, let strokeBorder, let backgroundStyle) = payload.operation
     {
-      node.drawPayload = .shape(
-        ShapePayload(
-          geometry: payload.geometry,
-          insetAmount: payload.insetAmount,
-          operation: .stroke(
-            style: style,
-            strokeStyle: stroke,
-            strokeBorder: strokeBorder,
-            backgroundStyle: backgroundStyle
-          )
-        )
+      var updated = payload
+      updated.operation = .stroke(
+        style: style,
+        strokeStyle: stroke,
+        strokeBorder: strokeBorder,
+        backgroundStyle: backgroundStyle
       )
+      node.drawPayload = .shape(updated)
     } else if case .rule = node.drawPayload {
       node.drawPayload = .rule(stroke)
     }
@@ -322,7 +339,9 @@ package struct ClipMaskPaths: Animatable, Equatable, Sendable {
   /// `nil` when no clip carries a custom path, so a node without one has no
   /// slot.
   package init?(_ clips: [DrawMetadata.ShapeClip]) {
-    let paths = clips.map(\.geometry.morphablePath)
+    // A mask of an `Animatable` shape does not morph: its data animates in a
+    // slot of its own, so it holds no path here.
+    let paths = clips.map { $0.animatableShape == nil ? $0.geometry.morphablePath : nil }
     guard paths.contains(where: { $0 != nil }) else { return nil }
     self.paths = paths
   }
@@ -381,7 +400,8 @@ package struct ClipMaskPaths: Animatable, Equatable, Sendable {
     var result = clips
     for index in clips.indices {
       guard let path = paths[index] else {
-        guard clips[index].geometry.morphablePath == nil else { return clips }
+        guard clips[index].animatableShape != nil || clips[index].geometry.morphablePath == nil
+        else { return clips }
         continue
       }
       guard let geometry = clips[index].geometry.replacingMorphablePath(with: path) else {

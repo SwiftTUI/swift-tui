@@ -1075,6 +1075,7 @@ swiftui_divergent:
   - SwiftTUIViews.ScrollView
   - SwiftTUIViews.ScrollViewProxy
   - SwiftTUIViews.ScrollViewReader
+  - SwiftTUIViews.Shape
   - SwiftTUIViews.Slider
   - SwiftTUIViews.Spacer
   - SwiftTUIViews.SpatialTapGesture

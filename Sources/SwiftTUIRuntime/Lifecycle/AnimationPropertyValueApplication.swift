@@ -307,39 +307,29 @@ package enum AnimationPropertyValueApplication {
 
     case .shapeFillStyle:
       guard let style = unwrapShapeStyle(value) else { return }
-      guard case .shape(let shapePayload) = node.drawPayload,
+      guard case .shape(var shapePayload) = node.drawPayload,
         case .fill(_, let mode) = shapePayload.operation
       else {
         return
       }
-      node.drawPayload = .shape(
-        ShapePayload(
-          geometry: shapePayload.geometry,
-          insetAmount: shapePayload.insetAmount,
-          operation: .fill(style: style, mode: mode)
-        )
-      )
+      shapePayload.operation = .fill(style: style, mode: mode)
+      node.drawPayload = .shape(shapePayload)
 
     case .shapeStrokeStyle:
       guard let style = unwrapShapeStyle(value) else { return }
-      guard case .shape(let shapePayload) = node.drawPayload,
+      guard case .shape(var shapePayload) = node.drawPayload,
         case .stroke(_, let strokeStyle, let strokeBorder, let backgroundStyle) =
           shapePayload.operation
       else {
         return
       }
-      node.drawPayload = .shape(
-        ShapePayload(
-          geometry: shapePayload.geometry,
-          insetAmount: shapePayload.insetAmount,
-          operation: .stroke(
-            style: style,
-            strokeStyle: strokeStyle,
-            strokeBorder: strokeBorder,
-            backgroundStyle: backgroundStyle
-          )
-        )
+      shapePayload.operation = .stroke(
+        style: style,
+        strokeStyle: strokeStyle,
+        strokeBorder: strokeBorder,
+        backgroundStyle: backgroundStyle
       )
+      node.drawPayload = .shape(shapePayload)
 
     case .borderForegroundStyle:
       guard let style = unwrapShapeStyle(value) else { return }
@@ -389,6 +379,24 @@ package enum AnimationPropertyValueApplication {
       stroke.trim = trim.isWhole ? nil : trim
       AnimatableSnapshot.setStrokeStyle(stroke, on: &node)
 
+    case .shapeData:
+      // The sample was turned into geometry when it was taken
+      // (`SampledShapeGeometry`), on the main actor, by the shape itself.
+      guard let sampled = value.unwrap(as: SampledShapeGeometry.self),
+        case .shape(var payload) = node.drawPayload
+      else { return }
+      payload.geometry = sampled.geometry
+      node.drawPayload = .shape(payload)
+
+    case .clipShapeData(let index):
+      guard let sampled = value.unwrap(as: SampledShapeGeometry.self) else { return }
+      var drawMetadata = node.drawMetadata
+      var clips = drawMetadata.shapeClips
+      guard clips.indices.contains(index), clips[index].animatableShape != nil else { return }
+      clips[index].geometry = sampled.geometry
+      drawMetadata.shapeClips = clips
+      node.drawMetadata = drawMetadata
+
     case .textRoll:
       // The roll only decorates a node whose payload is the string it rolls
       // toward; a payload that moved on under an unanimated write keeps its
@@ -402,6 +410,26 @@ package enum AnimationPropertyValueApplication {
       drawMetadata.textRoll = roll.isRolling && roll.text == content ? roll : nil
       node.drawMetadata = drawMetadata
     }
+  }
+
+  /// The value a sample of `slot` is written to a node as.
+  ///
+  /// A sample of an `Animatable` shape's data is data. The shape turns it
+  /// into geometry here, once, on the main actor: this is where `path(in:)`
+  /// runs for a sample. Every later write of the sample, including the
+  /// re-projection after a late-preference pass, uses that geometry. Any
+  /// other slot's sample is written as it is.
+  @MainActor
+  package static func presentationValue(
+    of sample: AnyAnimatable,
+    for slot: AnimatableSlot
+  ) -> AnyAnimatable {
+    guard slot.holdsShapeData,
+      let shape = sample.unwrapConforming(to: (any AnimatableShapeValue).self)
+    else {
+      return sample
+    }
+    return AnyAnimatable(SampledShapeGeometry(geometry: shape.geometry))
   }
 
   static func unwrapShapeStyle(_ value: AnyAnimatable) -> AnyShapeStyle? {
@@ -500,5 +528,16 @@ package enum AnimationPropertyValueApplication {
       return (dimensions.max, dimensions.ideal, .finite(value))
     }
     return dimensions
+  }
+}
+
+/// The geometry an `Animatable` shape gave for one animation sample: what a
+/// shape-data slot writes to a node. It is a finished value, so it holds no
+/// data of its own to animate.
+package struct SampledShapeGeometry: Animatable, Equatable, Sendable {
+  package var geometry: ShapeGeometry
+
+  package init(geometry: ShapeGeometry) {
+    self.geometry = geometry
   }
 }

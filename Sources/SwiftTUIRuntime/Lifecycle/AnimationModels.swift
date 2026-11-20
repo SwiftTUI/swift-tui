@@ -57,6 +57,33 @@ package enum AnimatableSlot: Hashable, Sendable {
   case clipShapePaths
   /// A `Text` node's content-transition roll (`TextRollValue`).
   case textRoll
+  /// The `animatableData` of a shape that conforms to `Animatable`, drawn by
+  /// a fill or a stroke (an `AnimatableShapeData`). A sample is turned back
+  /// into geometry by the shape itself, on the main actor, and written where
+  /// a morphed path is written. A shape that does not conform has no such
+  /// slot and morphs through ``shapePath``.
+  case shapeData
+  /// The `animatableData` of the `Animatable` shape of one `clipShape` mask,
+  /// by the mask's position among the node's clips. A clip of a shape that
+  /// does not conform morphs through ``clipShapePaths``.
+  case clipShapeData(Int)
+}
+
+extension AnimatableSlot {
+  /// Whether the slot holds the data of an `Animatable` shape. Its samples
+  /// are data: they become geometry before they reach a node.
+  package var holdsShapeData: Bool {
+    switch self {
+    case .shapeData, .clipShapeData: true
+    default: false
+    }
+  }
+
+  /// Whether the slot is the data of one `clipShape` mask.
+  package var isClipShapeData: Bool {
+    if case .clipShapeData = self { return true }
+    return false
+  }
 }
 
 /// Keyed identifier for a single active animation.  Carries the view
@@ -76,6 +103,11 @@ package struct AnimationKey: Hashable, Sendable {
     case insertionScale
     /// A matched-geometry translation animation (placed level).
     case matchedGeometry
+    /// The `animatableData` of a view or a view modifier that conforms to
+    /// `Animatable`, by the site's position at the identity
+    /// (`AnimatableValueSite.ordinal`). The sample is not written to any
+    /// tree: the site's body is evaluated with it.
+    case value(ordinal: Int)
   }
 
   package var identity: Identity
@@ -92,5 +124,18 @@ package struct AnimationKey: Hashable, Sendable {
   package init(identity: Identity, slot: AnimatableSlot) {
     self.identity = identity
     self.scope = .property(slot)
+  }
+
+  /// The key of the value animation of `site`.
+  package init(site: AnimatableValueSite) {
+    identity = site.identity
+    scope = .value(ordinal: site.ordinal)
+  }
+
+  /// Whether the key names the value animation of an `Animatable` view or
+  /// modifier.
+  package var isValue: Bool {
+    if case .value = scope { return true }
+    return false
   }
 }
