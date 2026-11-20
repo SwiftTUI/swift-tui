@@ -105,22 +105,117 @@ package struct TransitionModifiers: Sendable, Equatable {
     return result
   }
 
+  /// Whether these effects move or resize the view. Opacity alone does not.
+  /// This is the effect channel's contribution to
+  /// ``TransitionProperties/hasMotion``.
+  package var hasMotion: Bool {
+    hasOffsetEffect || scale != nil
+  }
+
+  /// The values the same channels hold in the identity phase: opacity 1,
+  /// zero offsets, no edge displacement and scale 1. A channel that is absent
+  /// stays absent.
+  package var identityCounterpart: TransitionModifiers {
+    TransitionModifiers(
+      opacity: opacity.map { _ in 1 },
+      offsetX: offsetX.map { _ in 0 },
+      offsetY: offsetY.map { _ in 0 },
+      scale: scale.map { TransitionScaleEffect(scale: 1, anchor: $0.anchor) }
+    )
+  }
+
+}
+
+/// The animation a transition carries for one direction.
+package enum TransitionAnimationOverride: Sendable, Equatable {
+  /// The transition has no animation of its own; the transaction decides.
+  case inherit
+  /// The transition's own animation replaces the transaction's. `nil` snaps.
+  /// Indirect, so the common inheriting transition stays one word wide.
+  indirect case explicit(Animation?)
+
+  /// The override of a combination: the first part that carries its own
+  /// animation decides for the whole combination.
+  package func orInheriting(_ other: TransitionAnimationOverride) -> TransitionAnimationOverride {
+    self == .inherit ? other : self
+  }
 }
 
 /// A type-erased transition wrapper.
 ///
 /// Compose the built-in opacity, offset, and scale effects with
-/// ``combined(with:)`` and ``asymmetric(insertion:removal:)``.
+/// ``combined(with:)`` and ``asymmetric(insertion:removal:)``, or erase a
+/// ``Transition`` with ``init(_:)``.
+///
+/// A value has two channels. The effect channel is the opacity, offset, move
+/// and scale values the built-in transitions declare. The body channel is the
+/// body of a custom ``Transition``. A combination can carry both.
 public struct AnyTransition: Sendable {
   package let insertionModifiers: @Sendable () -> TransitionModifiers
   package let removalModifiers: @Sendable () -> TransitionModifiers
+  /// The body channel: the erased bodies of the custom ``Transition`` values
+  /// in this transition, or `nil` when it has effects only.
+  package let bodyBox: (any TransitionBodyBox)?
+  /// The transition's own animation for insertion.
+  package let insertionAnimation: TransitionAnimationOverride
+  /// The transition's own animation for removal.
+  package let removalAnimation: TransitionAnimationOverride
+  /// Reports ``TransitionProperties/hasMotion`` for the whole transition. A
+  /// closure, because a custom transition's `properties` are main-actor
+  /// isolated while this value is built from any isolation.
+  package let motion: @MainActor @Sendable () -> Bool
 
+  /// An effects-only transition with no animation of its own. Its motion is
+  /// read from the effect values.
   package init(
     insertion: @escaping @Sendable () -> TransitionModifiers,
     removal: @escaping @Sendable () -> TransitionModifiers
   ) {
+    self.init(
+      insertion: insertion,
+      removal: removal,
+      bodyBox: nil,
+      insertionAnimation: .inherit,
+      removalAnimation: .inherit,
+      motion: { insertion().hasMotion || removal().hasMotion }
+    )
+  }
+
+  package init(
+    insertion: @escaping @Sendable () -> TransitionModifiers,
+    removal: @escaping @Sendable () -> TransitionModifiers,
+    bodyBox: (any TransitionBodyBox)?,
+    insertionAnimation: TransitionAnimationOverride,
+    removalAnimation: TransitionAnimationOverride,
+    motion: @escaping @MainActor @Sendable () -> Bool
+  ) {
     insertionModifiers = insertion
     removalModifiers = removal
+    self.bodyBox = bodyBox
+    self.insertionAnimation = insertionAnimation
+    self.removalAnimation = removalAnimation
+    self.motion = motion
+  }
+
+  /// Whether this transition moves or resizes the view, as
+  /// ``TransitionProperties/hasMotion`` reports it.
+  @MainActor
+  package var hasMotion: Bool {
+    motion()
+  }
+
+  /// The effect values the effect channel shows in `phase`. The identity
+  /// phase holds the identity value of every channel either direction uses.
+  package func effectModifiers(for phase: TransitionPhase) -> TransitionModifiers {
+    switch phase {
+    case .willAppear:
+      insertionModifiers()
+    case .didDisappear:
+      removalModifiers()
+    case .identity:
+      insertionModifiers().identityCounterpart
+        .merging(removalModifiers().identityCounterpart)
+    }
   }
 
   // MARK: - Built-ins
@@ -206,26 +301,52 @@ public struct AnyTransition: Sendable {
 
   // MARK: - Combinators
 
+  /// Combines this transition with another.
+  ///
+  /// Opacities multiply and offsets add. The scale of `other` replaces this
+  /// transition's scale. The body of `other` wraps this transition's body.
+  /// When more than one part carries its own animation, the first one decides
+  /// for the whole combination.
   public func combined(with other: AnyTransition) -> AnyTransition {
     let selfInsertion = insertionModifiers
     let selfRemoval = removalModifiers
     let otherInsertion = other.insertionModifiers
     let otherRemoval = other.removalModifiers
+    let selfMotion = motion
+    let otherMotion = other.motion
     return AnyTransition(
       insertion: { selfInsertion().merging(otherInsertion()) },
-      removal: { selfRemoval().merging(otherRemoval()) }
+      removal: { selfRemoval().merging(otherRemoval()) },
+      bodyBox: nestedTransitionBodyBox(inner: bodyBox, outer: other.bodyBox),
+      insertionAnimation: insertionAnimation.orInheriting(other.insertionAnimation),
+      removalAnimation: removalAnimation.orInheriting(other.removalAnimation),
+      motion: { selfMotion() || otherMotion() }
     )
   }
 
+  /// Uses `insertion` when the view appears and `removal` when it disappears.
   public static func asymmetric(
     insertion: AnyTransition,
     removal: AnyTransition
   ) -> AnyTransition {
     let insertionGetter = insertion.insertionModifiers
     let removalGetter = removal.removalModifiers
+    let insertionMotion = insertion.motion
+    let removalMotion = removal.motion
     return AnyTransition(
       insertion: insertionGetter,
-      removal: removalGetter
+      removal: removalGetter,
+      bodyBox: nestedTransitionBodyBox(
+        inner: insertion.bodyBox.map {
+          PhaseLimitedTransitionBodyBox(base: $0, activePhase: .willAppear)
+        },
+        outer: removal.bodyBox.map {
+          PhaseLimitedTransitionBodyBox(base: $0, activePhase: .didDisappear)
+        }
+      ),
+      insertionAnimation: insertion.insertionAnimation,
+      removalAnimation: removal.removalAnimation,
+      motion: { insertionMotion() || removalMotion() }
     )
   }
 

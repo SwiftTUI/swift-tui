@@ -134,8 +134,9 @@ the inherited style and uses the outer transaction.
 
 ## Transitions On Insertion And Removal
 
-``View/transition(_:)`` describes how a view enters and leaves when a
-condition adds or removes it. The change still needs an animation scope:
+``View/transition(_:)-(AnyTransition)`` describes how a view enters and
+leaves when a condition adds or removes it. The change still needs an
+animation scope:
 
 ```swift
 struct SavedBanner: View {
@@ -178,6 +179,73 @@ transition when no explicit transition is attached. Use `.transition(.identity)`
 to suppress that fade on the corresponding insertion or removal. Reinserting a
 view while its removal fade is still running continues from its displayed
 opacity, avoiding a flash back to full opacity.
+
+### Give A Transition Its Own Animation
+
+``AnyTransition/animation(_:)`` attaches an animation to a transition. That
+animation replaces the animation of the surrounding scope for the transition,
+on insertion and on removal:
+
+```swift
+Text("Saved!")
+  .transition(.opacity.animation(.linear(duration: .milliseconds(400))))
+```
+
+The banner now fades for 400 ms whatever the duration of the `withAnimation`
+scope is, and it also fades when the state changes with no animation scope at
+all. Pass `nil` to make the transition snap inside an animated scope. A
+`withAnimation` completion still waits for the transition's own animation.
+`withAnimation(nil)` and Reduce Motion disable the transition as they disable
+every animation. In ``AnyTransition/asymmetric(insertion:removal:)`` each side
+keeps its own animation. In a combination, one animation drives the whole
+transition: the first part that carries one decides.
+
+### Write Your Own Transition
+
+``Transition`` is the protocol behind the built-in transitions. A conforming
+type returns a view from ``Transition/body(content:phase:)``. `content` stands
+for the view the transition is attached to, and `phase` is a
+``TransitionPhase``: ``TransitionPhase/willAppear`` before the view appears,
+``TransitionPhase/identity`` while it is present, and
+``TransitionPhase/didDisappear`` after it has gone.
+
+```swift
+struct Spotlight: Transition {
+  func body(content: Content, phase: TransitionPhase) -> some View {
+    content
+      .padding(.horizontal, 1)
+      .background(phase.isIdentity ? Color.blue : Color.gray)
+      .opacity(phase.isIdentity ? 1 : 0)
+  }
+}
+
+Text("Saved!").transition(Spotlight())
+```
+
+Pass the value to ``View/transition(_:)-(T)``, or erase it with
+``AnyTransition/init(_:)`` to store it or to combine it with an
+``AnyTransition``. The built-in transitions are types too
+(``OpacityTransition``, ``MoveTransition``, ``ScaleTransition``,
+``OffsetTransition``, ``PushTransition``, ``SlideTransition``,
+``IdentityTransition`` and ``AsymmetricTransition``), with the static members
+`.opacity`, `.move(edge:)`, `.scale`, `.scale(_:anchor:)`, `.offset(_:)`,
+`.offset(x:y:)`, `.push(from:)`, `.slide` and `.identity`. Compose them with
+``Transition/combined(with:)`` and ``Transition/animation(_:)``, and build on
+one inside your own body with ``Transition/apply(content:phase:)``. A built-in
+type behaves exactly as the matching ``AnyTransition`` value, so
+`.transition(OpacityTransition())` and `.transition(.opacity)` are the same
+transition. ``AnyTransition/modifier(active:identity:)`` makes a transition
+from two values of one ``ViewModifier``.
+
+Every modifier a body applies to `content` lands on a boundary around the
+view, separate from the view's own modifiers. A body that places `content`
+twice mounts the view twice, each with its own state.
+
+> Important: SwiftTUI evaluates a custom body in its identity phase, so the
+> view shows the identity body while it is present. Insertion and removal of
+> a custom body snap. The built-in transitions animate, and so do the built-in
+> parts of a combination such as `Spotlight().combined(with: .opacity)`. See
+> <doc:Divergences-And-Gaps>.
 
 ## Roll A Number When It Changes
 
@@ -577,8 +645,8 @@ it. Because the modifier tags its content, tag the outermost node whose
 chrome should follow: `.background(...).border(...).matchedGeometryEffect(...)`,
 not the reverse.
 
-Add ``View/transition(_:)`` to both instances and the swap cross-fades along
-one path: the departing instance's exit overlay travels to the destination
+Add ``View/transition(_:)-(AnyTransition)`` to both instances and the swap
+cross-fades along one path: the departing instance's exit overlay travels to the destination
 rect while its removal phase plays, and the arriving instance fades in from
 the source rect while its insertion phase plays, so a change of colour or
 content between the two reads as a blend rather than a cut.

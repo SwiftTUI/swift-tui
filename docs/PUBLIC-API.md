@@ -82,6 +82,21 @@ The canonical public surface is the API ordinary app code uses first:
   `View` APIs; representation controls bind to ordinary application state.
 - The modifier algebra: `ViewModifier`, `View.modifier(_:)`, `ModifiedContent`,
   and the canonical identity/layout/styling/presentation modifiers.
+- Insertion and removal transitions: `View.transition(_:)` with an
+  `AnyTransition` or with any `Transition`. `Transition` is the extension
+  point: a conformer returns a view from `body(content:phase:)` for a
+  `TransitionPhase`, where `content` is a `TransitionContent`, and declares
+  `TransitionProperties`. The built-in conformers are `OpacityTransition`,
+  `IdentityTransition`, `MoveTransition`, `OffsetTransition`,
+  `PushTransition`, `ScaleTransition`, `SlideTransition` and
+  `AsymmetricTransition`; each erases to the matching `AnyTransition` value
+  through `AnyTransition.init(_:)`. `Scripts/check_transition_overloads.sh`
+  pins that every earlier `.transition(…)` spelling still selects the
+  `AnyTransition` overload, and `Scripts/check_transition_consumer.sh` builds
+  an external package that uses the whole surface with the `SwiftTUIViews`
+  product alone. What a custom body does today is the *Custom `Transition`
+  bodies* entry in
+  [Divergences-And-Gaps.md](../Sources/SwiftTUIViews/SwiftTUIViews.docc/Divergences-And-Gaps.md).
 - Runtime integration in `SwiftTUIRuntime`: `DefaultRenderer`, `RunLoop`,
   `RuntimeConfiguration`, `App`, `Scene`, `WindowGroup`, the scene builder
   artifacts, `RenderSnapshot`, `HostedSceneSession`, `HostedRasterSurface`,
@@ -94,7 +109,7 @@ Document a feature on this surface first when the surface can express it.
 
 ### The value-type conformance guard
 
-`View`, `ViewModifier`, `DynamicProperty`, `Scene`, `App`, and every
+`View`, `ViewModifier`, `DynamicProperty`, `Transition`, `Scene`, `App`, and every
 body-producing style protocol (`ButtonStyle`, `TextFieldStyle`, `PickerStyle`,
 `ToggleStyle`, `LabelStyle`, `LabeledContentStyle`, `GroupBoxStyle`,
 `ControlGroupStyle`, `MenuStyle`, `DisclosureGroupStyle`, `SliderStyle`,

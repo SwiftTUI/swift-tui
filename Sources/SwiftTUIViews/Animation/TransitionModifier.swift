@@ -25,7 +25,22 @@ public struct TransitionRegistrationModifier: IterativePrimitiveViewModifier, Se
     content: ModifierContentInputs<Base>,
     in context: ResolveContext
   ) -> ResolveWork<[ResolvedNode]> {
-    return content.resolveElementsWork(in: context).map { nodes in
+    // A transition with a body channel resolves its body in the identity
+    // phase, in this modifier's own context, the way a composed modifier's
+    // body resolves; the content sits behind the boundary node the body's
+    // `content` placement emits. A transition without one resolves the
+    // content directly and adds no node.
+    let elements: ResolveWork<[ResolvedNode]>
+    if let bodyBox = transition.bodyBox {
+      elements = bodyBox.resolveElementsWork(
+        content: TransitionContentSource(content),
+        phase: .identity,
+        in: context
+      )
+    } else {
+      elements = content.resolveElementsWork(in: context)
+    }
+    return elements.map { nodes in
       // Register the transition for every emitted identity so the
       // animation controller can look it up during insertion/removal
       // diffing.

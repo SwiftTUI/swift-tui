@@ -1,0 +1,3 @@
+# The gate builds a copy of this package out of tree. A resolved file written
+# here by an editor or an in-place build pins nothing the gate uses.
+Package.resolved

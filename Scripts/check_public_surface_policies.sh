@@ -87,6 +87,7 @@ ButtonStyle:Sources/SwiftTUIViews/Controls/ButtonStyles.swift
 PickerStyle:Sources/SwiftTUIViews/Controls/PickerStyles.swift
 TextFieldStyle:Sources/SwiftTUIViews/Controls/TextFieldStyles.swift
 TabViewStyle:Sources/SwiftTUIViews/TabViews/TabViewStyles.swift
+Transition:Sources/SwiftTUIViews/Animation/Transition.swift
 Scene:Sources/SwiftTUIRuntime/Scenes/App.swift
 App:Sources/SwiftTUIRuntime/Scenes/App.swift
 EOF

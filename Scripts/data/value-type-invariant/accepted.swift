@@ -160,6 +160,19 @@ struct AcceptedTabViewStyle: TabViewStyle {
   }
 }
 
+struct AcceptedTransition: Transition {
+  func body(content: Content, phase: TransitionPhase) -> some View { content }
+}
+
+// An enum transition stays allowed, like an enum view.
+enum AcceptedEnumTransition: Transition {
+  case only
+
+  func body(content: Content, phase: TransitionPhase) -> some View {
+    content.opacity(phase.isIdentity ? 1 : 0)
+  }
+}
+
 struct AcceptedScene: Scene {
   var body: some Scene {
     WindowGroup { Text("ok") }

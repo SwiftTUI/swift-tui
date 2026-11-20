@@ -132,6 +132,11 @@ final class RejectedTabViewStyle: TabViewStyle, @unchecked Sendable {
 }
 
 @MainActor
+final class RejectedTransition: Transition {
+  func body(content: Content, phase: TransitionPhase) -> some View { content }
+}
+
+@MainActor
 final class RejectedScene: Scene {
   var body: some Scene {
     WindowGroup { Text("no") }

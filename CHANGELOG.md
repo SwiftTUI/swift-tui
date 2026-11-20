@@ -31,6 +31,32 @@ require 1.0.0. See [COMPATIBILITY.md](docs/COMPATIBILITY.md).
   selection and composing range, and `TextField` and `TextEditor` draw
   composing text underlined until it is committed. Hosts that send only bytes,
   and `SecureField`, behave as before (STUI-135).
+- The `Transition` protocol, with `TransitionPhase`, `TransitionProperties`
+  and the content stand-in `TransitionContent`. A package that depends on
+  `SwiftTUIViews` alone can declare a transition, and
+  `View.transition(_:)` accepts any `Transition` beside `AnyTransition`. Every
+  existing `.transition(…)` call selects the same overload as before. A custom
+  body is evaluated in its identity phase, so the view shows that body while
+  it is present; insertion and removal of a custom body snap for now, and the
+  built-in transitions animate as before (STUI-1543).
+- The built-in transitions as types: `OpacityTransition`,
+  `IdentityTransition`, `MoveTransition`, `OffsetTransition`,
+  `PushTransition`, `ScaleTransition`, `SlideTransition` and
+  `AsymmetricTransition`, with the static members `.opacity`, `.identity`,
+  `.slide`, `.scale`, `.scale(_:anchor:)`, `.move(edge:)`, `.offset(_:)`,
+  `.offset(x:y:)` and `.push(from:)`, and `combined(with:)`, `animation(_:)`
+  and `apply(content:phase:)` on every transition. A built-in type behaves
+  exactly as the matching `AnyTransition` value (STUI-1543).
+- `AnyTransition.init(_:)` erases any `Transition`, and
+  `AnyTransition.modifier(active:identity:)` makes a transition from two
+  values of one view modifier (STUI-1543).
+- `AnyTransition.animation(_:)` and `Transition.animation(_:)` give a
+  transition its own animation. It replaces the animation of the surrounding
+  `withAnimation` scope for that transition on insertion and on removal, it
+  plays when the state change has no animation, and `nil` makes the transition
+  snap. A `withAnimation` completion waits for the transition's own animation.
+  `withAnimation(nil)` and Reduce Motion still disable the transition
+  (STUI-1543).
 
 ### Fixed
 

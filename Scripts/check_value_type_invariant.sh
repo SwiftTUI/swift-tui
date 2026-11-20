@@ -3,8 +3,8 @@
 # Negative-compile lane for the value-type authoring invariant
 # (plan 2026-08-29-001 Stage 1).
 #
-# `View`, `ViewModifier`, `DynamicProperty`, the four style protocols,
-# `Scene`, and `App` each declare a defaulted static witness whose
+# `View`, `ViewModifier`, `DynamicProperty`, the style protocols,
+# `Transition`, `Scene`, and `App` each declare a defaulted static witness whose
 # `Self: AnyObject` overload is `@available(*, unavailable)`. A class
 # conformer therefore fails to compile with the protocol's own message. That
 # enforcement is a compiler behavior, not a test the package can assert from
@@ -76,7 +76,7 @@ accepted="$fixture_dir/accepted.swift"
 
 # Every protocol the invariant covers, in declaration order. Each must produce
 # its own diagnostic in the rejected fixture.
-protocols="View ViewModifier DynamicProperty ButtonStyle PickerStyle TextFieldStyle TabViewStyle LabelStyle LabeledContentStyle GroupBoxStyle ToggleStyle DisclosureGroupStyle TextEditorStyle ProgressViewStyle SliderStyle StepperStyle MenuStyle ControlGroupStyle PaletteStyle Scene App"
+protocols="View ViewModifier DynamicProperty ButtonStyle PickerStyle TextFieldStyle TabViewStyle LabelStyle LabeledContentStyle GroupBoxStyle ToggleStyle DisclosureGroupStyle TextEditorStyle ProgressViewStyle SliderStyle StepperStyle MenuStyle ControlGroupStyle PaletteStyle Transition Scene App"
 
 for module in SwiftTUIViews SwiftTUIRuntime SwiftTUIGraph; do
   if [ ! -e "$modules_dir/$module.swiftmodule" ]; then

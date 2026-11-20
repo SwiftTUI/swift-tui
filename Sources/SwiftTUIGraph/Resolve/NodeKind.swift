@@ -115,6 +115,9 @@ package struct ViewKind: Hashable, Sendable, CustomStringConvertible, CustomDebu
   package static let toolbarContent = Self("ToolbarContent")
   package static let toolbarInset = Self("ToolbarInset")
   package static let toolbarScope = Self("ToolbarScope")
+  /// The boundary a `Transition` body's `content` placement resolves to: one
+  /// pass-through node whose single child is the content.
+  package static let transitionContent = Self("TransitionContent")
   package static let transitionOffset = Self("TransitionOffset")
   package static let unknown = Self("Unknown")
   package static let vStack = Self("VStack")

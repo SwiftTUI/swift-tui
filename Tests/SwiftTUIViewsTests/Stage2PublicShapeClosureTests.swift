@@ -2,10 +2,11 @@ import Testing
 
 @testable import SwiftTUIViews
 
-/// Positive compile fixtures for the Stage 2 preview-cut surface. The removed
-/// custom-transition declarations are pinned negatively by
-/// `docs/public_api_overrides.yml` and the generated symbol baseline; these
-/// fixtures prove their supported replacements remain usable.
+/// Positive compile fixtures for the Stage 2 preview-cut surface: the
+/// built-in transition effects, the literal `Text` initializers and the
+/// border placements remain usable. The custom-transition protocol that the
+/// preview cut removed returned with STUI-1543; `TransitionErasureTests`
+/// covers it.
 @MainActor
 @Suite("Stage 2 public-shape closure")
 struct Stage2PublicShapeClosureTests {

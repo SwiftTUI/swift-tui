@@ -217,6 +217,7 @@ current status of each.
 | `Color` vocabulary: `alpha:` not `opacity:`, `mixed(with:amount:method:)` not `mix(with:by:)`, no `Color.accentColor` | Prefer semantic roles (`.primary`, `.secondary`, `.tint`) resolved through the host theme; they are the intended currency |
 | No `ScenePhase` | None; a session is one full-canvas scene |
 | Scale transitions and matched size changes use placed bounds and clipping rather than re-layout or bitmap scaling | Expect whole-cell steps; content keeps its destination layout while the interpolated frame clips it |
+| A custom `Transition` body is evaluated in its identity phase only, so its insertion and removal snap | Combine it with a built-in transition, which animates: `Custom().combined(with: .opacity)` |
 | Lazy stacks estimate unseen content | Compose static fragments and multiple `ForEach` sources directly; default spacing is exact between realized neighbors. Body-dependent empty rows and negative spacing can require exhaustive work |
 | Path morphing requires matching ordered element kinds; clipping samples cell centers | Use `Angle`, `Path.addArc`, `Path.interpolated(to:progress:)`, and `clipShape(_:)`; see <doc:Shapes> |
 

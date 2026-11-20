@@ -284,6 +284,22 @@ classifications:
     - SwiftTUIViews.AnimationStateKey
     - SwiftTUIViews.AnyTransition
     - SwiftTUIViews.ContentTransition
+    # The Transition protocol and its built-in conformers (STUI-1543). The
+    # earlier protocol of this name was retired before 0.9 because the runtime
+    # extracted only opacity and offset from a body; this surface evaluates the
+    # body itself.
+    - SwiftTUIViews.AsymmetricTransition
+    - SwiftTUIViews.IdentityTransition
+    - SwiftTUIViews.MoveTransition
+    - SwiftTUIViews.OffsetTransition
+    - SwiftTUIViews.OpacityTransition
+    - SwiftTUIViews.PushTransition
+    - SwiftTUIViews.ScaleTransition
+    - SwiftTUIViews.SlideTransition
+    - SwiftTUIViews.Transition
+    - SwiftTUIViews.TransitionContent
+    - SwiftTUIViews.TransitionPhase
+    - SwiftTUIViews.TransitionProperties
     - SwiftTUIViews.Transaction
     - SwiftTUIViews.TransactionKey
     - "SwiftTUIViews.withAnimation(_:_:)"
@@ -938,13 +954,6 @@ classifications:
     - SwiftTUIRuntime.FileOpenError
     - SwiftTUIRuntime.Standard
     - SwiftTUIViews.ErrorToastStyle
-    # Retired before the 0.9 preview cut: the generic custom-transition body
-    # could express arbitrary modifiers while the runtime silently extracted
-    # only opacity and offset. Built-in AnyTransition effects remain canonical.
-    - SwiftTUIViews.Transition
-    - SwiftTUIViews.TransitionContent
-    - SwiftTUIViews.TransitionPhase
-    - SwiftTUIViews.TransitionProperties
     # NOTE: the control-style A2 spinner break retired the nested
     # `Spinner.SpinnerSet` vocabulary and the declaration-scoped spinner
     # initializer. Nested declarations are not top-level names, so their
@@ -1076,4 +1085,5 @@ swiftui_divergent:
   - SwiftTUIViews.TextField
   - SwiftTUIViews.Transaction
   - SwiftTUIViews.TransactionKey
+  - SwiftTUIViews.Transition
   - SwiftTUIRuntime.WindowGroup

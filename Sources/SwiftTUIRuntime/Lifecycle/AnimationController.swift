@@ -1828,10 +1828,18 @@ package final class AnimationController: Sendable {
     timestamp: MonotonicInstant
   ) {
     let modifiers = transition.insertionModifiers()
-    guard case .animate(let box) = transaction.animationRequest else {
+    guard
+      let box = transitionAnimationBox(
+        override: transition.insertionAnimation,
+        request: transaction.animationRequest,
+        hasEffect: modifiers != .identity
+      )
+    else {
       // No animation intent — snap to identity immediately.
       return
     }
+    // The animations retain the surrounding transaction's batch whichever
+    // curve they play, so its completion waits for the transition.
     let batchID = transaction.animationBatchID
     // Enqueue an animation for each modifier effect the transition
     // declares.  From values are derived from the modifiers (offset
@@ -1921,6 +1929,9 @@ package final class AnimationController: Sendable {
     timestamp: MonotonicInstant
   ) {
     guard transition.removalModifiers() != .identity else { return }
+    // A transition whose own animation is `nil` snaps: it plans no overlay,
+    // exactly as an identity transition plans none.
+    if transition.removalAnimation == .explicit(nil) { return }
     // Resolve the injection point: the deepest disappearing ancestor (the
     // subtree to inject) and the first surviving ancestor it attaches to.
     // See `AnimationTransitionRemovalPlanning` for the walk-up rules.
@@ -2066,7 +2077,11 @@ package final class AnimationController: Sendable {
       parentIdentity: injectionParent,
       childIndex: previousChildIndexByIdentity[injectionTarget] ?? 0,
       transition: transition,
-      animationBox: removalTransaction.animationRequest.animationBoxIfAny,
+      animationBox: transitionAnimationBox(
+        override: transition.removalAnimation,
+        request: removalTransaction.animationRequest,
+        hasEffect: true
+      ),
       startTime: timestamp,
       startOpacity: initialOpacity,
       startScale: initialScale,
@@ -2074,6 +2089,33 @@ package final class AnimationController: Sendable {
       placedSnapshot: placedSnapshot,
       matchedTravel: matchedTravel
     )
+  }
+
+  /// Picks the curve one direction of a transition plays, or `nil` when it
+  /// snaps.
+  ///
+  /// A transition with no animation of its own takes the transaction's curve,
+  /// as before. A transition's own animation replaces the transaction's and
+  /// also plays when the transaction carries none; its `nil` snaps. A
+  /// disabled request (`withAnimation(nil)`, reduced motion, stable output)
+  /// snaps whatever the transition carries. The override's curve is
+  /// registered here because no `withAnimation` scope delivered it, and only
+  /// when the direction has an effect to play it: a curve nothing uses would
+  /// stay in the registration ledger, which is pruned as its users complete.
+  private func transitionAnimationBox(
+    override: TransitionAnimationOverride,
+    request: AnimationRequest,
+    hasEffect: Bool
+  ) -> AnimationBox? {
+    switch override {
+    case .inherit:
+      return request.animationBoxIfAny
+    case .explicit(nil):
+      return nil
+    case .explicit(let animation?):
+      if request == .disabled || !hasEffect { return nil }
+      return register(animation)
+    }
   }
 
   /// Selects animation intent for a node that no longer exists in the current

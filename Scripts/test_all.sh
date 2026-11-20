@@ -944,6 +944,18 @@ if lane_runs_core; then
     "$repo_root" \
     "bash Scripts/check_public_import_consumers.sh" \
     bash Scripts/check_public_import_consumers.sh
+
+  run_step \
+    "Check View.transition overload selection (typecheck)" \
+    "$repo_root" \
+    "Scripts/check_transition_overloads.sh" \
+    Scripts/check_transition_overloads.sh
+
+  run_step \
+    "Build the external transition consumer" \
+    "$repo_root" \
+    "bash Scripts/check_transition_consumer.sh" \
+    bash Scripts/check_transition_consumer.sh
 fi
 
 if [ "$lane" = all ]; then
