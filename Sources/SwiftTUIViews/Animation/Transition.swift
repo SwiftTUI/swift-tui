@@ -33,9 +33,18 @@ public import SwiftTUICore
 /// change their modifiers: a view that only the `willAppear` body has is
 /// never shown, and SwiftTUI reports a runtime issue for it.
 ///
-/// The removal of a custom body does not animate yet. The built-in
-/// transitions animate both ways. See <doc:Divergences-And-Gaps> for the
-/// current limits on custom bodies.
+/// When the view is removed inside an animation it leaves through the body
+/// of ``TransitionPhase/didDisappear``: the views drawn are those of that
+/// body from the first frame of the removal, and every modifier value that
+/// interpolates animates from the value on screen. A value that cannot
+/// interpolate shows its `didDisappear` value at once.
+///
+/// SwiftTUI ends the life of the view when its removal starts: that frame
+/// cancels its tasks, runs `onDisappear` and drops its state, where SwiftUI
+/// waits for the removal to end. The removal then draws the view as it was
+/// last drawn, inside the `didDisappear` body. That body is drawn and not
+/// mounted, so a view it adds shows its initial state and runs nothing. See
+/// <doc:Divergences-And-Gaps> for the rules and the limits.
 @MainActor
 public protocol Transition: Sendable {
   /// The type of view that ``body(content:phase:)`` returns.
@@ -47,8 +56,10 @@ public protocol Transition: Sendable {
   /// Returns the view to show for `content` in `phase`.
   ///
   /// SwiftTUI calls this method with ``TransitionPhase/identity`` to build
-  /// the views on screen. It also calls it with another phase to read the
-  /// modifier values of that phase. That second call has no view state: a
+  /// the views on screen. It calls it with ``TransitionPhase/willAppear``
+  /// when an insertion starts, to read the modifier values of that phase, and
+  /// with ``TransitionPhase/didDisappear`` when a removal starts, to build
+  /// the views the removal draws. Those two calls have no view state: a
   /// `@State` property in a view the body adds reads its initial value there,
   /// and no lifecycle handler, task or action of the result ever runs.
   ///

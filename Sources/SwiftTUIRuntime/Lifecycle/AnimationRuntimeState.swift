@@ -164,6 +164,11 @@ package struct RemovalEntry: Sendable {
   /// SwiftUI behavior where a view in its removal transition is positioned
   /// onto the new source. `nil` fades in place.
   package var matchedTravel: MatchedRemovalTravel? = nil
+  /// The body channel of the removal, when the transition has a registered
+  /// body and its removal plays: the `.didDisappear` body, the frozen content
+  /// it wraps, and the property animations it owns. `nil` shows the frozen
+  /// snapshot as it is. See ``RemovalBodyState``.
+  package var body: RemovalBodyState? = nil
   /// Per-key persistent state threaded into the removal animation's
   /// ``CustomAnimation/animate(value:time:context:)`` on each tick.
   /// Built-in bezier/spring curves ignore this; custom animations can

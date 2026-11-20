@@ -271,10 +271,42 @@ A view the body adds, such as an overlay, mounts with the view the transition
 is attached to. It has ordinary state, `onAppear` and tasks, stays while that
 view is present, and leaves with it.
 
-With no animation scope the view shows the `identity` body at once.
-``Transition/animation(_:)`` gives the transition an animation of its own.
-Reduce Motion disables a custom transition as it disables the built-in ones,
-whatever ``TransitionProperties/hasMotion`` says.
+When the view is removed inside an animation scope, it leaves through the
+`didDisappear` body. `Spotlight` fades out while its background goes from
+blue to gray. The same modifiers interpolate, each from the value on screen,
+so a removal that interrupts an insertion carries on from where the insertion
+was, and a spring keeps its velocity. A value that does not interpolate shows
+its `didDisappear` value from the first frame of the removal. The removal ends
+when the last value it animates settles, so a body with nothing to interpolate
+leaves at once.
+
+SwiftTUI ends the life of the view when its removal starts. That frame
+cancels its tasks, runs `onDisappear` and drops its state, where SwiftUI
+waits for the removal to end. What you see afterwards is the view as it was
+last drawn, inside the `didDisappear` body. Three things follow:
+
+- The departing content does not change and is not laid out again. A body
+  that gives it another size moves or crops it. An environment value the
+  `didDisappear` body writes for `content`, such as `underline()`, does not
+  reach it; SwiftTUI reports a runtime issue. `foregroundStyle` and `tint`
+  are the exceptions, and they animate.
+- The `didDisappear` body is drawn and not mounted. A view it adds shows its
+  initial state and runs no `onAppear`, task or action. SwiftTUI reports a
+  runtime issue when a view that only the `didDisappear` body has declares
+  one.
+- The body is laid out where the view was, under the size it had, and the
+  views around it close up at once.
+
+A body that places `content` inside a ``GeometryReader`` or a lazy stack
+cannot be drawn around the departing view. Its removal plays without the
+body, and SwiftTUI reports a runtime issue. Read the size in a `background`
+or an `overlay` of `content` instead.
+
+With no animation scope the view shows the `identity` body at once, and a
+removed view leaves at once. ``Transition/animation(_:)`` gives the
+transition an animation of its own. Reduce Motion disables a custom
+transition as it disables the built-in ones, whatever
+``TransitionProperties/hasMotion`` says.
 
 Inside a body, ``Transition/apply(content:phase:)`` on ``OpacityTransition``
 and ``OffsetTransition`` animates like the modifiers above. A move relative to
@@ -288,9 +320,9 @@ Text("Saved!")
   .transition(Spotlight().combined(with: .move(edge: .leading)))
 ```
 
-> Important: The removal of a custom body snaps: the view disappears at once.
-> The built-in transitions animate both ways, and so do the built-in parts of
-> a combination such as `Spotlight().combined(with: .opacity)`. See
+> Important: A custom `Animatable` view or modifier inside a body is not
+> driven on every frame yet. It shows its destination value at once. Build a
+> body from the modifiers listed above until that lands. See
 > <doc:Divergences-And-Gaps>.
 
 ## Roll A Number When It Changes

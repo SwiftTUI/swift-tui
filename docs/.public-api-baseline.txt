@@ -916,6 +916,12 @@ SwiftTUIGraph.RuntimeIssue.Code.Tab.duplicateTag
 SwiftTUIGraph.RuntimeIssue.Code.Tab.missingStructuralTag
 SwiftTUIGraph.RuntimeIssue.Code.Toolbar
 SwiftTUIGraph.RuntimeIssue.Code.Toolbar.unhostedItems
+SwiftTUIGraph.RuntimeIssue.Code.Transition
+SwiftTUIGraph.RuntimeIssue.Code.Transition.phaseOnlyView
+SwiftTUIGraph.RuntimeIssue.Code.Transition.removalContentNotFound
+SwiftTUIGraph.RuntimeIssue.Code.Transition.removalEnvironmentIgnored
+SwiftTUIGraph.RuntimeIssue.Code.Transition.removalHandlersIgnored
+SwiftTUIGraph.RuntimeIssue.Code.Transition.unsupportedBuiltInBody
 SwiftTUIGraph.RuntimeIssue.Code.Windows
 SwiftTUIGraph.RuntimeIssue.Code.Windows.stackFloorLeanProfile
 SwiftTUIGraph.RuntimeIssue.Code.description

@@ -523,14 +523,33 @@ package final class AnimationController: Sendable {
     surfaceSize: CellSize? = nil,
     adoption: [MatchedGeometryAdoptionPair]? = nil
   ) -> PlacedAnimationOverlaySnapshot {
+    // A removal that plays a transition body draws that body around the
+    // frozen content. Lay it out here, on the main actor, with the samples
+    // the head tick took: the sampling below and the frame tail then receive
+    // a finished placed tree in place of the frozen snapshot, and treat it
+    // as they treat any removal overlay.
+    var sampledRemovals = removingNodes
+    var removalsWithAnimatingBody: Set<ViewNodeID> = []
+    if removingNodes.values.contains(where: { $0.body != nil }) {
+      for (viewNodeID, entry) in removingNodes {
+        guard let body = entry.body, let frozen = entry.placedSnapshot else { continue }
+        let isAnimating = body.drivingKeys.contains { activeAnimations[$0] != nil }
+        if isAnimating { removalsWithAnimatingBody.insert(viewNodeID) }
+        // A removal that ends on this sample draws nothing.
+        guard isAnimating || body.hasEffectChannel else { continue }
+        sampledRemovals[viewNodeID]?.placedSnapshot = AnimationTransitionBodyRemoval.compose(
+          body, in: frozen)
+      }
+    }
     let result = PlacedAnimationOverlaySampling.sample(
-      removingNodes: removingNodes,
+      removingNodes: sampledRemovals,
       activeAnimations: activeAnimations,
       registeredAnimations: registeredAnimations,
       tree: tree,
       timestamp: timestamp,
       surfaceSize: surfaceSize,
-      adoption: adoption
+      adoption: adoption,
+      removalsWithAnimatingBody: removalsWithAnimatingBody
     )
 
     for (viewNodeID, state) in result.removalCustomStates {
@@ -560,6 +579,11 @@ package final class AnimationController: Sendable {
       guard entry.completionBatchID != nil else {
         removingNodes.removeValue(forKey: viewNodeID)
         if let box = entry.animationBox { completedAnimationBoxes.insert(box) }
+        // An animation of the body that the removal did not drive may still
+        // be running. Its view leaves with the overlay.
+        if let body = entry.body {
+          completedAnimationBoxes.formUnion(endRemovalBodyAnimations(of: body))
+        }
         continue
       }
       if !entry.isLogicallyComplete {
@@ -718,8 +742,71 @@ package final class AnimationController: Sendable {
     removingNodes.values.first { $0.identity == identity }?.transition.bodyRegistration
   }
 
+  /// The state of the body channel of the removal in flight at `identity`,
+  /// or `nil` when no removal there plays a body. Test hook.
+  package func removalBodyState(forIdentity identity: Identity) -> RemovalBodyState? {
+    removingNodes.values.first { $0.identity == identity }?.body
+  }
+
   private var removingIdentitySet: Set<Identity> {
     Set(removingNodes.values.map(\.identity))
+  }
+
+  /// The removal that owns the property animations of each identity of a
+  /// transition body in flight. Empty when no removal plays a body.
+  ///
+  /// A removal that plays a body keeps animating the views of that body,
+  /// which are no longer in the live tree. Their animations stay in
+  /// ``activeAnimations`` under their `(identity, slot)` keys, so a later
+  /// insertion at the same key can retarget them. While the removal lasts
+  /// they belong to it: their samples go to its working tree, and the
+  /// departed-identity prune leaves them alone.
+  private var removalBodyOwners: [Identity: ViewNodeID] {
+    var owners: [Identity: ViewNodeID] = [:]
+    for (viewNodeID, entry) in removingNodes {
+      guard let body = entry.body else { continue }
+      for identity in body.ownedIdentities {
+        owners[identity] = viewNodeID
+      }
+    }
+    return owners
+  }
+
+  /// Ends the property animations a removal body owns, releasing the batches
+  /// they retained so their completions fire. Returns their curves for the
+  /// registration prune.
+  @discardableResult
+  private func endRemovalBodyAnimations(of body: RemovalBodyState) -> Set<AnimationBox> {
+    var finishedBoxes: Set<AnimationBox> = []
+    guard !activeAnimations.isEmpty, !body.ownedIdentities.isEmpty else { return finishedBoxes }
+    for key in Array(activeAnimations.keys) where body.ownedIdentities.contains(key.identity) {
+      guard case .property = key.scope, let entry = activeAnimations.removeValue(forKey: key)
+      else { continue }
+      slotVelocitySamplers.removeValue(forKey: key)
+      finishedBoxes.insert(entry.animationBox)
+      releaseBatch(entry.batchID, logicalAlreadyReleased: entry.isLogicallyReleased)
+    }
+    return finishedBoxes
+  }
+
+  /// Hands the property animations a removal body owned back to the live
+  /// tree, for a view that was inserted again during its removal. An
+  /// animation whose view is in the new tree follows that view from now on.
+  /// One whose view is not there ends.
+  private func returnRemovalBodyAnimations(
+    of body: RemovalBodyState,
+    to frame: AnimationTransitionBodyInsertion.Frame
+  ) {
+    guard !activeAnimations.isEmpty, !body.ownedIdentities.isEmpty else { return }
+    for key in Array(activeAnimations.keys) where body.ownedIdentities.contains(key.identity) {
+      guard case .property = key.scope else { continue }
+      if frame.snapshots[key.identity] != nil {
+        activeAnimations[key]?.ownerViewNodeID = frame.nodeIDs[key.identity]
+        activeAnimations[key]?.resolvedIdentity = key.identity
+      } else if let entry = activeAnimations.removeValue(forKey: key) {
+        releaseBatch(entry.batchID, logicalAlreadyReleased: entry.isLogicallyReleased)
+      }
+    }
   }
 
   package var preFrameHeadOffscreenPropertyAnimationRedrawIdentities: Set<Identity>? {
@@ -1150,6 +1237,11 @@ package final class AnimationController: Sendable {
       else { continue }
       removingNodes.removeValue(forKey: nodeID)
       if let box = entry.animationBox { finishedBoxes.insert(box) }
+      // The values of a transition body end with the removal that owns them.
+      // Their views are in no tree the walk above can reach.
+      if let body = entry.body {
+        finishedBoxes.formUnion(endRemovalBodyAnimations(of: body))
+      }
       releaseBatch(entry.completionBatchID, logicalAlreadyReleased: entry.isLogicallyComplete)
     }
     pruneCompletedAnimationRegistrations(finishedBoxes)
@@ -1438,6 +1530,9 @@ package final class AnimationController: Sendable {
     // reinsertion still fires its own insertion transition when one is
     // registered.)
     var reinsertionOpacities: [Identity: Double] = [:]
+    // The body channel of each superseded removal, by the removal's identity.
+    // Its animations stay in flight until the insertion below takes them.
+    var returnedRemovalBodies: [Identity: RemovalBodyState] = [:]
     if !removingNodes.isEmpty {
       let supersededRemovals = removingNodes.filter { _, entry in
         newIdentities.contains(entry.identity)
@@ -1453,6 +1548,9 @@ package final class AnimationController: Sendable {
                 elapsed: entry.startTime.duration(to: timestamp), state: &state) ?? 1
             reinsertionOpacities[entry.identity] =
               entry.startOpacity + (target - entry.startOpacity) * progress
+          }
+          if let body = entry.body {
+            returnedRemovalBodies[entry.identity] = body
           }
           releaseBatch(
             entry.completionBatchID,
@@ -1591,19 +1689,35 @@ package final class AnimationController: Sendable {
             transactions: newTransactionsByIdentity
           )
         bodyInsertionFrame = frame
-        let origin: AnimationTransitionBodyInsertion.Origin
-        if let evaluated = bodyInsertionOrigins[registration.identity] {
-          origin = evaluated
-        } else {
-          origin = AnimationTransitionBodyInsertion.origin(of: registration, in: frame)
-          if let issue = origin.phaseOnlyIssue {
-            // The tail of this frame drains the queue into its issue channel.
-            ImperativeRuntimeIssueQueue.record(issue)
-          }
-          bodyInsertionOrigins[registration.identity] = origin
+        let returnedIdentity = returnedRemovalBodies.keys.first { removalIdentity in
+          AnimationTransitionBodyInsertion.isInside(
+            removalIdentity, subtreeOf: identity, in: frame)
         }
-        bodyChanges = AnimationTransitionBodyInsertion.changes(
-          from: origin, insertedIdentity: identity, in: frame)
+        if let returnedIdentity,
+          let returned = returnedRemovalBodies.removeValue(forKey: returnedIdentity)
+        {
+          // The view came back while its removal was in flight. It continues
+          // from what the removal shows, not from the `.willAppear` body: a
+          // value still in flight is retargeted from its sample with its
+          // velocity, and a settled one starts at its `.didDisappear` value.
+          returnRemovalBodyAnimations(of: returned, to: frame)
+          bodyChanges = AnimationTransitionBodyRemoval.reinsertionChanges(
+            from: returned, insertedIdentity: identity, in: frame)
+        } else {
+          let origin: AnimationTransitionBodyInsertion.Origin
+          if let evaluated = bodyInsertionOrigins[registration.identity] {
+            origin = evaluated
+          } else {
+            origin = AnimationTransitionBodyInsertion.origin(of: registration, in: frame)
+            if let issue = origin.phaseOnlyIssue {
+              // The tail of this frame drains the queue into its issue channel.
+              ImperativeRuntimeIssueQueue.record(issue)
+            }
+            bodyInsertionOrigins[registration.identity] = origin
+          }
+          bodyChanges = AnimationTransitionBodyInsertion.changes(
+            from: origin, insertedIdentity: identity, in: frame)
+        }
       }
       enqueueInsertionAnimation(
         identity: identity,
@@ -1615,6 +1729,13 @@ package final class AnimationController: Sendable {
         transaction: insertionTransaction,
         timestamp: timestamp
       )
+    }
+
+    // A removal body whose view came back without replaying its transition
+    // (no curve, or an insertion the rules above skip) ends here: its values
+    // stop, and the view shows its identity body.
+    for body in returnedRemovalBodies.values {
+      endRemovalBodyAnimations(of: body)
     }
 
     // Process removals: look up the full subtree and position from the
@@ -1758,9 +1879,13 @@ package final class AnimationController: Sendable {
     // through `removingNodes`, not `activeAnimations`. Orphaned completions
     // are dropped, never fired — their awaiters died with the subtree.
     let exitOverlayIdentities = removingIdentitySet
+    // The values of a transition body in its removal are still animating,
+    // for the removal that owns them.
+    let removalBodyOwners = removalBodyOwners
     let departedKeys = activeAnimations.keys.filter { key in
       !newIdentities.contains(key.identity)
         && !exitOverlayIdentities.contains(key.identity)
+        && removalBodyOwners[key.identity] == nil
         && !(previousFrame.realizedPresentationTargets[key] != nil
           && previousFrame.realizedPresentationOwners[key.identity].map {
             newIdentities.contains($0)
@@ -2013,6 +2138,15 @@ package final class AnimationController: Sendable {
   /// Shared by both removal-detection channels — departed ViewNodeID
   /// occurrences and adopted-slot conditional removals (a registered identity
   /// leaving the identity set while its slot node survives).
+  ///
+  /// A transition with a registered body also plays that body
+  /// (``AnimationTransitionBodyRemoval``): the entry carries the
+  /// `.didDisappear` body, and the views of that body which were on screen
+  /// animate from the value they show. Those animations go through the slot
+  /// path, so one still in flight from the insertion is retargeted from its
+  /// sample with its velocity instead of being superseded. The body plays
+  /// only when the removal has a curve and a frozen placed snapshot to draw
+  /// it in; otherwise the removal is what its effects alone make it.
   private func planRemovalOverlay(
     removedNodeID: ViewNodeID,
     identity: Identity,
@@ -2023,20 +2157,38 @@ package final class AnimationController: Sendable {
     transactionPlan: FrameAnimationTransactionPlan,
     timestamp: MonotonicInstant
   ) {
-    guard transition.removalModifiers() != .identity else {
-      // The removal of a body does not play yet, so the view leaves at once.
-      // Its insertion may still be in flight. End that here, as the removal
-      // of an effect ends an insertion below: the completions the insertion
-      // retained fire now. Left to the departed-identity prune they would be
-      // dropped, which is right only for a view that had no transition.
-      if transition.bodyRegistration != nil {
+    let effects = transition.removalModifiers()
+    let registration = transition.bodyRegistration
+    guard effects != .identity || registration != nil else { return }
+    // A body whose removal does not play leaves at once. Its insertion may
+    // still be in flight. End that here, as the removal of an effect ends an
+    // insertion below: the completions the insertion retained fire now. Left
+    // to the departed-identity prune they would be dropped, which is right
+    // only for a view that had no transition.
+    func snapBody() {
+      if registration != nil {
         supersedeAnimations(inDepartingSubtreeAt: identity, previousRoot: previousRoot)
       }
-      return
     }
     // A transition whose own animation is `nil` snaps: it plans no overlay,
     // exactly as an identity transition plans none.
-    if transition.removalAnimation == .explicit(nil) { return }
+    if transition.removalAnimation == .explicit(nil) {
+      snapBody()
+      return
+    }
+    let removalTransaction = transactionForDepartedIdentity(
+      identity,
+      transactionPlan: transactionPlan
+    )
+    // Whether the removal has a curve. A body with none snaps, as an identity
+    // transition does.
+    let plays = Self.transitionPlays(
+      override: transition.removalAnimation,
+      request: removalTransaction.animationRequest)
+    if effects == .identity, !plays {
+      snapBody()
+      return
+    }
     // Resolve the injection point: the deepest disappearing ancestor (the
     // subtree to inject) and the first surviving ancestor it attaches to.
     // See `AnimationTransitionRemovalPlanning` for the walk-up rules.
@@ -2057,7 +2209,10 @@ package final class AnimationController: Sendable {
         in: previousRoot,
         identity: injectionTarget
       )
-    else { return }
+    else {
+      if effects == .identity { snapBody() }
+      return
+    }
 
     // A departing matched-geometry instance whose key swapped to a live
     // counterpart this frame keeps its exit transition: the overlay travels
@@ -2078,15 +2233,85 @@ package final class AnimationController: Sendable {
       }
     }
 
+    // If a previous placed tree is cached, look up the frozen
+    // placed subtree for the same identity so the overlay can be
+    // injected post-layout (draw-only, no layout-shift).
+    // The baseline is un-adopted; a departing co-present non-source was drawn
+    // at its source's rect, so its frozen clone takes last frame's adoption
+    // offset and the exit overlay starts where the node was drawn.
+    let placedSnapshot: PlacedNode?
+    if let previousPlacedRoot,
+      let frozen = AnimationTreeQueries.findPlacedSubtree(
+        in: previousPlacedRoot,
+        identity: injectionTarget
+      )
+    {
+      placedSnapshot =
+        previousAdoptionOffsets.isEmpty
+        ? frozen
+        : translatePlacedNodesByIdentity(
+          tree: frozen, offsets: previousAdoptionOffsets, offsetsAreAbsolute: true)
+    } else {
+      placedSnapshot = nil
+    }
+
+    // The body channel. It needs a curve and the frozen placed snapshot: the
+    // resolved-level fallback lays the overlay out with the live tree and
+    // cannot host a body.
+    var bodyPlan: AnimationTransitionBodyRemoval.Plan?
+    if let registration, plays, let placedSnapshot {
+      switch AnimationTransitionBodyRemoval.plan(
+        of: registration,
+        rootIdentity: identity,
+        frozenResolved: subtree,
+        frozenPlaced: placedSnapshot,
+        previousSnapshots: previousSnapshots,
+        hasEffectChannel: effects != .identity,
+        effectOwnsRootOpacity: effects.opacity != nil
+      ) {
+      case .plays(let plan):
+        bodyPlan = plan
+        for issue in plan.issues {
+          // The tail of this frame drains the queue into its issue channel.
+          ImperativeRuntimeIssueQueue.record(issue)
+        }
+      case .unavailable(let issue):
+        ImperativeRuntimeIssueQueue.record(issue)
+      }
+    }
+    if effects == .identity, bodyPlan == nil {
+      // Nothing to play: no effect, and no body that can be drawn.
+      snapBody()
+      return
+    }
+    let bodyIdentities = bodyPlan?.state.ownedIdentities ?? []
+    let styledContentIdentities = Set((bodyPlan?.state.contentStyles ?? [:]).keys)
+    // Whether the body channel keeps the animation at `key`. On a view of
+    // the body that is every slot but one: the opacity of the departing view
+    // itself belongs to the effect channel when the effects fade the view.
+    // On a view of the frozen content it is the two inherited styles the body
+    // can set; the content's own animations end here as they always did.
+    func bodyKeeps(_ key: AnimationKey) -> Bool {
+      guard case .property(let slot) = key.scope, bodyIdentities.contains(key.identity) else {
+        return false
+      }
+      if styledContentIdentities.contains(key.identity) {
+        return slot == .foregroundShapeStyle || slot == .tintShapeStyle
+      }
+      return !(slot == .opacity && key.identity == identity && effects.opacity != nil)
+    }
+
     // Before clearing the injected subtree's active animations, peek
     // at any mid-flight opacity animation on the transition's
     // registered identity (or anywhere in the subtree) so the
     // removal can start from the displayed value instead of
-    // snapping back to 1.0.  Must run before the filter below.
+    // snapping back to 1.0.  Must run before the filter below. An opacity
+    // the body channel keeps is not an effect to carry: it continues on its
+    // own key.
     let injectedIdentities = AnimationTreeQueries.collectIdentities(in: subtree)
     var initialOpacity: Double = 1.0
     let keyOnTarget = AnimationKey(identity: identity, slot: .opacity)
-    if let existing = activeAnimations[keyOnTarget],
+    if !bodyKeeps(keyOnTarget), let existing = activeAnimations[keyOnTarget],
       let sampled = sample(existing, at: timestamp),
       let value = sampled.unwrap(as: Double.self)
     {
@@ -2094,7 +2319,7 @@ package final class AnimationController: Sendable {
     } else {
       for sid in injectedIdentities {
         let k = AnimationKey(identity: sid, slot: .opacity)
-        if let existing = activeAnimations[k],
+        if !bodyKeeps(k), let existing = activeAnimations[k],
           let sampled = sample(existing, at: timestamp),
           let value = sampled.unwrap(as: Double.self)
         {
@@ -2135,45 +2360,62 @@ package final class AnimationController: Sendable {
     // filter, so they would tick to natural completion (or be purged
     // later by the placed-overlay loop's "registration missing" path)
     // even after the exit animation started.
-    let removalTransaction = transactionForDepartedIdentity(
-      identity,
-      transactionPlan: transactionPlan
-    )
+    //
+    // The animations the body channel keeps are spared: the removal
+    // retargets them below.
     let completionBatchID = removalTransaction.animationBatchID.flatMap { batchID in
       completions[batchID] == nil ? nil : batchID
     }
     retainBatch(completionBatchID)
 
     let supersededEntries = activeAnimations.filter {
-      injectedIdentities.contains($0.key.identity)
+      injectedIdentities.contains($0.key.identity) && !bodyKeeps($0.key)
     }
     activeAnimations = activeAnimations.filter {
-      !injectedIdentities.contains($0.key.identity)
+      !injectedIdentities.contains($0.key.identity) || bodyKeeps($0.key)
     }
     for (_, entry) in supersededEntries {
       releaseBatch(entry.batchID, logicalAlreadyReleased: entry.isLogicallyReleased)
     }
 
-    // If a previous placed tree is cached, look up the frozen
-    // placed subtree for the same identity so the overlay can be
-    // injected post-layout (draw-only, no layout-shift).
-    // The baseline is un-adopted; a departing co-present non-source was drawn
-    // at its source's rect, so its frozen clone takes last frame's adoption
-    // offset and the exit overlay starts where the node was drawn.
-    let placedSnapshot: PlacedNode?
-    if let previousPlacedRoot,
-      let frozen = AnimationTreeQueries.findPlacedSubtree(
-        in: previousPlacedRoot,
-        identity: injectionTarget
-      )
-    {
-      placedSnapshot =
-        previousAdoptionOffsets.isEmpty
-        ? frozen
-        : translatePlacedNodesByIdentity(
-          tree: frozen, offsets: previousAdoptionOffsets, offsetsAreAbsolute: true)
-    } else {
-      placedSnapshot = nil
+    let animationBox = transitionAnimationBox(
+      override: transition.removalAnimation,
+      request: removalTransaction.animationRequest,
+      hasEffect: true
+    )
+    var bodyState: RemovalBodyState?
+    if let bodyPlan, let animationBox {
+      var state = bodyPlan.state
+      // Each view of the body that was on screen animates the slots that
+      // differ, from the value it shows to its value in the `.didDisappear`
+      // phase, as ordinary property animations under the removal's curve. An
+      // animation already in flight at a key is retargeted from its sample,
+      // with the velocity projection. One whose target does not change is
+      // left to finish.
+      for change in bodyPlan.changes {
+        diffAndEnqueue(
+          identity: change.identity,
+          viewNodeID: nil,
+          previous: change.previous,
+          current: change.current,
+          request: .animate(animationBox),
+          batchID: removalTransaction.animationBatchID,
+          tracksVelocity: false,
+          timestamp: timestamp
+        )
+      }
+      // The nodes those animations were applied to are gone. From here on
+      // their samples go to the removal's working tree, by identity. The
+      // ones that start now are the removal's own, and it lasts as long as
+      // they do.
+      for key in Array(activeAnimations.keys) where bodyKeeps(key) {
+        activeAnimations[key]?.ownerViewNodeID = nil
+        activeAnimations[key]?.resolvedIdentity = nil
+        if activeAnimations[key]?.startTime == timestamp {
+          state.drivingKeys.insert(key)
+        }
+      }
+      bodyState = state
     }
 
     removingNodes[removedNodeID] = RemovalEntry(
@@ -2182,17 +2424,14 @@ package final class AnimationController: Sendable {
       parentIdentity: injectionParent,
       childIndex: previousChildIndexByIdentity[injectionTarget] ?? 0,
       transition: transition,
-      animationBox: transitionAnimationBox(
-        override: transition.removalAnimation,
-        request: removalTransaction.animationRequest,
-        hasEffect: true
-      ),
+      animationBox: animationBox,
       startTime: timestamp,
       startOpacity: initialOpacity,
       startScale: initialScale,
       completionBatchID: completionBatchID,
       placedSnapshot: placedSnapshot,
-      matchedTravel: matchedTravel
+      matchedTravel: matchedTravel,
+      body: bodyState
     )
   }
 
@@ -2945,6 +3184,13 @@ package final class AnimationController: Sendable {
     // it stays bounded across a run of unique finite curves (009).
     var completedAnimationBoxes: Set<AnimationBox> = []
 
+    // The property animations a removal's transition body owns are sampled
+    // here like any other, once per frame. Their views are not in `tree`:
+    // the samples go to the removal, which draws its body with them before
+    // the frame tail.
+    let removalBodyOwners = removalBodyOwners
+    var removalBodySamples: [ViewNodeID: [Identity: [AnimatableSlot: AnyAnimatable]]] = [:]
+
     // Walk every active animation regardless of scope.  Property
     // scopes are sampled here and write into ``interpolated`` for
     // application by ``applyInterpolatedValues`` below.  Placed-level
@@ -2955,6 +3201,30 @@ package final class AnimationController: Sendable {
     for (key, animation) in activeAnimations {
       switch animation.kind {
       case .property(let from, let to):
+        if let owner = removalBodyOwners[key.identity] {
+          let slot = AnimationPropertyValueApplication.propertySlot(for: key)
+          switch advancePropertyAnimationStep(
+            key: key,
+            animation: animation,
+            at: timestamp,
+            keysToRemove: &keysToRemove,
+            completedBatches: &completedBatches,
+            logicallyCompletedBatches: &logicallyCompletedBatches,
+            completedAnimationBoxes: &completedAnimationBoxes,
+            redrawIdentities: &redrawIdentities
+          ) {
+          case .unregistered:
+            break
+          case .completed:
+            removalBodySamples[owner, default: [:]][key.identity, default: [:]][slot] = to
+          case .progressed(let progress):
+            removalBodySamples[owner, default: [:]][key.identity, default: [:]][slot] =
+              AnimationPropertyValueApplication.interpolate(from: from, to: to, progress: progress)
+            latestDeadline = timestamp.advanced(by: frameInterval)
+            hasPendingWork = true
+          }
+          continue
+        }
         if previousFrame.realizedPresentationTargets[key] != nil {
           // The tail owns this curve's single evaluation after row realization.
           hasPendingWork = true
@@ -3034,6 +3304,12 @@ package final class AnimationController: Sendable {
       releaseBatch(release.batchID, logicalAlreadyReleased: release.logicalAlreadyReleased)
     }
 
+    // Each removal that plays a body takes this frame's samples. A slot
+    // without one shows the value of the removal's working tree.
+    for viewNodeID in Array(removingNodes.keys) where removingNodes[viewNodeID]?.body != nil {
+      removingNodes[viewNodeID]?.body?.samples = removalBodySamples[viewNodeID] ?? [:]
+    }
+
     // Process removal entries: compute interpolated transition modifiers
     // and prepare them for injection back into the tree.
     var removalsToPurge: [ViewNodeID] = []
@@ -3058,6 +3334,9 @@ package final class AnimationController: Sendable {
           // whether or not a placed pass follows (elided frames run none).
           removingNodes.removeValue(forKey: viewNodeID)
           completedAnimationBoxes.insert(box)
+          if let body = entry.body {
+            completedAnimationBoxes.formUnion(endRemovalBodyAnimations(of: body))
+          }
           releaseBatch(entry.completionBatchID, logicalAlreadyReleased: true)
           redrawIdentities.insert(entry.identity)
           continue

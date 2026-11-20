@@ -27,15 +27,23 @@ package struct TransitionBodyRegistration: Sendable {
   /// tree the host emitted, in tree order. A body that places `content` twice
   /// has two. The content of each is at its `content` child identity.
   package let boundaryIdentities: [Identity]
+  /// What the body alone stamped on each root it emitted, by the root's
+  /// identity. A modifier applied outside `.transition(_:)` stamps the same
+  /// node afterwards, so the root on screen can carry more than this. The
+  /// difference is what a removal has to keep on the root when it draws
+  /// another phase of the body.
+  package let rootStamps: [Identity: TransitionBodyRootStamps]
 
   package init(
     box: any TransitionBodyBox,
     context: ResolveContext,
-    boundaryIdentities: [Identity]
+    boundaryIdentities: [Identity],
+    rootStamps: [Identity: TransitionBodyRootStamps] = [:]
   ) {
     self.box = box
     self.context = context
     self.boundaryIdentities = boundaryIdentities
+    self.rootStamps = rootStamps
   }
 
   /// The identity the body resolves at: the identity of the view the
@@ -91,13 +99,46 @@ package struct TransitionBodyRegistration: Sendable {
         AnimationCompletionStorage.$currentTaskSink.withValue(nil) {
           ViewNodeContext.withCurrentValue(nil) {
             withAuthoringContext(nil) {
-              box.resolveElementsWork(content: standIn, phase: phase, in: context).run()
+              TransitionPhaseScratchScope.$isActive.withValue(true) {
+                box.resolveElementsWork(content: standIn, phase: phase, in: context).run()
+              }
             }
           }
         }
       }
     }
     return TransitionPhaseTree(roots: roots, contentIdentities: recorder.identities)
+  }
+}
+
+/// Marks the evaluation of a transition phase outside the graph.
+///
+/// Nothing registers in that scope: the context has no registry. A modifier
+/// that would register a handler and skips its node when it cannot reads this
+/// to keep the stamp it leaves on the node, so the animation engine can
+/// report a handler that will never run
+/// (`RuntimeIssue.Code.Transition.removalHandlersIgnored`).
+package enum TransitionPhaseScratchScope {
+  /// True while ``TransitionBodyRegistration/resolve(phase:contentSize:)``
+  /// evaluates a body.
+  @TaskLocal package static var isActive = false
+}
+
+/// The draw and layout metadata a transition body leaves on one of its roots,
+/// before any modifier outside the transition stamps that node.
+package struct TransitionBodyRootStamps: Sendable, Equatable {
+  package var drawMetadata: DrawMetadata
+  package var drawEffects: DrawEffects
+  package var surfaceComposition: SurfaceCompositionMetadata
+  package var layoutMetadata: LayoutMetadata
+  package var matchedGeometry: MatchedGeometryConfig?
+
+  package init(_ node: ResolvedNode) {
+    drawMetadata = node.drawMetadata
+    drawEffects = node.drawEffects
+    surfaceComposition = node.surfaceComposition
+    layoutMetadata = node.layoutMetadata
+    matchedGeometry = node.matchedGeometry
   }
 }
 
@@ -161,7 +202,10 @@ extension AnyTransition {
       box: box,
       context: context.detachedForTransitionPhase(),
       boundaryIdentities: transitionContentBoundaryIdentities(
-        in: nodes, boundaryTypes: box.boundaryTypes)
+        in: nodes, boundaryTypes: box.boundaryTypes),
+      rootStamps: Dictionary(
+        nodes.map { ($0.identity, TransitionBodyRootStamps($0)) },
+        uniquingKeysWith: { first, _ in first })
     )
     return AnyTransition(
       insertion: insertionModifiers,

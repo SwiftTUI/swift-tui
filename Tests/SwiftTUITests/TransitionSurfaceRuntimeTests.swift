@@ -311,14 +311,16 @@ struct TransitionSurfaceRuntimeTests {
     #expect(result.rasterSurface.lines.filter { $0.contains("PRESENT") }.count == 2)
   }
 
-  @Test("a custom body animates its insertion, snaps on removal and takes no default fade")
-  func customBodySnaps() throws {
+  @Test("a custom body animates its insertion and its removal and takes no default fade")
+  func customBodyAnimatesBothWays() throws {
     // STUI-1544 changed the insertion half of this test: a body now animates
     // from its willAppear phase. `Veil` fades from zero, so the content is
     // hidden on the first frame and one opacity animation runs on the
-    // boundary. Removal of a body still snaps (STUI-1545).
+    // boundary. STUI-1545 changed the removal half the same way: the removal
+    // plays the body toward its didDisappear phase, under one overlay and
+    // one opacity animation, and nothing else fades the view.
     let probe = try TransitionProbe(
-      named: "body-snap", shown: false, transition: AnyTransition(Veil()))
+      named: "body-both-ways", shown: false, transition: AnyTransition(Veil()))
     defer { probe.shutdown() }
     try probe.run { start in
       try probe.toggle(animation: Self.transactionAnimation)
@@ -329,10 +331,17 @@ struct TransitionSurfaceRuntimeTests {
       #expect(probe.activeAnimationCount == 0)
       try probe.settle()
 
+      let removal = probe.clock.now
       try probe.toggle(animation: Self.transactionAnimation)
+      #expect(probe.frame.contains("PRESENT"))
+      #expect(probe.removingCount == 1)
+      #expect(probe.opacityAnimationCount == 1)
+      #expect(probe.activeAnimationCount == 1)
+      try probe.advance(to: removal.advanced(by: .milliseconds(800)))
       #expect(!probe.frame.contains("PRESENT"))
-      #expect(probe.removingCount == 0)
       #expect(probe.activeAnimationCount == 0)
+      try probe.settle()
+      #expect(probe.removingCount == 0)
     }
   }
 
@@ -351,7 +360,9 @@ struct TransitionSurfaceRuntimeTests {
 
       try probe.toggle(animation: Self.transactionAnimation)
       #expect(probe.removingCount == 1)
-      #expect(probe.frame.contains("[PRESENT]"))
+      // The overlay draws the body of the didDisappear phase (STUI-1545),
+      // whose brackets are angled, while the effect channel fades it.
+      #expect(probe.frame.contains("<PRESENT>"))
       try probe.settle()
       #expect(probe.removingCount == 0)
       #expect(!probe.frame.contains("PRESENT"))

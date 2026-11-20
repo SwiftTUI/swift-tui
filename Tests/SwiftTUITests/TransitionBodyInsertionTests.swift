@@ -282,11 +282,16 @@ struct TransitionBodyInsertionTests {
       #expect(log.appears == 1)
       #expect(log.disappears == 0)
 
-      // Torn down with the content, on the frame of the removal.
+      // Torn down with the content, on the frame of the removal. The removal
+      // then draws the body of the didDisappear phase outside the graph
+      // (STUI-1545), where the view the body adds has no state: it shows its
+      // initial value until the removal ends.
       try probe.toggle(animation: Self.transactionAnimation)
       #expect(log.disappears == 1)
-      #expect(!probe.frame.contains("taps"), "\(probe.frame)")
+      #expect(probe.frame.contains("taps 0"), "\(probe.frame)")
       try probe.settle()
+      #expect(!probe.frame.contains("taps"), "\(probe.frame)")
+      #expect(log.disappears == 1)
 
       // A new insertion is a new mount with new state.
       try probe.toggle(animation: nil)
@@ -533,22 +538,31 @@ struct TransitionBodyInsertionTests {
     }
   }
 
-  @Test("removal of a custom body still snaps")
-  func removalStillSnaps() throws {
+  // The two tests below pinned a removal that snapped until STUI-1545. The
+  // removal of a body now plays; `TransitionBodyRemovalTests` covers it.
+
+  @Test("removal of a custom body plays its didDisappear phase")
+  func removalPlaysTheBody() throws {
     let probe = try TransitionBodyProbe(named: "removal", shown: true) {
       Text(Self.letters).transition(Reveal())
     }
     defer { probe.shutdown() }
     try probe.run { _ in
       try probe.toggle(animation: Self.transactionAnimation)
-      #expect(!probe.frame.contains(Self.letters), "\(probe.frame)")
+      // The view is still whole on the frame of the removal, under one
+      // overlay, with the clip path and the opacity animating.
+      #expect(probe.line(1) == Self.letters, "\(probe.frame)")
+      #expect(probe.removingCount == 1)
+      #expect(probe.activeAnimationCount == 2)
+      try probe.settle()
+      #expect(!probe.frame.contains("A"), "\(probe.frame)")
       #expect(probe.removingCount == 0)
       #expect(probe.activeAnimationCount == 0)
     }
   }
 
-  @Test("a removal during an insertion ends the insertion at once")
-  func removalDuringInsertionEndsIt() throws {
+  @Test("a removal during an insertion continues from the state on screen")
+  func removalDuringInsertionRetargetsIt() throws {
     let probe = try TransitionBodyProbe(named: "removal-mid-insertion") {
       Text(Self.letters).transition(Reveal())
     }
@@ -561,14 +575,16 @@ struct TransitionBodyInsertionTests {
       #expect(probe.line(1) == String(Self.letters.prefix(10)), "\(probe.frame)")
       #expect(probe.log.completions == 0)
       try probe.toggle(animation: Self.transactionAnimation)
-      // The view is gone, with no overlay, and its animations went with it.
-      #expect(!probe.frame.contains("A"), "\(probe.frame)")
-      #expect(probe.removingCount == 0)
-      #expect(probe.activeAnimationCount == 0)
-      // The insertion's completion fires when the removal ends it. The
-      // removal's own completion follows at the end of its transaction.
+      // The removal shows what was on screen, and the two animations go on
+      // toward the didDisappear values.
+      #expect(probe.line(1) == String(Self.letters.prefix(10)), "\(probe.frame)")
+      #expect(probe.removingCount == 1)
+      #expect(probe.activeAnimationCount == 2)
+      // The insertion's completion fires when the removal retargets it. The
+      // removal's own completion follows when the removal ends.
       #expect(probe.log.completions == 1)
       try probe.settle()
+      #expect(!probe.frame.contains("A"), "\(probe.frame)")
       #expect(probe.activeAnimationCount == 0)
       #expect(probe.log.completions == 2)
     }

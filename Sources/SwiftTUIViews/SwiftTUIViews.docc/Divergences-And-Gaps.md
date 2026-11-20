@@ -897,8 +897,8 @@ are omitted even when SwiftUI exposes a corresponding API.
   transaction across the placeholder restore; a closer style writer in the
   base view takes precedence. Nested scopes keep their own timings, and a nil
   scoped animation leaves the base view's outer animation intact.
-- **Custom `Transition` bodies animate on insertion; their removal snaps.**
-  *Gap.* SwiftTUI ships
+- **Custom `Transition` bodies animate on insertion and on removal; a custom
+  `Animatable` inside a body does not animate yet.** *Gap.* SwiftTUI ships
   the built-in `AnyTransition` opacity, move, offset, scale, combined, and
   asymmetric effects. Scale preserves layout and changes placed bounds around
   its `UnitPoint` anchor; cell extents round to whole cells and clip content
@@ -910,6 +910,10 @@ are omitted even when SwiftUI exposes a corresponding API.
   exist with SwiftUI's names. A custom body is resolved in
   `TransitionPhase.identity` while its view is present, and every modifier it
   applies there is rendered.
+  *The remaining gap.* A custom `Animatable` view or modifier inside a body is
+  not driven per frame yet. It shows its destination value at once: the
+  `identity` value on insertion and the `didDisappear` value on removal
+  (STUI-1546). Everything else in this entry is how transitions work.
   *Insertion.* When a view with a custom body is inserted under an animation,
   it appears through the body of `willAppear` and moves to the body of
   `identity`, as in SwiftUI. The rendered view tree is the `identity` body
@@ -926,17 +930,83 @@ are omitted even when SwiftUI exposes a corresponding API.
   transition, an environment value, a modifier that is present in one phase
   only) shows its `identity` value from the first frame. SwiftUI does the
   same for values it has no animation for; it cross-fades a changed `Text`
-  string by default, which SwiftTUI does not. A custom `Animatable` modifier
-  or view is not driven per frame yet (STUI-1546), so it also shows its
-  `identity` value at once. A wrapper the body places inside a
-  `GeometryReader` or a lazy container resolves during layout, so it does not
-  animate from its `willAppear` value. A custom body plays where a built-in
-  transition plays: a view that appears together with its container plays no
-  transition.
-  *Structure that differs between phases.* The view structure is that of the
-  `identity` body from the first frame. A view only the `identity` body has
-  is present at once. A view only the `willAppear` body has is never
-  displayed, and the insertion reports the runtime issue
+  string by default, which SwiftTUI does not. A wrapper the body places inside
+  a `GeometryReader` or a lazy container resolves during layout, so it does
+  not animate from its `willAppear` value. A custom body plays where a
+  built-in transition plays: a view that appears together with its container
+  plays no transition.
+  *Removal.* When a view with a custom body is removed under an animation, it
+  leaves through the body of `didDisappear`, as in SwiftUI. The rendered view
+  tree is the `didDisappear` body from the first frame of the removal, and
+  each value the engine can interpolate (the list above) starts at the value
+  on screen. A value it cannot interpolate shows its `didDisappear` value from
+  the first frame and holds it, which is what SwiftUI does. The removal lasts
+  until the last value it animates settles and the built-in effects of a
+  combination, if any, have ended. An animation of the body that was already
+  running toward a value the removal does not change (the rest of an
+  insertion, a view that pulses) plays on in the departing view and ends with
+  it. A body with nothing to interpolate is gone on the first frame, as
+  SwiftUI tears such a view down at once. With no
+  curve (no animation, `animation(nil)`, a disabled transaction, reduced
+  motion, the stable-output policy) the view leaves at once.
+  *The departing content is torn down when the removal starts.* This differs
+  from SwiftUI, which keeps the view alive until its removal ends. On the
+  frame that starts a removal SwiftTUI cancels the view's tasks, runs
+  `onDisappear` and drops its state, for a custom body as for a built-in
+  transition. What the removal draws afterwards is the content as it was last
+  drawn. It does not update, and it is not laid out again: a `didDisappear`
+  body that gives the content another size moves or crops it. The overlay has
+  no semantics, takes no focus and no input, and is outside layout, so the
+  views around it close up on the first frame. A body that places `content`
+  more than once draws the same frozen content at each placement.
+  *The removal body is drawn, not mounted.* The `didDisappear` body is
+  evaluated outside the view graph. A view it adds has no state there (a
+  `@State` shows its initial value, even when the same view held another
+  value while the content was present), no `onAppear`, `onDisappear` or task,
+  and no handlers. A view only the `didDisappear` body has is drawn from the
+  first frame; when it declares lifecycle handlers, tasks or interaction
+  handlers the removal reports `transition.removalHandlersIgnored`, because
+  they never run. A view only the `identity` body has is gone on the first
+  frame. SwiftUI mounts both and cross-fades them. The body is evaluated under
+  the environment its view last resolved under; a value that only the
+  `didDisappear` body reads can be one change behind, because nothing told
+  the framework the view depended on it. An environment value the
+  `didDisappear` body writes for its content (an underline, a custom key)
+  does not reach content that was resolved earlier, and the removal reports
+  `transition.removalEnvironmentIgnored`; a foreground style and a tint are
+  applied when a view is drawn, so those two reach the content and animate.
+  The body is laid out at the place and under the size the view had, so a
+  `didDisappear` body that needs more room than the `identity` body is laid
+  out like any view in a proposal that is too small. A modifier applied
+  outside `.transition(_:)` that draws on the same view (an opacity, a clip
+  shape, a blend mode) stays on the view while it arrives and while it
+  leaves, and composes with the body's own.
+  *Interruption.* A removal that interrupts an insertion, and a re-insertion
+  that interrupts a removal, continue each value of the body from what is on
+  screen, and a spring keeps its velocity. A re-inserted view is a new mount
+  with new state. A re-insertion that plays no animation ends the removal's
+  values and shows the `identity` body. The built-in effects keep their own
+  behaviour: opacity continues both ways, scale continues into a removal, and
+  an offset or a move restarts.
+  *Where removal plays.* Wherever a built-in removal plays: an `if` in a
+  container, an `if`/`else` swap, a row of a `ForEach` in an eager stack, an
+  `id(_:)` change. The limits are those of the built-ins: a view whose
+  container leaves with it plays no removal. Two limits are the body's own.
+  A body is drawn in the copy of the departing view as it was last laid out,
+  so a view that was never laid out plays no body. And a body that places
+  `content` inside a view that resolves during layout (a `GeometryReader`, a
+  lazy stack) cannot be drawn around the departing content, so its removal
+  reports `transition.removalContentNotFound`. In both cases the removal is
+  what the built-in effects of the transition alone make it, or immediate
+  when it has none. Put a `GeometryReader` in a background or an overlay of
+  `content` instead. With `matchedGeometryEffect`, the match moves
+  the view it is applied to: a match on the content travels inside the body,
+  whose own views stay where the departing view was, and a match applied
+  outside the transition moves the whole departing body.
+  *Structure that differs between phases.* On insertion the view structure is
+  that of the `identity` body from the first frame. A view only the
+  `identity` body has is present at once. A view only the `willAppear` body
+  has is never displayed, and the insertion reports the runtime issue
   `transition.phaseOnlyView`, which names the transition type. SwiftUI mounts
   both structures and cross-fades them with its default opacity transition.
   *Views a body adds.* A view the `identity` body adds mounts with the view
@@ -952,15 +1022,12 @@ are omitted even when SwiftUI exposes a corresponding API.
   `PushTransition`, `SlideTransition` and `ScaleTransition` report the runtime
   issue `transition.unsupportedBuiltInBody` and render the content without the
   move or the scale. Combine instead: `Custom().combined(with: .move(edge:
-  .leading))` plays the built-in effect beside the body. In a combination
-  whose built-in part fades, the inserted view fades from zero to its
-  `identity` opacity, whatever opacity the `willAppear` body gives that view.
-  *Removal.* The `didDisappear` phase is not evaluated yet, so a view with a
-  custom body disappears at once (STUI-1545). A removal that interrupts an
-  insertion ends it at once, and the completion of the insertion's animation
-  scope fires then. The built-in transitions animate both ways as before, and
-  so do the built-in parts of a combination such as
-  `Custom().combined(with: .opacity)`.
+  .leading))` plays the built-in effect beside the body, in both directions.
+  In a combination whose built-in part fades, that part owns the opacity of
+  the view the transition is attached to: the view fades from zero on
+  insertion and to zero on removal, whatever opacity the body gives it
+  outside `identity`.
+  The five issues are `RuntimeIssue.Code.Transition` values.
   A built-in transition type erases to the matching `AnyTransition` value, so
   `.transition(OpacityTransition())` and `.transition(.opacity)` are one
   transition.
@@ -982,7 +1049,8 @@ are omitted even when SwiftUI exposes a corresponding API.
   SwiftUI; an explicitly disabled transaction (`withAnimation(nil)`) and
   reduced motion still snap. A combination plays one animation, the first one
   attached to a part, where SwiftUI animates each part with its own. With no
-  animation at all, an insertion shows the `identity` body at once.
+  animation at all, an insertion shows the `identity` body at once and a
+  removal takes the view away at once.
 - **Content transitions roll per digit column; `.interpolate` is not
   offered.** *Ratified.* `View.contentTransition(_:)` and
   `EnvironmentValues.contentTransition` carry a `ContentTransition` to every

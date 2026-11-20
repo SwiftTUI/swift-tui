@@ -119,6 +119,13 @@ public struct GestureAttachmentModifier<G: Gesture>: IterativePrimitiveViewModif
       guard let gestureRegistry = context.localGestureRegistry,
         let pointerRegistry = context.localPointerHandlerRegistry
       else {
+        if TransitionPhaseScratchScope.isActive {
+          // A phase of a transition body evaluated for drawing only. No
+          // recognizer registers, and the node keeps the hit-test stamp of
+          // an attachment so a gesture that will never run can be reported.
+          node.semanticMetadata = node.semanticMetadata.merging(
+            SemanticMetadata(participatesInPointerHitTesting: true, allowsHitTesting: true))
+        }
         return [node]
       }
 

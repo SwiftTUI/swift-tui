@@ -77,7 +77,16 @@ enum AnimationTransitionBodyInsertion {
     in frame: Frame
   ) -> Origin {
     var origin = Origin()
-    for root in registration.resolve(phase: .willAppear).roots {
+    for var root in registration.resolve(phase: .willAppear).roots {
+      // A modifier applied outside the transition stamped the live root
+      // after the body did. This phase is the body alone, so give its root
+      // the same stamps: the two snapshots then differ only where the body
+      // does.
+      if let stamps = registration.rootStamps[root.identity],
+        let live = subtree(at: root.identity, in: frame)
+      {
+        AnimationTransitionBodyRemoval.carryOuterStamps(onto: &root, onScreen: live, body: stamps)
+      }
       collect(root, into: &origin)
     }
     // A view of the origin phase that the live tree does not have is never
@@ -152,11 +161,11 @@ enum AnimationTransitionBodyInsertion {
   /// A node whose own effective transaction is disabled snaps, as any change
   /// to it would: reduced motion, stable output, or an authored
   /// `disablesAnimations` inside the body.
-  private static func animates(_ identity: Identity, in frame: Frame) -> Bool {
+  static func animates(_ identity: Identity, in frame: Frame) -> Bool {
     frame.transactions[identity]?.animationRequest != .disabled
   }
 
-  private static func isInside(
+  static func isInside(
     _ identity: Identity,
     subtreeOf ancestor: Identity,
     in frame: Frame

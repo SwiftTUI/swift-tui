@@ -130,15 +130,30 @@ extension RuntimeIssue {
       public static let unhostedItems = Code(rawValue: "toolbar.unhostedItems")
     }
 
-    /// Issues about custom `Transition` bodies. The namespace is package
-    /// scoped: hosts match these issues by their raw value.
-    package enum Transition {
-      /// A view exists only in a phase of a transition body that is never on
-      /// screen, so it is never displayed.
-      package static let phaseOnlyView = Code(rawValue: "transition.phaseOnlyView")
+    /// Issues about custom `Transition` bodies.
+    public enum Transition {
+      /// A view exists only in the `willAppear` phase of a transition body.
+      /// An insertion shows the views of the identity phase, so that view is
+      /// never displayed.
+      public static let phaseOnlyView = Code(rawValue: "transition.phaseOnlyView")
+      /// The removal of a transition body could not find where the body
+      /// placed its content in the departing view, so the body does not play.
+      public static let removalContentNotFound = Code(
+        rawValue: "transition.removalContentNotFound")
+      /// The `didDisappear` phase of a transition body writes an environment
+      /// value for its content that the identity phase does not. The
+      /// departing content was resolved before the removal and does not see
+      /// it.
+      public static let removalEnvironmentIgnored = Code(
+        rawValue: "transition.removalEnvironmentIgnored")
+      /// A view exists only in the `didDisappear` phase of a transition body
+      /// and declares lifecycle handlers, tasks or interaction handlers. A
+      /// removal draws that view and never runs its handlers.
+      public static let removalHandlersIgnored = Code(
+        rawValue: "transition.removalHandlersIgnored")
       /// A built-in move or scale transition was applied inside a transition
       /// body with a value the body cannot render.
-      package static let unsupportedBuiltInBody = Code(
+      public static let unsupportedBuiltInBody = Code(
         rawValue: "transition.unsupportedBuiltInBody")
     }
 

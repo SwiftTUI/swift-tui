@@ -34,7 +34,7 @@ For products, supported imports, and re-export reachability, see [PUBLIC_MODULE_
 | `SwiftTUIAndroidHost` | 20 | 49 |
 | `SwiftTUICore` | 43 | 296 |
 | `SwiftTUIPrimitives` | 176 | 1582 |
-| `SwiftTUIGraph` | 78 | 592 |
+| `SwiftTUIGraph` | 78 | 598 |
 | `SwiftTUIPTYCPrimitives` | 0 | 0 |
 | `SwiftTUIPlatformIO` | 1 | 19 |
 | `SwiftTUITestSupport` | 0 | 0 |
@@ -964,7 +964,7 @@ For products, supported imports, and re-export reachability, see [PUBLIC_MODULE_
 - `PreferenceKey` — protocol — 3 members
 - `RouteID` — struct — 4 members
 - `RouteKind` — enum — 2 members
-- `RuntimeIssue` — struct — 72 members
+- `RuntimeIssue` — struct — 78 members
 - `RuntimeIssueSeverity` — enum — 3 members
 - `RuntimeIssueSink` — struct — 2 members
 - `RuntimeRegistrationDiagnostics` — struct — 5 members

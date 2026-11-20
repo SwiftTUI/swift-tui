@@ -42,7 +42,8 @@ package struct TransitionContentSource {
 /// the body applies to `content` (an opacity, a clip shape, a draw effect)
 /// stays separate from the modifiers of the view itself. A body that places
 /// `content` more than once mounts the view once for each placement, with
-/// separate state and lifecycle.
+/// separate state and lifecycle. In the body a removal draws, each placement
+/// shows the view as it was last drawn.
 public struct TransitionContent<T: Transition>: PrimitiveView, IterativeResolvableView {
   private let source: TransitionContentSource
 

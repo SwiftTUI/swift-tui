@@ -2,8 +2,12 @@
 package import SwiftTUIViews
 
 package enum PlacedAnimationOverlaySampling {
-  /// - Parameter adoption: the tree's co-present pairs, when the caller's
-  ///   capture already walked the tree; `nil` walks it here.
+  /// - Parameters:
+  ///   - adoption: the tree's co-present pairs, when the caller's
+  ///     capture already walked the tree; `nil` walks it here.
+  ///   - removalsWithAnimatingBody: the removals whose transition body still
+  ///     has a property animation in flight. Such a removal is not over when
+  ///     its own curve ends.
   package static func sample(
     removingNodes: [ViewNodeID: RemovalEntry],
     activeAnimations: [AnimationKey: ActiveAnimation],
@@ -11,7 +15,8 @@ package enum PlacedAnimationOverlaySampling {
     tree: PlacedNode,
     timestamp: MonotonicInstant,
     surfaceSize: CellSize?,
-    adoption: [MatchedGeometryAdoptionPair]? = nil
+    adoption: [MatchedGeometryAdoptionPair]? = nil,
+    removalsWithAnimatingBody: Set<ViewNodeID> = []
   ) -> PlacedAnimationOverlaySamplingResult {
     let effectiveSurfaceSize = surfaceSize ?? tree.bounds.size
     let adoptionPairs = adoption ?? MatchedGeometryAdoption.pairs(in: tree)
@@ -30,7 +35,8 @@ package enum PlacedAnimationOverlaySampling {
       registeredAnimations: registeredAnimations,
       restingTree: restingTree,
       timestamp: timestamp,
-      surfaceSize: effectiveSurfaceSize
+      surfaceSize: effectiveSurfaceSize,
+      removalsWithAnimatingBody: removalsWithAnimatingBody
     )
     let insertionResult = sampleInsertionOffsets(
       activeAnimations: activeAnimations,
@@ -140,7 +146,8 @@ package enum PlacedAnimationOverlaySampling {
     registeredAnimations: [AnimationBox: Animation],
     restingTree: PlacedNode,
     timestamp: MonotonicInstant,
-    surfaceSize: CellSize
+    surfaceSize: CellSize,
+    removalsWithAnimatingBody: Set<ViewNodeID>
   ) -> RemovalSamplingResult {
     var result = RemovalSamplingResult()
 
@@ -167,17 +174,42 @@ package enum PlacedAnimationOverlaySampling {
       }
 
       let elapsed = entry.startTime.duration(to: timestamp)
-      var state = entry.customState
-      let evaluated = animation.evaluate(elapsed: elapsed, state: &state)
-      result.customStates[viewNodeID] = state
-
-      guard let progress = evaluated else {
-        // The exit curve finished. The placed pass owns this removal's single
-        // evaluation and completion (the resolved tick no longer evaluates or
-        // purges placed removals — 016), so record the node for the controller
-        // to purge from `removingNodes`.
-        result.completedNodeIDs.append(viewNodeID)
-        continue
+      let bodyIsAnimating = removalsWithAnimatingBody.contains(viewNodeID)
+      let progress: Double
+      if let body = entry.body, !body.hasEffectChannel {
+        // A removal that plays only a transition body has no curve of its
+        // own. It lasts as long as a value of the body animates, so a body
+        // with nothing to interpolate is over on its first sample. The curve
+        // is evaluated only to carry matched travel.
+        guard bodyIsAnimating else {
+          result.completedNodeIDs.append(viewNodeID)
+          continue
+        }
+        if entry.matchedTravel != nil {
+          var state = entry.customState
+          progress = animation.evaluate(elapsed: elapsed, state: &state) ?? 1
+          result.customStates[viewNodeID] = state
+        } else {
+          progress = 0
+        }
+      } else {
+        var state = entry.customState
+        let evaluated = animation.evaluate(elapsed: elapsed, state: &state)
+        result.customStates[viewNodeID] = state
+        if let evaluated {
+          progress = evaluated
+        } else if bodyIsAnimating {
+          // The effects reached their end. The overlay holds it while the
+          // values of the body settle.
+          progress = 1
+        } else {
+          // The exit curve finished. The placed pass owns this removal's single
+          // evaluation and completion (the resolved tick no longer evaluates or
+          // purges placed removals — 016), so record the node for the controller
+          // to purge from `removingNodes`.
+          result.completedNodeIDs.append(viewNodeID)
+          continue
+        }
       }
 
       // The departing view leaves across its OWN edge, so the frozen overlay's

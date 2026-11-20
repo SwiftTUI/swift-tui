@@ -705,7 +705,14 @@ can evaluate another phase as a plain resolved tree with no state storage,
 lifecycle or handlers. On an insertion that plays,
 `Lifecycle/AnimationTransitionBodyInsertion.swift` pairs the `willAppear` tree
 with the live tree by identity and the controller enqueues each differing slot
-as an ordinary property animation.
+as an ordinary property animation. On a removal that plays,
+`Lifecycle/AnimationTransitionBodyRemoval.swift` evaluates the `didDisappear`
+tree around a stand-in for the content and pairs it with the frozen subtree.
+The removal entry keeps that tree and owns the property animations of its
+views: their samples go to the entry, not to the live tree. Each frame, on
+the main actor before the frame tail, the same file lays the tree out at the
+frozen rect and puts the frozen placed content under each stand-in, so the
+tail receives a finished placed overlay.
 
 `resolve` reuses unchanged work in two ways. **Retained reuse** skips a subtree
 that is separate from the frame's invalidation. **Memoized-body reuse** is on by

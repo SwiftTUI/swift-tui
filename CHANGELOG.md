@@ -50,8 +50,8 @@ require 1.0.0. See [COMPATIBILITY.md](docs/COMPATIBILITY.md).
   frame. A view the body adds mounts with the view it decorates and leaves
   with it. The built-in part of a combination such as
   `Custom().combined(with: .opacity)` plays beside the body, a transition's
-  own animation drives both, and a `withAnimation` completion waits for both.
-  Removal of a custom body still snaps (STUI-1544).
+  own animation drives both, and a `withAnimation` completion waits for both
+  (STUI-1544).
 - Two runtime issues for transition bodies. `transition.phaseOnlyView` reports
   a view that exists only in the `willAppear` phase of a body, which an
   insertion never shows. `transition.unsupportedBuiltInBody` reports a
@@ -62,6 +62,40 @@ require 1.0.0. See [COMPATIBILITY.md](docs/COMPATIBILITY.md).
   (STUI-1544).
 - `OffsetTransition` applied inside a body with `apply(content:phase:)`
   renders its offset in every phase and animates it (STUI-1544).
+- A custom `Transition` body animates when its view is removed inside an
+  animation scope. The view leaves through the body of
+  `TransitionPhase.didDisappear`: that body is drawn from the first frame of
+  the removal, around the view as it was last drawn, and each modifier value
+  that interpolates animates from the value on screen. A value that does not
+  interpolate shows its `didDisappear` value at once. The removal ends when
+  the last value it animates settles, so a body with nothing to interpolate
+  leaves at once. It plays wherever a built-in removal plays: an `if` in a container, an
+  `if`/`else` swap, a `ForEach` row in an eager stack and an `id(_:)` change.
+  The built-in part of a combination plays beside the body, a transition's own
+  animation drives both, and `withAnimation` completions wait for both
+  (STUI-1545).
+- A removal that interrupts the insertion of a custom body, and a re-insertion
+  that interrupts its removal, continue every value of the body from what is
+  on screen, and a spring keeps its velocity (STUI-1545).
+- A modifier applied outside `.transition(_:)` that draws on the same view
+  (an opacity, a clip shape, a blend mode) composes with a custom body while
+  the view arrives and while it leaves. On insertion the outer clip shape no
+  longer stops the body's own clip path from animating (STUI-1545).
+- The lifetime of a departing view is unchanged: its tasks are cancelled,
+  `onDisappear` runs and its state is dropped on the frame that starts the
+  removal, for a custom body as for a built-in transition. The body a removal
+  draws is not mounted: a view it adds shows its initial state and runs no
+  handler (STUI-1545).
+- `RuntimeIssue.Code.Transition` names the transition issues, so a host can
+  match them without their raw strings. It has the two issues above and three
+  for removal. `removalHandlersIgnored` reports a view that only the
+  `didDisappear` phase has and that declares lifecycle handlers, tasks or
+  interaction handlers, which never run. `removalEnvironmentIgnored` reports
+  an environment value the `didDisappear` phase writes for its content, which
+  the departing content does not see; a foreground style and a tint are
+  applied and animate. `removalContentNotFound` reports a body that places
+  `content` inside a view that resolves during layout, such as a
+  `GeometryReader`, whose removal plays without the body (STUI-1545).
 - The built-in transitions as types: `OpacityTransition`,
   `IdentityTransition`, `MoveTransition`, `OffsetTransition`,
   `PushTransition`, `ScaleTransition`, `SlideTransition` and

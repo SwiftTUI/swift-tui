@@ -403,7 +403,10 @@ private func applyOpacityAtOverlayRoot(
   node.drawMetadata = drawMetadata
 }
 
-private func translateBounds(
+/// Moves a placed subtree by a delta. Also used to put frozen content at the
+/// origin of its stand-in in a removal's transition body
+/// (`AnimationTransitionBodyRemoval`).
+func translateBounds(
   _ node: inout PlacedNode,
   dx: Int,
   dy: Int
