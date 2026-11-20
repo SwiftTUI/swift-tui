@@ -125,6 +125,20 @@ does not refine `Animatable` here, so a shape opts in by adding the
 conformance. Without it the shape's path morphs point by point. See
 <doc:Animating-Views>.
 
+The same modifier drives a transition. Its body runs on every frame of the
+insertion and of the removal, with `progress` between the two values:
+
+```swift
+Text("Saved!").transition(
+  .modifier(active: Fade(progress: 0), identity: Fade(progress: 1)))
+```
+
+As in SwiftUI, the data is not clamped: a spring with bounce takes
+`progress` above 1 on the way in and below 0 on the way out. `Fade` should
+clamp what it passes to `opacity`. The modifier type has to be `Sendable`,
+which a modifier that declares its conformances in its primary declaration
+already is.
+
 ### Keyboard-first interaction
 
 Focus traversal is geometry-aware and wraps; there is no surrounding native
@@ -246,7 +260,7 @@ current status of each.
 | `Color` vocabulary: `alpha:` not `opacity:`, `mixed(with:amount:method:)` not `mix(with:by:)`, no `Color.accentColor` | Prefer semantic roles (`.primary`, `.secondary`, `.tint`) resolved through the host theme; they are the intended currency |
 | No `ScenePhase` | None; a session is one full-canvas scene |
 | Scale transitions and matched size changes use placed bounds and clipping rather than re-layout or bitmap scaling | Expect whole-cell steps; content keeps its destination layout while the interpolated frame clips it |
-| A custom `Transition` body animates on insertion and on removal, but the departing view's tasks, `onDisappear` and state end when the removal starts, a view only one phase has does not cross-fade, and a custom `Animatable` view or modifier inside a body shows its destination value at once | Keep the same views in every phase and change their modifiers. Do not rely on `onDisappear` to mark the end of a removal: use the completion of `withAnimation`. Build the body from interpolating modifiers (`opacity`, `clipShape`, `offset`, styles); a `clipShape` of a shape that conforms to `Animatable` is evaluated on every frame |
+| A custom `Transition` body animates on insertion and on removal, but the departing view's tasks, `onDisappear` and state end when the removal starts, and a view only one phase has does not cross-fade | Keep the same views in every phase and change their modifiers. Do not rely on `onDisappear` to mark the end of a removal: use the completion of `withAnimation`. Build the body from interpolating modifiers (`opacity`, `clipShape`, `offset`, styles), or from a view, a modifier or a shape that conforms to `Animatable`, which is evaluated on every frame. Do not let such a modifier and another part of the transition animate the same property of the same view |
 | Lazy stacks estimate unseen content | Compose static fragments and multiple `ForEach` sources directly; default spacing is exact between realized neighbors. Body-dependent empty rows and negative spacing can require exhaustive work |
 | Path morphing requires matching ordered element kinds; clipping samples cell centers | Use `Angle`, `Path.addArc`, `Path.interpolated(to:progress:)`, and `clipShape(_:)`; see <doc:Shapes> |
 

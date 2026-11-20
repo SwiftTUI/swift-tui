@@ -148,6 +148,21 @@ package protocol TransitionRegistrationSink: AnyObject, Sendable {
     viewNodeID: ViewNodeID?,
     transition: any Sendable
   )
+  /// Registers a transition for the node `viewNodeID`, declared by the node
+  /// `declaringNodeID`: the node whose evaluation ran the `.transition()`
+  /// modifier.
+  ///
+  /// The two differ when the modifier's content has graph nodes of its own,
+  /// as each view of a transition body with several roots does. The
+  /// registration then stands until the declaring node is evaluated again
+  /// without declaring it. An evaluation of the registered node alone says
+  /// nothing about it: that node never declared the transition.
+  func registerTransition(
+    for identity: Identity,
+    viewNodeID: ViewNodeID?,
+    declaringNodeID: ViewNodeID?,
+    transition: any Sendable
+  )
 }
 
 extension TransitionRegistrationSink {
@@ -157,6 +172,15 @@ extension TransitionRegistrationSink {
     transition: any Sendable
   ) {
     registerTransition(for: identity, transition: transition)
+  }
+
+  package func registerTransition(
+    for identity: Identity,
+    viewNodeID: ViewNodeID?,
+    declaringNodeID: ViewNodeID?,
+    transition: any Sendable
+  ) {
+    registerTransition(for: identity, viewNodeID: viewNodeID, transition: transition)
   }
 }
 
@@ -217,6 +241,11 @@ package struct AnimatableValueSite: Hashable, Sendable {
 /// data the body evaluates with: the target when nothing animates, or the
 /// sample of the animation toward it. With no sink bound a site evaluates
 /// with its target.
+///
+/// A phase of a transition body that is evaluated outside the graph binds a
+/// sink of its own, which answers from values the animation engine supplies
+/// and tells the controller nothing: its sites have the names of the live
+/// ones, and their data is another phase's.
 ///
 /// `ownerNodeID` is the graph node that evaluates the site, when there is
 /// one. The site's identity is the one its view resolves at, which is not

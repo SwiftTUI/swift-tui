@@ -729,6 +729,26 @@ data beside the geometry (`SwiftTUIPrimitives/Animation/AnimatableShapeValue.swi
 the data is an animated slot of the node, and each sample is turned back into
 geometry by the shape, on the main actor, when the controller takes it.
 
+Inside a transition body such a view or modifier is a site like any other,
+with the name it has in the live tree in every phase. A phase evaluated
+outside the graph asks a sink of its own
+(`Lifecycle/TransitionBodyValueSink.swift`), which records what the phase
+wrote for each site and answers from values the engine supplies, so the
+controller's records stay those of the live sites. On an insertion the site
+resolves in the frame head, with the data of the identity phase, before the
+injection stage qualifies the insertion. The head therefore has a pass of its
+own (`startTransitionBodySiteAnimations` in
+`Rendering/DefaultRendererFrameHeadCoordinator.swift`), which runs only when
+a site resolved for the first time and a body transition was newly
+registered: the controller qualifies the insertions with the helper the
+injection stage uses, starts each site from the `willAppear` data and names
+the owners, and the head evaluates them again. The decisions and the
+evaluated `willAppear` phase are kept for the injection stage of the same
+frame. On a removal the entry owns the value animations of the sites of its
+body by key. The `didDisappear` body is evaluated again on each frame the
+removal draws, with that frame's samples, and takes the steps planning took
+after its evaluation, which the two share.
+
 `resolve` reuses unchanged work in two ways. **Retained reuse** skips a subtree
 that is separate from the frame's invalidation. **Memoized-body reuse** is on by
 default. It can also skip a subtree under an invalidated ancestor when all of

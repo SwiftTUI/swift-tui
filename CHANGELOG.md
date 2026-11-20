@@ -125,11 +125,22 @@ require 1.0.0. See [COMPATIBILITY.md](docs/COMPATIBILITY.md).
 - A shape that conforms to `Animatable` has `path(in:)` evaluated with
   interpolated data on every frame, in `fill`, `stroke`, `strokeBorder` and
   `clipShape`, without evaluating any view. A trim or an inset of such a
-  shape animates with it. This also holds for the `clipShape` of a custom
-  `Transition` body, on insertion and on removal (STUI-1546).
+  shape animates with it. This also holds for a `clipShape`, a `fill` and a
+  `stroke` in a custom `Transition` body, on insertion and on removal
+  (STUI-1546).
 - A type that conforms to `Animatable` and has nothing to animate needs no
   `animatableData`: the property has a default for `EmptyAnimatableData`, as
   in SwiftUI (STUI-1546).
+- A view or a view modifier that conforms to `Animatable` animates inside a
+  custom `Transition` body. Its body runs on every frame of an insertion and
+  of a removal with interpolated `animatableData`: from the data of the
+  `willAppear` body on the way in, and to the data of the `didDisappear` body
+  on the way out. `AnyTransition.modifier(active: M(progress: 0), identity:
+  M(progress: 1))` delivers `progress` between the two values for the whole
+  transition, in both directions. A spring with bounce delivers values
+  outside them, unclamped. A removal that interrupts an insertion, and a
+  re-insertion that interrupts a removal, continue the data from its current
+  sample (STUI-1546).
 
 ### Changed
 

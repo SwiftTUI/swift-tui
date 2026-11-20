@@ -558,6 +558,58 @@ struct DefaultRendererFrameHeadCoordinator {
     }
   }
 
+  /// The frame head's pass for the `Animatable` views and modifiers of the
+  /// transition bodies this frame inserts.
+  ///
+  /// Such a site resolves in the head with the data of the identity phase,
+  /// before the injection stage has qualified the insertion. When some site
+  /// resolved for the first time this frame and a transition with a body was
+  /// newly registered, the controller qualifies the insertions now, on the
+  /// tree as resolved so far, starts each site's animation from the data of
+  /// the body's `.willAppear` phase, and names the views that have to run
+  /// again. They are queued dirty and evaluated here, like the head's other
+  /// same-frame escalations, so the first presented frame shows the origin
+  /// values. The injection stage reads the decisions made here.
+  ///
+  /// Every other frame pays the controller's two emptiness checks.
+  private func startTransitionBodySiteAnimations(
+    animationDraft: AnimationFrameDraft,
+    graphDraft: ViewGraphFrameDraft,
+    resolveContext: ResolveContext,
+    resolveInputs: FrameResolveInputs
+  ) {
+    let controller = animationDraft.controller
+    guard controller.hasFreshTransitionBodySites, viewGraph.root != nil else {
+      return
+    }
+    let resolved = wrapInContainerSafeArea(
+      renderPipelineContentTree(viewGraph.snapshot()),
+      context: resolveContext
+    )
+    let viewGraph = viewGraph
+    let owners = controller.prepareTransitionBodyInsertions(
+      in: resolved,
+      transactionPlan: FrameAnimationTransactionPlan(
+        base: resolveInputs.transaction,
+        segments: resolveInputs.animationSegments
+      ),
+      reEvaluatedNodeIDs: viewGraph.evaluatedNodeIDsThisFrame
+    ) { viewNodeID in
+      viewGraph.nodeForViewNodeID(viewNodeID).map { viewGraph.stateReaderIdentity(of: $0) }
+    }
+    guard !owners.isEmpty else {
+      return
+    }
+    viewGraph.invalidateAndQueueDirty(owners)
+    let evaluation = viewGraph.selectiveDirtyEvaluationPlanWithDiagnostics(
+      invalidatedIdentities: RuntimeRegistrationPublicationDiagnosticsConfiguration.isEnabled
+        ? owners : []
+    )
+    graphDraft.recordDirtyEvaluationPlan(evaluation.plan, diagnostics: evaluation.diagnostics)
+    _ = viewGraph.evaluateDirtyNodes(using: evaluation.plan)
+    recomposeDeclaredChildren(graphDraft: graphDraft)
+  }
+
   private func installPresentationPortalEvaluator<V: View>(
     _ root: V,
     resolveContext: ResolveContext,
@@ -729,6 +781,17 @@ struct DefaultRendererFrameHeadCoordinator {
               )
             }
           }
+          // A transition body inserted this frame can hold a view or a
+          // modifier that conforms to `Animatable`. It has just resolved
+          // with the data of the identity phase; its animation starts from
+          // the data of the `.willAppear` phase, and its body runs again
+          // with that before the frame is final.
+          startTransitionBodySiteAnimations(
+            animationDraft: animationDraft,
+            graphDraft: graphDraft,
+            resolveContext: resolveContext,
+            resolveInputs: resolveInputs
+          )
         }
       }
     }

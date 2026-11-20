@@ -118,6 +118,19 @@ extension AnimationController {
     /// value animations. A value animation that starts during resolve
     /// starts at this instant.
     package var frameInstant: MonotonicInstant?
+    /// The data each value animation presented on the frame before this
+    /// one: that frame's ``samples``. Together with ``targets`` it says what
+    /// the body of a site last ran with, which is what is on screen. A
+    /// removal that plays a transition body reads it to compare the body of
+    /// its `.didDisappear` phase with the tree on screen under the same
+    /// data.
+    package var previousSamples: [AnimationKey: AnyAnimatable] = [:]
+    /// The sites that resolved for the first time on the frame being
+    /// prepared. A site of a transition body that is being inserted is among
+    /// them: the frame head starts its animation from the data of the
+    /// body's `.willAppear` phase, and no site that was already there is
+    /// touched.
+    package var freshKeys: Set<AnimationKey> = []
 
     package init() {}
 
@@ -127,6 +140,46 @@ extension AnimationController {
       samples.removeAll(keepingCapacity: true)
       tickedOwners.removeAll(keepingCapacity: true)
       frameInstant = nil
+      previousSamples.removeAll(keepingCapacity: true)
+      freshKeys.removeAll(keepingCapacity: true)
+    }
+  }
+
+  /// What the frame head decided for the transition bodies inserted on the
+  /// frame being prepared, for the injection stage of the same frame.
+  ///
+  /// A view or a modifier of a body that conforms to `Animatable` resolves
+  /// during the head, with the data of the identity phase, before the
+  /// injection stage qualifies the insertion. The head therefore qualifies
+  /// the insertion first, with the code the injection stage runs, starts the
+  /// animation of each such site from the data of the `.willAppear` phase and
+  /// evaluates the owners again. What it decided is kept here. The injection
+  /// stage reads it instead of deciding again, so the data of the sites and
+  /// the slots of the body animate under one decision, and the `.willAppear`
+  /// phase is evaluated once.
+  ///
+  /// The records are part of the checkpoint, so they leave with a frame
+  /// draft that is dropped. They are cleared when a frame begins to collect
+  /// transitions and when the injection stage has read them.
+  struct TransitionBodyInsertionRecords: Sendable {
+    /// The decision for each inserted identity whose transition has a
+    /// registered body.
+    var decisions: [Identity: AnimationTransitionBodyInsertion.Decision] = [:]
+    /// The roots of the `.willAppear` phase of each body the head
+    /// evaluated, by the identity of its registration, each with the stamps
+    /// of the modifiers outside the transition. The head carries those
+    /// stamps: they are the difference between the live root and what the
+    /// body alone left on it, and the registration the head reads and the
+    /// tree it has come from one evaluation.
+    var willAppearRoots: [Identity: [ResolvedNode]] = [:]
+
+    var isEmpty: Bool {
+      decisions.isEmpty && willAppearRoots.isEmpty
+    }
+
+    mutating func reset() {
+      decisions.removeAll(keepingCapacity: true)
+      willAppearRoots.removeAll(keepingCapacity: true)
     }
   }
 
@@ -175,6 +228,14 @@ extension AnimationController {
     package var previousIdentitiesByNodeID: [ViewNodeID: Identity] = [:]
     package var pendingByNodeID: [ViewNodeID: AnyTransition] = [:]
     package var pendingIdentitiesByNodeID: [ViewNodeID: Identity] = [:]
+    /// The node whose evaluation declared each registration, for the
+    /// registrations another node than the registered one declared. A
+    /// `.transition()` modifier registers every node it emits. An emitted
+    /// node with a graph node of its own (each view of a transition body
+    /// with several roots) is then registered by its host, and an evaluation
+    /// of that node alone does not run the modifier again.
+    package var declaringNodeIDsByNodeID: [ViewNodeID: ViewNodeID] = [:]
+    package var pendingDeclaringNodeIDsByNodeID: [ViewNodeID: ViewNodeID] = [:]
 
     package init() {}
 
@@ -186,6 +247,132 @@ extension AnimationController {
       previousIdentitiesByNodeID.removeAll(keepingCapacity: true)
       pendingByNodeID.removeAll(keepingCapacity: true)
       pendingIdentitiesByNodeID.removeAll(keepingCapacity: true)
+      declaringNodeIDsByNodeID.removeAll(keepingCapacity: true)
+      pendingDeclaringNodeIDsByNodeID.removeAll(keepingCapacity: true)
+    }
+
+    /// Starts the collection of a frame's registrations: the current maps
+    /// become the previous ones, and the pending maps are emptied.
+    package mutating func beginCollection() {
+      previousByNodeID = byNodeID
+      previousIdentitiesByNodeID = identitiesByNodeID
+      pendingByNodeID.removeAll(keepingCapacity: true)
+      pendingIdentitiesByNodeID.removeAll(keepingCapacity: true)
+      pendingDeclaringNodeIDsByNodeID.removeAll(keepingCapacity: true)
+    }
+
+    /// Records a registration made during this frame's resolve.
+    package mutating func registerPending(
+      _ transition: AnyTransition,
+      for identity: Identity,
+      viewNodeID: ViewNodeID,
+      declaringNodeID: ViewNodeID?
+    ) {
+      pendingByNodeID[viewNodeID] = transition
+      pendingIdentitiesByNodeID[viewNodeID] = identity
+      if let declaringNodeID, declaringNodeID != viewNodeID {
+        pendingDeclaringNodeIDsByNodeID[viewNodeID] = declaringNodeID
+      } else {
+        pendingDeclaringNodeIDsByNodeID.removeValue(forKey: viewNodeID)
+      }
+    }
+
+    /// Drops the registrations of the nodes that are not in `liveNodeIDs`.
+    package mutating func pruneDepartedNodes(liveNodeIDs: Set<ViewNodeID>) {
+      byNodeID = byNodeID.filter { viewNodeID, _ in liveNodeIDs.contains(viewNodeID) }
+      identitiesByNodeID = identitiesByNodeID.filter { viewNodeID, _ in
+        liveNodeIDs.contains(viewNodeID)
+      }
+      if !declaringNodeIDsByNodeID.isEmpty {
+        declaringNodeIDsByNodeID = declaringNodeIDsByNodeID.filter { viewNodeID, _ in
+          liveNodeIDs.contains(viewNodeID)
+        }
+      }
+    }
+
+    /// Merges the registrations collected this frame into the current maps
+    /// and drops every registration whose declaring node was evaluated again
+    /// without declaring it.
+    ///
+    /// `reEvaluatedNodeIDs` are the nodes whose declarations ran this frame;
+    /// `nil` means every live node. The pending maps are left as they are,
+    /// so merging twice gives the result of merging once.
+    package mutating func mergePendingRegistrations(reEvaluatedNodeIDs: Set<ViewNodeID>?) {
+      // Merge newly registered transitions into the existing map so
+      // that registrations for non-re-evaluated subtrees survive
+      // across selective-evaluation frames.  Without this, a
+      // PhaseAnimator-only tick would wipe every other subtree's
+      // transition and the next removal couldn't find it.
+      for (viewNodeID, transition) in pendingByNodeID {
+        byNodeID[viewNodeID] = transition
+        identitiesByNodeID[viewNodeID] = pendingIdentitiesByNodeID[viewNodeID]
+        declaringNodeIDsByNodeID[viewNodeID] = pendingDeclaringNodeIDsByNodeID[viewNodeID]
+      }
+
+      // Prune registrations whose declaring node was re-evaluated this frame
+      // but declared no `.transition()` (the pending entry is absent). A live
+      // node that drops its transition modifier — while keeping its
+      // ViewNodeID — would otherwise retain the stale registration and
+      // mis-animate a *later* removal. A node that was reused (not in
+      // `reEvaluatedNodeIDs`) is left alone: the merge above preserved its
+      // registration and it did not re-run its declaration this frame. `nil`
+      // treats the whole current map as re-evaluated (full evaluation), so
+      // every un-re-collected entry is dropped.
+      //
+      // The declaring node is the registered node itself unless another
+      // node's evaluation registered it. A view of a transition body with
+      // several roots has its own graph node and is registered by the
+      // body's host: when such a view alone is evaluated again (a state it
+      // reads changed, or an animation of its `animatableData` ticked), the
+      // modifier did not run and its registration stands.
+      let staleNodeIDs: [ViewNodeID]
+      if let reEvaluatedNodeIDs {
+        staleNodeIDs = byNodeID.keys.filter { viewNodeID in
+          pendingByNodeID[viewNodeID] == nil
+            && reEvaluatedNodeIDs.contains(declaringNodeIDsByNodeID[viewNodeID] ?? viewNodeID)
+        }
+      } else {
+        staleNodeIDs = byNodeID.keys.filter { pendingByNodeID[$0] == nil }
+      }
+      for viewNodeID in staleNodeIDs {
+        byNodeID.removeValue(forKey: viewNodeID)
+        identitiesByNodeID.removeValue(forKey: viewNodeID)
+        declaringNodeIDsByNodeID.removeValue(forKey: viewNodeID)
+      }
+    }
+
+    /// Moves each registration whose node id is not in the committed tree
+    /// onto the node that carries its identity there.
+    ///
+    /// A node-backed conditional branch child registers under its own mint,
+    /// but a one-element chain level absorbs its output and the committed
+    /// tree carries the absorber's stamp. Every channel that reads a
+    /// registration — the occurrence diff, the insertion lookup, the
+    /// adopted-slot removal channel, and the live-node prune — keys on
+    /// committed stamps, so a registration left keyed to the aliased-away
+    /// mint is invisible to all of them: insertions never fire and
+    /// branch-flip removals plan no exit overlay. Moving it onto the
+    /// stamp-owning id restores the host-keyed registration the value-only
+    /// fallback used to produce.
+    package mutating func rehomeAliasedRegistrations(
+      liveNodeIDs: Set<ViewNodeID>,
+      nodeIDByIdentity: [Identity: ViewNodeID]
+    ) {
+      for (nodeID, identity) in identitiesByNodeID where !liveNodeIDs.contains(nodeID) {
+        guard let liveNodeID = nodeIDByIdentity[identity],
+          liveNodeID != nodeID,
+          identitiesByNodeID[liveNodeID] == nil,
+          let transition = byNodeID[nodeID]
+        else { continue }
+        byNodeID[liveNodeID] = transition
+        identitiesByNodeID[liveNodeID] = identity
+        // A re-homed registration is pruned by its new node, as before: the
+        // absorber is evaluated whenever what it absorbs changes.
+        declaringNodeIDsByNodeID.removeValue(forKey: liveNodeID)
+        byNodeID.removeValue(forKey: nodeID)
+        identitiesByNodeID.removeValue(forKey: nodeID)
+        declaringNodeIDsByNodeID.removeValue(forKey: nodeID)
+      }
     }
   }
 

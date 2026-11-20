@@ -17,6 +17,13 @@ import SwiftTUIViews
 /// into ``samples`` instead of the live tree, which no longer holds those
 /// identities. The value is plain `Sendable` data, so it rides the controller
 /// checkpoint and the per-frame draft like the rest of a ``RemovalEntry``.
+///
+/// A view or a modifier of the body that conforms to `Animatable` animates
+/// its `animatableData` too, from what the live view presented to what the
+/// `.didDisappear` phase gives it. The removal owns those value animations
+/// by site (``valueSites``). Their samples are not written anywhere: the
+/// body is evaluated again with them, on every frame the removal draws, and
+/// the result replaces ``workingRoot``.
 package struct RemovalBodyState: Sendable {
   /// The identity of the transition root: the view the body emitted that the
   /// removal is keyed on. The composed tree replaces this node inside the
@@ -59,6 +66,36 @@ package struct RemovalBodyState: Sendable {
   /// The values the owned animations sampled on the current frame, by
   /// identity. A slot without a sample shows the value of ``workingRoot``.
   package var samples: [Identity: [AnimatableSlot: AnyAnimatable]] = [:]
+  /// Each placement of the content in the frozen subtree, in tree order: the
+  /// boundary the body put around it, the content, and the content as it was
+  /// placed. The steps that make a `.didDisappear` body ready to draw read
+  /// them, when the removal is planned and on every frame that evaluates the
+  /// body again.
+  package var frozenContents: [RemovalFrozenContent] = []
+  /// The position of the root the removal draws among the roots of the
+  /// `.didDisappear` body, when that body has no root at ``rootIdentity``
+  /// and the root was paired by position.
+  package var fallbackRootIndex: Int? = nil
+  /// Whether the transition's built-in effects fade the departing view. The
+  /// root of the working tree then keeps ``heldRootOpacity``, the opacity it
+  /// had on screen, and the effect channel fades from there.
+  package var holdsRootOpacity = false
+  package var heldRootOpacity: Double? = nil
+  /// The views and the modifiers of the `.didDisappear` body that conform to
+  /// `Animatable`, by site, with the data that phase gives each: where the
+  /// site's animation ends. The removal owns the value animation at each of
+  /// these keys, as it owns the property animations of ``ownedIdentities``.
+  /// Empty for a body with no such view or modifier, which is then evaluated
+  /// once, when the removal is planned.
+  package var valueSites: [AnimationKey: AnyAnimatable] = [:]
+  /// The instant of the frame ``workingRoot`` was last evaluated for. A body
+  /// with ``valueSites`` is evaluated again on every frame one of them
+  /// animates, once.
+  package var valueResolveInstant: MonotonicInstant? = nil
+  /// Whether ``workingRoot`` was evaluated with every site at the data the
+  /// `.didDisappear` phase gives it. It then needs no further evaluation
+  /// until a site animates again.
+  package var valueTreeIsAtRest = true
 }
 
 /// The inherited styles a removal body gives one view of the frozen content.
@@ -67,15 +104,29 @@ package struct RemovalContentStyle: Sendable {
   package var tintStyle: AnyShapeStyle?
 }
 
+/// One placement of the content in the frozen subtree of a removal.
+package struct RemovalFrozenContent: Sendable {
+  /// The boundary node, which carries the environment the body handed to
+  /// the content in the identity phase.
+  package var boundary: ResolvedNode
+  package var content: ResolvedNode
+  package var placed: PlacedNode
+}
+
 /// Plans and draws the body channel of a removal transition.
 ///
 /// The counterpart of ``AnimationTransitionBodyInsertion``. Planning runs
 /// once, on the frame the view leaves: it finds the transition root and the
 /// content inside the frozen subtree, evaluates the `.didDisappear` body, and
 /// lists the slots that animate from the value on screen. Composition runs on
-/// every frame of the removal, on the main actor before the frame tail: it
+/// every frame the removal draws, on the main actor before the frame tail: it
 /// lays the body out at the frozen rect and puts the frozen content under it,
-/// so the tail receives a finished placed tree.
+/// so the tail receives a finished placed tree. A body with an `Animatable`
+/// view or modifier in it is evaluated again before it is composed, with the
+/// data each such site presents on the frame, and takes the steps planning
+/// took after its evaluation
+/// (``workingTree(from:inputs:fallbackRootIndex:)``). A body with none is
+/// evaluated once, when the removal is planned.
 ///
 /// Rules that follow from the working tree being the `.didDisappear` body:
 ///
@@ -97,6 +148,10 @@ enum AnimationTransitionBodyRemoval {
     /// For each owned identity, the slots on screen and the slots of the
     /// `.didDisappear` phase. The controller enqueues the differences.
     var changes: [AnimationTransitionBodyInsertion.SlotChange]
+    /// What each site of ``RemovalBodyState/valueSites`` showed, for the
+    /// sites a live view or modifier resolved at. The removal's animation of
+    /// a site starts at the data the site presents on the removal frame.
+    var liveSites: [AnimationKey: LiveSite] = [:]
     /// What the removal cannot honour: handlers on a view only the
     /// `.didDisappear` phase has, and environment values that phase writes
     /// for the content.
@@ -110,13 +165,28 @@ enum AnimationTransitionBodyRemoval {
     case unavailable(RuntimeIssue)
   }
 
-  /// One placement of the content in the frozen subtree.
-  private struct FrozenContent {
-    /// The boundary node, which carries the environment the body handed to
-    /// the content in the identity phase.
-    var boundary: ResolvedNode
-    var content: ResolvedNode
-    var placed: PlacedNode
+  /// What one live `Animatable` view or modifier shows.
+  struct LiveSite {
+    /// The data the site's body last ran with: what the tree on screen was
+    /// evaluated with.
+    var shown: AnyAnimatable
+    /// The data the site presents on the frame being prepared: this frame's
+    /// sample of its animation when one is in flight, else its target.
+    var presented: AnyAnimatable
+  }
+
+  /// What the `Animatable` views and modifiers of the departing body show,
+  /// by site. Both answers are `nil` for a site no live view resolved at.
+  struct LiveSiteData {
+    /// ``LiveSite/shown`` of the site.
+    var shown: (AnimationKey) -> AnyAnimatable?
+    /// ``LiveSite/presented`` of the site.
+    var presented: (AnimationKey) -> AnyAnimatable?
+
+    /// A body none of whose sites is live.
+    static var none: LiveSiteData {
+      LiveSiteData(shown: { _ in nil }, presented: { _ in nil })
+    }
   }
 
   /// A phase of the body, flattened.
@@ -126,8 +196,62 @@ enum AnimationTransitionBodyRemoval {
     var standIns: [ResolvedNode] = []
   }
 
+  /// What the steps between an evaluation of the `.didDisappear` body and a
+  /// tree that can be drawn read, beside the evaluated body. Each is fixed
+  /// when the removal is planned.
+  private struct WorkingTreeInputs {
+    var rootIdentity: Identity
+    /// The transition root as it was on screen, with the stamps of the
+    /// modifiers outside the transition.
+    var frozenRoot: ResolvedNode
+    var frozenContents: [RemovalFrozenContent]
+    /// What the body alone left on the root in the identity phase.
+    var rootStamps: TransitionBodyRootStamps?
+    var holdsRootOpacity: Bool
+    var heldRootOpacity: Double?
+  }
+
+  /// A `.didDisappear` body made ready to draw.
+  private struct WorkingTree {
+    /// The root the removal draws, with its stand-ins sized, the stamps of
+    /// the modifiers outside the transition, and the opacity a fading effect
+    /// holds.
+    var root: ResolvedNode
+    /// Every node of ``root`` except the content stand-ins, in tree order.
+    var wrappers: [ResolvedNode]
+    /// Each stand-in with the frozen content it shows.
+    var paired: [(standIn: ResolvedNode, frozen: RemovalFrozenContent)]
+    /// The frozen placed content by the identity of its stand-in.
+    var contents: [Identity: PlacedNode]
+    /// The inherited styles this phase hands to the views of the content.
+    var contentStyles: [Identity: RemovalContentStyle]
+    /// Where ``contentStyles`` came from, one entry for each view and
+    /// placement, in the order they were applied.
+    var styleApplications: [InheritedStyleApplication]
+  }
+
+  /// One inherited style of the `.didDisappear` phase landing on one view of
+  /// the frozen content.
+  private struct InheritedStyleApplication {
+    var identity: Identity
+    var foregroundStyle: AnyShapeStyle?
+    var tintStyle: AnyShapeStyle?
+  }
+
   /// Plans the body channel for the removal of the transition root at
   /// `rootIdentity`.
+  ///
+  /// The `.didDisappear` body is evaluated with each `Animatable` view and
+  /// modifier in it at the data that site shows on screen
+  /// (``LiveSiteData/shown``). The tree on screen and this tree then differ
+  /// only where the phase makes them differ, and those differences are the
+  /// slots that animate. What a site drives is equal in both: it does not
+  /// animate as a slot. It animates as the site's data, and the body is
+  /// evaluated again with each sample
+  /// (``evaluateWorkingTree(of:registration:answers:)``).
+  /// When a site is in flight, its sample for this frame differs from what
+  /// is on screen, and the body is evaluated a second time with the samples
+  /// to get the tree this frame draws.
   ///
   /// - Parameters:
   ///   - frozenResolved: the canonical resolved subtree the removal injects.
@@ -136,6 +260,9 @@ enum AnimationTransitionBodyRemoval {
   ///   - previousSnapshots: the slots of every view of the previous frame.
   ///   - effectOwnsRootOpacity: whether the transition's built-in effects
   ///     fade the departing view. They then own the opacity of the root.
+  ///   - liveSites: what the `Animatable` views and modifiers of the
+  ///     departing body show.
+  ///   - timestamp: the instant of the removal frame.
   @MainActor
   static func plan(
     of registration: TransitionBodyRegistration,
@@ -144,7 +271,9 @@ enum AnimationTransitionBodyRemoval {
     frozenPlaced: PlacedNode,
     previousSnapshots: [Identity: AnimatableSnapshot],
     hasEffectChannel: Bool,
-    effectOwnsRootOpacity: Bool
+    effectOwnsRootOpacity: Bool,
+    liveSites: LiveSiteData = .none,
+    timestamp: MonotonicInstant? = nil
   ) -> Outcome {
     guard
       let frozenRoot = AnimationTreeQueries.findResolvedSubtree(
@@ -157,7 +286,7 @@ enum AnimationTransitionBodyRemoval {
 
     // The content of each boundary the host registered that lies under this
     // root. A body with several roots has the boundaries of all of them.
-    var frozenContents: [FrozenContent] = []
+    var frozenContents: [RemovalFrozenContent] = []
     for boundaryIdentity in registration.boundaryIdentities {
       guard
         let boundary = AnimationTreeQueries.findResolvedSubtree(
@@ -168,7 +297,8 @@ enum AnimationTransitionBodyRemoval {
           in: frozenRootPlaced, identity: boundaryIdentity),
         let placed = placedBoundary.children.first(where: { $0.identity == content.identity })
       else { continue }
-      frozenContents.append(FrozenContent(boundary: boundary, content: content, placed: placed))
+      frozenContents.append(
+        RemovalFrozenContent(boundary: boundary, content: content, placed: placed))
     }
     // A body that places `content` inside a view that resolves during layout
     // has no registered boundary: the content is somewhere in that view, and
@@ -182,7 +312,12 @@ enum AnimationTransitionBodyRemoval {
     let frozenSizes = Dictionary(
       frozenContents.map { ($0.content.identity, $0.placed.bounds.size) },
       uniquingKeysWith: { first, _ in first })
-    let tree = registration.resolve(phase: .didDisappear) { frozenSizes[$0] ?? .zero }
+    // The sites of the body ask this sink for their data. It answers with
+    // what each one shows on screen, and records what the phase wrote.
+    let shownSink = TransitionBodyValueSink(answering: liveSites.shown)
+    let tree = registration.resolve(phase: .didDisappear, valueSink: shownSink) {
+      frozenSizes[$0] ?? .zero
+    }
     // The identity phase evaluated the same way, for the checks below that
     // compare two phases. The tree on screen came through the graph and this
     // one does not, so a difference between those two is not evidence of a
@@ -199,52 +334,25 @@ enum AnimationTransitionBodyRemoval {
       evaluatedIdentityPhase = flattened
       return flattened
     }
-    var workingRoot = tree.roots.first { $0.identity == rootIdentity }
-    if workingRoot == nil {
-      // The roots of this phase have other identities than those on screen.
-      // Pair them by position among the roots of the identity phase.
-      if let index = identityPhase().roots.firstIndex(of: rootIdentity),
-        tree.roots.indices.contains(index)
-      {
-        workingRoot = tree.roots[index]
-      }
+    // The roots of this phase can have other identities than those on
+    // screen. They are then paired by position among the roots of the
+    // identity phase.
+    var fallbackRootIndex: Int?
+    if !tree.roots.contains(where: { $0.identity == rootIdentity }) {
+      fallbackRootIndex = identityPhase().roots.firstIndex(of: rootIdentity)
     }
-    guard var workingRoot else {
+    let inputs = WorkingTreeInputs(
+      rootIdentity: rootIdentity,
+      frozenRoot: frozenRoot,
+      frozenContents: frozenContents,
+      rootStamps: registration.rootStamps[rootIdentity],
+      holdsRootOpacity: effectOwnsRootOpacity,
+      heldRootOpacity: effectOwnsRootOpacity ? previousSnapshots[rootIdentity]?.opacity : nil
+    )
+    guard
+      let working = workingTree(from: tree, inputs: inputs, fallbackRootIndex: fallbackRootIndex)
+    else {
       return .unavailable(contentNotFoundIssue(for: registration))
-    }
-
-    var flattened = Flattened()
-    collect(workingRoot, into: &flattened)
-
-    // Pair each stand-in with frozen content: the content at the same
-    // identity, else the content at the same position, else the last one.
-    // So a body that places `content` twice shows it twice.
-    var contents: [Identity: PlacedNode] = [:]
-    var pairedContents: [(standIn: ResolvedNode, frozen: FrozenContent)] = []
-    var resized: [Identity: CellSize] = [:]
-    for (index, standIn) in flattened.standIns.enumerated() {
-      guard !frozenContents.isEmpty else {
-        return .unavailable(contentNotFoundIssue(for: registration))
-      }
-      let frozen =
-        frozenContents.first { $0.content.identity == standIn.identity }
-        ?? frozenContents[min(index, frozenContents.count - 1)]
-      contents[standIn.identity] = frozen.placed
-      pairedContents.append((standIn, frozen))
-      if standIn.intrinsicSize != frozen.placed.bounds.size {
-        resized[standIn.identity] = frozen.placed.bounds.size
-      }
-    }
-    if !resized.isEmpty {
-      workingRoot = resizingStandIns(in: workingRoot, to: resized)
-    }
-
-    // A modifier applied outside the transition stamped the root after the
-    // body did. Keep what it stamped: this tree is the body alone.
-    if workingRoot.identity == rootIdentity, let stamps = registration.rootStamps[rootIdentity] {
-      carryOuterStamps(onto: &workingRoot, onScreen: frozenRoot, body: stamps)
-      flattened = Flattened()
-      collect(workingRoot, into: &flattened)
     }
 
     // Every view of the working tree that was on screen animates from the
@@ -252,7 +360,7 @@ enum AnimationTransitionBodyRemoval {
     let frozenIdentities = AnimationTreeQueries.collectIdentities(in: frozenRoot)
     var owned: Set<Identity> = []
     var changes: [AnimationTransitionBodyInsertion.SlotChange] = []
-    for wrapper in flattened.wrappers {
+    for wrapper in working.wrappers {
       guard frozenIdentities.contains(wrapper.identity),
         var displayed = previousSnapshots[wrapper.identity]
       else { continue }
@@ -268,23 +376,36 @@ enum AnimationTransitionBodyRemoval {
       changes.append(
         .init(identity: wrapper.identity, viewNodeID: nil, previous: displayed, current: target))
     }
-    if effectOwnsRootOpacity, workingRoot.identity == rootIdentity {
-      var drawMetadata = workingRoot.drawMetadata
-      drawMetadata.baseStyle.explicitOpacity = previousSnapshots[rootIdentity]?.opacity
-      workingRoot.drawMetadata = drawMetadata
-    }
-
-    var contentStyles: [Identity: RemovalContentStyle] = [:]
-    for (standIn, frozen) in pairedContents {
-      appendInheritedStyles(
-        from: standIn, to: frozen, previousSnapshots: previousSnapshots,
-        styles: &contentStyles, owned: &owned, changes: &changes)
+    // A view of the content that takes an inherited style animates there
+    // when the style on screen and the new one both interpolate.
+    for application in working.styleApplications {
+      var displayed = AnimatableSnapshot()
+      var target = AnimatableSnapshot()
+      if let shown = previousSnapshots[application.identity]?[.foregroundShapeStyle],
+        let end = AnimatableSnapshot.extractAnimatableShapeStyle(
+          from: application.foregroundStyle)
+      {
+        displayed[.foregroundShapeStyle] = shown
+        target[.foregroundShapeStyle] = end
+      }
+      if let shown = previousSnapshots[application.identity]?[.tintShapeStyle],
+        let end = AnimatableSnapshot.extractAnimatableShapeStyle(from: application.tintStyle)
+      {
+        displayed[.tintShapeStyle] = shown
+        target[.tintShapeStyle] = end
+      }
+      if !target.values.isEmpty {
+        owned.insert(application.identity)
+        changes.append(
+          .init(
+            identity: application.identity, viewNodeID: nil, previous: displayed, current: target))
+      }
     }
 
     var issues: [RuntimeIssue] = []
     // A view of this phase that was not on screen is drawn and nothing more.
     // Its handlers never run, which would be a silent no-op.
-    let unmounted = flattened.wrappers.filter {
+    let unmounted = working.wrappers.filter {
       !frozenIdentities.contains($0.identity) && declaresHandlers($0)
     }
     if !unmounted.isEmpty {
@@ -298,7 +419,7 @@ enum AnimationTransitionBodyRemoval {
     // and is drawn as it was. An environment value this phase writes for it
     // changes nothing, which would be a silent no-op too.
     var ignoredKeys: Set<String> = []
-    for (standIn, frozen) in pairedContents {
+    for (standIn, frozen) in working.paired {
       let onScreen = unappliedEnvironmentKeys(
         of: standIn.environmentSnapshot, against: frozen.boundary.environmentSnapshot)
       guard !onScreen.isEmpty else { continue }
@@ -316,22 +437,203 @@ enum AnimationTransitionBodyRemoval {
       issues.append(environmentIgnoredIssue(for: registration, keys: ignoredKeys.sorted()))
     }
 
+    // The sites of the body. Each live one starts from the data it presents
+    // on this frame. When that is not what is on screen (an animation of the
+    // site is in flight and has moved on), the tree this frame draws is the
+    // body evaluated with the presented data.
+    let valueSites = shownSink.phaseData
+    var planned: [AnimationKey: LiveSite] = [:]
+    var presentedDiffersFromShown = false
+    for key in shownSink.sites {
+      guard let shown = liveSites.shown(key), let presented = liveSites.presented(key) else {
+        continue
+      }
+      planned[key] = LiveSite(shown: shown, presented: presented)
+      if shown != presented {
+        presentedDiffersFromShown = true
+      }
+    }
+    var drawn = working
+    if presentedDiffersFromShown {
+      let presentedTree = registration.resolve(
+        phase: .didDisappear,
+        valueSink: TransitionBodyValueSink(answers: planned.mapValues(\.presented))
+      ) { frozenSizes[$0] ?? .zero }
+      if let presented = workingTree(
+        from: presentedTree, inputs: inputs, fallbackRootIndex: fallbackRootIndex)
+      {
+        drawn = presented
+      }
+    }
+
     return .plays(
       Plan(
         state: RemovalBodyState(
           rootIdentity: rootIdentity,
-          workingRoot: workingRoot,
+          workingRoot: drawn.root,
           rootRect: frozenRootPlaced.bounds,
           rootZIndex: frozenRootPlaced.zIndex,
-          contents: contents,
+          contents: drawn.contents,
           orderedContents: frozenContents.map(\.placed),
-          contentStyles: contentStyles,
+          contentStyles: drawn.contentStyles,
           ownedIdentities: owned,
-          hasEffectChannel: hasEffectChannel
+          hasEffectChannel: hasEffectChannel,
+          frozenContents: frozenContents,
+          fallbackRootIndex: fallbackRootIndex,
+          holdsRootOpacity: inputs.holdsRootOpacity,
+          heldRootOpacity: inputs.heldRootOpacity,
+          valueSites: valueSites,
+          valueResolveInstant: timestamp,
+          valueTreeIsAtRest: planned.allSatisfy { valueSites[$0.key] == $0.value.presented }
         ),
         changes: changes,
+        liveSites: planned,
         issues: issues
       )
+    )
+  }
+
+  /// Evaluates the `.didDisappear` body of a removal again, with each of its
+  /// `Animatable` views and modifiers at the data in `answers`.
+  ///
+  /// `answers` holds this frame's sample for each site whose animation is in
+  /// flight. A site without an answer evaluates with the data the phase
+  /// gives it, which is where its animation ended. A body with several roots
+  /// has a removal for each root, and one evaluation serves them all:
+  /// ``refreshWorkingTree(of:from:registration:frozenResolved:isAtRest:at:)``
+  /// takes the result for each.
+  @MainActor
+  static func evaluateWorkingTree(
+    of body: RemovalBodyState,
+    registration: TransitionBodyRegistration,
+    answers: [AnimationKey: AnyAnimatable]
+  ) -> TransitionPhaseTree {
+    let contents = body.contents
+    return registration.resolve(
+      phase: .didDisappear, valueSink: TransitionBodyValueSink(answers: answers)
+    ) { contents[$0]?.bounds.size ?? .zero }
+  }
+
+  /// Makes `tree`, the `.didDisappear` body as just evaluated, the tree the
+  /// removal draws.
+  ///
+  /// The evaluated body takes the steps it took when the removal was planned
+  /// (``workingTree(from:inputs:fallbackRootIndex:)``), so the stand-ins,
+  /// the stamps of the modifiers outside the transition and the inherited
+  /// styles are those of this evaluation. A body that can no longer be
+  /// drawn around the content keeps the tree it had.
+  ///
+  /// - Parameter isAtRest: whether the body was evaluated with every site
+  ///   at the data the phase gives it.
+  static func refreshWorkingTree(
+    of body: inout RemovalBodyState,
+    from tree: TransitionPhaseTree,
+    registration: TransitionBodyRegistration,
+    frozenResolved: ResolvedNode,
+    isAtRest: Bool,
+    at timestamp: MonotonicInstant
+  ) {
+    body.valueResolveInstant = timestamp
+    body.valueTreeIsAtRest = isAtRest
+    guard
+      let frozenRoot = AnimationTreeQueries.findResolvedSubtree(
+        in: frozenResolved, identity: body.rootIdentity)
+    else { return }
+    let inputs = WorkingTreeInputs(
+      rootIdentity: body.rootIdentity,
+      frozenRoot: frozenRoot,
+      frozenContents: body.frozenContents,
+      rootStamps: registration.rootStamps[body.rootIdentity],
+      holdsRootOpacity: body.holdsRootOpacity,
+      heldRootOpacity: body.heldRootOpacity
+    )
+    guard
+      let working = workingTree(
+        from: tree, inputs: inputs, fallbackRootIndex: body.fallbackRootIndex)
+    else { return }
+    body.workingRoot = working.root
+    body.contents = working.contents
+    body.contentStyles = working.contentStyles
+  }
+
+  /// Makes an evaluated `.didDisappear` body ready to draw: the steps a
+  /// removal takes after every evaluation of that body, when it is planned
+  /// and on each frame a site of the body animates.
+  ///
+  /// 1. Pick the root the removal is keyed on: the root at the removal's
+  ///    identity, else the root at `fallbackRootIndex`.
+  /// 2. Pair each stand-in with frozen content (the content at the same
+  ///    identity, else the content at the same position, else the last one,
+  ///    so a body that places `content` twice shows it twice), and give the
+  ///    stand-in the size the content was placed with.
+  /// 3. Keep on the root what modifiers outside the transition stamped on
+  ///    it: this tree is the body alone.
+  /// 4. Keep the opacity the root had on screen when the transition's
+  ///    built-in effects fade the view.
+  /// 5. Record the foreground style and the tint the body hands to the
+  ///    content, for the views of the frozen content that inherit them.
+  ///
+  /// Returns `nil` when the body has no root to draw, or places content that
+  /// the frozen subtree does not have.
+  private static func workingTree(
+    from tree: TransitionPhaseTree,
+    inputs: WorkingTreeInputs,
+    fallbackRootIndex: Int?
+  ) -> WorkingTree? {
+    var selectedRoot = tree.roots.first { $0.identity == inputs.rootIdentity }
+    if selectedRoot == nil, let fallbackRootIndex, tree.roots.indices.contains(fallbackRootIndex) {
+      selectedRoot = tree.roots[fallbackRootIndex]
+    }
+    guard var workingRoot = selectedRoot else { return nil }
+
+    var flattened = Flattened()
+    collect(workingRoot, into: &flattened)
+
+    var contents: [Identity: PlacedNode] = [:]
+    var paired: [(standIn: ResolvedNode, frozen: RemovalFrozenContent)] = []
+    var resized: [Identity: CellSize] = [:]
+    for (index, standIn) in flattened.standIns.enumerated() {
+      guard !inputs.frozenContents.isEmpty else { return nil }
+      let frozen =
+        inputs.frozenContents.first { $0.content.identity == standIn.identity }
+        ?? inputs.frozenContents[min(index, inputs.frozenContents.count - 1)]
+      contents[standIn.identity] = frozen.placed
+      paired.append((standIn, frozen))
+      if standIn.intrinsicSize != frozen.placed.bounds.size {
+        resized[standIn.identity] = frozen.placed.bounds.size
+      }
+    }
+    if !resized.isEmpty {
+      workingRoot = resizingStandIns(in: workingRoot, to: resized)
+    }
+
+    if workingRoot.identity == inputs.rootIdentity {
+      if let stamps = inputs.rootStamps {
+        carryOuterStamps(onto: &workingRoot, onScreen: inputs.frozenRoot, body: stamps)
+      }
+      if inputs.holdsRootOpacity {
+        var drawMetadata = workingRoot.drawMetadata
+        drawMetadata.baseStyle.explicitOpacity = inputs.heldRootOpacity
+        workingRoot.drawMetadata = drawMetadata
+      }
+    }
+    flattened = Flattened()
+    collect(workingRoot, into: &flattened)
+
+    var contentStyles: [Identity: RemovalContentStyle] = [:]
+    var styleApplications: [InheritedStyleApplication] = []
+    for (standIn, frozen) in paired {
+      recordInheritedStyles(
+        from: standIn, to: frozen, styles: &contentStyles, applications: &styleApplications)
+    }
+
+    return WorkingTree(
+      root: workingRoot,
+      wrappers: flattened.wrappers,
+      paired: paired,
+      contents: contents,
+      contentStyles: contentStyles,
+      styleApplications: styleApplications
     )
   }
 
@@ -361,10 +663,18 @@ enum AnimationTransitionBodyRemoval {
       )
     }
     let engine = LayoutEngine()
-    let measured = engine.measure(
-      presented,
-      proposal: ProposedSize(width: body.rootRect.size.width, height: body.rootRect.size.height))
-    var placed = engine.place(presented, measured: measured, origin: body.rootRect.origin)
+    // A view of the body that resolves during layout (the content of a
+    // `GeometryReader`) is evaluated here, and may conform to `Animatable`.
+    // It belongs to a body that is drawn and not mounted, so it asks no
+    // sink: bound to the frame's controller, its pull would leave a record
+    // there for a site no live view has.
+    var placed = AnimatableValueStorage.withSink(nil) {
+      let measured = engine.measure(
+        presented,
+        proposal: ProposedSize(
+          width: body.rootRect.size.width, height: body.rootRect.size.height))
+      return engine.place(presented, measured: measured, origin: body.rootRect.origin)
+    }
     placed.zIndex = body.rootZIndex
     var unmatched = 0
     placed = graftingContents(of: body, into: placed, unmatched: &unmatched)
@@ -578,15 +888,13 @@ enum AnimationTransitionBodyRemoval {
   /// The boundary carries what the body handed to the content in the identity
   /// phase, and the stand-in carries it for this phase. A view of the content
   /// that still sees the boundary's value, and sets none of its own, takes
-  /// the stand-in's. It animates there when both values interpolate, and
-  /// shows the new value at once when they do not.
-  private static func appendInheritedStyles(
+  /// the stand-in's. The planner animates it there when both values
+  /// interpolate; a value that does not interpolate shows at once.
+  private static func recordInheritedStyles(
     from standIn: ResolvedNode,
-    to frozen: FrozenContent,
-    previousSnapshots: [Identity: AnimatableSnapshot],
+    to frozen: RemovalFrozenContent,
     styles: inout [Identity: RemovalContentStyle],
-    owned: inout Set<Identity>,
-    changes: inout [AnimationTransitionBodyInsertion.SlotChange]
+    applications: inout [InheritedStyleApplication]
   ) {
     let liveForeground = frozen.boundary.environmentSnapshot.style.foregroundStyle
     let liveTint = frozen.boundary.environmentSnapshot.style.tintStyle
@@ -600,36 +908,23 @@ enum AnimationTransitionBodyRemoval {
     while let node = pending.popLast() {
       pending.append(contentsOf: node.children)
       var style = styles[node.identity] ?? RemovalContentStyle()
-      var displayed = AnimatableSnapshot()
-      var target = AnimatableSnapshot()
+      var application = InheritedStyleApplication(identity: node.identity)
       if foregroundChanges,
         AnimatableSnapshot.extractAnimatableShapeStyle(
           from: node.drawMetadata.baseStyle.foregroundStyle) == nil,
         node.environmentSnapshot.style.foregroundStyle == liveForeground
       {
         style.foregroundStyle = targetForeground
-        if let shown = previousSnapshots[node.identity]?[.foregroundShapeStyle],
-          let end = AnimatableSnapshot.extractAnimatableShapeStyle(from: targetForeground)
-        {
-          displayed[.foregroundShapeStyle] = shown
-          target[.foregroundShapeStyle] = end
-        }
+        application.foregroundStyle = targetForeground
       }
       if tintChanges, node.environmentSnapshot.style.tintStyle == liveTint {
         style.tintStyle = targetTint
-        if let shown = previousSnapshots[node.identity]?[.tintShapeStyle],
-          let end = AnimatableSnapshot.extractAnimatableShapeStyle(from: targetTint)
-        {
-          displayed[.tintShapeStyle] = shown
-          target[.tintShapeStyle] = end
-        }
+        application.tintStyle = targetTint
       }
       guard style.foregroundStyle != nil || style.tintStyle != nil else { continue }
       styles[node.identity] = style
-      if !target.values.isEmpty {
-        owned.insert(node.identity)
-        changes.append(
-          .init(identity: node.identity, viewNodeID: nil, previous: displayed, current: target))
+      if application.foregroundStyle != nil || application.tintStyle != nil {
+        applications.append(application)
       }
     }
   }

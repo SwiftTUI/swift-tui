@@ -39,6 +39,14 @@ public import SwiftTUICore
 /// interpolates animates from the value on screen. A value that cannot
 /// interpolate shows its `didDisappear` value at once.
 ///
+/// A view or a view modifier in the body that conforms to `Animatable`
+/// animates its `animatableData` in the same way: from the data the
+/// `willAppear` body gives it on insertion, and to the data the
+/// `didDisappear` body gives it on removal. Its body runs on every frame of
+/// the transition with the interpolated data, so it can draw what no
+/// modifier value interpolates to. ``AnyTransition/modifier(active:identity:)``
+/// is the short form for one such modifier.
+///
 /// SwiftTUI ends the life of the view when its removal starts: that frame
 /// cancels its tasks, runs `onDisappear` and drops its state, where SwiftUI
 /// waits for the removal to end. The removal then draws the view as it was
@@ -59,9 +67,13 @@ public protocol Transition: Sendable {
   /// the views on screen. It calls it with ``TransitionPhase/willAppear``
   /// when an insertion starts, to read the modifier values of that phase, and
   /// with ``TransitionPhase/didDisappear`` when a removal starts, to build
-  /// the views the removal draws. Those two calls have no view state: a
-  /// `@State` property in a view the body adds reads its initial value there,
-  /// and no lifecycle handler, task or action of the result ever runs.
+  /// the views the removal draws. When the result holds a view or a modifier
+  /// that conforms to `Animatable`, a removal calls it with `didDisappear`
+  /// again on each frame it draws, to evaluate that view or modifier with
+  /// the frame's data. The calls for `willAppear` and `didDisappear` have no
+  /// view state: a `@State` property in a view the body adds reads its
+  /// initial value there, and no lifecycle handler, task or action of the
+  /// result ever runs.
   ///
   /// - Parameters:
   ///   - content: A stand-in for the view the transition is applied to. Place

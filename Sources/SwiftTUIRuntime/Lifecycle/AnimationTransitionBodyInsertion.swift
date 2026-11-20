@@ -27,6 +27,22 @@ import SwiftTUIViews
 /// content in the `.willAppear` phase, and the live boundary records it for
 /// the identity phase. Every view of the live content that still sees the
 /// boundary's value, and sets none of its own, animates from the stand-in's.
+///
+/// A view or a modifier of the body that conforms to `Animatable` is not a
+/// slot. Its `animatableData` is one more value that animates from the
+/// origin phase, and its body runs with each sample. That needs the frame
+/// head: the live body resolves there, with the data of the identity phase,
+/// before the injection stage qualifies the insertion. So on such a frame
+/// the head qualifies the insertion first, evaluates the `.willAppear` phase
+/// with a sink that records what the phase wrote for each site
+/// (``TransitionBodyValueSink``), starts each site's animation from there and
+/// evaluates the owners again
+/// (`AnimationController.prepareTransitionBodyInsertions`). The first
+/// presented frame then holds what the `.willAppear` body produces wherever a
+/// site drives it, so the pairing here finds no difference there and the two
+/// mechanisms never animate one value twice. The head's ``Decision`` and its
+/// evaluated phase are handed to the injection stage, which does not decide
+/// or evaluate again.
 enum AnimationTransitionBodyInsertion {
   /// The tables of the frame being processed that the body channel reads.
   struct Frame {
@@ -60,6 +76,24 @@ enum AnimationTransitionBodyInsertion {
     var phaseOnlyIssue: RuntimeIssue?
   }
 
+  /// What is decided once for the body channel of one insertion.
+  ///
+  /// The frame head decides it when a view or a modifier of the body conforms
+  /// to `Animatable`, because the data of such a site has to start animating
+  /// before the frame resolves for the last time. The injection stage then
+  /// reads the head's decision. For every other body the injection stage
+  /// decides, with the same code.
+  struct Decision: Sendable {
+    /// The transaction the insertion animates under.
+    var transaction: TransactionSnapshot
+    /// Whether the insertion has a curve. Without one it snaps.
+    var plays: Bool
+    /// The identity of the removal this insertion interrupts, when the view
+    /// came back while its removal was in flight. The body then continues
+    /// from what that removal shows and not from its `.willAppear` phase.
+    var returnedRemovalIdentity: Identity?
+  }
+
   /// The slots of one live node that animate from the origin phase.
   struct SlotChange {
     var identity: Identity
@@ -70,23 +104,56 @@ enum AnimationTransitionBodyInsertion {
     var current: AnimatableSnapshot
   }
 
+  /// The roots of the `.willAppear` phase of `registration`, each with the
+  /// stamps of the modifiers outside the transition.
+  ///
+  /// A modifier applied outside the transition stamped the live root after
+  /// the body did. A phase evaluated in the scratch scope is the body alone,
+  /// so its root gets the same stamps: the two then differ only where the
+  /// body does. What the outer modifiers stamped is the difference between
+  /// the live root and what the body alone left on it, so `root` and
+  /// `parents` have to be the tree of the evaluation `registration` was
+  /// registered in.
+  ///
+  /// `evaluated` is the phase when the caller has evaluated it already, with
+  /// a sink of its own. Without it the phase is evaluated here.
+  @MainActor
+  static func willAppearRoots(
+    of registration: TransitionBodyRegistration,
+    evaluated: TransitionPhaseTree? = nil,
+    root: ResolvedNode,
+    parents: [Identity: Identity]
+  ) -> [ResolvedNode] {
+    (evaluated ?? registration.resolve(phase: .willAppear)).roots.map { phaseRoot in
+      var phaseRoot = phaseRoot
+      if let stamps = registration.rootStamps[phaseRoot.identity],
+        let live = subtree(at: phaseRoot.identity, root: root, parents: parents)
+      {
+        AnimationTransitionBodyRemoval.carryOuterStamps(
+          onto: &phaseRoot, onScreen: live, body: stamps)
+      }
+      return phaseRoot
+    }
+  }
+
   /// Evaluates the `.willAppear` phase of `registration` and flattens it.
+  ///
+  /// `willAppearRoots` are the roots of that phase when the frame head has
+  /// evaluated it already, to learn where the data of the body's
+  /// `Animatable` views and modifiers starts
+  /// (``willAppearRoots(of:evaluated:root:parents:)``). The phase is then not
+  /// evaluated a second time.
   @MainActor
   static func origin(
     of registration: TransitionBodyRegistration,
-    in frame: Frame
+    in frame: Frame,
+    willAppearRoots: [ResolvedNode]? = nil
   ) -> Origin {
     var origin = Origin()
-    for var root in registration.resolve(phase: .willAppear).roots {
-      // A modifier applied outside the transition stamped the live root
-      // after the body did. This phase is the body alone, so give its root
-      // the same stamps: the two snapshots then differ only where the body
-      // does.
-      if let stamps = registration.rootStamps[root.identity],
-        let live = subtree(at: root.identity, in: frame)
-      {
-        AnimationTransitionBodyRemoval.carryOuterStamps(onto: &root, onScreen: live, body: stamps)
-      }
+    let roots =
+      willAppearRoots
+      ?? Self.willAppearRoots(of: registration, root: frame.root, parents: frame.parents)
+    for root in roots {
       collect(root, into: &origin)
     }
     // A view of the origin phase that the live tree does not have is never
@@ -170,10 +237,20 @@ enum AnimationTransitionBodyInsertion {
     subtreeOf ancestor: Identity,
     in frame: Frame
   ) -> Bool {
+    isInside(identity, subtreeOf: ancestor, parents: frame.parents)
+  }
+
+  /// Whether `identity` is `ancestor` or lies below it, by the parent of each
+  /// identity in a resolved tree.
+  static func isInside(
+    _ identity: Identity,
+    subtreeOf ancestor: Identity,
+    parents: [Identity: Identity]
+  ) -> Bool {
     var candidate: Identity? = identity
     while let current = candidate {
       if current == ancestor { return true }
-      candidate = frame.parents[current]
+      candidate = parents[current]
     }
     return false
   }
@@ -198,7 +275,7 @@ enum AnimationTransitionBodyInsertion {
     // the identity phase, before any modifier of the content itself. The
     // stand-in carries the same for the origin phase.
     guard let boundaryIdentity = frame.parents[content.identity],
-      let boundary = subtree(at: boundaryIdentity, in: frame),
+      let boundary = subtree(at: boundaryIdentity, root: frame.root, parents: frame.parents),
       boundary.kind == .view(.transitionContent),
       let liveContent = boundary.children.first(where: { $0.identity == content.identity })
     else { return }
@@ -252,17 +329,21 @@ enum AnimationTransitionBodyInsertion {
     }
   }
 
-  /// The live subtree at `identity`, reached along the frame's parent chain
-  /// instead of a search of the whole tree.
-  private static func subtree(at identity: Identity, in frame: Frame) -> ResolvedNode? {
+  /// The subtree at `identity` of the tree at `root`, reached along the
+  /// parent chain instead of a search of the whole tree.
+  private static func subtree(
+    at identity: Identity,
+    root: ResolvedNode,
+    parents: [Identity: Identity]
+  ) -> ResolvedNode? {
     var chain: [Identity] = []
     var candidate: Identity? = identity
-    while let current = candidate, current != frame.root.identity {
+    while let current = candidate, current != root.identity {
       chain.append(current)
-      candidate = frame.parents[current]
+      candidate = parents[current]
     }
-    guard candidate == frame.root.identity else { return nil }
-    var node = frame.root
+    guard candidate == root.identity else { return nil }
+    var node = root
     for next in chain.reversed() {
       guard let child = node.children.first(where: { $0.identity == next }) else { return nil }
       node = child

@@ -353,7 +353,8 @@ one inside your own body with ``Transition/apply(content:phase:)``. A built-in
 type behaves exactly as the matching ``AnyTransition`` value, so
 `.transition(OpacityTransition())` and `.transition(.opacity)` are the same
 transition. ``AnyTransition/modifier(active:identity:)`` makes a transition
-from two values of one ``ViewModifier``.
+from two values of one ``ViewModifier``; see "Drive A Transition With Your
+Own Modifier" below.
 
 Every modifier a body applies to `content` lands on a boundary around the
 view, separate from the view's own modifiers. A body that places `content`
@@ -438,11 +439,91 @@ Text("Saved!")
   .transition(Spotlight().combined(with: .move(edge: .leading)))
 ```
 
-> Important: A custom `Animatable` view or modifier inside a body is not
-> driven on every frame yet. It shows its destination value at once. Build a
-> body from the modifiers listed above, or clip it with a shape that
-> conforms to `Animatable`, which is evaluated on every frame of the
-> transition. See <doc:Divergences-And-Gaps>.
+### Drive A Transition With Your Own Modifier
+
+The modifiers above interpolate one value each. For a transition that no
+single value describes (a typewriter reveal, a dissolve, a set of blinds),
+put a view modifier or a view that conforms to `Animatable` in the body. Its
+`animatableData` animates as the modifier values do: on insertion from the
+data the `willAppear` body gives it to the data of the `identity` body, and
+on removal from the data on screen to the data of the `didDisappear` body.
+Its body runs on every frame of the transition with the interpolated data.
+
+``AnyTransition/modifier(active:identity:)`` is the short form for one
+modifier. It applies `active` outside the `identity` phase and `identity` in
+it:
+
+```swift
+struct Reveal: ViewModifier, Animatable {
+  var progress: Double
+
+  nonisolated var animatableData: Double {
+    get { progress }
+    set { progress = newValue }
+  }
+
+  func body(content: Content) -> some View {
+    content
+      .opacity(min(1, max(0, progress)))
+      .padding(.leading, Int((4 * (1 - progress)).rounded()))
+  }
+}
+
+Text("Saved!").transition(
+  .modifier(active: Reveal(progress: 0), identity: Reveal(progress: 1)))
+```
+
+`progress` runs from 0 to 1 while the view arrives and from 1 to 0 while it
+leaves, and `body(content:)` runs for each frame with the value between. A
+view the body adds can conform in the same way, and so can a modifier inside
+your own ``Transition``:
+
+```swift
+struct RevealIn: Transition {
+  func body(content: Content, phase: TransitionPhase) -> some View {
+    content.modifier(Reveal(progress: phase.isIdentity ? 1 : 0))
+  }
+}
+```
+
+What to expect:
+
+- **A spring takes `progress` outside 0…1.** A spring with bounce passes its
+  target and comes back, so `progress` is above 1 for a few frames on the way
+  in and below 0 on the way out. The body gets the values as they are. Clamp
+  what must stay in range, as `Reveal` does for its opacity.
+- **An interruption continues from the value on screen.** A removal during
+  the insertion, and a re-insertion during the removal, carry `progress` on
+  from its current value, and a spring keeps its velocity.
+- **With no animation the body runs once.** A plain state write,
+  `withAnimation(nil)` and Reduce Motion insert the view with the `identity`
+  data and remove it at once. Reduce Motion that turns on in flight ends the
+  transition on that frame.
+- **On insertion the conformer is part of the live view.** It is mounted,
+  and only its own subtree runs again for a frame; for a modifier that
+  includes the content it wraps. On the frame of the insertion its body runs
+  more than once: to build the view, and again with the data the transition
+  starts from.
+- **On removal SwiftTUI evaluates the `didDisappear` body again for each
+  frame it draws.** That body is drawn and not mounted, as described above,
+  and the content inside it is the view as it was last drawn. The frame on
+  which the removal ends draws nothing, so the last data the conformer sees
+  on the way out is the sample before the target.
+- **Keep what the conformer writes apart from what else the transition
+  animates.** A view has one opacity, one padding, one offset. When the
+  conformer writes one of them and another part of the same transition
+  animates the same property of the same view (a plain modifier whose value
+  differs between phases, or the fade of `.combined(with: .opacity)`), the
+  two do not compose: one of them takes its end value at once. Have the
+  conformer write a different property, or wrap `content` in a stack and put
+  one of the two on the stack.
+
+A shape that conforms to `Animatable` also animates inside a body, in a
+`clipShape`, a `fill` or a `stroke`, and costs less: its `path(in:)` runs for
+each frame and no view is evaluated. Prefer it where a shape can draw the
+effect. A conformer the body places inside a ``GeometryReader`` or a lazy
+stack is evaluated while that view lays out and gets its `identity` data at
+once. See <doc:Divergences-And-Gaps>.
 
 ## Roll A Number When It Changes
 

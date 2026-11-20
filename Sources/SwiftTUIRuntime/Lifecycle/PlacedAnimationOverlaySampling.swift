@@ -6,8 +6,14 @@ package enum PlacedAnimationOverlaySampling {
   ///   - adoption: the tree's co-present pairs, when the caller's
   ///     capture already walked the tree; `nil` walks it here.
   ///   - removalsWithAnimatingBody: the removals whose transition body still
-  ///     has a property animation in flight. Such a removal is not over when
-  ///     its own curve ends.
+  ///     has an animation of its own in flight. Such a removal is not over
+  ///     when its own curve ends.
+  ///   - removalBodySnapshot: the placed tree a removal that plays a
+  ///     transition body draws on this sample, in place of its frozen
+  ///     snapshot; `nil` for a removal without a body. It is asked only for
+  ///     a removal that draws on this sample, after its end is decided, so a
+  ///     body is laid out, and evaluated when it has to be, once for each
+  ///     frame that shows it.
   package static func sample(
     removingNodes: [ViewNodeID: RemovalEntry],
     activeAnimations: [AnimationKey: ActiveAnimation],
@@ -16,7 +22,8 @@ package enum PlacedAnimationOverlaySampling {
     timestamp: MonotonicInstant,
     surfaceSize: CellSize?,
     adoption: [MatchedGeometryAdoptionPair]? = nil,
-    removalsWithAnimatingBody: Set<ViewNodeID> = []
+    removalsWithAnimatingBody: Set<ViewNodeID> = [],
+    removalBodySnapshot: (ViewNodeID, RemovalEntry) -> PlacedNode? = { _, _ in nil }
   ) -> PlacedAnimationOverlaySamplingResult {
     let effectiveSurfaceSize = surfaceSize ?? tree.bounds.size
     let adoptionPairs = adoption ?? MatchedGeometryAdoption.pairs(in: tree)
@@ -36,7 +43,8 @@ package enum PlacedAnimationOverlaySampling {
       restingTree: restingTree,
       timestamp: timestamp,
       surfaceSize: effectiveSurfaceSize,
-      removalsWithAnimatingBody: removalsWithAnimatingBody
+      removalsWithAnimatingBody: removalsWithAnimatingBody,
+      removalBodySnapshot: removalBodySnapshot
     )
     let insertionResult = sampleInsertionOffsets(
       activeAnimations: activeAnimations,
@@ -147,12 +155,13 @@ package enum PlacedAnimationOverlaySampling {
     restingTree: PlacedNode,
     timestamp: MonotonicInstant,
     surfaceSize: CellSize,
-    removalsWithAnimatingBody: Set<ViewNodeID>
+    removalsWithAnimatingBody: Set<ViewNodeID>,
+    removalBodySnapshot: (ViewNodeID, RemovalEntry) -> PlacedNode?
   ) -> RemovalSamplingResult {
     var result = RemovalSamplingResult()
 
     for (viewNodeID, entry) in removingNodes {
-      guard let placedSnapshot = entry.placedSnapshot,
+      guard let frozenSnapshot = entry.placedSnapshot,
         let parentId = entry.parentIdentity
       else {
         // Nothing to composite (no frozen placed snapshot or no surviving
@@ -211,6 +220,10 @@ package enum PlacedAnimationOverlaySampling {
           continue
         }
       }
+
+      // The removal draws on this sample. One that plays a transition body
+      // draws that body around the frozen content, as it shows now.
+      let placedSnapshot = removalBodySnapshot(viewNodeID, entry) ?? frozenSnapshot
 
       // The departing view leaves across its OWN edge, so the frozen overlay's
       // size is the basis — not the surface, which would fling a small view a

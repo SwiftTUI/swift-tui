@@ -924,9 +924,9 @@ are omitted even when SwiftUI exposes a corresponding API.
   body writes for each sample as well, so the result trails the data; scope
   such a modifier with `animation(_:value:)` or `transaction(value:_:)`
   instead. A conformer inside the rows of a lazy stack gets its new value at
-  once, as every animated change there does (STUI-1376), and one inside a
-  custom `Transition` body does too (STUI-1546, in the transition entry
-  below).
+  once, as every animated change there does (STUI-1376). A conformer inside
+  a custom `Transition` body animates through the insertion and the removal;
+  the transition entry below has the rules.
 - **Scoped `body:` forms include environment-carried foreground and tint.**
   *Ratified.* `View.animation(_:body:)` and `View.transaction(_:body:)`
   scope the transaction to modifiers that create a node (`offset`,
@@ -936,8 +936,8 @@ are omitted even when SwiftUI exposes a corresponding API.
   transaction across the placeholder restore; a closer style writer in the
   base view takes precedence. Nested scopes keep their own timings, and a nil
   scoped animation leaves the base view's outer animation intact.
-- **Custom `Transition` bodies animate on insertion and on removal; a custom
-  `Animatable` inside a body does not animate yet.** *Gap.* SwiftTUI ships
+- **Custom `Transition` bodies animate on insertion and on removal, with the
+  `Animatable` views and modifiers in them.** *Provisional.* SwiftTUI ships
   the built-in `AnyTransition` opacity, move, offset, scale, combined, and
   asymmetric effects. Scale preserves layout and changes placed bounds around
   its `UnitPoint` anchor; cell extents round to whole cells and clip content
@@ -949,13 +949,45 @@ are omitted even when SwiftUI exposes a corresponding API.
   exist with SwiftUI's names. A custom body is resolved in
   `TransitionPhase.identity` while its view is present, and every modifier it
   applies there is rendered.
-  *The remaining gap.* A custom `Animatable` view or modifier inside a body is
-  not driven per frame yet. It shows its destination value at once: the
-  `identity` value on insertion and the `didDisappear` value on removal
-  (STUI-1546). A shape that conforms to `Animatable` is a value the engine
-  interpolates, so a body's `clipShape` of such a shape is evaluated on every
-  frame of an insertion and of a removal. Everything else in this entry is
-  how transitions work.
+  *`Animatable` in a body.* A view or a view modifier of the body that
+  conforms to `Animatable` receives interpolated `animatableData` on every
+  frame of the transition, as in SwiftUI: on insertion from the data the
+  `willAppear` body gives it to the data of the `identity` body, and on
+  removal from the data on screen to the data of the `didDisappear` body.
+  `AnyTransition.modifier(active: M(progress: 0), identity: M(progress: 1))`
+  so delivers `progress` between 0 and 1 for the whole transition, both ways.
+  A spring with bounce delivers values above 1 on the way in and below 0 on
+  the way out, and nothing clamps them. A removal that interrupts an
+  insertion, and a re-insertion that interrupts a removal, continue the data
+  from its current sample, and a spring keeps its velocity. With no curve
+  the conformer is evaluated once, with the `identity` data, and a removed
+  view leaves at once.
+  The differences from SwiftUI are these. On insertion the conformer is in
+  the live view: its body runs again for each frame, with the content it
+  hosts, and on the frame of the insertion it runs more than once (with the
+  `identity` data when the view is built, then with the data the transition
+  starts from, which is what the frame shows). On removal the conformer is
+  in the `didDisappear` body, which SwiftTUI evaluates again, outside the
+  view graph, for each frame the removal draws; a body with no conformer is
+  evaluated once. The frame on which a removal ends draws nothing, so on the
+  way out the conformer's last evaluation is with its last sample, not with
+  the `didDisappear` data itself. A conformer and another part of the same
+  transition do not both animate one property of one view. When the
+  conformer's body writes a property (an opacity, say) of the view on which
+  a plain modifier of the body gives the same property a value that differs
+  between phases, the view has one merged value: on insertion the plain
+  modifier's part takes its `identity` value on the second frame, and on
+  removal the conformer's part of that property is not drawn as it changes.
+  The same holds when a conformer writes the opacity of the view the
+  transition is attached to in a combination whose built-in part fades: on
+  insertion the built-in fade stops on the second frame, and on removal the
+  built-in fade plays over the opacity the conformer had on screen. Write
+  different properties, or put one of the two on a wrapper view. A conformer
+  that the body places inside a `GeometryReader` or a lazy container
+  resolves during layout and gets its destination data at once. A shape that
+  conforms to `Animatable` is a value the engine interpolates, so a body's
+  `clipShape`, `fill` or `stroke` of such a shape is evaluated on every frame
+  of an insertion and of a removal, and no view is evaluated for it.
   *Insertion.* When a view with a custom body is inserted under an animation,
   it appears through the body of `willAppear` and moves to the body of
   `identity`, as in SwiftUI. The rendered view tree is the `identity` body
@@ -966,8 +998,10 @@ are omitted even when SwiftUI exposes a corresponding API.
   (`background(_:)` with a style is one), border styles, padding, offset,
   position, frame width and height, the path of a shape and of a `clipShape`
   when both phases have the same path elements, the data of a shape that
-  conforms to `Animatable`, a stroke's dash phase, and a stroke's trim. A `Text` under a `contentTransition` rolls from the
-  `willAppear` string, as it does for any change. A value the engine cannot
+  conforms to `Animatable`, the data of a view or a modifier that conforms
+  to `Animatable`, a stroke's dash phase, and a stroke's trim. A `Text`
+  under a `contentTransition` rolls from the `willAppear` string, as it does
+  for any change. A value the engine cannot
   interpolate (a blend mode, a text attribute, a string with no content
   transition, an environment value, a modifier that is present in one phase
   only) shows its `identity` value from the first frame. SwiftUI does the

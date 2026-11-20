@@ -39,8 +39,51 @@ extension AnyTransition {
   /// A transition that applies `active` while the view appears or disappears
   /// and `identity` while it is present.
   ///
+  /// The view is inserted through `active` and moves to `identity`, and it
+  /// is removed by moving from `identity` to `active`. What moves depends on
+  /// the modifier type.
+  ///
+  /// A modifier that conforms to `Animatable` receives interpolated
+  /// `animatableData` on every frame of the transition, in both directions:
+  /// its `body(content:)` runs on each frame with the data between the two
+  /// values. Give the modifier one `progress` and derive everything it draws
+  /// from that:
+  ///
+  /// ```swift
+  /// struct Reveal: ViewModifier, Animatable {
+  ///   var progress: Double
+  ///
+  ///   nonisolated var animatableData: Double {
+  ///     get { progress }
+  ///     set { progress = newValue }
+  ///   }
+  ///
+  ///   func body(content: Content) -> some View {
+  ///     content
+  ///       .opacity(min(1, max(0, progress)))
+  ///       .padding(.leading, Int((4 * (1 - progress)).rounded()))
+  ///   }
+  /// }
+  ///
+  /// Text("Saved").transition(
+  ///   .modifier(active: Reveal(progress: 0), identity: Reveal(progress: 1)))
+  /// ```
+  ///
+  /// The data is not clamped to the two values. A spring with bounce
+  /// delivers values past its target, so `progress` goes above 1 on the way
+  /// in and below 0 on the way out: clamp it where the modifier needs a
+  /// value in `0...1`, as `Reveal` does for its opacity.
+  ///
+  /// A modifier that does not conform is evaluated once for each phase. The
+  /// modifier values it writes that SwiftTUI can interpolate (opacity,
+  /// styles, padding, offset, position, frame, shape and clip paths) animate
+  /// between the two results; the others take the destination's value at
+  /// once.
+  ///
   /// The modifier type must be `Sendable`. A modifier that declares its
-  /// conformance in its primary declaration already is.
+  /// conformance in its primary declaration already is. `animatableData` is
+  /// declared `nonisolated`, because `Animatable` is not isolated to the main
+  /// actor and a modifier is.
   public static func modifier<E: ViewModifier & Sendable>(
     active: E,
     identity: E
