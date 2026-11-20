@@ -694,6 +694,30 @@ package final class AnimationController: Sendable {
     }.count
   }
 
+  /// The registration of the body transition whose host registered
+  /// `identity`, as of the most recent collection, or `nil` when no body
+  /// transition is registered there. Test hook.
+  package func transitionBodyRegistration(
+    forIdentity identity: Identity
+  ) -> TransitionBodyRegistration? {
+    for (nodeID, registeredIdentity) in transitionIdentitiesByNodeID
+    where registeredIdentity == identity {
+      if let registration = transitionsByNodeID[nodeID]?.bodyRegistration {
+        return registration
+      }
+    }
+    return nil
+  }
+
+  /// The body registration the removal overlay of `identity` carries, or
+  /// `nil` when no removal is in flight there or its transition has no
+  /// registered body. Test hook.
+  package func removalBodyRegistration(
+    forIdentity identity: Identity
+  ) -> TransitionBodyRegistration? {
+    removingNodes.values.first { $0.identity == identity }?.transition.bodyRegistration
+  }
+
   private var removingIdentitySet: Set<Identity> {
     Set(removingNodes.values.map(\.identity))
   }
@@ -1493,6 +1517,12 @@ package final class AnimationController: Sendable {
     // PhaseAnimator or other continuous animation shares the frame
     // transaction.  This matches SwiftUI, which only fires
     // .transition() when the view's conditional presence changes.
+    //
+    // A transition with a body also animates the slots its `.willAppear`
+    // body and the live tree hold different values for. One evaluation of
+    // that phase serves every root a body emitted this frame.
+    var bodyInsertionFrame: AnimationTransitionBodyInsertion.Frame?
+    var bodyInsertionOrigins: [Identity: AnimationTransitionBodyInsertion.Origin] = [:]
     for identity in insertedIdentities {
       // Structural first-appearance guard: if the parent identity is
       // also freshly inserted, this view appeared as part of a bulk
@@ -1541,14 +1571,48 @@ package final class AnimationController: Sendable {
       {
         continue
       }
+      let insertionTransaction =
+        newTransactionsByIdentity[identity] ?? transactionPlan.transaction(for: identity)
+      // The body channel. The `.willAppear` body is evaluated only when the
+      // insertion can play: with no curve it snaps, as the effects do.
+      var bodyChanges: [AnimationTransitionBodyInsertion.SlotChange] = []
+      if let registration = transition.bodyRegistration,
+        Self.transitionPlays(
+          override: transition.insertionAnimation,
+          request: insertionTransaction.animationRequest)
+      {
+        let frame =
+          bodyInsertionFrame
+          ?? AnimationTransitionBodyInsertion.Frame(
+            root: node,
+            snapshots: newSnapshots,
+            nodeIDs: newNodeIDByIdentity,
+            parents: newParentByIdentity,
+            transactions: newTransactionsByIdentity
+          )
+        bodyInsertionFrame = frame
+        let origin: AnimationTransitionBodyInsertion.Origin
+        if let evaluated = bodyInsertionOrigins[registration.identity] {
+          origin = evaluated
+        } else {
+          origin = AnimationTransitionBodyInsertion.origin(of: registration, in: frame)
+          if let issue = origin.phaseOnlyIssue {
+            // The tail of this frame drains the queue into its issue channel.
+            ImperativeRuntimeIssueQueue.record(issue)
+          }
+          bodyInsertionOrigins[registration.identity] = origin
+        }
+        bodyChanges = AnimationTransitionBodyInsertion.changes(
+          from: origin, insertedIdentity: identity, in: frame)
+      }
       enqueueInsertionAnimation(
         identity: identity,
         viewNodeID: viewNodeID,
         transition: transition,
         snapshot: newSnapshots[identity] ?? .init(),
         reinsertionOpacity: reinsertionOpacities[identity],
-        transaction: newTransactionsByIdentity[identity]
-          ?? transactionPlan.transaction(for: identity),
+        bodyChanges: bodyChanges,
+        transaction: insertionTransaction,
         timestamp: timestamp
       )
     }
@@ -1824,6 +1888,7 @@ package final class AnimationController: Sendable {
     transition: AnyTransition,
     snapshot: AnimatableSnapshot,
     reinsertionOpacity: Double? = nil,
+    bodyChanges: [AnimationTransitionBodyInsertion.SlotChange] = [],
     transaction: TransactionSnapshot,
     timestamp: MonotonicInstant
   ) {
@@ -1832,7 +1897,10 @@ package final class AnimationController: Sendable {
       let box = transitionAnimationBox(
         override: transition.insertionAnimation,
         request: transaction.animationRequest,
-        hasEffect: modifiers != .identity
+        // A body that changes a slot between its phases is an effect to
+        // play. A body with nothing to interpolate is not: it leaves no curve
+        // in the registration ledger.
+        hasEffect: modifiers != .identity || !bodyChanges.isEmpty
       )
     else {
       // No animation intent — snap to identity immediately.
@@ -1910,6 +1978,33 @@ package final class AnimationController: Sendable {
         batchID: batchID
       )
     }
+    // The body channel. Each node the `.willAppear` body shares with the
+    // live tree animates the slots that differ, from the body's values to
+    // the live ones, as ordinary property animations: keyed by identity and
+    // slot, retaining the batch, and retargeted from the displayed value
+    // when one is already in flight at the key. The first sample, on this
+    // frame, is the `.willAppear` value.
+    for change in bodyChanges {
+      var previous = change.previous
+      var current = change.current
+      if modifiers.opacity != nil, change.identity == identity {
+        // The effect channel owns the opacity of the inserted view itself,
+        // which it starts at the declared value (zero for every built-in).
+        // Opacities multiply, so that start is also the product's.
+        previous[.opacity] = nil
+        current[.opacity] = nil
+      }
+      diffAndEnqueue(
+        identity: change.identity,
+        viewNodeID: change.viewNodeID,
+        previous: previous,
+        current: current,
+        request: .animate(box),
+        batchID: batchID,
+        tracksVelocity: false,
+        timestamp: timestamp
+      )
+    }
   }
 
   /// Plans one removal overlay: resolves the injection point, captures the
@@ -1928,7 +2023,17 @@ package final class AnimationController: Sendable {
     transactionPlan: FrameAnimationTransactionPlan,
     timestamp: MonotonicInstant
   ) {
-    guard transition.removalModifiers() != .identity else { return }
+    guard transition.removalModifiers() != .identity else {
+      // The removal of a body does not play yet, so the view leaves at once.
+      // Its insertion may still be in flight. End that here, as the removal
+      // of an effect ends an insertion below: the completions the insertion
+      // retained fire now. Left to the departed-identity prune they would be
+      // dropped, which is right only for a view that had no transition.
+      if transition.bodyRegistration != nil {
+        supersedeAnimations(inDepartingSubtreeAt: identity, previousRoot: previousRoot)
+      }
+      return
+    }
     // A transition whose own animation is `nil` snaps: it plans no overlay,
     // exactly as an identity transition plans none.
     if transition.removalAnimation == .explicit(nil) { return }
@@ -2091,6 +2196,25 @@ package final class AnimationController: Sendable {
     )
   }
 
+  /// Ends every animation in flight on the subtree that departed at
+  /// `identity`, releasing the batches they retained so their completions
+  /// fire.
+  private func supersedeAnimations(
+    inDepartingSubtreeAt identity: Identity,
+    previousRoot: ResolvedNode
+  ) {
+    guard !activeAnimations.isEmpty,
+      let subtree = AnimationTreeQueries.findResolvedSubtree(in: previousRoot, identity: identity)
+    else { return }
+    let departing = AnimationTreeQueries.collectIdentities(in: subtree)
+    let superseded = activeAnimations.filter { departing.contains($0.key.identity) }
+    guard !superseded.isEmpty else { return }
+    activeAnimations = activeAnimations.filter { !departing.contains($0.key.identity) }
+    for (_, entry) in superseded {
+      releaseBatch(entry.batchID, logicalAlreadyReleased: entry.isLogicallyReleased)
+    }
+  }
+
   /// Picks the curve one direction of a transition plays, or `nil` when it
   /// snaps.
   ///
@@ -2115,6 +2239,23 @@ package final class AnimationController: Sendable {
     case .explicit(let animation?):
       if request == .disabled || !hasEffect { return nil }
       return register(animation)
+    }
+  }
+
+  /// Whether ``transitionAnimationBox(override:request:hasEffect:)`` would
+  /// pick a curve for a direction that has an effect. It registers nothing,
+  /// so the body channel can ask before it evaluates a phase.
+  private static func transitionPlays(
+    override: TransitionAnimationOverride,
+    request: AnimationRequest
+  ) -> Bool {
+    switch override {
+    case .inherit:
+      request.animationBoxIfAny != nil
+    case .explicit(nil):
+      false
+    case .explicit(.some):
+      request != .disabled
     }
   }
 

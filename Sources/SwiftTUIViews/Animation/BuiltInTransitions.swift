@@ -75,31 +75,93 @@ extension AnyTransition {
 ///
 /// The body of every built-in transition is its content with this modifier.
 /// It carries the same `TransitionModifiers` value the effect channel of the
-/// erased transition holds for the phase, so a built-in transition applied
-/// inside a custom body describes the same effect as the built-in itself.
+/// erased transition holds for the phase.
+///
+/// A body is made of nodes, so it can render the effects that have a node
+/// form. Opacity is the ordinary opacity modifier. A fixed offset is the
+/// ordinary offset layout behaviour, present in every phase (at zero in the
+/// identity phase), so it renders exactly and animates as a slot. An
+/// edge-relative move and a scale act on placed bounds: the distance of a move
+/// is the placed size of the view, and a scale crops the placed rectangle.
+/// Neither has a node form. Resolved with such a value, the modifier reports a
+/// runtime issue and renders the content without that effect. The engine
+/// plays those two through the effect channel of an erased transition, which
+/// is what `combined(with:)` builds.
 package struct TransitionPhaseEffectModifier: IterativePrimitiveViewModifier, Sendable, Equatable {
   /// The effect values for the phase. The identity phase carries the
   /// identity value of each channel the transition uses.
   package var modifiers: TransitionModifiers
+  /// The name of the built-in transition type, for diagnostics.
+  package var transitionTypeName: String
 
-  package init(modifiers: TransitionModifiers) {
+  package init(modifiers: TransitionModifiers, transitionTypeName: String = "") {
     self.modifiers = modifiers
+    self.transitionTypeName = transitionTypeName
+  }
+
+  /// Whether the values include an effect a body cannot render: a move
+  /// relative to an edge, or a scale other than one.
+  package var hasPlacedOnlyEffect: Bool {
+    !modifiers.moveEdges.isEmpty || modifiers.scale.map { $0.scale != 1 } == true
   }
 
   package func makeResolveWork<Base: View>(
     content: ModifierContentInputs<Base>,
     in context: ResolveContext
   ) -> ResolveWork<[ResolvedNode]> {
-    // STUI-1544: the offset, edge move and scale of a phase other than
-    // identity are placed-level effects. They are applied when the engine
-    // evaluates the bodies of those phases. The identity phase has no
-    // displacement and no resize, so this stage renders it exactly.
-    guard let opacity = modifiers.opacity else {
-      return content.resolveWork(in: context).map { [$0] }
+    if hasPlacedOnlyEffect {
+      reportPlacedOnlyEffect(in: context)
     }
-    // Opacity is the ordinary opacity modifier, in every phase.
-    return DrawMetadataModifier(metadata: DrawMetadata(opacity: opacity))
+    let hasOffset = modifiers.offsetX != nil || modifiers.offsetY != nil
+    guard hasOffset else {
+      guard let opacity = modifiers.opacity else {
+        return content.resolveWork(in: context).map { [$0] }
+      }
+      // Opacity is the ordinary opacity modifier, in every phase.
+      return DrawMetadataModifier(metadata: DrawMetadata(opacity: opacity))
+        .makeResolveWork(content: content, in: context)
+    }
+    // A fixed offset is the ordinary offset modifier, in every phase.
+    let offset = OffsetModifier(x: modifiers.offsetX ?? 0, y: modifiers.offsetY ?? 0)
       .makeResolveWork(content: content, in: context)
+    guard let opacity = modifiers.opacity else {
+      return offset
+    }
+    return offset.map { nodes in
+      nodes.map { node in
+        var node = node
+        node.drawMetadata = node.drawMetadata.merging(DrawMetadata(opacity: opacity))
+        node.recordOpacityAnimationScope(context.transaction)
+        return node
+      }
+    }
+  }
+
+  /// Reports the move or scale this modifier cannot render. During a live
+  /// resolve the issue rides the frame the graph is resolving. A phase that
+  /// is evaluated outside the graph has no frame of its own, so the issue
+  /// goes to the queue the next frame tail drains.
+  @MainActor
+  private func reportPlacedOnlyEffect(in context: ResolveContext) {
+    let effect = modifiers.moveEdges.isEmpty ? "a scale" : "a move relative to an edge"
+    let name = transitionTypeName.isEmpty ? "A built-in transition" : transitionTypeName
+    let issue = RuntimeIssue(
+      severity: .warning,
+      code: .Transition.unsupportedBuiltInBody,
+      message:
+        "\(name) was applied inside a transition body in a phase where it has \(effect). "
+        + "A transition body cannot render \(effect), so the content is shown without it. "
+        + "Combine the transitions instead, for example "
+        + "MyTransition().combined(with: .move(edge: .leading)), which plays the built-in "
+        + "effect beside the body.",
+      identity: context.identity,
+      source: "Transition.apply(content:phase:)"
+    )
+    if let viewGraph = context.viewGraph {
+      viewGraph.recordFrameRuntimeIssue(issue)
+    } else {
+      ImperativeRuntimeIssueQueue.record(issue)
+    }
   }
 }
 
@@ -109,7 +171,10 @@ extension Transition where Self: ErasableTransition {
   @MainActor
   func effectBody(content: Content, phase: TransitionPhase) -> some View {
     content.modifier(
-      TransitionPhaseEffectModifier(modifiers: erasedTransition.effectModifiers(for: phase))
+      TransitionPhaseEffectModifier(
+        modifiers: erasedTransition.effectModifiers(for: phase),
+        transitionTypeName: "\(Self.self)"
+      )
     )
   }
 }
@@ -153,7 +218,10 @@ nonisolated public struct IdentityTransition: Transition, ErasableTransition {
 
 /// A transition that moves the view in from an edge and back out to it.
 ///
-/// The distance is the size of the view itself along the edge's axis.
+/// The distance is the size of the view itself along the edge's axis. The
+/// move acts on the placed frame of the view, so it cannot be part of another
+/// transition's body: combine it with that transition instead of applying it
+/// with ``Transition/apply(content:phase:)``.
 nonisolated public struct MoveTransition: Transition, ErasableTransition {
   /// The edge the view moves from and to.
   public var edge: Edge
@@ -173,6 +241,10 @@ nonisolated public struct MoveTransition: Transition, ErasableTransition {
 }
 
 /// A transition that shifts the view by a fixed number of cells.
+///
+/// Applied inside another transition's body with
+/// ``Transition/apply(content:phase:)``, the shift is an ordinary offset: it
+/// renders in every phase and animates.
 nonisolated public struct OffsetTransition: Transition, ErasableTransition {
   /// The shift in cells: `width` columns and `height` rows.
   public var offset: CellSize
@@ -195,6 +267,10 @@ nonisolated public struct OffsetTransition: Transition, ErasableTransition {
 
 /// A transition that fades and moves the view in from an edge, and fades and
 /// moves it out toward the opposite edge.
+///
+/// The move acts on the placed frame of the view, so only the fade can be
+/// part of another transition's body. Combine the push with that transition
+/// instead of applying it with ``Transition/apply(content:phase:)``.
 nonisolated public struct PushTransition: Transition, ErasableTransition {
   /// The edge the view enters from.
   public var edge: Edge
@@ -216,7 +292,9 @@ nonisolated public struct PushTransition: Transition, ErasableTransition {
 /// A transition that scales the view around an anchor.
 ///
 /// The scale changes the rendered bounds and clips to them. It does not take
-/// part in layout.
+/// part in layout, so it cannot be part of another transition's body: combine
+/// it with that transition instead of applying it with
+/// ``Transition/apply(content:phase:)``.
 nonisolated public struct ScaleTransition: Transition, ErasableTransition {
   /// The scale the view has when it is not present.
   public var scale: Double
@@ -243,6 +321,10 @@ nonisolated public struct ScaleTransition: Transition, ErasableTransition {
 
 /// A transition that moves the view in from its leading edge and out toward
 /// its trailing edge.
+///
+/// The move acts on the placed frame of the view, so it cannot be part of
+/// another transition's body: combine it with that transition instead of
+/// applying it with ``Transition/apply(content:phase:)``.
 nonisolated public struct SlideTransition: Transition, ErasableTransition {
   /// Creates a slide transition.
   public init() {}

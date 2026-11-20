@@ -118,6 +118,10 @@ package struct ViewKind: Hashable, Sendable, CustomStringConvertible, CustomDebu
   /// The boundary a `Transition` body's `content` placement resolves to: one
   /// pass-through node whose single child is the content.
   package static let transitionContent = Self("TransitionContent")
+  /// The leaf that stands in for the content when a `Transition` body is
+  /// evaluated in a phase that is not on screen. It never reaches a
+  /// committed tree.
+  package static let transitionContentStandIn = Self("TransitionContentStandIn")
   package static let transitionOffset = Self("TransitionOffset")
   package static let unknown = Self("Unknown")
   package static let vStack = Self("VStack")

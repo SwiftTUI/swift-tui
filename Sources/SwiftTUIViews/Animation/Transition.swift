@@ -21,10 +21,21 @@ public import SwiftTUICore
 /// declaration already is, because the protocol is isolated to the main
 /// actor.
 ///
-/// SwiftTUI evaluates a custom body in its ``TransitionPhase/identity`` phase
-/// while the view is present. The built-in transitions animate insertion and
-/// removal. See <doc:Divergences-And-Gaps> for the current limits on custom
-/// bodies.
+/// While the view is present it shows the body of the
+/// ``TransitionPhase/identity`` phase. When the view is inserted inside an
+/// animation it appears through the body of ``TransitionPhase/willAppear``
+/// and moves to the identity body: the views on screen are those of the
+/// identity body from the first frame, and every modifier value SwiftTUI can
+/// interpolate (opacity, styles, padding, offset, position, frame, shape and
+/// clip paths, stroke dash phase and trim) animates from the value the
+/// `willAppear` body gives the same view. A value that cannot interpolate
+/// shows its identity value at once. Keep the same views in every phase and
+/// change their modifiers: a view that only the `willAppear` body has is
+/// never shown, and SwiftTUI reports a runtime issue for it.
+///
+/// The removal of a custom body does not animate yet. The built-in
+/// transitions animate both ways. See <doc:Divergences-And-Gaps> for the
+/// current limits on custom bodies.
 @MainActor
 public protocol Transition: Sendable {
   /// The type of view that ``body(content:phase:)`` returns.
@@ -34,6 +45,12 @@ public protocol Transition: Sendable {
   typealias Content = TransitionContent<Self>
 
   /// Returns the view to show for `content` in `phase`.
+  ///
+  /// SwiftTUI calls this method with ``TransitionPhase/identity`` to build
+  /// the views on screen. It also calls it with another phase to read the
+  /// modifier values of that phase. That second call has no view state: a
+  /// `@State` property in a view the body adds reads its initial value there,
+  /// and no lifecycle handler, task or action of the result ever runs.
   ///
   /// - Parameters:
   ///   - content: A stand-in for the view the transition is applied to. Place
@@ -86,6 +103,14 @@ extension Transition {
   ///   OpacityTransition().apply(content: content.padding(1), phase: phase)
   /// }
   /// ```
+  ///
+  /// A body can render the opacity of a built-in transition and its fixed
+  /// offset. It cannot render a move relative to an edge or a scale, which
+  /// act on the placed frame of the view: ``MoveTransition``,
+  /// ``PushTransition``, ``SlideTransition`` and ``ScaleTransition`` report
+  /// a runtime issue when they are applied this way outside the identity
+  /// phase, and show the content without that effect. Use
+  /// ``combined(with:)`` for those.
   public func apply<V: View>(content: V, phase: TransitionPhase) -> some View {
     TransitionBodyHost(
       transition: self,
@@ -120,8 +145,8 @@ extension Transition {
 
 /// The phase a transition body describes.
 public enum TransitionPhase: Hashable, Sendable {
-  /// The view is about to appear. An insertion animates from this phase to
-  /// ``identity``.
+  /// The view is about to appear. An insertion animates from the modifier
+  /// values of this phase to those of ``identity``.
   case willAppear
   /// The view is present.
   case identity
@@ -153,8 +178,9 @@ public struct TransitionProperties: Sendable {
   /// `true` for the other built-in transitions. A combination has motion when
   /// any part has motion.
   ///
-  /// SwiftTUI carries this value and does not act on it: under reduced
-  /// motion no transition plays, whatever the value is.
+  /// SwiftTUI carries this value and does not act on it. Under
+  /// `accessibilityReduceMotion` no transition plays, whatever the value is:
+  /// the view appears and disappears at once.
   public var hasMotion: Bool
 
   /// Creates the properties of a transition.

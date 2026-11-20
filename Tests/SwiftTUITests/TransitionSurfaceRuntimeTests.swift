@@ -311,14 +311,21 @@ struct TransitionSurfaceRuntimeTests {
     #expect(result.rasterSurface.lines.filter { $0.contains("PRESENT") }.count == 2)
   }
 
-  @Test("a custom body snaps on insertion and on removal and takes no default fade")
+  @Test("a custom body animates its insertion, snaps on removal and takes no default fade")
   func customBodySnaps() throws {
+    // STUI-1544 changed the insertion half of this test: a body now animates
+    // from its willAppear phase. `Veil` fades from zero, so the content is
+    // hidden on the first frame and one opacity animation runs on the
+    // boundary. Removal of a body still snaps (STUI-1545).
     let probe = try TransitionProbe(
-      named: "body-snap", shown: false, transition: AnyTransition(Bracket()))
+      named: "body-snap", shown: false, transition: AnyTransition(Veil()))
     defer { probe.shutdown() }
-    try probe.run { _ in
+    try probe.run { start in
       try probe.toggle(animation: Self.transactionAnimation)
-      #expect(probe.frame.contains("[PRESENT]"))
+      #expect(!probe.frame.contains("PRESENT"))
+      #expect(probe.opacityAnimationCount == 1)
+      try probe.advance(to: start.advanced(by: .milliseconds(800)))
+      #expect(probe.frame.contains("PRESENT"))
       #expect(probe.activeAnimationCount == 0)
       try probe.settle()
 

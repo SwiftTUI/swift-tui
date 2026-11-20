@@ -52,11 +52,16 @@ public struct TransitionRegistrationModifier: IterativePrimitiveViewModifier, Se
       // registered *identity* is what the adopted-slot removal/insertion
       // channels key conditional-presence detection on.
       if let sink = TransitionRegistrationStorage.effectiveSink {
+        // A transition with a body registers with what the animation engine
+        // needs to evaluate another phase of that body after this resolve:
+        // this context without its graph, and the boundaries that enclose
+        // the content in the trees just emitted.
+        let registered = transition.registeringBody(in: context, emitting: nodes)
         for node in nodes {
           sink.registerTransition(
             for: node.identity,
             viewNodeID: node.viewNodeID ?? ViewNodeContext.current?.viewNodeID,
-            transition: transition
+            transition: registered
           )
         }
       }

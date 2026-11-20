@@ -9,7 +9,8 @@ import SwiftTUICore
 // modifier's content. A `TransitionBodyBox` is the `Sendable` form of one or
 // more bodies; it resolves in any phase, in any `ResolveContext`, around any
 // source, which is what lets the engine evaluate a phase that is not on
-// screen around a stand-in for the live content.
+// screen around a stand-in for the live content
+// (`TransitionBodyRegistration`).
 
 /// The erased content a transition body places.
 @MainActor
@@ -59,18 +60,28 @@ public struct TransitionContent<T: Transition>: PrimitiveView, IterativeResolvab
     // single child. The node has the default intrinsic layout and no draw or
     // semantic data of its own, so it passes layout, drawing and semantics
     // through. A modifier that stamps its content lands on the boundary.
+    //
+    // The type discriminator names the transition whose body placed this
+    // boundary. It is how a host tells its own boundaries from those of
+    // another transition inside its body or its content.
     let contentContext = context.child(component: .named("content"))
     return source.resolveWork(contentContext).map { contentNode in
       [
         ResolvedNode(
           identity: context.identity,
           kind: .view(.transitionContent),
+          typeDiscriminator: Self.boundaryType,
           children: [contentNode],
           environmentSnapshot: context.environment,
           transactionSnapshot: context.transaction
         )
       ]
     }
+  }
+
+  /// The type discriminator of the boundary nodes this carrier emits.
+  nonisolated static var boundaryType: ObjectIdentifier {
+    ObjectIdentifier(Self.self)
   }
 }
 
@@ -101,11 +112,31 @@ package protocol TransitionBodyBox: Sendable {
     phase: TransitionPhase,
     in context: ResolveContext
   ) -> ResolveWork<[ResolvedNode]>
+
+  /// The type discriminators of the boundary nodes on the way from a root
+  /// of this body to its content, outermost first: one for each custom
+  /// transition in the box. The last one is the boundary whose child is the
+  /// content.
+  var boundaryTypes: [ObjectIdentifier] { get }
+
+  /// The names of the custom transition types in the box, for diagnostics.
+  var transitionTypeNames: [String] { get }
+
+  /// What the host recorded when it registered this body with the animation
+  /// engine, or `nil` for a body no host has registered.
+  var hostRegistration: TransitionBodyRegistration? { get }
+}
+
+extension TransitionBodyBox {
+  package var hostRegistration: TransitionBodyRegistration? { nil }
 }
 
 /// The body of one custom transition value.
 struct ConcreteTransitionBodyBox<T: Transition>: TransitionBodyBox {
   let transition: T
+
+  var boundaryTypes: [ObjectIdentifier] { [TransitionContent<T>.boundaryType] }
+  var transitionTypeNames: [String] { ["\(T.self)"] }
 
   @MainActor
   func resolveElementsWork(
@@ -126,6 +157,9 @@ struct PhaseLimitedTransitionBodyBox: TransitionBodyBox {
   let base: any TransitionBodyBox
   let activePhase: TransitionPhase
 
+  var boundaryTypes: [ObjectIdentifier] { base.boundaryTypes }
+  var transitionTypeNames: [String] { base.transitionTypeNames }
+
   @MainActor
   func resolveElementsWork(
     content: TransitionContentSource,
@@ -144,6 +178,9 @@ struct PhaseLimitedTransitionBodyBox: TransitionBodyBox {
 struct NestedTransitionBodyBox: TransitionBodyBox {
   let inner: any TransitionBodyBox
   let outer: any TransitionBodyBox
+
+  var boundaryTypes: [ObjectIdentifier] { outer.boundaryTypes + inner.boundaryTypes }
+  var transitionTypeNames: [String] { outer.transitionTypeNames + inner.transitionTypeNames }
 
   @MainActor
   func resolveElementsWork(

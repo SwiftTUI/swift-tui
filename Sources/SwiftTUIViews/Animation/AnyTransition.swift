@@ -149,7 +149,9 @@ package enum TransitionAnimationOverride: Sendable, Equatable {
 ///
 /// A value has two channels. The effect channel is the opacity, offset, move
 /// and scale values the built-in transitions declare. The body channel is the
-/// body of a custom ``Transition``. A combination can carry both.
+/// body of a custom ``Transition``. A combination can carry both, and both
+/// animate an insertion: the effects as before, and the body from the
+/// modifier values of its ``TransitionPhase/willAppear`` phase.
 public struct AnyTransition: Sendable {
   package let insertionModifiers: @Sendable () -> TransitionModifiers
   package let removalModifiers: @Sendable () -> TransitionModifiers

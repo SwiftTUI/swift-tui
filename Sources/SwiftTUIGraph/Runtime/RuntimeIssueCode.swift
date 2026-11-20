@@ -130,6 +130,18 @@ extension RuntimeIssue {
       public static let unhostedItems = Code(rawValue: "toolbar.unhostedItems")
     }
 
+    /// Issues about custom `Transition` bodies. The namespace is package
+    /// scoped: hosts match these issues by their raw value.
+    package enum Transition {
+      /// A view exists only in a phase of a transition body that is never on
+      /// screen, so it is never displayed.
+      package static let phaseOnlyView = Code(rawValue: "transition.phaseOnlyView")
+      /// A built-in move or scale transition was applied inside a transition
+      /// body with a value the body cannot render.
+      package static let unsupportedBuiltInBody = Code(
+        rawValue: "transition.unsupportedBuiltInBody")
+    }
+
     public enum Windows {
       public static let stackFloorLeanProfile = Code(rawValue: "windows.stackFloorLeanProfile")
     }

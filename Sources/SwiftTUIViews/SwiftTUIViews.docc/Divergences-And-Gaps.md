@@ -897,8 +897,8 @@ are omitted even when SwiftUI exposes a corresponding API.
   transaction across the placeholder restore; a closer style writer in the
   base view takes precedence. Nested scopes keep their own timings, and a nil
   scoped animation leaves the base view's outer animation intact.
-- **Custom `Transition` bodies are evaluated in their identity phase; their
-  insertion and removal snap.** *Gap.* SwiftTUI ships
+- **Custom `Transition` bodies animate on insertion; their removal snaps.**
+  *Gap.* SwiftTUI ships
   the built-in `AnyTransition` opacity, move, offset, scale, combined, and
   asymmetric effects. Scale preserves layout and changes placed bounds around
   its `UnitPoint` anchor; cell extents round to whole cells and clip content
@@ -909,33 +909,80 @@ are omitted even when SwiftUI exposes a corresponding API.
   `AnyTransition.modifier(active:identity:)` and the concrete transition types
   exist with SwiftUI's names. A custom body is resolved in
   `TransitionPhase.identity` while its view is present, and every modifier it
-  applies there is rendered. Its `willAppear` and `didDisappear` phases are
-  not evaluated yet, so a custom body appears and disappears at once, where
-  SwiftUI animates between the phases; insertion is STUI-1544 and removal is
-  STUI-1545. The built-in transitions animate as before, and so do the
-  built-in parts of a combination such as `Custom().combined(with: .opacity)`.
+  applies there is rendered.
+  *Insertion.* When a view with a custom body is inserted under an animation,
+  it appears through the body of `willAppear` and moves to the body of
+  `identity`, as in SwiftUI. The rendered view tree is the `identity` body
+  from the first frame, and each value the engine can interpolate starts at
+  the value the `willAppear` body gives the same view. Those values are
+  opacity, the foreground style and the tint (on the body's views and on the
+  views of the content that inherit them), shape fill and stroke styles
+  (`background(_:)` with a style is one), border styles, padding, offset,
+  position, frame width and height, the path of a shape and of a `clipShape`
+  when both phases have the same path elements, a stroke's dash phase, and a
+  stroke's trim. A `Text` under a `contentTransition` rolls from the
+  `willAppear` string, as it does for any change. A value the engine cannot
+  interpolate (a blend mode, a text attribute, a string with no content
+  transition, an environment value, a modifier that is present in one phase
+  only) shows its `identity` value from the first frame. SwiftUI does the
+  same for values it has no animation for; it cross-fades a changed `Text`
+  string by default, which SwiftTUI does not. A custom `Animatable` modifier
+  or view is not driven per frame yet (STUI-1546), so it also shows its
+  `identity` value at once. A wrapper the body places inside a
+  `GeometryReader` or a lazy container resolves during layout, so it does not
+  animate from its `willAppear` value. A custom body plays where a built-in
+  transition plays: a view that appears together with its container plays no
+  transition.
+  *Structure that differs between phases.* The view structure is that of the
+  `identity` body from the first frame. A view only the `identity` body has
+  is present at once. A view only the `willAppear` body has is never
+  displayed, and the insertion reports the runtime issue
+  `transition.phaseOnlyView`, which names the transition type. SwiftUI mounts
+  both structures and cross-fades them with its default opacity transition.
+  *Views a body adds.* A view the `identity` body adds mounts with the view
+  the transition is attached to, has ordinary state, `onAppear` and tasks,
+  stays mounted while that view is present, and is torn down with it when a
+  removal starts. A body that places `content` more than once mounts the view
+  once for each placement, with separate state, where SwiftUI draws one
+  instance twice.
+  *Built-in transitions inside a body.* `apply(content:phase:)` on a built-in
+  type applies its opacity and its fixed offset in every phase, and both
+  animate. An edge-relative move and a scale act on placed bounds and have no
+  form a body can render: resolved with such a value, `MoveTransition`,
+  `PushTransition`, `SlideTransition` and `ScaleTransition` report the runtime
+  issue `transition.unsupportedBuiltInBody` and render the content without the
+  move or the scale. Combine instead: `Custom().combined(with: .move(edge:
+  .leading))` plays the built-in effect beside the body. In a combination
+  whose built-in part fades, the inserted view fades from zero to its
+  `identity` opacity, whatever opacity the `willAppear` body gives that view.
+  *Removal.* The `didDisappear` phase is not evaluated yet, so a view with a
+  custom body disappears at once (STUI-1545). A removal that interrupts an
+  insertion ends it at once, and the completion of the insertion's animation
+  scope fires then. The built-in transitions animate both ways as before, and
+  so do the built-in parts of a combination such as
+  `Custom().combined(with: .opacity)`.
   A built-in transition type erases to the matching `AnyTransition` value, so
   `.transition(OpacityTransition())` and `.transition(.opacity)` are one
-  transition. Inside a custom body, `apply(content:phase:)` on a built-in
-  type applies its opacity in every phase; its offset, edge move and scale
-  apply with STUI-1544.
+  transition.
   Recorded differences in shape: `Transition` refines `Sendable` and
   `AnyTransition.modifier(active:identity:)` requires a `Sendable` modifier
   (members of the strict-concurrency class above); `OffsetTransition` and
   `offset(x:y:)` take `Int` cells; `Transition.Content` is
-  `TransitionContent<Self>` where SwiftUI's is `PlaceholderContentView<Self>`;
-  a body that places `content` more than once mounts the view once for each
-  placement, with separate state, where SwiftUI draws one instance twice.
+  `TransitionContent<Self>` where SwiftUI's is `PlaceholderContentView<Self>`.
   `View.transition(_: AnyTransition)` stays the preferred overload, so
   `.transition(.opacity)` selects it, where SwiftUI disfavours it; the result
   is the same transition. `blurReplace` and `symbolEffect` are not offered.
   `TransitionProperties.hasMotion` is carried with SwiftUI's values and is
-  not acted on: under reduced motion no transition plays, whatever it says.
+  not acted on: under `accessibilityReduceMotion` and under the stable-output
+  policy no transition plays, whatever it says. SwiftUI replaces a transition
+  that has motion by opacity under a separate cross-fade preference, which
+  SwiftTUI does not offer.
   `animation(_:)` on a transition replaces the transaction's animation on
   insertion and removal and plays with no animated transaction, as in
   SwiftUI; an explicitly disabled transaction (`withAnimation(nil)`) and
   reduced motion still snap. A combination plays one animation, the first one
-  attached to a part, where SwiftUI animates each part with its own.
+  attached to a part, where SwiftUI animates each part with its own. With no
+  animation at all, an insertion shows the `identity` body at once.
 - **Content transitions roll per digit column; `.interpolate` is not
   offered.** *Ratified.* `View.contentTransition(_:)` and
   `EnvironmentValues.contentTransition` carry a `ContentTransition` to every

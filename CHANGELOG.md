@@ -37,8 +37,31 @@ require 1.0.0. See [COMPATIBILITY.md](docs/COMPATIBILITY.md).
   `View.transition(_:)` accepts any `Transition` beside `AnyTransition`. Every
   existing `.transition(…)` call selects the same overload as before. A custom
   body is evaluated in its identity phase, so the view shows that body while
-  it is present; insertion and removal of a custom body snap for now, and the
-  built-in transitions animate as before (STUI-1543).
+  it is present, and the built-in transitions animate as before (STUI-1543).
+- A custom `Transition` body animates when its view is inserted inside an
+  animation scope. The view appears through the body of
+  `TransitionPhase.willAppear` and moves to the identity body. The views on
+  screen are those of the identity body from the first frame, and these
+  modifier values interpolate from the `willAppear` body's: opacity,
+  foreground style and tint, shape fill and stroke styles, border styles,
+  padding, offset, position, frame, shape and `clipShape` paths, a stroke's
+  dash phase and trim, and a `Text` string under a content transition. Any
+  other difference between the phases shows its identity value from the first
+  frame. A view the body adds mounts with the view it decorates and leaves
+  with it. The built-in part of a combination such as
+  `Custom().combined(with: .opacity)` plays beside the body, a transition's
+  own animation drives both, and a `withAnimation` completion waits for both.
+  Removal of a custom body still snaps (STUI-1544).
+- Two runtime issues for transition bodies. `transition.phaseOnlyView` reports
+  a view that exists only in the `willAppear` phase of a body, which an
+  insertion never shows. `transition.unsupportedBuiltInBody` reports a
+  `MoveTransition`, `PushTransition`, `SlideTransition` or `ScaleTransition`
+  applied inside a body with `apply(content:phase:)` outside the identity
+  phase: a body cannot render a move relative to an edge or a scale, so the
+  content shows without it. Combine such a transition with the body instead
+  (STUI-1544).
+- `OffsetTransition` applied inside a body with `apply(content:phase:)`
+  renders its offset in every phase and animates it (STUI-1544).
 - The built-in transitions as types: `OpacityTransition`,
   `IdentityTransition`, `MoveTransition`, `OffsetTransition`,
   `PushTransition`, `ScaleTransition`, `SlideTransition` and

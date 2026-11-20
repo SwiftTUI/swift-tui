@@ -697,6 +697,16 @@ foreground and tint writes in scoped modifier bodies. Placeholder restoration
 preserves that per-style provenance while restoring the base transaction;
 closer base-view style writers clear or replace the provenance.
 
+A custom `Transition` body is resolved live in its identity phase only
+(`Animation/TransitionContent.swift`). The `.transition` host registers the
+transition together with its resolve context detached from the view graph
+(`Animation/TransitionBodyRegistration.swift`), so the animation controller
+can evaluate another phase as a plain resolved tree with no state storage,
+lifecycle or handlers. On an insertion that plays,
+`Lifecycle/AnimationTransitionBodyInsertion.swift` pairs the `willAppear` tree
+with the live tree by identity and the controller enqueues each differing slot
+as an ordinary property animation.
+
 `resolve` reuses unchanged work in two ways. **Retained reuse** skips a subtree
 that is separate from the frame's invalidation. **Memoized-body reuse** is on by
 default. It can also skip a subtree under an invalidated ancestor when all of

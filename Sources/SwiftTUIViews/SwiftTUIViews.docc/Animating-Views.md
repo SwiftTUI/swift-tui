@@ -241,10 +241,56 @@ Every modifier a body applies to `content` lands on a boundary around the
 view, separate from the view's own modifiers. A body that places `content`
 twice mounts the view twice, each with its own state.
 
-> Important: SwiftTUI evaluates a custom body in its identity phase, so the
-> view shows the identity body while it is present. Insertion and removal of
-> a custom body snap. The built-in transitions animate, and so do the built-in
-> parts of a combination such as `Spotlight().combined(with: .opacity)`. See
+When the view is inserted inside an animation scope, it appears through the
+`willAppear` body and moves to the `identity` body. `Spotlight` fades in from
+an opacity of zero while its background goes from gray to blue. The views on
+screen are those of the `identity` body from the first frame. What animates
+is the value of each modifier, from the value the `willAppear` body gives the
+same view. These modifiers interpolate:
+
+- `opacity`.
+- `foregroundStyle` and `tint`, on the views of the body and on the views of
+  the content that inherit them.
+- A style given to `background`, to a shape's `fill` or `stroke`, and to
+  `border`.
+- `padding`, `offset`, `position` and `frame`.
+- The path of a shape and of a `clipShape`, when both phases build the path
+  from the same elements. This is how a wipe or an iris grows.
+- The dash phase and the trim of a stroke.
+- The string of a ``Text`` under a ``View/contentTransition(_:)``.
+
+Any other difference between the two phases shows its `identity` value from
+the first frame: a blend mode, a text attribute, a string with no content
+transition, a modifier that only one phase applies. So keep the same views
+and modifiers in every phase, and change their values. A view that only the
+`identity` body has is present from the first frame. A view that only the
+`willAppear` body has is never shown, and SwiftTUI reports a runtime issue
+that names the transition.
+
+A view the body adds, such as an overlay, mounts with the view the transition
+is attached to. It has ordinary state, `onAppear` and tasks, stays while that
+view is present, and leaves with it.
+
+With no animation scope the view shows the `identity` body at once.
+``Transition/animation(_:)`` gives the transition an animation of its own.
+Reduce Motion disables a custom transition as it disables the built-in ones,
+whatever ``TransitionProperties/hasMotion`` says.
+
+Inside a body, ``Transition/apply(content:phase:)`` on ``OpacityTransition``
+and ``OffsetTransition`` animates like the modifiers above. A move relative to
+an edge and a scale act on the placed frame of the view, which a body cannot
+express, so ``MoveTransition``, ``PushTransition``, ``SlideTransition`` and
+``ScaleTransition`` report a runtime issue when a body applies them outside
+the identity phase. Combine them with the body instead:
+
+```swift
+Text("Saved!")
+  .transition(Spotlight().combined(with: .move(edge: .leading)))
+```
+
+> Important: The removal of a custom body snaps: the view disappears at once.
+> The built-in transitions animate both ways, and so do the built-in parts of
+> a combination such as `Spotlight().combined(with: .opacity)`. See
 > <doc:Divergences-And-Gaps>.
 
 ## Roll A Number When It Changes
