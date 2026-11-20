@@ -31,8 +31,9 @@ cleanup() {
 trap cleanup EXIT
 echo "[check_transition_consumer] Fresh consumer state: ${scratch}"
 
-consumer="${scratch}/TransitionConsumer"
-mkdir -p "${consumer}"
+# The copy sits three directories below the checkout, as the fixture does, so
+# the manifest's literal "../../.." package path reaches this checkout.
+consumer="${scratch}"
 cp "${fixture}/Package.swift" "${consumer}/Package.swift"
 cp -R "${fixture}/Sources" "${consumer}/Sources"
 if [ -d "${fixture}/Tests" ]; then
@@ -40,8 +41,7 @@ if [ -d "${fixture}/Tests" ]; then
 fi
 
 echo "[check_transition_consumer] Building the SwiftTUIViews-only transition consumer"
-# The manifest reads the framework's location from the environment, so the
-# copy depends on this checkout and never on a published release.
-SWIFTTUI_PACKAGE_PATH="${repo_root}" swiftly run swift build \
+# The copy depends on this checkout by path and never on a published release.
+swiftly run swift build \
   --package-path "${consumer}" --jobs "${SWIFTTUI_PUBLIC_API_SWIFT_JOBS:-4}"
 echo "[check_transition_consumer] ok"

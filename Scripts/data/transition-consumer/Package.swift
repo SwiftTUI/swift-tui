@@ -10,9 +10,9 @@ import PackageDescription
 // library repositories use (the `swift-tui-charts` manifest is the model), so
 // it compiles as a third-party transition library would.
 //
-// The framework is found through `SWIFTTUI_PACKAGE_PATH`, which the gate
-// script sets to the checkout. The default is the path from this directory.
-let swiftTUIPath = Context.environment["SWIFTTUI_PACKAGE_PATH"] ?? "../../.."
+// The framework is this checkout, three directories up. The gate script
+// copies the package to a directory at the same depth, so the same literal
+// path reaches the checkout from the copy.
 
 let consumerSwiftSettings: [SwiftSetting] = [
   .swiftLanguageMode(.v6),
@@ -32,7 +32,7 @@ let package = Package(
     .library(name: "TransitionConsumer", targets: ["TransitionConsumer"])
   ],
   dependencies: [
-    .package(name: "swift-tui", path: swiftTUIPath)
+    .package(name: "swift-tui", path: "../../..")
   ],
   targets: [
     .target(
