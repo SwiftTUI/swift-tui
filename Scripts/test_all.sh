@@ -952,7 +952,7 @@ if lane_runs_core; then
     Scripts/check_transition_overloads.sh
 
   run_step \
-    "Build the external transition consumer" \
+    "Build and test the external transition consumer" \
     "$repo_root" \
     "bash Scripts/check_transition_consumer.sh" \
     bash Scripts/check_transition_consumer.sh

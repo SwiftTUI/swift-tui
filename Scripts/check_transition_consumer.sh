@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Build the external transition consumer against this checkout (STUI-1543).
+# Build and test the external transition consumer against this checkout
+# (STUI-1543, STUI-1546).
 #
 # Scripts/data/transition-consumer is a SwiftPM package a third party could
 # have written: its library target depends on the SwiftTUIViews product alone,
@@ -7,6 +8,11 @@
 # own Transition types and uses every public symbol of the transition surface.
 # Building it proves the surface is complete and usable from outside the
 # package.
+#
+# The library also holds six demonstration transitions. The package's tests
+# render them frame by frame through the public renderer, and its
+# transition-showcase executable plays them in a terminal. The build covers
+# all three targets, and the tests then run in the same copy.
 #
 # The package is copied out of the tree first, so each run starts from fresh
 # consumer state and leaves no build products or resolved file beside the
@@ -40,8 +46,12 @@ if [ -d "${fixture}/Tests" ]; then
   cp -R "${fixture}/Tests" "${consumer}/Tests"
 fi
 
-echo "[check_transition_consumer] Building the SwiftTUIViews-only transition consumer"
+echo "[check_transition_consumer] Building the transition consumer: library, showcase and tests"
 # The copy depends on this checkout by path and never on a published release.
 swiftly run swift build \
+  --package-path "${consumer}" --jobs "${SWIFTTUI_PUBLIC_API_SWIFT_JOBS:-4}"
+
+echo "[check_transition_consumer] Running the demonstration frame tests"
+swiftly run swift test \
   --package-path "${consumer}" --jobs "${SWIFTTUI_PUBLIC_API_SWIFT_JOBS:-4}"
 echo "[check_transition_consumer] ok"

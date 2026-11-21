@@ -93,9 +93,10 @@ The canonical public surface is the API ordinary app code uses first:
   through `AnyTransition.init(_:)`. `Scripts/check_transition_overloads.sh`
   pins that every earlier `.transition(…)` spelling still selects the
   `AnyTransition` overload, and `Scripts/check_transition_consumer.sh` builds
-  an external package that uses the whole surface with the `SwiftTUIViews`
-  product alone. What a custom body does today is the *Custom `Transition`
-  bodies* entry in
+  an external package whose library uses the whole surface with the
+  `SwiftTUIViews` product alone, and runs that package's frame tests of six
+  demonstration transitions. What a custom body does today is the *Custom
+  `Transition` bodies* entry in
   [Divergences-And-Gaps.md](../Sources/SwiftTUIViews/SwiftTUIViews.docc/Divergences-And-Gaps.md).
 - Runtime integration in `SwiftTUIRuntime`: `DefaultRenderer`, `RunLoop`,
   `RuntimeConfiguration`, `App`, `Scene`, `WindowGroup`, the scene builder
