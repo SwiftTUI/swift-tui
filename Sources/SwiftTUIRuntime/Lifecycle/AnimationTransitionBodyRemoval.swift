@@ -24,6 +24,13 @@ import SwiftTUIViews
 /// by site (``valueSites``). Their samples are not written anywhere: the
 /// body is evaluated again with them, on every frame the removal draws, and
 /// the result replaces ``workingRoot``.
+///
+/// A removal owns a site only when its root holds the site
+/// (``TransitionBodySiteHolders``) and no live view resolves there any more.
+/// A body with several roots has a removal for each root that leaves, and a
+/// root can leave while the others stay: a site another root holds, or one
+/// a view that stayed still resolves, is not this removal's to animate, and
+/// the removal leaves it as it is.
 package struct RemovalBodyState: Sendable {
   /// The identity of the transition root: the view the body emitted that the
   /// removal is keyed on. The composed tree replaces this node inside the
@@ -82,20 +89,32 @@ package struct RemovalBodyState: Sendable {
   package var holdsRootOpacity = false
   package var heldRootOpacity: Double? = nil
   /// The views and the modifiers of the `.didDisappear` body that conform to
-  /// `Animatable`, by site, with the data that phase gives each: where the
-  /// site's animation ends. The removal owns the value animation at each of
-  /// these keys, as it owns the property animations of ``ownedIdentities``.
-  /// Empty for a body with no such view or modifier, which is then evaluated
-  /// once, when the removal is planned.
+  /// `Animatable` and that this removal animates, by site, with the data
+  /// that phase gives each: where the site's animation ends. The removal
+  /// owns the value animation at each of these keys, as it owns the property
+  /// animations of ``ownedIdentities``. Empty for a body with no such view
+  /// or modifier, which is then evaluated once, when the removal is planned.
   package var valueSites: [AnimationKey: AnyAnimatable] = [:]
   /// The instant of the frame ``workingRoot`` was last evaluated for. A body
-  /// with ``valueSites`` is evaluated again on every frame one of them
-  /// animates, once.
+  /// with sites is evaluated at most once a frame.
   package var valueResolveInstant: MonotonicInstant? = nil
+  /// The data ``workingRoot`` was last evaluated with, for each site that
+  /// was given other data than the `.didDisappear` phase gives it. The body
+  /// is evaluated again when this differs from what the sites present.
+  package var valueAnswers: [AnimationKey: AnyAnimatable] = [:]
+
   /// Whether ``workingRoot`` was evaluated with every site at the data the
   /// `.didDisappear` phase gives it. It then needs no further evaluation
-  /// until a site animates again.
-  package var valueTreeIsAtRest = true
+  /// until a site presents something else.
+  package var valueTreeIsAtRest: Bool { valueAnswers.isEmpty }
+
+  /// `answers` without the entries that give a site the data the phase
+  /// gives it anyway: the form ``valueAnswers`` is kept in.
+  package func normalizedValueAnswers(
+    _ answers: [AnimationKey: AnyAnimatable]
+  ) -> [AnimationKey: AnyAnimatable] {
+    answers.filter { key, value in valueSites[key] != value }
+  }
 }
 
 /// The inherited styles a removal body gives one view of the frozen content.
@@ -182,10 +201,14 @@ enum AnimationTransitionBodyRemoval {
     var shown: (AnimationKey) -> AnyAnimatable?
     /// ``LiveSite/presented`` of the site.
     var presented: (AnimationKey) -> AnyAnimatable?
+    /// Whether a view of the tree this frame resolved still resolves the
+    /// site: a root of the body that stayed while another left. A removal
+    /// takes no such site over.
+    var staysLive: (AnimationKey) -> Bool
 
     /// A body none of whose sites is live.
     static var none: LiveSiteData {
-      LiveSiteData(shown: { _ in nil }, presented: { _ in nil })
+      LiveSiteData(shown: { _ in nil }, presented: { _ in nil }, staysLive: { _ in false })
     }
   }
 
@@ -437,14 +460,26 @@ enum AnimationTransitionBodyRemoval {
       issues.append(environmentIgnoredIssue(for: registration, keys: ignoredKeys.sorted()))
     }
 
-    // The sites of the body. Each live one starts from the data it presents
-    // on this frame. When that is not what is on screen (an animation of the
-    // site is in flight and has moved on), the tree this frame draws is the
-    // body evaluated with the presented data.
-    let valueSites = shownSink.phaseData
+    // The sites of the body that this removal takes: the ones its root
+    // holds, unless a view that stayed still resolves there. The others
+    // belong to the body's other roots, or to a view that is still live,
+    // and this removal leaves them as they are.
+    let rootIndex = tree.roots.firstIndex { $0.identity == rootIdentity } ?? fallbackRootIndex
+    let holders = TransitionBodySiteHolders(roots: tree.roots)
+    var valueSites: [AnimationKey: AnyAnimatable] = [:]
+    for key in shownSink.sites {
+      guard let rootIndex, let phaseData = shownSink.phaseData[key],
+        holders.holderIndex(ofSiteAt: key.identity) == rootIndex, !liveSites.staysLive(key)
+      else { continue }
+      valueSites[key] = phaseData
+    }
+    // Each of those sites that a live view resolved starts from the data it
+    // presents on this frame. When that is not what is on screen (an
+    // animation of the site is in flight and has moved on), the tree this
+    // frame draws is the body evaluated with the presented data.
     var planned: [AnimationKey: LiveSite] = [:]
     var presentedDiffersFromShown = false
-    for key in shownSink.sites {
+    for key in shownSink.sites where valueSites[key] != nil {
       guard let shown = liveSites.shown(key), let presented = liveSites.presented(key) else {
         continue
       }
@@ -466,31 +501,25 @@ enum AnimationTransitionBodyRemoval {
       }
     }
 
-    return .plays(
-      Plan(
-        state: RemovalBodyState(
-          rootIdentity: rootIdentity,
-          workingRoot: drawn.root,
-          rootRect: frozenRootPlaced.bounds,
-          rootZIndex: frozenRootPlaced.zIndex,
-          contents: drawn.contents,
-          orderedContents: frozenContents.map(\.placed),
-          contentStyles: drawn.contentStyles,
-          ownedIdentities: owned,
-          hasEffectChannel: hasEffectChannel,
-          frozenContents: frozenContents,
-          fallbackRootIndex: fallbackRootIndex,
-          holdsRootOpacity: inputs.holdsRootOpacity,
-          heldRootOpacity: inputs.heldRootOpacity,
-          valueSites: valueSites,
-          valueResolveInstant: timestamp,
-          valueTreeIsAtRest: planned.allSatisfy { valueSites[$0.key] == $0.value.presented }
-        ),
-        changes: changes,
-        liveSites: planned,
-        issues: issues
-      )
+    var state = RemovalBodyState(
+      rootIdentity: rootIdentity,
+      workingRoot: drawn.root,
+      rootRect: frozenRootPlaced.bounds,
+      rootZIndex: frozenRootPlaced.zIndex,
+      contents: drawn.contents,
+      orderedContents: frozenContents.map(\.placed),
+      contentStyles: drawn.contentStyles,
+      ownedIdentities: owned,
+      hasEffectChannel: hasEffectChannel,
+      frozenContents: frozenContents,
+      fallbackRootIndex: fallbackRootIndex,
+      holdsRootOpacity: inputs.holdsRootOpacity,
+      heldRootOpacity: inputs.heldRootOpacity,
+      valueSites: valueSites,
+      valueResolveInstant: timestamp
     )
+    state.valueAnswers = state.normalizedValueAnswers(planned.mapValues(\.presented))
+    return .plays(Plan(state: state, changes: changes, liveSites: planned, issues: issues))
   }
 
   /// Evaluates the `.didDisappear` body of a removal again, with each of its
@@ -498,9 +527,9 @@ enum AnimationTransitionBodyRemoval {
   ///
   /// `answers` holds this frame's sample for each site whose animation is in
   /// flight. A site without an answer evaluates with the data the phase
-  /// gives it, which is where its animation ended. A body with several roots
-  /// has a removal for each root, and one evaluation serves them all:
-  /// ``refreshWorkingTree(of:from:registration:frozenResolved:isAtRest:at:)``
+  /// gives it, which is where its animation ended. Removals of one body
+  /// that are given the same answers share one evaluation:
+  /// ``refreshWorkingTree(of:from:registration:frozenResolved:answers:at:)``
   /// takes the result for each.
   @MainActor
   static func evaluateWorkingTree(
@@ -523,18 +552,18 @@ enum AnimationTransitionBodyRemoval {
   /// styles are those of this evaluation. A body that can no longer be
   /// drawn around the content keeps the tree it had.
   ///
-  /// - Parameter isAtRest: whether the body was evaluated with every site
-  ///   at the data the phase gives it.
+  /// - Parameter answers: what the body was evaluated with, as
+  ///   ``RemovalBodyState/valueAnswers`` keeps it.
   static func refreshWorkingTree(
     of body: inout RemovalBodyState,
     from tree: TransitionPhaseTree,
     registration: TransitionBodyRegistration,
     frozenResolved: ResolvedNode,
-    isAtRest: Bool,
+    answers: [AnimationKey: AnyAnimatable],
     at timestamp: MonotonicInstant
   ) {
     body.valueResolveInstant = timestamp
-    body.valueTreeIsAtRest = isAtRest
+    body.valueAnswers = answers
     guard
       let frozenRoot = AnimationTreeQueries.findResolvedSubtree(
         in: frozenResolved, identity: body.rootIdentity)

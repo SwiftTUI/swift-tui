@@ -141,6 +141,19 @@ extension ViewGraph {
   }
 }
 
+/// The frame head's second evaluation of nodes it has already evaluated on
+/// the same frame (``ViewGraph/reevaluatingThisFrame(_:)``): which graph is
+/// being evaluated again, and the nodes it had evaluated when the pass began.
+///
+/// Like the other resolve scopes this is task-local context, not graph
+/// state. It opens and closes inside one synchronous call of the frame head.
+package struct ViewGraphReevaluationScope: Sendable {
+  var graph: ObjectIdentifier
+  var evaluatedNodeIDs: Set<ViewNodeID>
+
+  @TaskLocal static var current: ViewGraphReevaluationScope?
+}
+
 @MainActor
 package final class ViewGraph {
   // CHECKPOINT TOTALITY CONTRACT (audit finding F4):
@@ -2094,6 +2107,40 @@ package final class ViewGraph {
   /// changed node and the decision taken for it.
   private var preferenceDeltaEscalationRequested = false
   package private(set) var preferenceDeltaNotesThisFrame: [String] = []
+  /// The nodes this graph had evaluated on this frame when the frame head
+  /// began to evaluate some of them again, after the frontier that evaluated
+  /// them had unwound (``reevaluatingThisFrame(_:)``). `nil` at any other
+  /// time, and for another graph's pass.
+  private func reevaluationBaseline() -> Set<ViewNodeID>? {
+    guard let scope = ViewGraphReevaluationScope.current, scope.graph == ObjectIdentifier(self)
+    else { return nil }
+    return scope.evaluatedNodeIDs
+  }
+
+  /// Runs `body`, which evaluates again nodes that this frame has already
+  /// evaluated, with other inputs than the first time.
+  ///
+  /// The frame head does this for the views of an inserted transition body
+  /// that conform to `Animatable`: they resolve with the data of the
+  /// identity phase, and run again with the data their animation starts at.
+  /// The views above composed the output of the first run. So while `body`
+  /// runs, a node that commits other preferences than its earlier evaluation
+  /// on this frame did requests the escalation, whether or not the node was
+  /// there when the frame began and whether or not its ancestor was
+  /// evaluated on this frame: that ancestor read the first output. An
+  /// ancestor that is being evaluated right now reads the new one, as
+  /// always.
+  ///
+  /// The pass is a scope of one synchronous call, so it is task-local
+  /// context (``ViewGraphReevaluationScope``) and not a field of the graph:
+  /// no checkpoint can be taken while it is open.
+  package func reevaluatingThisFrame<Result>(_ body: () -> Result) -> Result {
+    let scope = ViewGraphReevaluationScope(
+      graph: ObjectIdentifier(self), evaluatedNodeIDs: evaluatedNodeIDsThisFrame)
+    return ViewGraphReevaluationScope.$current.withValue(scope) {
+      body()
+    }
+  }
 
   /// A dirty-frontier evaluation committed preferences that differ from the
   /// node's previous commit. Its ancestors were served from committed
@@ -2130,7 +2177,7 @@ package final class ViewGraph {
       return
     }
     guard !ancestor.isEvaluating,
-      !evaluatedNodeIDsThisFrame.contains(ancestor.viewNodeID)
+      reevaluationBaseline() != nil || !evaluatedNodeIDsThisFrame.contains(ancestor.viewNodeID)
     else {
       preferenceDeltaNotesThisFrame.append(
         "changed \(node.identity.path) -> \(ancestor.identity.path) is \(ancestor.isEvaluating ? "evaluating" : "evaluated")"
@@ -2341,8 +2388,11 @@ package final class ViewGraph {
       for: node,
       resolved: resolved
     )
+    // What the node committed before this evaluation: on an earlier frame,
+    // or earlier on this one when the frame head is evaluating it again.
     let previousPreferences =
-      node.wasPresentAtFrameStart ? node.committed.preferenceValues : nil
+      node.wasPresentAtFrameStart || reevaluationBaseline()?.contains(node.viewNodeID) == true
+      ? node.committed.preferenceValues : nil
     applyResolvedNode(
       node,
       resolved: resolved,

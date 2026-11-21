@@ -373,3 +373,54 @@ enum AnimationTransitionBodyInsertion {
     )
   }
 }
+
+/// Which root of a transition body holds each `Animatable` view or modifier
+/// in it.
+///
+/// A body can emit several roots. Each root is inserted and removed through
+/// a transition of its own, under its own transaction, and a root can come
+/// or go without the others. A site of the body animates once, so one root
+/// decides whether and how it does. The rule, on insertion and on removal:
+///
+/// > A site is held by the first root, in the order the body emits them,
+/// > that the site is part of: the root has a view at the site's identity
+/// > or beneath it, or the site lies beneath the root. A site that is part
+/// > of no root is held by the body's first root.
+///
+/// A modifier around one root's view is held by that root, and so is a view
+/// inside it, whether or not it draws anything. A site above several roots
+/// is held by the first of them. The site animates under the transaction of
+/// the root that holds it, when that root plays, and not at all when it
+/// does not. No other root starts, retargets or ends its animation.
+///
+/// The roots are those of one evaluation of the body, in any phase: every
+/// phase resolves under the host's identity, so the sites and the roots
+/// have the same names in each.
+struct TransitionBodySiteHolders {
+  private var rootIdentities: [Identity]
+  private var identitiesByRoot: [Set<Identity>]
+
+  init(roots: [ResolvedNode]) {
+    rootIdentities = roots.map(\.identity)
+    identitiesByRoot = roots.map(AnimationTreeQueries.collectIdentities(in:))
+  }
+
+  /// The position of the root that holds the site at `identity`, or `nil`
+  /// for a body with no root.
+  func holderIndex(ofSiteAt identity: Identity) -> Int? {
+    guard !identitiesByRoot.isEmpty else { return nil }
+    return identitiesByRoot.indices.first { reaches(identity, rootAt: $0) } ?? 0
+  }
+
+  /// Whether the site at `identity` is part of the root at `index`: the
+  /// root has a view at the site's identity or beneath it, so what the
+  /// site's body produces is part of what the root draws, or the site lies
+  /// beneath the root and produces nothing.
+  func reaches(_ identity: Identity, rootAt index: Int) -> Bool {
+    guard identitiesByRoot.indices.contains(index) else { return false }
+    let identities = identitiesByRoot[index]
+    return identities.contains(identity)
+      || rootIdentities[index].isAncestor(of: identity)
+      || identities.contains { identity.isAncestor(of: $0) }
+  }
+}

@@ -270,6 +270,232 @@ struct TransitionBodyAnimatableEngineTests {
       ])
   }
 
+  // MARK: - A registration another node declared
+
+  @Test("a registration another node declared follows what its own node emits")
+  func registrationFollowsWhatItsNodeEmits() throws {
+    let controller = AnimationController()
+    controller.register(Self.linear)
+    let host = testIdentity("body-site-engine", "declared")
+    let shown = host.child(.named("true"))
+    let other = host.child(.named("false"))
+    let declaring = ViewNodeID(rawValue: 1)
+    let member = ViewNodeID(rawValue: 2)
+    let start = MonotonicInstant(offset: .seconds(50))
+    var animated = TransactionSnapshot()
+    animated.animationRequest = .animate(Self.linear.animationBox)
+    func tree(_ identity: Identity) -> ResolvedNode {
+      ResolvedNode(
+        viewNodeID: declaring,
+        identity: host,
+        kind: .view(.vStack),
+        children: [
+          ResolvedNode(
+            viewNodeID: member, identity: identity, kind: .view(.text), drawPayload: .text("X"))
+        ])
+    }
+
+    // The node above declares the transition for the node below, which has
+    // a graph node of its own.
+    controller.beginTransitionCollection()
+    controller.registerTransition(
+      for: shown, viewNodeID: member, declaringNodeID: declaring, transition: AnyTransition.opacity)
+    controller.finishTransitionCollection(reEvaluatedNodeIDs: [declaring, member])
+    controller.processResolvedTree(tree(shown), transaction: .init(), timestamp: start)
+    #expect(controller.debugStateSnapshot().transitionIdentities == [shown])
+
+    // The node below runs alone and still emits the identity that was
+    // registered. The modifier did not run, and the registration stands.
+    controller.beginTransitionCollection()
+    controller.finishTransitionCollection(reEvaluatedNodeIDs: [member])
+    controller.processResolvedTree(
+      tree(shown), transaction: .init(), timestamp: start.advanced(by: .milliseconds(33)))
+    #expect(controller.debugStateSnapshot().transitionIdentities == [shown])
+    #expect(controller.debugStateSnapshot().removingIdentities.isEmpty)
+
+    // It runs alone again and now emits another identity. The registration
+    // was for the view that left: that view plays its exit, and the
+    // registration goes.
+    controller.beginTransitionCollection()
+    controller.finishTransitionCollection(reEvaluatedNodeIDs: [member])
+    controller.processResolvedTree(
+      tree(other), transaction: animated, timestamp: start.advanced(by: .milliseconds(66)))
+    let state = controller.debugStateSnapshot()
+    #expect(state.removingIdentities == [shown])
+    #expect(!state.transitionIdentities.contains(shown))
+    #expect(state.transitionNodeIDs.isEmpty)
+  }
+
+  @Test("a registration goes when the node that declared it has left the graph")
+  func registrationOfADepartedDeclarationIsDropped() {
+    let host = testIdentity("body-site-engine", "departed-declaration")
+    let shown = host.child(.named("item"))
+    let declaring = ViewNodeID(rawValue: 1)
+    let member = ViewNodeID(rawValue: 2)
+    let unrelated: Set<ViewNodeID> = [ViewNodeID(rawValue: 9)]
+    let start = MonotonicInstant(offset: .seconds(50))
+    // The registered node stays in the tree throughout and never runs again.
+    let tree = ResolvedNode(
+      viewNodeID: ViewNodeID(rawValue: 3),
+      identity: host,
+      kind: .view(.vStack),
+      children: [
+        ResolvedNode(
+          viewNodeID: member, identity: shown, kind: .view(.text), drawPayload: .text("X"))
+      ])
+    func registered() -> AnimationController {
+      let controller = AnimationController()
+      controller.beginTransitionCollection()
+      controller.registerTransition(
+        for: shown, viewNodeID: member, declaringNodeID: declaring,
+        transition: AnyTransition.opacity)
+      controller.finishTransitionCollection(
+        reEvaluatedNodeIDs: [declaring, member], isLiveNode: { _ in true })
+      controller.processResolvedTree(tree, transaction: .init(), timestamp: start)
+      return controller
+    }
+
+    // The declaring node is in the graph and did not run: the registration
+    // stands.
+    let kept = registered()
+    kept.beginTransitionCollection()
+    kept.finishTransitionCollection(reEvaluatedNodeIDs: unrelated, isLiveNode: { _ in true })
+    #expect(kept.debugStateSnapshot().transitionIdentities == [shown])
+
+    // The declaring node has left the graph, and its modifier with it.
+    let dropped = registered()
+    dropped.beginTransitionCollection()
+    dropped.finishTransitionCollection(
+      reEvaluatedNodeIDs: unrelated, isLiveNode: { $0 != declaring })
+    #expect(dropped.debugStateSnapshot().transitionIdentities.isEmpty)
+    #expect(dropped.debugStateSnapshot().transitionNodeIDs.isEmpty)
+    // The frame before still knows it, for a removal on this frame.
+    #expect(dropped.debugStateSnapshot().previousTransitionIdentities == [shown])
+
+    // A caller that cannot say which nodes are in the graph drops nothing
+    // for it.
+    let unknown = registered()
+    unknown.beginTransitionCollection()
+    unknown.finishTransitionCollection(reEvaluatedNodeIDs: unrelated)
+    #expect(unknown.debugStateSnapshot().transitionIdentities == [shown])
+  }
+
+  // MARK: - A site's record
+
+  @Test("a site is live until the node that evaluates it runs without resolving it")
+  func siteLivenessFollowsItsOwnersEvaluation() {
+    let host = testIdentity("body-site-engine", "liveness")
+    let inline = AnimationKey(
+      site: AnimatableValueSite(identity: host.child(.named("inline")), ordinal: 0))
+    let beside = AnimationKey(
+      site: AnimatableValueSite(identity: host.child(.named("beside")), ordinal: 0))
+    let late = AnimationKey(
+      site: AnimatableValueSite(identity: host.child(.named("late")), ordinal: 0))
+    let slot = ViewNodeID(rawValue: 7)
+    let other = ViewNodeID(rawValue: 8)
+    // None of the three identities is in the tree: each site is known by the
+    // node that evaluates it, and both nodes stay in the tree throughout.
+    let liveNodeIDs: Set<ViewNodeID> = [slot, other]
+    func isLive(_ key: AnimationKey, in sites: AnimationController.ValueSiteState) -> Bool {
+      sites.isLive(key, identities: [], liveNodeIDs: liveNodeIDs)
+    }
+    func resolved() -> AnimationController.ValueSiteState {
+      var sites = AnimationController.ValueSiteState()
+      // Two sites resolve while the head resolves, one for each node. The
+      // third resolves afterwards, as a view does that resolves in layout.
+      sites.beginHeadResolve()
+      sites.ownerNodeIDs = [inline: slot, beside: other]
+      sites.noteResolve(of: inline)
+      sites.noteResolve(of: beside)
+      sites.finishHeadResolve(reEvaluatedNodeIDs: [slot, other])
+      sites.ownerNodeIDs[late] = slot
+      sites.noteResolve(of: late)
+      return sites
+    }
+
+    var sites = resolved()
+    #expect(isLive(inline, in: sites) && isLive(beside, in: sites) && isLive(late, in: sites))
+
+    // The slot's node runs again and resolves neither of its sites: the
+    // view at the first site left, and the slot kept its node. The site
+    // that resolves outside the head is not judged by that: nothing says it
+    // would have resolved by now. The other node did not run.
+    sites.beginHeadResolve()
+    sites.finishHeadResolve(reEvaluatedNodeIDs: [slot])
+    #expect(!isLive(inline, in: sites))
+    #expect(isLive(late, in: sites))
+    #expect(isLive(beside, in: sites))
+
+    // The node runs and resolves its site: the site stays.
+    sites = resolved()
+    sites.beginHeadResolve()
+    sites.noteResolve(of: inline)
+    sites.finishHeadResolve(reEvaluatedNodeIDs: [slot])
+    #expect(isLive(inline, in: sites))
+
+    // A frame that evaluates nothing judges no site, and one that evaluates
+    // everything judges every site that resolves in the head.
+    sites = resolved()
+    sites.beginHeadResolve()
+    sites.finishHeadResolve(reEvaluatedNodeIDs: [])
+    #expect(isLive(inline, in: sites) && isLive(beside, in: sites))
+    sites.beginHeadResolve()
+    sites.finishHeadResolve(reEvaluatedNodeIDs: nil)
+    #expect(!isLive(inline, in: sites) && !isLive(beside, in: sites))
+    #expect(isLive(late, in: sites))
+
+    // A site that later resolves in the head is judged like any other.
+    sites = resolved()
+    sites.beginHeadResolve()
+    sites.noteResolve(of: late)
+    sites.finishHeadResolve(reEvaluatedNodeIDs: [slot])
+    #expect(isLive(late, in: sites))
+    sites.beginHeadResolve()
+    sites.finishHeadResolve(reEvaluatedNodeIDs: [slot])
+    #expect(!isLive(late, in: sites))
+  }
+
+  // MARK: - The root that holds a site
+
+  @Test("a site is held by the first root of the body that it is part of")
+  func holderOfASite() {
+    let body = testIdentity("body-site-engine", "holders")
+    func node(_ identity: Identity, _ children: [ResolvedNode] = []) -> ResolvedNode {
+      ResolvedNode(identity: identity, kind: .view(.vStack), children: children)
+    }
+    let first = body.child(.named("first"))
+    let second = body.child(.named("second"))
+    let third = body.child(.named("third"))
+    // A view of the second root whose body root is a conditional: only its
+    // branch is in the tree.
+    let branching = second.child(.named("gauge"))
+    let holders = TransitionBodySiteHolders(roots: [
+      node(first, [node(first.child(.named("content")))]),
+      node(second, [node(branching.child(.named("true")))]),
+      node(third),
+    ])
+    // A modifier around a root's view, and a view inside a root.
+    #expect(holders.holderIndex(ofSiteAt: first) == 0)
+    #expect(holders.holderIndex(ofSiteAt: second) == 1)
+    #expect(holders.holderIndex(ofSiteAt: first.child(.named("content"))) == 0)
+    // A view whose own identity is not in the tree, and a view that draws
+    // nothing, belong to the root they lie in.
+    #expect(holders.holderIndex(ofSiteAt: branching) == 1)
+    #expect(holders.holderIndex(ofSiteAt: third.child(.named("silent"))) == 2)
+    // A site above every root is held by the first, and is part of each.
+    #expect(holders.holderIndex(ofSiteAt: body) == 0)
+    #expect((0..<3).allSatisfy { holders.reaches(body, rootAt: $0) })
+    // A site that is part of no root is held by the first and is part of
+    // none.
+    let elsewhere = testIdentity("body-site-engine", "elsewhere")
+    #expect(holders.holderIndex(ofSiteAt: elsewhere) == 0)
+    #expect((0..<3).allSatisfy { !holders.reaches(elsewhere, rootAt: $0) })
+    // A site one root holds is not part of the others.
+    #expect(!holders.reaches(first, rootAt: 1) && !holders.reaches(second, rootAt: 0))
+    // A body with no root holds nothing.
+    #expect(TransitionBodySiteHolders(roots: []).holderIndex(ofSiteAt: body) == nil)
+  }
+
   // MARK: - A removal's sites
 
   @Test("a removal owns the value animations of its body's sites")

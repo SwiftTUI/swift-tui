@@ -1346,7 +1346,554 @@ struct TransitionBodyAnimatableTests {
     }
   }
 
+  // MARK: - A registration lasts as long as the view it was made for
+
+  @Test("a view with state of its own under a transition over several views plays its own flips")
+  func memberOfASharedTransitionPlaysItsFlips() throws {
+    let flips = FlipBox()
+    let probe = try AnimatableValueProbe(named: "member-flips", showsSibling: false) { _, _ in
+      Group {
+        Text("A")
+        Flipper(box: flips)
+      }
+      .transition(.opacity)
+    }
+    defer { probe.shutdown() }
+    try probe.run { _ in
+      #expect(probe.frame.contains("ON"))
+      _ = try probe.step()
+      // Under the stack-lean profile every frame evaluates the whole tree,
+      // so the view above runs on the frame of each flip and declares the
+      // transition again for the branch that arrives. A flip then plays
+      // nothing, there as before this change.
+      guard animatableProbeEvaluatesSelectively else { return }
+      // The transition is declared by the view above. The view that flips
+      // runs alone, and each flip changes which identity it emits: the branch
+      // that leaves plays an exit, on every flip, and from the second flip on
+      // the branch that arrives fades in.
+      for flip in 1...4 {
+        let arriving = flip.isMultiple(of: 2) ? "ON" : "OFF"
+        try Self.flip(flips, in: probe, animation: Self.linear)
+        let state = probe.controller.debugStateSnapshot()
+        #expect(
+          state.removingIdentities.count == 1,
+          "flip \(flip): removing \(state.removingIdentities.map(\.path)), animations \(state.activeAnimationKeys.map { "\($0.identity.path) \($0.scope)" })"
+        )
+        if flip > 1 {
+          #expect(
+            probe.controller.activeAnimationCount == 1,
+            "flip \(flip): \(state.activeAnimationKeys.map { "\($0.identity.path) \($0.scope)" })")
+        }
+        _ = try probe.steps(27)
+        let settled = probe.controller.debugStateSnapshot()
+        #expect(settled.removingNodeIDs.isEmpty, "flip \(flip)")
+        #expect(settled.activeAnimationKeys.isEmpty, "flip \(flip)")
+        #expect(probe.frame.contains(arriving), "flip \(flip): \(probe.frame)")
+      }
+    }
+  }
+
+  @Test("a view with state of its own keeps the transition declared above it when it runs alone")
+  func memberKeepsTheTransitionDeclaredAboveIt() throws {
+    let probe = try AnimatableValueProbe(
+      named: "member-keeps", initial: 1, showsSibling: false
+    ) { shown, log in
+      if shown > 0.5 {
+        Group {
+          Text("A")
+          TraceCounter(log: log)
+        }
+        .transition(.identity)
+      }
+    }
+    defer { probe.shutdown() }
+    try probe.run { _ in
+      _ = try probe.step()
+      // The counter changes its own state and runs alone. The modifier that
+      // declares the transition does not run, and the counter still emits
+      // the view the transition was declared for.
+      _ = try probe.harness.clickText("count 0")
+      #expect(probe.frame.contains("count 1"), "\(probe.frame)")
+      #expect(probe.controller.debugStateSnapshot().transitionIdentities.count == 2)
+      // Both views then leave under an animation. The identity transition
+      // still stands for each, so neither fades: they are gone at once.
+      let removed = try probe.set(0, animation: Self.linear)
+      #expect(!removed.frame.contains("count 1"), "\(removed.frame)")
+      #expect(probe.controller.debugStateSnapshot().removingNodeIDs.isEmpty)
+    }
+  }
+
+  // MARK: - A site's record lasts as long as the view at the site
+
+  @Test(
+    "after a removal that snapped, the next animated insertion animates its site",
+    arguments: SnapRemoval.allCases, [false, true])
+  func insertionAfterASnapRemovalAnimates(removal: SnapRemoval, adoptedSlot: Bool) throws {
+    let dots = String(repeating: ".", count: 20)
+    let probe = try AnimatableValueProbe(
+      named: "after-snap-\(removal)-\(adoptedSlot)", showsSibling: false
+    ) { shown, log in
+      if adoptedSlot {
+        // The overlay's slot keeps its graph node when its occupant leaves.
+        Text(dots).overlay(alignment: .leading) {
+          if shown > 0.5 {
+            Text("OVER").transition(Self.shift(log))
+          }
+        }
+      } else {
+        if shown > 0.5 {
+          Text("OVER").transition(Self.shift(log))
+        }
+      }
+    }
+    defer { probe.shutdown() }
+    try probe.run { _ in
+      // The view arrives under an animation and comes to rest. Its site has
+      // resolved, and the controller holds what it resolved with.
+      _ = try Self.insertion(probe, Self.linear)
+      #expect(probe.log.values.last == 1)
+      #expect(probe.controller.valueSiteCount == 1)
+
+      // It leaves without playing.
+      switch removal {
+      case .plainWrite:
+        _ = try probe.set(0, animation: nil)
+      case .nilAnimation:
+        _ = try probe.set(0, animation: nil, disabling: true)
+      case .reduceMotion:
+        try Self.setPolicy(.reduceMotion, in: probe)
+        _ = try probe.set(0, animation: Self.linear)
+      }
+      #expect(!probe.frame.contains("OVER"), "\(probe.frame)")
+      #expect(probe.controller.debugStateSnapshot().removingNodeIDs.isEmpty)
+      // The record left with the view.
+      #expect(probe.controller.valueSiteCount == 0)
+      #expect(probe.controller.activeValueAnimationCount == 0)
+      if removal == .reduceMotion {
+        try Self.setPolicy(.normal, in: probe)
+      }
+
+      // It arrives again under an animation, and its site animates again
+      // from the data of the `willAppear` phase.
+      let again = try Self.insertion(probe, Self.linear)
+      #expect(again.first?.values.last == 0, "\(again.first?.values ?? [])")
+      let running = again.filter { $0.milliseconds <= 825 }
+      #expect(running.count == 26, "\(again.map(\.milliseconds))")
+      for frame in running {
+        let value = try #require(frame.values.last, "\(frame.milliseconds) ms")
+        #expect(
+          abs(value - min(1, Double(frame.milliseconds) / 800)) < 1e-9,
+          "\(frame.milliseconds) ms: \(value)")
+      }
+      // The padding is the site's: no slot animates in its place.
+      #expect(again.allSatisfy { $0.propertyAnimations == 0 }, "\(again.map(\.propertyAnimations))")
+      #expect(again.last?.frame.contains("OVER") == true)
+    }
+  }
+
+  @Test("a conformer that comes back into a slot its node stayed in starts from its own data")
+  func conformerInASlotStartsFromItsOwnData() throws {
+    let dots = String(repeating: ".", count: 20)
+    let probe = try AnimatableValueProbe(
+      named: "slot-record", initial: 1, showsSibling: false
+    ) { level, log in
+      Text(dots).overlay(alignment: .leading) {
+        if level > 0.25 {
+          Text("OVER").modifier(TraceShift(progress: level, log: log))
+        }
+      }
+    }
+    defer { probe.shutdown() }
+    try probe.run { _ in
+      #expect(probe.log.values == [1])
+      #expect(probe.controller.valueSiteCount == 1)
+      // The view leaves. No transition is declared for it and the write is
+      // plain, so nothing plays.
+      _ = try probe.set(0, animation: nil)
+      #expect(!probe.frame.contains("OVER"))
+      #expect(probe.controller.valueSiteCount == 0)
+      // Another view arrives at the same place with other data, under an
+      // animation. It is new: it has nothing to animate from, and shows its
+      // own data at once.
+      let back = try probe.set(0.5, animation: Self.linear)
+      #expect(Set(back.values) == [0.5], "\(back.values)")
+      #expect(probe.controller.activeValueAnimationCount == 0)
+      #expect(probe.controller.valueSiteCount == 1)
+    }
+  }
+
+  @Test("a conformer inside a GeometryReader of the live tree animates while its host runs again")
+  func liveLayoutRealizedConformerAnimates() throws {
+    let probe = try AnimatableValueProbe(named: "live-geometry", showsSibling: false) {
+      level, log in
+      GeometryReader { _ in
+        TraceGauge(level: level, log: log)
+      }
+      .frame(width: 12, height: 1)
+    }
+    defer { probe.shutdown() }
+    try probe.run { _ in
+      // The content of the reader resolves while it lays out, after the frame
+      // head. Its site still has a record that lasts as long as the view: the
+      // host runs again on every tick, and the animation goes on.
+      let frames = try probe.animate(to: 1, Self.linear)
+      let values = frames.flatMap(\.values)
+      #expect(values.contains { $0 > 0.2 && $0 < 0.8 }, "\(values)")
+      #expect(values == values.sorted(), "\(values)")
+      #expect(values.last == 1, "\(values)")
+      #expect(probe.log.completions == 1)
+      #expect(probe.controller.valueSiteCount == 1)
+      #expect(probe.controller.activeValueAnimationCount == 0)
+    }
+  }
+
+  // MARK: - Every ending fires the completion once
+
+  @Test(
+    "a removal that snaps during an insertion fires the insertion's completion once",
+    arguments: [false, true], [false, true])
+  func snapRemovalDuringInsertionFiresTheCompletion(branchingView: Bool, disabling: Bool) throws {
+    let probe = try AnimatableValueProbe(
+      named: "snap-in-flight-\(branchingView)-\(disabling)", showsSibling: false
+    ) { shown, log in
+      if shown > 0.5 {
+        // The second body adds a conformer whose body root is a conditional:
+        // the identity its site resolves at is not an identity of the tree.
+        Text("PRESENT").transition(
+          branchingView ? AnyTransition(BranchingGaugeBeside(log: log)) : Self.shift(log))
+      }
+    }
+    defer { probe.shutdown() }
+    try probe.run { _ in
+      _ = try probe.set(1, animation: Self.linear)
+      _ = try probe.steps(5)
+      #expect(probe.log.completions == 0)
+      #expect(probe.controller.activeValueAnimationCount == 1)
+      // A plain write, or `withAnimation(nil)`, takes the view away six
+      // frames in. The insertion ends there, and its completion fires.
+      let removed = try probe.set(0, animation: nil, disabling: disabling, atNextWake: true)
+      #expect(!removed.frame.contains("PRESENT"), "\(removed.frame)")
+      #expect(removed.animationKeys == 0)
+      #expect(removed.completions == 1)
+      let state = probe.controller.debugStateSnapshot()
+      #expect(state.completionClosureBatchIDs.isEmpty)
+      #expect(state.removingNodeIDs.isEmpty)
+      #expect(probe.controller.valueSiteCount == 0)
+      _ = try probe.runToEnd()
+      #expect(probe.log.completions == 1)
+    }
+  }
+
+  @Test(
+    "a removal whose body cannot be drawn ends an insertion in flight with its completion",
+    arguments: [false, true])
+  func undrawableRemovalDuringInsertionFiresTheCompletion(fades: Bool) throws {
+    let probe = try AnimatableValueProbe(
+      named: "undrawable-in-flight-\(fades)", showsSibling: false
+    ) { shown, log in
+      if shown > 0.5 {
+        Text("PRESENT").transition(
+          fades
+            ? AnyTransition(UndrawableWithGauge(log: log)).combined(with: .opacity)
+            : AnyTransition(UndrawableWithGauge(log: log)))
+      }
+    }
+    defer { probe.shutdown() }
+    try probe.run { _ in
+      _ = try probe.set(1, animation: Self.linear)
+      _ = try probe.steps(5)
+      #expect(probe.log.completions == 0)
+      #expect(probe.controller.activeValueAnimationCount == 1)
+      // The removal is animated, but its body places the content inside a
+      // view that resolves during layout and cannot be drawn. The view's
+      // insertion ends on the frame of the removal, and its completion fires
+      // there. The removal's own completion fires when the removal is over.
+      let removed = try probe.set(0, animation: Self.linear, atNextWake: true)
+      #expect(removed.completions == 1)
+      // Under the stack-lean profile the removal can draw this body, and
+      // continues the site from its sample instead.
+      if animatableProbeEvaluatesSelectively {
+        #expect(probe.controller.activeValueAnimationCount == 0)
+      }
+      #expect(probe.controller.valueSiteCount == 0)
+      _ = try probe.runToEnd()
+      #expect(probe.log.completions == 2)
+      let state = probe.controller.debugStateSnapshot()
+      #expect(state.completionClosureBatchIDs.isEmpty)
+      #expect(state.activeAnimationKeys.isEmpty)
+      #expect(state.removingNodeIDs.isEmpty)
+      #expect(!probe.frame.contains("PRESENT"))
+    }
+  }
+
+  @Test("a view that leaves under a transition ends the animation of a conformer in its content")
+  func departingContentConformerFiresItsCompletion() throws {
+    let probe = try AnimatableValueProbe(
+      named: "content-conformer", initial: 0.5, showsSibling: false
+    ) { level, log in
+      if level > 0.25 {
+        TraceBranchingGauge(level: level, log: log).transition(.opacity)
+      }
+    }
+    defer { probe.shutdown() }
+    try probe.run { _ in
+      _ = try probe.step()
+      // The conformer's data animates while the view stays.
+      _ = try probe.set(1, animation: Self.linear)
+      _ = try probe.steps(5)
+      #expect(probe.controller.activeValueAnimationCount == 1)
+      #expect(probe.log.completions == 0)
+      // The view leaves under its transition. The removal ends every
+      // animation of the departing view, as it ends a property animation
+      // there: the first write's completion fires now.
+      let removed = try probe.set(0, animation: Self.linear, atNextWake: true)
+      #expect(removed.completions == 1)
+      #expect(probe.controller.activeValueAnimationCount == 0)
+      #expect(probe.controller.valueSiteCount == 0)
+      _ = try probe.runToEnd()
+      #expect(probe.log.completions == 2)
+      #expect(probe.controller.debugStateSnapshot().completionClosureBatchIDs.isEmpty)
+    }
+  }
+
+  // MARK: - A preference a site writes
+
+  @Test("a preference a site writes is read at the site's origin on the frame of the insertion")
+  func preferenceOfASiteIsComposedOnTheInsertionFrame() throws {
+    let probe = try AnimatableValueProbe(named: "site-preference", showsSibling: false) {
+      shown, log in
+      VStack(alignment: .leading, spacing: 0) {
+        Text("HEADER")
+        if shown > 0.5 {
+          Text("PRESENT").transition(
+            .modifier(
+              active: TraceLevelPreference(progress: 0, log: log),
+              identity: TraceLevelPreference(progress: 1, log: log)))
+        }
+      }
+      .frame(width: 28, alignment: .leading)
+      .overlayPreferenceValue(TraceLevelKey.self, alignment: .topTrailing) { level in
+        Text("level \(Int((level * 100).rounded()))")
+      }
+    }
+    defer { probe.shutdown() }
+    try probe.run { _ in
+      // Nothing writes the preference yet.
+      #expect(probe.frame.contains("level -100"), "\(probe.frame)")
+      var frames = [try probe.set(1, animation: Self.linear)]
+      frames += try probe.steps(27)
+      // The view above reads what the site's body wrote for the data the
+      // frame presents, from the first frame on: the origin, then each
+      // sample.
+      for frame in frames where frame.milliseconds <= 825 {
+        let value = try #require(frame.values.last, "\(frame.milliseconds) ms")
+        #expect(abs(value - min(1, Double(frame.milliseconds) / 800)) < 1e-9, "\(value)")
+        #expect(
+          frame.line(0).hasSuffix("level \(Int((value * 100).rounded()))"),
+          "\(frame.milliseconds) ms: \(frame.line(0))")
+      }
+      #expect(frames.last?.line(0).hasSuffix("level 100") == true)
+
+      // A removal draws its `didDisappear` body without mounting it, so the
+      // preference has no writer from the frame of the removal on.
+      let removed = [try probe.set(0, animation: Self.linear)] + (try probe.runToEnd())
+      #expect(
+        removed.allSatisfy { $0.line(0).hasSuffix("level -100") },
+        "\(removed.map { $0.line(0) })")
+    }
+  }
+
+  // MARK: - A body with several roots
+
+  @Test("a root of a body that leaves alone leaves the site its sibling still shows")
+  func rootThatLeavesAloneLeavesItsSiblingsSite() throws {
+    let badge = FlipBox()
+    let probe = try AnimatableValueProbe(
+      named: "badge-leaves", initial: 1, showsSibling: false
+    ) { shown, log in
+      if shown > 0.5 {
+        Text("PRESENT").transition(BadgedShift(box: badge, log: log))
+      }
+    }
+    defer { probe.shutdown() }
+    try probe.run { _ in
+      #expect(probe.frame.contains("PRESENT") && probe.frame.contains("BADGE"))
+      #expect(probe.controller.valueSiteCount == 1)
+      _ = try probe.step()
+      // The badge hides itself under an animation. The content stays, and so
+      // does the site of the modifier around it: its record is kept, nothing
+      // animates its data, and its body never runs with other data than 1.
+      try Self.flip(badge, in: probe, animation: Self.linear)
+      #expect(probe.controller.valueSiteCount == 1)
+      #expect(probe.controller.activeValueAnimationCount == 0)
+      _ = try probe.steps(27)
+      #expect(probe.frame.contains("PRESENT") && !probe.frame.contains("BADGE"), "\(probe.frame)")
+      #expect(probe.controller.debugStateSnapshot().removingNodeIDs.isEmpty)
+      #expect(Set(probe.log.values) == [1], "\(probe.log.values)")
+      #expect(probe.controller.valueSiteCount == 1)
+
+      // The whole view then leaves, and its site animates to the data of the
+      // `didDisappear` phase.
+      let removed = [try probe.set(0, animation: Self.linear)] + (try probe.runToEnd())
+      let drawn = removed.filter { $0.milliseconds < 800 }
+      #expect(drawn.count == 25, "\(removed.map(\.milliseconds))")
+      for frame in drawn {
+        let value = try #require(frame.values.last, "\(frame.milliseconds) ms")
+        #expect(
+          abs(value - (1 - Double(frame.milliseconds) / 800)) < 1e-9,
+          "\(frame.milliseconds) ms: \(value)")
+        #expect(
+          frame.line(0) == String(repeating: " ", count: traceShiftIndent(value)) + "PRESENT",
+          "\(frame.milliseconds) ms: \(frame.line(0))")
+      }
+      #expect(!probe.frame.contains("PRESENT"))
+      #expect(probe.controller.debugStateSnapshot().activeAnimationKeys.isEmpty)
+    }
+  }
+
+  @Test(
+    "a conformer around several views that adds none of its own gets its destination data at once",
+    arguments: [false, true])
+  func conformerAroundSeveralViewsSnaps(removing: Bool) throws {
+    // The modifier gives both views the body returns a foreground style
+    // through the environment and adds no view. Neither the identity its
+    // site resolves at nor the node that evaluates it is in the resolved
+    // tree, so the engine keeps no record of the site from one frame to the
+    // next. Its data does not animate. The style it writes does, as a value
+    // of each view: there is no frame that shows the other phase and then
+    // jumps.
+    let offsets = [0, 200, 400, 600, 792]
+    let scene = BodyFrames(named: "around-several-\(removing)") { shown, log in
+      if shown {
+        Text("PRESENT").transition(TintAroundBoth(log: log))
+      }
+    }
+    let frames = scene.artifacts(removing: removing, at: offsets)
+    #expect(Set(scene.log.values).isSubset(of: [0, 1]), "\(scene.log.values)")
+    for row in [1, 2] {
+      var reds: [Double] = []
+      for (frame, offset) in zip(frames, offsets) {
+        let cell = frame.artifacts.rasterSurface.cells[row][0]
+        #expect(cell.character == (row == 1 ? "P" : "T"), "\(offset) ms, row \(row)")
+        reds.append(try #require(cell.style?.foregroundColor, "\(offset) ms, row \(row)").red)
+      }
+      // Blue at the `willAppear` and `didDisappear` end, red at the
+      // `identity` end, and every frame between them in order.
+      let rising = removing ? Array(reds.reversed()) : reds
+      #expect(rising == rising.sorted() && Set(rising).count == rising.count, "row \(row): \(reds)")
+      #expect((rising.first ?? 1) < 0.1 && (rising.last ?? 0) > 0.9, "row \(row): \(reds)")
+    }
+    #expect(scene.controller.activeValueAnimationCount == 0)
+    #expect(scene.controller.valueSiteCount == 0)
+  }
+
+  @Test("on insertion a site animates only when the root that holds it plays")
+  func holderRootDecidesWhetherItsSiteAnimatesOnInsertion() throws {
+    // The root that holds the site has animations disabled, and the body's
+    // other root has not. The other root plays. The site does not: the live
+    // view shows the identity data from the first frame.
+    let scene = BodyFrames(named: "holder-snaps-in") { shown, log in
+      if shown {
+        Text("PRESENT").transition(HolderSnaps(log: log))
+      }
+    }
+    scene.run {
+      scene.render(shown: false, at: -33)
+      for offset in [0, 200, 400, 600, 792] {
+        let artifacts = scene.render(shown: true, animated: offset == 0, at: offset)
+        #expect(scene.controller.activeValueAnimationCount == 0, "\(offset) ms")
+        #expect(artifacts.rasterSurface.lines[1] == "PRESENT", "\(offset) ms")
+      }
+    }
+    // The live site only ever ran with the identity data. The `willAppear`
+    // phase was evaluated off the graph for the root that plays, with that
+    // phase's data. No evaluation ran with a value in between.
+    #expect(Set(scene.log.values).isSubset(of: [0, 1]), "\(scene.log.values)")
+  }
+
+  @Test("on removal a site animates only when the root that holds it plays")
+  func holderRootDecidesWhetherItsSiteAnimatesOnRemoval() throws {
+    // The root that holds the site cannot be drawn by a removal: it places
+    // the content inside a view that resolves during layout, so it leaves
+    // at once. The body's other root can, and its removal plays. The site
+    // is not that root's to animate: no evaluation of the body runs with
+    // other data than the site showed. The order the two removals are
+    // planned in depends on how the roots' graph nodes hash, so the body is
+    // tried behind several numbers of other views.
+    for padding in 0..<8 {
+      let scene = BodyFrames(named: "holder-snaps-out-\(padding)") { shown, log in
+        ForEach(0..<padding, id: \.self) { _ in
+          PaddingNode()
+        }
+        if shown {
+          Text("PRESENT").transition(UndrawableHolder(log: log))
+        }
+      }
+      scene.run {
+        scene.render(shown: true, at: -33)
+        #expect(scene.log.values == [1], "\(padding)")
+        for offset in [0, 200, 400, 600, 792] {
+          scene.render(shown: false, animated: offset == 0, at: offset)
+          #expect(scene.controller.activeValueAnimationCount == 0, "\(padding), \(offset) ms")
+        }
+      }
+      #expect(Set(scene.log.values) == [1], "\(padding): \(scene.log.values)")
+      #expect(scene.controller.valueSiteCount == 0, "\(padding)")
+    }
+  }
+
+  @Test(
+    "a site animates under the curve of the root that holds it, whatever the other roots play",
+    arguments: [false, true])
+  func holderRootDecidesTheCurveOfItsSite(removing: Bool) throws {
+    // The root that holds the site takes the frame's 800 ms curve. The
+    // body's other root has a 400 ms curve of its own, which its insertion
+    // plays. (A removal takes the transaction of the write that removes the
+    // view for every root, so there the two agree.) The order the roots are
+    // visited in depends on how their identities hash, so several bodies at
+    // different identities are tried.
+    let offsets = [0, 200, 400, 600]
+    for name in ["a", "b", "c", "d", "e", "f", "g", "h"] {
+      let scene = BodyFrames(named: "two-curves-\(name)-\(removing)") { shown, log in
+        if shown {
+          Text("PRESENT").transition(OtherRootHasItsOwnCurve(log: log))
+        }
+      }
+      let frames = scene.artifacts(removing: removing, at: offsets)
+      for (frame, offset) in zip(frames, offsets) {
+        let progress = Double(offset) / 800
+        let data = removing ? 1 - progress : progress
+        #expect(
+          abs((frame.values.last ?? -1) - data) < 1e-9, "\(name), \(offset) ms: \(frame.values)")
+      }
+      let boxes = Set(scene.controller.debugStateSnapshot().activeAnimationBoxesByKey.values)
+      #expect(boxes == [Self.linear.animationBox], "\(name): \(boxes.count) curves")
+    }
+  }
+
   // MARK: - Shared steps and expectations
+
+  /// Toggles the state a view keeps for itself, under `animation`, and
+  /// renders the frame of the write.
+  private static func flip<Content: View>(
+    _ box: FlipBox,
+    in probe: AnimatableValueProbe<Content>,
+    animation: Animation
+  ) throws {
+    let isOn = try #require(box.isOn)
+    withAnimation(animation) { isOn.wrappedValue.toggle() }
+    _ = try probe.harness.render()
+  }
+
+  /// Sets the rendering policy and renders the frame of the write.
+  private static func setPolicy<Content: View>(
+    _ policy: AnimatableValueProbePolicy,
+    in probe: AnimatableValueProbe<Content>
+  ) throws {
+    let binding = try #require(probe.log.policy)
+    binding.wrappedValue = policy
+    _ = try probe.harness.render()
+  }
 
   /// The transition under test in most cases: `modifier(active:identity:)`
   /// around a modifier that conforms to `Animatable`.
@@ -1847,6 +2394,198 @@ private struct TraceCounter: View {
     Button("count \(count)") { count += 1 }
       .onAppear { log.appears += 1 }
       .onDisappear { log.disappears += 1 }
+  }
+}
+
+/// How a view leaves without playing its transition.
+enum SnapRemoval: String, CaseIterable, Sendable, CustomStringConvertible {
+  /// A state write outside `withAnimation`.
+  case plainWrite
+  /// `withAnimation(nil)`.
+  case nilAnimation
+  /// An animated write under Reduce Motion.
+  case reduceMotion
+
+  var description: String { rawValue }
+}
+
+/// Where a test keeps the binding to a view's own state.
+@MainActor
+private final class FlipBox {
+  var isOn: Binding<Bool>?
+
+  func capture(_ binding: Binding<Bool>) { isOn = binding }
+}
+
+/// A view with state of its own whose body is a conditional: each flip
+/// changes the identity it emits, and no view above it runs.
+private struct Flipper: View {
+  @State private var isOn = true
+  let box: FlipBox
+
+  var body: some View {
+    let _ = box.capture($isOn)
+    if isOn {
+      Text("ON")
+    } else {
+      Text("OFF")
+    }
+  }
+}
+
+/// A view that hides itself through state of its own, and then emits nothing.
+private struct HidingBadge: View {
+  @State private var isShown = true
+  let box: FlipBox
+
+  var body: some View {
+    let _ = box.capture($isShown)
+    if isShown {
+      Text("BADGE")
+    }
+  }
+}
+
+/// A body with two roots: its content under an `Animatable` modifier, and a
+/// badge that can leave by itself.
+private struct BadgedShift: Transition {
+  let box: FlipBox
+  let log: AnimatableValueLog
+
+  func body(content: Content, phase: TransitionPhase) -> some View {
+    content.modifier(TraceShift(progress: phase.isIdentity ? 1 : 0, log: log))
+    HidingBadge(box: box)
+  }
+}
+
+/// A body with two roots under one `Animatable` modifier that adds no view
+/// of its own: the modifier's site is above both roots.
+private struct TintAroundBoth: Transition {
+  let log: AnimatableValueLog
+
+  func body(content: Content, phase: TransitionPhase) -> some View {
+    Group {
+      content
+      Text("TAIL")
+    }
+    .modifier(TraceTint(progress: phase.isIdentity ? 1 : 0, log: log))
+  }
+}
+
+/// A body with two roots. The root that holds the `Animatable` modifier has
+/// animations disabled, and the other root has not.
+private struct HolderSnaps: Transition {
+  let log: AnimatableValueLog
+
+  func body(content: Content, phase: TransitionPhase) -> some View {
+    content
+      .modifier(TraceShift(progress: phase.isIdentity ? 1 : 0, log: log))
+      .transaction { $0.animation = nil }
+    Text("TAIL")
+  }
+}
+
+/// A view that draws nothing and has a graph node of its own.
+private struct PaddingNode: View {
+  var body: some View { EmptyView() }
+}
+
+/// A body with two roots. The root that holds the `Animatable` modifier
+/// places the content inside a view that resolves during layout, which a
+/// removal cannot draw. The other root is a plain view.
+private struct UndrawableHolder: Transition {
+  let log: AnimatableValueLog
+
+  func body(content: Content, phase: TransitionPhase) -> some View {
+    GeometryReader { _ in content }
+      .frame(width: 12, height: 1)
+      .modifier(TraceShift(progress: phase.isIdentity ? 1 : 0, log: log))
+    Text("TAIL")
+  }
+}
+
+/// A body with two roots. The root that holds the `Animatable` modifier
+/// takes the transaction it is inserted or removed under, and the other root
+/// has a 400 ms curve of its own.
+private struct OtherRootHasItsOwnCurve: Transition {
+  let log: AnimatableValueLog
+
+  func body(content: Content, phase: TransitionPhase) -> some View {
+    content.modifier(TraceShift(progress: phase.isIdentity ? 1 : 0, log: log))
+    Text("TAIL").transaction { $0.animation = .linear(duration: .milliseconds(400)) }
+  }
+}
+
+/// An `Animatable` view whose body root is a conditional. The identity its
+/// site resolves at is not an identity of the resolved tree: the branch's
+/// node is committed in its place.
+private struct TraceBranchingGauge: View, Animatable {
+  var level: Double
+  let log: AnimatableValueLog
+
+  nonisolated var animatableData: Double {
+    get { level }
+    set { level = newValue }
+  }
+
+  var body: some View {
+    let _ = log.values.append(level)
+    if level >= 0 {
+      Text(String(repeating: "#", count: traceGaugeWidth(level)))
+    } else {
+      Text("below")
+    }
+  }
+}
+
+/// A body that adds `TraceBranchingGauge` beside its content.
+private struct BranchingGaugeBeside: Transition {
+  let log: AnimatableValueLog
+
+  func body(content: Content, phase: TransitionPhase) -> some View {
+    HStack(spacing: 1) {
+      content
+      TraceBranchingGauge(level: phase.isIdentity ? 1 : 0, log: log)
+    }
+  }
+}
+
+/// A body a removal cannot draw: it places its content inside a view that
+/// resolves during layout. It also adds `TraceBranchingGauge`, outside that
+/// view.
+private struct UndrawableWithGauge: Transition {
+  let log: AnimatableValueLog
+
+  func body(content: Content, phase: TransitionPhase) -> some View {
+    VStack(alignment: .leading, spacing: 0) {
+      GeometryReader { _ in content }
+        .frame(width: 12, height: 1)
+      TraceBranchingGauge(level: phase.isIdentity ? 1 : 0, log: log)
+    }
+  }
+}
+
+private enum TraceLevelKey: PreferenceKey {
+  static let defaultValue: Double = -1
+
+  static func reduce(value: inout Double, nextValue: () -> Double) {
+    value = nextValue()
+  }
+}
+
+/// An `Animatable` modifier that writes its data as a preference.
+private struct TraceLevelPreference: ViewModifier, Animatable {
+  var progress: Double
+  let log: AnimatableValueLog
+
+  nonisolated var animatableData: Double {
+    get { progress }
+    set { progress = newValue }
+  }
+
+  func body(content: Content) -> some View {
+    let _ = log.values.append(progress)
+    content.preference(key: TraceLevelKey.self, value: progress)
   }
 }
 

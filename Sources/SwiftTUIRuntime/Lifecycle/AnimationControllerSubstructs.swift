@@ -131,6 +131,27 @@ extension AnimationController {
     /// body's `.willAppear` phase, and no site that was already there is
     /// touched.
     package var freshKeys: Set<AnimationKey> = []
+    /// Whether the frame head is resolving the graph: the time between the
+    /// start and the end of the frame's transition collection. A site that
+    /// resolves then does so because the node in ``ownerNodeIDs`` is being
+    /// evaluated.
+    package var headIsResolving = false
+    /// The sites that resolved while the head of the frame being prepared
+    /// was resolving.
+    package var headResolvedKeys: Set<AnimationKey> = []
+    /// The sites whose latest resolve came at another time: a view that
+    /// resolves during layout, in a host of a late preference, or through a
+    /// controller no frame head drives. For such a site, the evaluation of
+    /// its owner node says nothing about whether the site resolves.
+    package var lateKeys: Set<AnimationKey> = []
+    /// The sites whose owner node ran while this frame's head was resolving
+    /// and did not resolve them. A site resolves whenever the node that
+    /// evaluates it runs, so the view at such a site is gone from that
+    /// node's output, even where the node itself stays in the tree (a slot
+    /// that keeps its node for the next occupant). Its record goes when the
+    /// resolved tree is processed, after a removal that plays the view's
+    /// transition has had the chance to take the site over.
+    package var unresolvedKeys: Set<AnimationKey> = []
 
     package init() {}
 
@@ -142,6 +163,71 @@ extension AnimationController {
       frameInstant = nil
       previousSamples.removeAll(keepingCapacity: true)
       freshKeys.removeAll(keepingCapacity: true)
+      headIsResolving = false
+      headResolvedKeys.removeAll(keepingCapacity: true)
+      lateKeys.removeAll(keepingCapacity: true)
+      unresolvedKeys.removeAll(keepingCapacity: true)
+    }
+
+    /// Starts the frame head's resolve: from here until
+    /// ``finishHeadResolve(reEvaluatedNodeIDs:)`` a site that resolves is
+    /// counted as resolved by its owner's evaluation.
+    package mutating func beginHeadResolve() {
+      headIsResolving = true
+      if !headResolvedKeys.isEmpty {
+        headResolvedKeys.removeAll(keepingCapacity: true)
+      }
+      if !unresolvedKeys.isEmpty {
+        unresolvedKeys.removeAll(keepingCapacity: true)
+      }
+    }
+
+    /// Notes that the site at `key` resolved.
+    package mutating func noteResolve(of key: AnimationKey) {
+      if headIsResolving {
+        headResolvedKeys.insert(key)
+        if !lateKeys.isEmpty {
+          lateKeys.remove(key)
+        }
+      } else if !lateKeys.contains(key) {
+        lateKeys.insert(key)
+      }
+    }
+
+    /// Ends the frame head's resolve and lists the sites whose owner ran
+    /// without resolving them (``unresolvedKeys``).
+    ///
+    /// `reEvaluatedNodeIDs` are the nodes that were evaluated; `nil` means
+    /// every live node.
+    package mutating func finishHeadResolve(reEvaluatedNodeIDs: Set<ViewNodeID>?) {
+      headIsResolving = false
+      guard !ownerNodeIDs.isEmpty, reEvaluatedNodeIDs.map({ !$0.isEmpty }) ?? true else {
+        return
+      }
+      for (key, ownerNodeID) in ownerNodeIDs
+      where !headResolvedKeys.contains(key) && !lateKeys.contains(key)
+        && (reEvaluatedNodeIDs?.contains(ownerNodeID) ?? true)
+      {
+        unresolvedKeys.insert(key)
+      }
+    }
+
+    /// Whether a live view still resolves the site at `key` in a tree with
+    /// the given identities and node stamps.
+    ///
+    /// A site is live while its identity or its owner node is in the tree
+    /// (see ``ownerNodeIDs``), unless that node ran this frame without
+    /// resolving it.
+    package func isLive(
+      _ key: AnimationKey,
+      identities: Set<Identity>,
+      liveNodeIDs: Set<ViewNodeID>
+    ) -> Bool {
+      if !unresolvedKeys.isEmpty, unresolvedKeys.contains(key) {
+        return false
+      }
+      return identities.contains(key.identity)
+        || ownerNodeIDs[key].map(liveNodeIDs.contains) == true
     }
   }
 
@@ -236,6 +322,14 @@ extension AnimationController {
     /// of that node alone does not run the modifier again.
     package var declaringNodeIDsByNodeID: [ViewNodeID: ViewNodeID] = [:]
     package var pendingDeclaringNodeIDsByNodeID: [ViewNodeID: ViewNodeID] = [:]
+    /// The registrations another node declared whose own node was evaluated
+    /// this frame while the declaring node was not. The modifier did not
+    /// run, so nothing registered them again, and whether they still hold
+    /// depends on what their node emits now: a view that only ran again
+    /// emits the identity that was registered, and a view that was replaced
+    /// emits another. The resolved tree says which
+    /// (``reconcile(liveNodeIDs:nodeIDByIdentity:)``).
+    package var unconfirmedNodeIDs: Set<ViewNodeID> = []
 
     package init() {}
 
@@ -249,6 +343,7 @@ extension AnimationController {
       pendingIdentitiesByNodeID.removeAll(keepingCapacity: true)
       declaringNodeIDsByNodeID.removeAll(keepingCapacity: true)
       pendingDeclaringNodeIDsByNodeID.removeAll(keepingCapacity: true)
+      unconfirmedNodeIDs.removeAll(keepingCapacity: true)
     }
 
     /// Starts the collection of a frame's registrations: the current maps
@@ -259,6 +354,9 @@ extension AnimationController {
       pendingByNodeID.removeAll(keepingCapacity: true)
       pendingIdentitiesByNodeID.removeAll(keepingCapacity: true)
       pendingDeclaringNodeIDsByNodeID.removeAll(keepingCapacity: true)
+      if !unconfirmedNodeIDs.isEmpty {
+        unconfirmedNodeIDs.removeAll(keepingCapacity: true)
+      }
     }
 
     /// Records a registration made during this frame's resolve.
@@ -291,13 +389,17 @@ extension AnimationController {
     }
 
     /// Merges the registrations collected this frame into the current maps
-    /// and drops every registration whose declaring node was evaluated again
-    /// without declaring it.
+    /// and drops every registration whose declaration ran again without
+    /// making it.
     ///
     /// `reEvaluatedNodeIDs` are the nodes whose declarations ran this frame;
-    /// `nil` means every live node. The pending maps are left as they are,
-    /// so merging twice gives the result of merging once.
-    package mutating func mergePendingRegistrations(reEvaluatedNodeIDs: Set<ViewNodeID>?) {
+    /// `nil` means every live node. `isLiveNode` says whether a node is
+    /// still in the graph; `nil` means it is not known. The pending maps are
+    /// left as they are, so merging twice gives the result of merging once.
+    package mutating func mergePendingRegistrations(
+      reEvaluatedNodeIDs: Set<ViewNodeID>?,
+      isLiveNode: ((ViewNodeID) -> Bool)? = nil
+    ) {
       // Merge newly registered transitions into the existing map so
       // that registrations for non-re-evaluated subtrees survive
       // across selective-evaluation frames.  Without this, a
@@ -322,23 +424,75 @@ extension AnimationController {
       // The declaring node is the registered node itself unless another
       // node's evaluation registered it. A view of a transition body with
       // several roots has its own graph node and is registered by the
-      // body's host: when such a view alone is evaluated again (a state it
-      // reads changed, or an animation of its `animatableData` ticked), the
-      // modifier did not run and its registration stands.
-      let staleNodeIDs: [ViewNodeID]
-      if let reEvaluatedNodeIDs {
-        staleNodeIDs = byNodeID.keys.filter { viewNodeID in
-          pendingByNodeID[viewNodeID] == nil
-            && reEvaluatedNodeIDs.contains(declaringNodeIDsByNodeID[viewNodeID] ?? viewNodeID)
+      // body's host, and so is every view with a graph node of its own under
+      // a `.transition()` over several views. Three things can then happen
+      // to such a registration without its modifier running:
+      //
+      // - The declaring node left the graph. The modifier is gone, and the
+      //   registration with it.
+      // - The registered node was evaluated alone and emits what it did (a
+      //   state it reads changed, or an animation of its `animatableData`
+      //   ticked). The registration stands.
+      // - The registered node was evaluated alone and now emits another
+      //   view. The registration was for the view that left.
+      //
+      // The last two differ only in what the node emits, which the resolved
+      // tree says. Such a registration is kept here and listed as
+      // unconfirmed until that tree is read.
+      var staleNodeIDs: [ViewNodeID] = []
+      var unconfirmed: Set<ViewNodeID> = []
+      for viewNodeID in byNodeID.keys where pendingByNodeID[viewNodeID] == nil {
+        guard let reEvaluatedNodeIDs else {
+          staleNodeIDs.append(viewNodeID)
+          continue
         }
-      } else {
-        staleNodeIDs = byNodeID.keys.filter { pendingByNodeID[$0] == nil }
+        guard let declaringNodeID = declaringNodeIDsByNodeID[viewNodeID] else {
+          if reEvaluatedNodeIDs.contains(viewNodeID) {
+            staleNodeIDs.append(viewNodeID)
+          }
+          continue
+        }
+        if reEvaluatedNodeIDs.contains(declaringNodeID) || isLiveNode?(declaringNodeID) == false {
+          staleNodeIDs.append(viewNodeID)
+        } else if reEvaluatedNodeIDs.contains(viewNodeID) {
+          unconfirmed.insert(viewNodeID)
+        }
       }
       for viewNodeID in staleNodeIDs {
         byNodeID.removeValue(forKey: viewNodeID)
         identitiesByNodeID.removeValue(forKey: viewNodeID)
         declaringNodeIDsByNodeID.removeValue(forKey: viewNodeID)
       }
+      if unconfirmed != unconfirmedNodeIDs {
+        unconfirmedNodeIDs = unconfirmed
+      }
+    }
+
+    /// Brings the registrations in line with the tree the frame resolved.
+    ///
+    /// Every reader of a registration keys on the stamps of that tree, so
+    /// this runs before any of them: a registration whose node was aliased
+    /// away moves onto the node that carries its identity
+    /// (``rehomeAliasedRegistrations(liveNodeIDs:nodeIDByIdentity:)``), and
+    /// an unconfirmed one whose node no longer carries the registered
+    /// identity is dropped. The injection stage calls it on the controller's
+    /// maps, and the frame head on a copy of them, so the two decide on the
+    /// same registrations.
+    package mutating func reconcile(
+      liveNodeIDs: Set<ViewNodeID>,
+      nodeIDByIdentity: [Identity: ViewNodeID]
+    ) {
+      rehomeAliasedRegistrations(liveNodeIDs: liveNodeIDs, nodeIDByIdentity: nodeIDByIdentity)
+      guard !unconfirmedNodeIDs.isEmpty else { return }
+      for viewNodeID in unconfirmedNodeIDs {
+        guard let identity = identitiesByNodeID[viewNodeID],
+          nodeIDByIdentity[identity] != viewNodeID
+        else { continue }
+        byNodeID.removeValue(forKey: viewNodeID)
+        identitiesByNodeID.removeValue(forKey: viewNodeID)
+        declaringNodeIDsByNodeID.removeValue(forKey: viewNodeID)
+      }
+      unconfirmedNodeIDs.removeAll(keepingCapacity: true)
     }
 
     /// Moves each registration whose node id is not in the committed tree

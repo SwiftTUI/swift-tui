@@ -937,7 +937,8 @@ are omitted even when SwiftUI exposes a corresponding API.
   base view takes precedence. Nested scopes keep their own timings, and a nil
   scoped animation leaves the base view's outer animation intact.
 - **Custom `Transition` bodies animate on insertion and on removal, with the
-  `Animatable` views and modifiers in them.** *Provisional.* SwiftTUI ships
+  `Animatable` views and modifiers in them; parts of SwiftUI's behaviour are
+  missing.** *Gap.* SwiftTUI ships
   the built-in `AnyTransition` opacity, move, offset, scale, combined, and
   asymmetric effects. Scale preserves layout and changes placed bounds around
   its `UnitPoint` anchor; cell extents round to whole cells and clip content
@@ -949,6 +950,20 @@ are omitted even when SwiftUI exposes a corresponding API.
   exist with SwiftUI's names. A custom body is resolved in
   `TransitionPhase.identity` while its view is present, and every modifier it
   applies there is rendered.
+  *The remaining gaps.* Each is described below. A view only one phase has
+  does not cross-fade, and a changed `Text` string does not either. A removal
+  draws its `didDisappear` body without mounting it. A conformer and another
+  part of the same transition do not both animate one property of one view.
+  An edge-relative move and a scale have no form inside a custom body. A body
+  that places `content` or a conformer inside a view that resolves during
+  layout does not animate there, and a conformer modifier around several
+  views that adds none of its own does not animate its data. A combination
+  plays one animation where SwiftUI animates each part with its own. An
+  offset or a move restarts at an interruption. A timing curve does not keep
+  its velocity through an interruption. The rest of this entry is how
+  transitions work here by decision: the departing content is torn down when
+  the removal starts, `content` placed twice mounts twice, and no transition
+  plays under reduced motion.
   *`Animatable` in a body.* A view or a view modifier of the body that
   conforms to `Animatable` receives interpolated `animatableData` on every
   frame of the transition, as in SwiftUI: on insertion from the data the
@@ -961,7 +976,13 @@ are omitted even when SwiftUI exposes a corresponding API.
   insertion, and a re-insertion that interrupts a removal, continue the data
   from its current sample, and a spring keeps its velocity. With no curve
   the conformer is evaluated once, with the `identity` data, and a removed
-  view leaves at once.
+  view leaves at once. A body that returns several views is inserted and
+  removed one view at a time, and each conformer goes with the view that
+  holds it: the view it wraps or is part of. The conformer animates under
+  that view's transaction, and does not animate when that view's transition
+  does not play. The views of one body that leave together stay on screen
+  until its conformers have settled, and a view of the body that leaves by
+  itself leaves the conformers of the others as they are.
   The differences from SwiftUI are these. On insertion the conformer is in
   the live view: its body runs again for each frame, with the content it
   hosts, and on the frame of the insertion it runs more than once (with the
@@ -984,7 +1005,10 @@ are omitted even when SwiftUI exposes a corresponding API.
   built-in fade plays over the opacity the conformer had on screen. Write
   different properties, or put one of the two on a wrapper view. A conformer
   that the body places inside a `GeometryReader` or a lazy container
-  resolves during layout and gets its destination data at once. A shape that
+  resolves during layout and gets its destination data at once. So does a
+  conformer modifier around several views that adds no view of its own (a
+  modifier on a `Group` whose body only sets a style, say): the styles it
+  writes still animate as values of each view. A shape that
   conforms to `Animatable` is a value the engine interpolates, so a body's
   `clipShape`, `fill` or `stroke` of such a shape is evaluated on every frame
   of an insertion and of a removal, and no view is evaluated for it.
@@ -1039,11 +1063,14 @@ are omitted even when SwiftUI exposes a corresponding API.
   evaluated outside the view graph. A view it adds has no state there (a
   `@State` shows its initial value, even when the same view held another
   value while the content was present), no `onAppear`, `onDisappear` or task,
-  and no handlers. A view only the `didDisappear` body has is drawn from the
-  first frame; when it declares lifecycle handlers, tasks or interaction
-  handlers the removal reports `transition.removalHandlersIgnored`, because
-  they never run. A view only the `identity` body has is gone on the first
-  frame. SwiftUI mounts both and cross-fades them. The body is evaluated under
+  and no handlers. A preference the body writes has no reader while the view
+  leaves: from the first frame of the removal the views above read the
+  preference without the departing view. A view only the `didDisappear` body
+  has is drawn from the first frame; when it declares lifecycle handlers,
+  tasks or interaction handlers the removal reports
+  `transition.removalHandlersIgnored`, because they never run. A view only
+  the `identity` body has is gone on the first frame. SwiftUI mounts both and
+  cross-fades them. The body is evaluated under
   the environment its view last resolved under; a value that only the
   `didDisappear` body reads can be one change behind, because nothing told
   the framework the view depended on it. An environment value the
@@ -1059,11 +1086,14 @@ are omitted even when SwiftUI exposes a corresponding API.
   leaves, and composes with the body's own.
   *Interruption.* A removal that interrupts an insertion, and a re-insertion
   that interrupts a removal, continue each value of the body from what is on
-  screen, and a spring keeps its velocity. A re-inserted view is a new mount
-  with new state. A re-insertion that plays no animation ends the removal's
-  values and shows the `identity` body. The built-in effects keep their own
-  behaviour: opacity continues both ways, scale continues into a removal, and
-  an offset or a move restarts.
+  screen, and a spring keeps its velocity. Under a timing curve the value
+  turns on the next frame, where SwiftUI carries the velocity through the
+  turn (measured natively: a removal 300 ms into a linear 0.8 s insertion
+  keeps rising from 0.354 to about 0.458 before it falls). A re-inserted view
+  is a new mount with new state. A re-insertion that plays no animation ends
+  the removal's values and shows the `identity` body. The built-in effects
+  keep their own behaviour: opacity continues both ways, scale continues into
+  a removal, and an offset or a move restarts.
   *Where removal plays.* Wherever a built-in removal plays: an `if` in a
   container, an `if`/`else` swap, a row of a `ForEach` in an eager stack, an
   `id(_:)` change. The limits are those of the built-ins: a view whose
@@ -1126,7 +1156,8 @@ are omitted even when SwiftUI exposes a corresponding API.
   reduced motion still snap. A combination plays one animation, the first one
   attached to a part, where SwiftUI animates each part with its own. With no
   animation at all, an insertion shows the `identity` body at once and a
-  removal takes the view away at once.
+  removal takes the view away at once. Only the `identity` body is evaluated
+  then; SwiftUI still calls `body` with `willAppear` and with `didDisappear`.
 - **Content transitions roll per digit column; `.interpolate` is not
   offered.** *Ratified.* `View.contentTransition(_:)` and
   `EnvironmentValues.contentTransition` carry a `ContentTransition` to every

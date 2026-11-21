@@ -875,10 +875,15 @@ package final class AnimationController: Sendable {
   ///
   /// `planned` are the sites another removal has taken over on this frame
   /// already, with what they showed then. A body with several roots has a
-  /// removal for each root, and a site above the roots belongs to all of
-  /// them: each has to see what the site showed before the first took it.
+  /// removal for each root that leaves, and each evaluates the whole body
+  /// when it is planned: it has to see what a site showed before the
+  /// removal of the root that holds the site took it.
+  ///
+  /// `isLive` says whether a view of the tree this frame resolved still
+  /// resolves a site. A site a removal has taken is not live.
   private func liveSiteData(
-    planned: [AnimationKey: AnimationTransitionBodyRemoval.LiveSite]
+    planned: [AnimationKey: AnimationTransitionBodyRemoval.LiveSite],
+    isLive: @escaping (AnimationKey) -> Bool
   ) -> AnimationTransitionBodyRemoval.LiveSiteData {
     AnimationTransitionBodyRemoval.LiveSiteData(
       shown: { [valueSites] key in
@@ -890,16 +895,59 @@ package final class AnimationController: Sendable {
         if let planned = planned[key] { return planned.presented }
         guard let target = valueSites.targets[key] else { return nil }
         return (activeAnimations[key] != nil ? valueSites.samples[key] : nil) ?? target
+      },
+      staysLive: { [valueSites] key in
+        planned[key] == nil && valueSites.targets[key] != nil && isLive(key)
       }
     )
   }
 
   /// Ends every removal's ownership of the value animation at `key`: a live
-  /// site has taken the animation over.
+  /// site has taken the animation over. No removal lasts for it any more,
+  /// the one that owned it or another removal of the same body
+  /// (``shareRemovalValueSiteLifetimes(plannedAt:)``).
   private func releaseRemovalOwnership(ofValueAt key: AnimationKey) {
-    for (viewNodeID, entry) in removingNodes where entry.body?.valueSites[key] != nil {
-      removingNodes[viewNodeID]?.body?.valueSites.removeValue(forKey: key)
-      removingNodes[viewNodeID]?.body?.drivingKeys.remove(key)
+    for (viewNodeID, entry) in removingNodes {
+      guard let body = entry.body else { continue }
+      if body.valueSites[key] != nil {
+        removingNodes[viewNodeID]?.body?.valueSites.removeValue(forKey: key)
+      }
+      if body.drivingKeys.contains(key) {
+        removingNodes[viewNodeID]?.body?.drivingKeys.remove(key)
+      }
+    }
+  }
+
+  /// Makes every removal of one transition body that was planned at
+  /// `timestamp` last while a site of that body animates toward the
+  /// `.didDisappear` phase.
+  ///
+  /// A body with several roots leaves through one removal for each root.
+  /// Each of its sites animates once, in the removal of the root that holds
+  /// it (``TransitionBodySiteHolders``), and the body leaves as one: a root
+  /// with nothing of its own to animate stays on screen until the sites of
+  /// the other roots have settled. This runs after every removal of the
+  /// frame is planned, so the result does not depend on the order they were
+  /// planned in.
+  private func shareRemovalValueSiteLifetimes(plannedAt timestamp: MonotonicInstant) {
+    guard removingNodes.count > 1 else { return }
+    var removalsByBody: [Identity: [ViewNodeID]] = [:]
+    var drivingSitesByBody: [Identity: Set<AnimationKey>] = [:]
+    for (viewNodeID, entry) in removingNodes where entry.startTime == timestamp {
+      guard let body = entry.body, let registration = entry.transition.bodyRegistration else {
+        continue
+      }
+      removalsByBody[registration.identity, default: []].append(viewNodeID)
+      let sites = body.drivingKeys.filter(\.isValue)
+      if !sites.isEmpty {
+        drivingSitesByBody[registration.identity, default: []].formUnion(sites)
+      }
+    }
+    for (identity, sites) in drivingSitesByBody {
+      guard let removals = removalsByBody[identity], removals.count > 1 else { continue }
+      for viewNodeID in removals {
+        removingNodes[viewNodeID]?.body?.drivingKeys.formUnion(sites)
+      }
     }
   }
 
@@ -972,20 +1020,21 @@ package final class AnimationController: Sendable {
   /// The `.didDisappear` bodies evaluated for one frame, by the identity of
   /// the body's registration, with the answers each was evaluated with. A
   /// body with several roots has a removal for each root, and one evaluation
-  /// of the body serves them all.
+  /// of the body serves every one of them that is given the same answers.
   private typealias RemovalBodyEvaluations = [Identity: (
     answers: [AnimationKey: AnyAnimatable], tree: TransitionPhaseTree
   )]
 
-  /// Evaluates the working tree of a removal body again when a site of it
-  /// has moved since the tree was last evaluated, and returns whether it
-  /// did.
+  /// Evaluates the working tree of a removal body again when what its sites
+  /// present has changed since the tree was last evaluated, and returns
+  /// whether it did.
   ///
-  /// The body is evaluated once for a frame, with this frame's sample of
-  /// each value animation the removal owns that is in flight. When the last
-  /// of them has ended it is evaluated once more, with every site at the
-  /// data the `.didDisappear` phase gives it, and then no more. A body with
-  /// no `Animatable` view or modifier is never evaluated here.
+  /// The body is evaluated at most once for a frame, with this frame's
+  /// sample of each value animation the removal owns that is in flight. A
+  /// site with none evaluates with the data the `.didDisappear` phase gives
+  /// it. So the body is evaluated on every frame that moves one of its
+  /// sites, once more when the last of them has ended, and then no more. A
+  /// body with no `Animatable` view or modifier is never evaluated here.
   @discardableResult
   private func refreshRemovalWorkingTree(
     _ body: inout RemovalBodyState,
@@ -996,13 +1045,14 @@ package final class AnimationController: Sendable {
     guard !body.valueSites.isEmpty, body.valueResolveInstant != timestamp,
       let registration = entry.transition.bodyRegistration
     else { return false }
-    var answers: [AnimationKey: AnyAnimatable] = [:]
+    var presented: [AnimationKey: AnyAnimatable] = [:]
     for key in body.valueSites.keys where activeAnimations[key] != nil {
       if let sample = valueSites.samples[key] {
-        answers[key] = sample
+        presented[key] = sample
       }
     }
-    guard !answers.isEmpty || !body.valueTreeIsAtRest else { return false }
+    let answers = body.normalizedValueAnswers(presented)
+    guard answers != body.valueAnswers else { return false }
     let tree: TransitionPhaseTree
     if let evaluated = evaluations[registration.identity], evaluated.answers == answers {
       tree = evaluated.tree
@@ -1016,7 +1066,7 @@ package final class AnimationController: Sendable {
       from: tree,
       registration: registration,
       frozenResolved: entry.snapshot,
-      isAtRest: answers.isEmpty,
+      answers: answers,
       at: timestamp)
     return true
   }
@@ -1321,6 +1371,9 @@ package final class AnimationController: Sendable {
   /// ``processResolvedTree(_:transaction:timestamp:)``.
   package func beginTransitionCollection() {
     transitions.beginCollection()
+    // The collection lasts as long as the frame head's resolve, which is
+    // also when a site resolves through the evaluation of its owner node.
+    valueSites.beginHeadResolve()
     // What the head of an earlier frame decided for its insertions is not
     // this frame's.
     if !bodyInsertions.isEmpty {
@@ -1335,8 +1388,18 @@ package final class AnimationController: Sendable {
   /// ``ViewGraph/evaluatedNodeIDsThisFrame``). `nil` means "every live node was
   /// re-evaluated" (a full evaluation, and the shape a direct test drives),
   /// which prunes any registration not re-collected this frame.
-  package func finishTransitionCollection(reEvaluatedNodeIDs: Set<ViewNodeID>? = nil) {
-    transitions.mergePendingRegistrations(reEvaluatedNodeIDs: reEvaluatedNodeIDs)
+  ///
+  /// `isLiveNode` says whether a graph node is still in the graph (the
+  /// renderer asks its view graph). A registration another node declared
+  /// goes when that node has left. `nil` means it is not known, and no
+  /// registration is dropped for it.
+  package func finishTransitionCollection(
+    reEvaluatedNodeIDs: Set<ViewNodeID>? = nil,
+    isLiveNode: ((ViewNodeID) -> Bool)? = nil
+  ) {
+    transitions.mergePendingRegistrations(
+      reEvaluatedNodeIDs: reEvaluatedNodeIDs, isLiveNode: isLiveNode)
+    valueSites.finishHeadResolve(reEvaluatedNodeIDs: reEvaluatedNodeIDs)
   }
 
   /// Registers a concrete animation so the controller can re-hydrate it
@@ -1380,6 +1443,10 @@ package final class AnimationController: Sendable {
     // continuity-only transaction cannot enqueue controller work and
     // must not defeat the skip (plan 2026-08-04-002 §5.5).
     previousTreeRoot != nil
+      // A registration or a site record that waits for this frame's tree to
+      // say whether its view is still there has to see that tree.
+      && transitions.unconfirmedNodeIDs.isEmpty
+      && valueSites.unresolvedKeys.isEmpty
       && !transactionPlan.hasExplicitTransactions
       && transactionPlan.base.animationRequest.animationBoxIfAny == nil
       && transactionPlan.base.animationBatchID == nil
@@ -1675,11 +1742,12 @@ package final class AnimationController: Sendable {
       activeKeysByOwnerNodeID: activeKeysByOwnerNodeID
     )
 
-    // Re-home registrations whose node id was aliased away by single-child
-    // subtree re-stamping, onto the node that carries their identity in the
-    // committed tree. See ``TransitionRegistry/rehomeAliasedRegistrations``.
-    transitions.rehomeAliasedRegistrations(
-      liveNodeIDs: newLiveNodeIDs, nodeIDByIdentity: newNodeIDByIdentity)
+    // Bring the registrations in line with the committed tree: re-home the
+    // ones whose node id was aliased away by single-child subtree
+    // re-stamping onto the node that carries their identity, and drop the
+    // ones whose node now emits another view than the one they were made
+    // for. See ``TransitionRegistry/reconcile(liveNodeIDs:nodeIDByIdentity:)``.
+    transitions.reconcile(liveNodeIDs: newLiveNodeIDs, nodeIDByIdentity: newNodeIDByIdentity)
 
     // Detect insertions and removals by diffing identity sets.  Skip
     // identities that are already mid-removal: they exist in the
@@ -1904,8 +1972,8 @@ package final class AnimationController: Sendable {
     }
 
     // What the sites of each departing transition body showed when the
-    // first removal of that body took them over, for the removals of the
-    // body's other roots.
+    // removal of the root that holds them took them over, for the removals
+    // of the body's other roots.
     var plannedRemovalSites: [AnimationKey: AnimationTransitionBodyRemoval.LiveSite] = [:]
 
     // Process removals: look up the full subtree and position from the
@@ -1945,6 +2013,7 @@ package final class AnimationController: Sendable {
         transition: transition,
         previousRoot: previousRoot,
         newIdentities: newIdentities,
+        newLiveNodeIDs: newLiveNodeIDs,
         matchedDestinationsByKey: matchedDestinationsByKey,
         transactionPlan: transactionPlan,
         timestamp: timestamp,
@@ -1982,6 +2051,7 @@ package final class AnimationController: Sendable {
         transition: transition,
         previousRoot: previousRoot,
         newIdentities: newIdentities,
+        newLiveNodeIDs: newLiveNodeIDs,
         matchedDestinationsByKey: matchedDestinationsByKey,
         transactionPlan: transactionPlan,
         timestamp: timestamp,
@@ -2016,6 +2086,7 @@ package final class AnimationController: Sendable {
               removedNodeID: nodeID, identity: previousNode.identity,
               transition: .opacity, previousRoot: previousRoot,
               newIdentities: newIdentities,
+              newLiveNodeIDs: newLiveNodeIDs,
               matchedDestinationsByKey: matchedDestinationsByKey,
               transactionPlan: transactionPlan, timestamp: timestamp,
               plannedSites: &plannedRemovalSites)
@@ -2025,6 +2096,9 @@ package final class AnimationController: Sendable {
         pending.append(contentsOf: previousNode.children)
       }
     }
+
+    // The removals of one body last together while its sites animate.
+    shareRemovalValueSiteLifetimes(plannedAt: timestamp)
 
     // Prune transition registrations for nodes that are no longer
     // in the live tree. Their registration was already copied into
@@ -2051,11 +2125,11 @@ package final class AnimationController: Sendable {
     // for the removal that owns them.
     let removalBodyOwners = removalBodyOwners
     // A value animation belongs to the view at its site. That view's
-    // identity can be absent from the tree while its node is in it (see
-    // ``ValueSiteState/ownerNodeIDs``).
+    // identity can be absent from the tree while its node is in it, and its
+    // node can stay in the tree after the view has gone (see
+    // ``ValueSiteState/isLive(_:identities:liveNodeIDs:)``).
     let valueSiteIsLive = { [valueSites] (key: AnimationKey) -> Bool in
-      newIdentities.contains(key.identity)
-        || valueSites.ownerNodeIDs[key].map(newLiveNodeIDs.contains) == true
+      valueSites.isLive(key, identities: newIdentities, liveNodeIDs: newLiveNodeIDs)
     }
     // So is the data of that body's `Animatable` views and modifiers, by
     // key: such a site need not resolve at an identity the removal froze.
@@ -2095,16 +2169,25 @@ package final class AnimationController: Sendable {
       slotVelocitySamplers = slotVelocitySamplers.filter { newIdentities.contains($0.key.identity) }
     }
     // The target an `Animatable` view or modifier last resolved with belongs
-    // to the view at that identity. One that left the tree takes its record
-    // with it, so a view that later appears there starts from its own
-    // value and not from an old one.
+    // to the view at that site. One that left takes its record with it, so
+    // a view that later appears there starts from its own value and not
+    // from an old one, and is a new site to the frame head.
     if !valueSites.targets.isEmpty {
-      valueSites.targets = valueSites.targets.filter { valueSiteIsLive($0.key) }
-      if !valueSites.ownerNodeIDs.isEmpty {
-        valueSites.ownerNodeIDs = valueSites.ownerNodeIDs.filter {
-          valueSites.targets[$0.key] != nil
-        }
+      let liveTargets = valueSites.targets.filter { valueSiteIsLive($0.key) }
+      if liveTargets.count != valueSites.targets.count {
+        valueSites.targets = liveTargets
       }
+      if !valueSites.ownerNodeIDs.isEmpty {
+        valueSites.ownerNodeIDs = valueSites.ownerNodeIDs.filter { liveTargets[$0.key] != nil }
+      }
+      if !valueSites.lateKeys.isEmpty {
+        valueSites.lateKeys = valueSites.lateKeys.filter { liveTargets[$0] != nil }
+      }
+    } else if !valueSites.lateKeys.isEmpty {
+      valueSites.lateKeys.removeAll(keepingCapacity: true)
+    }
+    if !valueSites.unresolvedKeys.isEmpty {
+      valueSites.unresolvedKeys.removeAll(keepingCapacity: true)
     }
 
     // A policy change is meaningful even when the authored target value did
@@ -2328,7 +2411,7 @@ package final class AnimationController: Sendable {
   /// this frame for an identity that had none on the frame before.
   ///
   /// The frame head asks after it has resolved, and runs
-  /// ``prepareTransitionBodyInsertions(in:transactionPlan:reEvaluatedNodeIDs:currentIdentity:)``
+  /// ``prepareTransitionBodyInsertions(in:transactionPlan:reEvaluatedNodeIDs:isLiveNode:currentIdentity:)``
   /// when this is `true`. On every other frame the check is two emptiness
   /// tests.
   package var hasFreshTransitionBodySites: Bool {
@@ -2385,13 +2468,16 @@ package final class AnimationController: Sendable {
   ///
   /// - Parameters:
   ///   - reEvaluatedNodeIDs: the nodes whose declarations ran this frame, as
-  ///     for ``finishTransitionCollection(reEvaluatedNodeIDs:)``.
+  ///     for ``finishTransitionCollection(reEvaluatedNodeIDs:isLiveNode:)``.
+  ///   - isLiveNode: whether a graph node is still in the graph, as for
+  ///     ``finishTransitionCollection(reEvaluatedNodeIDs:isLiveNode:)``.
   ///   - currentIdentity: which identity a graph node is indexed at now, as
   ///     for ``beginValueSiteFrame(at:currentIdentity:)``.
   package func prepareTransitionBodyInsertions(
     in node: ResolvedNode,
     transactionPlan: FrameAnimationTransactionPlan,
     reEvaluatedNodeIDs: Set<ViewNodeID>? = nil,
+    isLiveNode: ((ViewNodeID) -> Bool)? = nil,
     currentIdentity: (ViewNodeID) -> Identity? = { _ in nil }
   ) -> Set<Identity> {
     guard hasFreshTransitionBodySites, let timestamp = valueSites.frameInstant else {
@@ -2399,13 +2485,13 @@ package final class AnimationController: Sendable {
     }
     let census = insertionCensus(of: node, transactionPlan: transactionPlan)
     // The registration maps as the injection stage will read them: this
-    // frame's registrations merged in, and aliased ones moved onto the node
-    // that carries their identity. The controller's own maps stay as they
-    // are until the frame's collection ends.
+    // frame's registrations merged in, and the result brought in line with
+    // the tree. The controller's own maps stay as they are until the frame's
+    // collection ends.
     var registry = transitions
-    registry.mergePendingRegistrations(reEvaluatedNodeIDs: reEvaluatedNodeIDs)
-    registry.rehomeAliasedRegistrations(
-      liveNodeIDs: census.liveNodeIDs, nodeIDByIdentity: census.nodeIDs)
+    registry.mergePendingRegistrations(
+      reEvaluatedNodeIDs: reEvaluatedNodeIDs, isLiveNode: isLiveNode)
+    registry.reconcile(liveNodeIDs: census.liveNodeIDs, nodeIDByIdentity: census.nodeIDs)
     let insertedIdentities = census.identities.subtracting(previousIdentities)
     // The removals with a body that this frame's tree supersedes.
     var returnedRemovals: [Identity: ViewNodeID] = [:]
@@ -2415,12 +2501,11 @@ package final class AnimationController: Sendable {
     }
 
     // Decide every insertion first. What each one starts from must not
-    // depend on the order the inserted identities are visited in.
-    var playing:
-      [(
-        insertion: QualifiedInsertion, registration: TransitionBodyRegistration,
-        returnedRemoval: ViewNodeID?
-      )] = []
+    // depend on the order the inserted identities are visited in. The
+    // insertions are kept by body: a body with several roots has one for
+    // each root that arrives, and which of them a site animates under is a
+    // property of the site (``TransitionBodySiteHolders``).
+    var bodies: [Identity: InsertedBody] = [:]
     for identity in insertedIdentities {
       guard
         let insertion = qualifiedInsertion(
@@ -2436,12 +2521,14 @@ package final class AnimationController: Sendable {
         parents: census.parents,
         returnedRemovalIdentities: returnedRemovals.keys)
       bodyInsertions.decisions[identity] = decision
-      guard decision.plays else { continue }
-      playing.append(
-        (
-          insertion, registration,
-          decision.returnedRemovalIdentity.flatMap { returnedRemovals.removeValue(forKey: $0) }
-        ))
+      let returnedRemoval =
+        decision.plays
+        ? decision.returnedRemovalIdentity.flatMap { returnedRemovals.removeValue(forKey: $0) }
+        : nil
+      bodies[registration.identity, default: InsertedBody(registration: registration)]
+        .roots.append(
+          InsertedBody.Root(
+            insertion: insertion, plays: decision.plays, returnedRemoval: returnedRemoval))
     }
 
     var owners: Set<Identity> = []
@@ -2450,49 +2537,66 @@ package final class AnimationController: Sendable {
     // starts from the removal's working tree, so bring the tree of every
     // superseded removal to this frame's samples first, while the removals
     // still own the animations those samples are of.
-    let takenRemovals = playing.compactMap(\.returnedRemoval)
-    if !takenRemovals.isEmpty {
+    let returning = bodies.values.flatMap(\.roots).filter { $0.returnedRemoval != nil }
+    if !returning.isEmpty {
       var evaluations: RemovalBodyEvaluations = [:]
-      for viewNodeID in takenRemovals + returnedRemovals.values {
+      for viewNodeID in returning.compactMap(\.returnedRemoval) + returnedRemovals.values {
         guard let entry = removingNodes[viewNodeID], var body = entry.body else { continue }
         if refreshRemovalWorkingTree(&body, of: entry, at: timestamp, evaluations: &evaluations) {
           removingNodes[viewNodeID]?.body = body
         }
       }
-      for item in playing {
-        guard let removalNodeID = item.returnedRemoval else { continue }
+      for root in returning {
+        guard let removalNodeID = root.returnedRemoval else { continue }
         owners.formUnion(
           continueRemovalValueSites(
             ofRemoval: removalNodeID,
-            under: item.insertion,
+            under: root.insertion,
+            in: census,
             at: timestamp,
             currentIdentity: currentIdentity))
       }
     }
     // The others start from the `.willAppear` phase. One evaluation serves
     // every root a body emitted.
-    var evaluatedRegistrations: Set<Identity> = []
-    for item in playing where item.returnedRemoval == nil {
-      guard evaluatedRegistrations.insert(item.registration.identity).inserted else { continue }
+    for body in bodies.values
+    where body.roots.contains(where: { $0.plays && $0.returnedRemoval == nil }) {
       owners.formUnion(
-        startInsertionValueSites(
-          of: item.registration,
-          under: item.insertion,
-          in: census,
-          currentIdentity: currentIdentity))
+        startInsertionValueSites(of: body, in: census, currentIdentity: currentIdentity))
     }
     return owners
+  }
+
+  /// The insertions of one transition body on the frame being prepared: one
+  /// for each root of the body that arrives.
+  private struct InsertedBody {
+    struct Root {
+      var insertion: QualifiedInsertion
+      /// Whether the insertion has a curve.
+      var plays: Bool
+      /// The removal this insertion interrupts, when the view came back
+      /// while that removal was in flight and the insertion plays.
+      var returnedRemoval: ViewNodeID?
+    }
+
+    var registration: TransitionBodyRegistration
+    var roots: [Root] = []
   }
 
   /// Evaluates the `.willAppear` phase of an inserted body and starts the
   /// animation of each of its live sites from the data that phase wrote for
   /// it. Returns the owners of the sites that started.
+  ///
+  /// Each site animates under the insertion of the root that holds it
+  /// (``TransitionBodySiteHolders``): under that insertion's transaction
+  /// when it plays, and not at all when it does not, whatever the body's
+  /// other roots do.
   private func startInsertionValueSites(
-    of registration: TransitionBodyRegistration,
-    under insertion: QualifiedInsertion,
+    of body: InsertedBody,
     in census: InsertionCensus,
     currentIdentity: (ViewNodeID) -> Identity?
   ) -> Set<Identity> {
+    let registration = body.registration
     let sink = TransitionBodyValueSink()
     let willAppear = registration.resolve(phase: .willAppear, valueSink: sink)
     // The slot channel of the injection stage takes this evaluation. Its
@@ -2502,40 +2606,63 @@ package final class AnimationController: Sendable {
     bodyInsertions.willAppearRoots[registration.identity] =
       AnimationTransitionBodyInsertion.willAppearRoots(
         of: registration, evaluated: willAppear, root: census.root, parents: census.parents)
+    // The insertion each root of the body arrives through: the one whose
+    // inserted subtree the root is in. A root that was already there has
+    // none. A body with one insertion whose root has another identity in
+    // this phase than on screen arrives through that insertion.
+    let holders = TransitionBodySiteHolders(roots: willAppear.roots)
+    let insertionByRoot: [Int?] = willAppear.roots.map { root in
+      body.roots.firstIndex { candidate in
+        AnimationTransitionBodyInsertion.isInside(
+          root.identity, subtreeOf: candidate.insertion.identity, parents: census.parents)
+      } ?? (body.roots.count == 1 && !census.identities.contains(root.identity) ? 0 : nil)
+    }
     var owners: Set<Identity> = []
-    var animationBox: AnimationBox?
+    var animationBoxes: [Int: AnimationBox] = [:]
     for key in sink.sites {
       // Only a site that resolved for the first time this frame is a site of
       // the body being inserted. It resolved with the data of the identity
       // phase, which is its target. A site that already has an animation
       // took it over from a removal on this frame and continues from there.
       // One that a removal still owns belongs to a view that removal is
-      // drawing: the live site keeps its own data.
+      // drawing: the live site keeps its own data. And a site the tree does
+      // not anchor (neither its identity nor the node that evaluates it is
+      // stamped there) loses its record when this frame is processed: it
+      // gets its destination data at once, and the slots its body writes
+      // animate in its place.
       guard valueSites.freshKeys.contains(key),
         activeAnimations[key] == nil,
         !removalOwnsValue(at: key),
+        valueSites.isLive(key, identities: census.identities, liveNodeIDs: census.liveNodeIDs),
         let target = valueSites.targets[key],
         let origin = sink.phaseData[key],
         origin.wrapsSameType(as: target),
         origin != target,
-        case .value(let ordinal) = key.scope
+        case .value(let ordinal) = key.scope,
+        let holder = holders.holderIndex(ofSiteAt: key.identity),
+        let rootIndex = insertionByRoot[holder]
       else { continue }
-      // The curve of the transition, picked once and only when a site has
-      // something to animate: a curve nothing uses would stay registered.
+      let root = body.roots[rootIndex]
+      // A root that came back during its removal continues the sites of
+      // that removal and starts no other.
+      guard root.plays, root.returnedRemoval == nil else { continue }
+      // The curve of the root's transition, picked once and only when a
+      // site has something to animate: a curve nothing uses would stay
+      // registered.
       let box =
-        animationBox
+        animationBoxes[rootIndex]
         ?? transitionAnimationBox(
-          override: insertion.transition.insertionAnimation,
-          request: insertion.transaction.animationRequest,
+          override: root.insertion.transition.insertionAnimation,
+          request: root.insertion.transaction.animationRequest,
           hasEffect: true)
-      guard let box else { break }
-      animationBox = box
+      guard let box else { continue }
+      animationBoxes[rootIndex] = box
       if beginValueAnimation(
         at: AnimatableValueSite(identity: key.identity, ordinal: ordinal),
         from: origin,
         to: target,
         animationBox: box,
-        batchID: insertion.transaction.animationBatchID)
+        batchID: root.insertion.transaction.animationBatchID)
       {
         owners.insert(valueSites.ownerNodeIDs[key].flatMap(currentIdentity) ?? key.identity)
       }
@@ -2550,11 +2677,13 @@ package final class AnimationController: Sendable {
   /// when the removal's animation of the site has ended. Returns the owners
   /// of the sites that animate.
   ///
-  /// A site of a body with several roots is owned by the removal of each
-  /// root. The first of them to be taken hands the site over for all.
+  /// A site of a body with several roots is owned by the removal of the
+  /// root that holds it, so it is handed over under the insertion of that
+  /// same root.
   private func continueRemovalValueSites(
     ofRemoval removalNodeID: ViewNodeID,
     under insertion: QualifiedInsertion,
+    in census: InsertionCensus,
     at timestamp: MonotonicInstant,
     currentIdentity: (ViewNodeID) -> Identity?
   ) -> Set<Identity> {
@@ -2572,7 +2701,11 @@ package final class AnimationController: Sendable {
         (activeAnimations[key] != nil ? valueSites.samples[key] : nil) ?? removalTarget
       // From here on the animation at the key is the live site's.
       releaseRemovalOwnership(ofValueAt: key)
-      guard shown.wrapsSameType(as: target), shown != target else {
+      // A site the tree does not anchor keeps no record past this frame
+      // (see ``startInsertionValueSites``): it shows its own data.
+      guard shown.wrapsSameType(as: target), shown != target,
+        valueSites.isLive(key, identities: census.identities, liveNodeIDs: census.liveNodeIDs)
+      else {
         endValueAnimation(at: key)
         continue
       }
@@ -2789,6 +2922,7 @@ package final class AnimationController: Sendable {
     transition: AnyTransition,
     previousRoot: ResolvedNode,
     newIdentities: Set<Identity>,
+    newLiveNodeIDs: Set<ViewNodeID>,
     matchedDestinationsByKey: [MatchedGeometryKey: Identity],
     transactionPlan: FrameAnimationTransactionPlan,
     timestamp: MonotonicInstant,
@@ -2797,6 +2931,10 @@ package final class AnimationController: Sendable {
     let effects = transition.removalModifiers()
     let registration = transition.bodyRegistration
     guard effects != .identity || registration != nil else { return }
+    // Whether a live view still resolves the site at `key` in the new tree.
+    let siteIsLive = { [valueSites] (key: AnimationKey) -> Bool in
+      valueSites.isLive(key, identities: newIdentities, liveNodeIDs: newLiveNodeIDs)
+    }
     // A body whose removal does not play leaves at once. Its insertion may
     // still be in flight. End that here, as the removal of an effect ends an
     // insertion below: the completions the insertion retained fire now. Left
@@ -2804,7 +2942,8 @@ package final class AnimationController: Sendable {
     // only for a view that had no transition.
     func snapBody() {
       if registration != nil {
-        supersedeAnimations(inDepartingSubtreeAt: identity, previousRoot: previousRoot)
+        supersedeAnimations(
+          inDepartingSubtreeAt: identity, previousRoot: previousRoot, siteIsLive: siteIsLive)
       }
     }
     // A transition whose own animation is `nil` snaps: it plans no overlay,
@@ -2905,7 +3044,7 @@ package final class AnimationController: Sendable {
         previousSnapshots: previousSnapshots,
         hasEffectChannel: effects != .identity,
         effectOwnsRootOpacity: effects.opacity != nil,
-        liveSites: liveSiteData(planned: plannedSites),
+        liveSites: liveSiteData(planned: plannedSites, isLive: siteIsLive),
         timestamp: timestamp
       ) {
       case .plays(let plan):
@@ -2954,7 +3093,8 @@ package final class AnimationController: Sendable {
     // snapping back to 1.0.  Must run before the filter below. An opacity
     // the body channel keeps is not an effect to carry: it continues on its
     // own key.
-    let injectedIdentities = AnimationTreeQueries.collectIdentities(in: subtree)
+    let departing = DepartingViews(subtree)
+    let injectedIdentities = departing.identities
     var initialOpacity: Double = 1.0
     let keyOnTarget = AnimationKey(identity: identity, slot: .opacity)
     if !bodyKeeps(keyOnTarget), let existing = activeAnimations[keyOnTarget],
@@ -3015,12 +3155,15 @@ package final class AnimationController: Sendable {
     retainBatch(completionBatchID)
 
     let supersededEntries = activeAnimations.filter {
-      injectedIdentities.contains($0.key.identity) && !bodyKeeps($0.key)
+      animation(at: $0.key, belongsTo: departing, siteIsLive: siteIsLive) && !bodyKeeps($0.key)
     }
-    activeAnimations = activeAnimations.filter {
-      !injectedIdentities.contains($0.key.identity) || bodyKeeps($0.key)
+    if !supersededEntries.isEmpty {
+      activeAnimations = activeAnimations.filter { supersededEntries[$0.key] == nil }
     }
-    for (_, entry) in supersededEntries {
+    for (key, entry) in supersededEntries {
+      if key.isValue {
+        valueSites.samples.removeValue(forKey: key)
+      }
       releaseBatch(entry.batchID, logicalAlreadyReleased: entry.isLogicallyReleased)
     }
 
@@ -3109,21 +3252,70 @@ package final class AnimationController: Sendable {
     )
   }
 
+  /// The views of a subtree that left the tree, as the animation maps name
+  /// them: by identity, and by the graph node that evaluated them.
+  private struct DepartingViews {
+    var identities: Set<Identity> = []
+    var nodeIDs: Set<ViewNodeID> = []
+
+    init(_ subtree: ResolvedNode) {
+      var pending = [subtree]
+      while let node = pending.popLast() {
+        identities.insert(node.identity)
+        if let viewNodeID = node.viewNodeID {
+          nodeIDs.insert(viewNodeID)
+        }
+        pending.append(contentsOf: node.children)
+      }
+    }
+  }
+
+  /// Whether the animation at `key` is an animation of a view of
+  /// `departing`.
+  ///
+  /// Every animation is keyed at the identity of its view, and that covers
+  /// all but one case. The data of an `Animatable` view or modifier animates
+  /// at the identity the view resolves at, which need not be an identity of
+  /// the tree (see ``ValueSiteState/ownerNodeIDs``). Such an animation
+  /// belongs to the departing views when the node that evaluated its site is
+  /// one of theirs and no live view resolves the site any more. The second
+  /// condition matters where a node outlives its view: a slot keeps its node
+  /// for the next occupant, whose sites are that node's too.
+  private func animation(
+    at key: AnimationKey,
+    belongsTo departing: DepartingViews,
+    siteIsLive: (AnimationKey) -> Bool
+  ) -> Bool {
+    if departing.identities.contains(key.identity) {
+      return true
+    }
+    guard key.isValue, let ownerNodeID = valueSites.ownerNodeIDs[key],
+      departing.nodeIDs.contains(ownerNodeID)
+    else { return false }
+    return !siteIsLive(key)
+  }
+
   /// Ends every animation in flight on the subtree that departed at
   /// `identity`, releasing the batches they retained so their completions
   /// fire.
   private func supersedeAnimations(
     inDepartingSubtreeAt identity: Identity,
-    previousRoot: ResolvedNode
+    previousRoot: ResolvedNode,
+    siteIsLive: (AnimationKey) -> Bool
   ) {
     guard !activeAnimations.isEmpty,
       let subtree = AnimationTreeQueries.findResolvedSubtree(in: previousRoot, identity: identity)
     else { return }
-    let departing = AnimationTreeQueries.collectIdentities(in: subtree)
-    let superseded = activeAnimations.filter { departing.contains($0.key.identity) }
+    let departing = DepartingViews(subtree)
+    let superseded = activeAnimations.filter {
+      animation(at: $0.key, belongsTo: departing, siteIsLive: siteIsLive)
+    }
     guard !superseded.isEmpty else { return }
-    activeAnimations = activeAnimations.filter { !departing.contains($0.key.identity) }
-    for (_, entry) in superseded {
+    activeAnimations = activeAnimations.filter { superseded[$0.key] == nil }
+    for (key, entry) in superseded {
+      if key.isValue {
+        valueSites.samples.removeValue(forKey: key)
+      }
       releaseBatch(entry.batchID, logicalAlreadyReleased: entry.isLogicallyReleased)
     }
   }
@@ -4889,6 +5081,7 @@ extension AnimationController: AnimatableValueSink {
     } else if valueSites.ownerNodeIDs[key] != nil {
       valueSites.ownerNodeIDs.removeValue(forKey: key)
     }
+    valueSites.noteResolve(of: key)
     if removalOwnsValue(at: key) {
       // A removal is still drawing the view that was at this site, and owns
       // the animation at the key. A view that resolves here now came back

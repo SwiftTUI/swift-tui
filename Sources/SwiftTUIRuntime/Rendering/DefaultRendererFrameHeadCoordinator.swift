@@ -593,7 +593,8 @@ struct DefaultRendererFrameHeadCoordinator {
         base: resolveInputs.transaction,
         segments: resolveInputs.animationSegments
       ),
-      reEvaluatedNodeIDs: viewGraph.evaluatedNodeIDsThisFrame
+      reEvaluatedNodeIDs: viewGraph.evaluatedNodeIDsThisFrame,
+      isLiveNode: { viewGraph.nodeForViewNodeID($0) != nil }
     ) { viewNodeID in
       viewGraph.nodeForViewNodeID(viewNodeID).map { viewGraph.stateReaderIdentity(of: $0) }
     }
@@ -606,8 +607,18 @@ struct DefaultRendererFrameHeadCoordinator {
         ? owners : []
     )
     graphDraft.recordDirtyEvaluationPlan(evaluation.plan, diagnostics: evaluation.diagnostics)
-    _ = viewGraph.evaluateDirtyNodes(using: evaluation.plan)
-    recomposeDeclaredChildren(graphDraft: graphDraft)
+    viewGraph.reevaluatingThisFrame {
+      _ = viewGraph.evaluateDirtyNodes(using: evaluation.plan)
+      recomposeDeclaredChildren(graphDraft: graphDraft)
+    }
+    // The owners ran with other data than the first time. A preference one
+    // of them writes (a presentation it declares is one) is then not what
+    // the views above composed on this frame, which was the output of the
+    // first run. They compose again, from the root, as they do when a
+    // narrow evaluation changes a preference below a view that was served:
+    // the head's checks for that ran before this pass. A body whose sites
+    // write no preference pays the check and nothing more.
+    _ = escalateForPreferenceDelta(graphDraft: graphDraft, resolveInputs: resolveInputs)
   }
 
   private func installPresentationPortalEvaluator<V: View>(
@@ -799,8 +810,12 @@ struct DefaultRendererFrameHeadCoordinator {
     // this frame yet declared no `.transition()` (they dropped the modifier).
     // Only the *evaluated* set is passed — reused subtrees are untouched, so
     // their still-valid registrations are preserved across selective frames.
+    // A registration another node declared also goes when that node has left
+    // the graph.
+    let graph = viewGraph
     animationDraft.controller.finishTransitionCollection(
-      reEvaluatedNodeIDs: viewGraph.evaluatedNodeIDsThisFrame
+      reEvaluatedNodeIDs: graph.evaluatedNodeIDsThisFrame,
+      isLiveNode: { graph.nodeForViewNodeID($0) != nil }
     )
 
     let resolved = wrapInContainerSafeArea(

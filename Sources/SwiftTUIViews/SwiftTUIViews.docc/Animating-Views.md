@@ -494,7 +494,8 @@ What to expect:
   what must stay in range, as `Reveal` does for its opacity.
 - **An interruption continues from the value on screen.** A removal during
   the insertion, and a re-insertion during the removal, carry `progress` on
-  from its current value, and a spring keeps its velocity.
+  from its current value, and a spring keeps its velocity. Under a timing
+  curve `progress` turns round on the next frame.
 - **With no animation the body runs once.** A plain state write,
   `withAnimation(nil)` and Reduce Motion insert the view with the `identity`
   data and remove it at once. Reduce Motion that turns on in flight ends the
@@ -518,12 +519,21 @@ What to expect:
   conformer write a different property, or wrap `content` in a stack and put
   one of the two on the stack.
 
+- **A body that returns several views animates each conformer with the view
+  that holds it.** Each of those views arrives and leaves through the
+  transition by itself. A conformer animates when the view it wraps, or the
+  view it is part of, plays the transition, under that view's transaction.
+  Views of one body that leave together stay until its conformers have
+  settled.
+
 A shape that conforms to `Animatable` also animates inside a body, in a
 `clipShape`, a `fill` or a `stroke`, and costs less: its `path(in:)` runs for
 each frame and no view is evaluated. Prefer it where a shape can draw the
 effect. A conformer the body places inside a ``GeometryReader`` or a lazy
 stack is evaluated while that view lays out and gets its `identity` data at
-once. See <doc:Divergences-And-Gaps>.
+once. So does a modifier that wraps several views and adds none of its own:
+put such views in a stack and apply the modifier to the stack. See
+<doc:Divergences-And-Gaps>.
 
 ## Roll A Number When It Changes
 

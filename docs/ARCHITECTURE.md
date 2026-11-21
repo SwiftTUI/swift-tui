@@ -749,6 +749,26 @@ body by key. The `didDisappear` body is evaluated again on each frame the
 removal draws, with that frame's samples, and takes the steps planning took
 after its evaluation, which the two share.
 
+What the controller keeps for a view lasts as long as that view, by three
+rules. A site's record goes when the node that evaluates the site runs in
+the frame head without resolving it, or leaves the tree
+(`ValueSiteState.isLive` in `Lifecycle/AnimationControllerSubstructs.swift`):
+a slot keeps its node for the next occupant, so the node alone does not say
+the view is still there. A transition registration that another node
+declared goes when that node leaves the graph, or when the registered node
+runs alone and the resolved tree shows it emitting another view
+(`TransitionRegistry.mergePendingRegistrations` and `reconcile`). The
+animations of a departing view are the ones keyed at its identities together
+with the value animations of the sites its nodes evaluated
+(`AnimationController.animation(at:belongsTo:siteIsLive:)`), so a removal
+that snaps ends them all and their completions fire. A body with several
+roots has an insertion and a removal for each root, and one rule says which
+root a site animates with (`TransitionBodySiteHolders` in
+`Lifecycle/AnimationTransitionBodyInsertion.swift`): a removal takes only
+the sites its root holds and no live view still resolves. When the head's
+second run of a site's owner changes a preference, the head composes the
+frame again from the root (`ViewGraph.reevaluatingThisFrame`).
+
 `resolve` reuses unchanged work in two ways. **Retained reuse** skips a subtree
 that is separate from the frame's invalidation. **Memoized-body reuse** is on by
 default. It can also skip a subtree under an invalidated ancestor when all of

@@ -59,14 +59,22 @@ public struct TransitionRegistrationModifier: IterativePrimitiveViewModifier, Se
         let registered = transition.registeringBody(in: context, emitting: nodes)
         // The node whose evaluation declares the transition. An emitted
         // node can have a graph node of its own (each view of a body with
-        // several roots does), and an evaluation of that node alone does
-        // not run this modifier: the sink keeps such a registration until
-        // this node is evaluated again without declaring it.
-        let declaringNodeID = ViewNodeContext.current?.viewNodeID
+        // several roots does, and so does a view with state of its own
+        // under a transition over several views), and an evaluation of that
+        // node alone does not run this modifier. The sink keeps such a
+        // registration while this node stays in the graph without declaring
+        // it again, and the emitted node still emits the view it was made
+        // for. Only a node of this resolve's own graph is named: the sink
+        // asks that graph whether the node is still there.
+        let hostNodeID = ViewNodeContext.current?.viewNodeID
+        let declaringNodeID =
+          ViewNodeContext.current.flatMap { current in
+            current.ownerGraph === context.viewGraph ? current.viewNodeID : nil
+          }
         for node in nodes {
           sink.registerTransition(
             for: node.identity,
-            viewNodeID: node.viewNodeID ?? declaringNodeID,
+            viewNodeID: node.viewNodeID ?? hostNodeID,
             declaringNodeID: declaringNodeID,
             transition: registered
           )

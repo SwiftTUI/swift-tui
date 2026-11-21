@@ -155,6 +155,13 @@ require 1.0.0. See [COMPATIBILITY.md](docs/COMPATIBILITY.md).
 
 ### Fixed
 
+- A view with state of its own keeps the transition that was declared for
+  it together with other views, as in
+  `Group { Text("Total"); Counter() }.transition(.slide)`. After the view's own
+  state changed, its next removal used the default opacity fade in place of
+  the declared transition, and a declared `.identity` no longer suppressed
+  the fade. The declared transition now stands for as long as the view does
+  (STUI-1546).
 - An app's empty clipboard write on Android is delivered, and replaces text
   the client has not drained yet, for a client that takes clipboard text.
   Before, the write was refused and the earlier text was delivered. A client
