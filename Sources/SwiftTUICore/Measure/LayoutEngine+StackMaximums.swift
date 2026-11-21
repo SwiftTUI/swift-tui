@@ -95,8 +95,9 @@ extension LayoutEngine {
       return DirectMaximum(value: nil)
     }
     // Before the Spacer rule: `.fixedSize()` merges onto the Spacer node
-    // itself, and a fixed Spacer is rigid at its ideal length.
-    if isFixedSize(node.layoutMetadata, on: axis) {
+    // itself, and a fixed Spacer is rigid at its ideal length. Read through
+    // the boundary of a transition body, like the Spacer rule below.
+    if node.withContainerLayoutMetadata({ isFixedSize($0, on: axis) }) {
       return DirectMaximum(value: idealMain)
     }
     if isSpacer(node) {
@@ -106,7 +107,9 @@ extension LayoutEngine {
       // vertically greedy inside a VStack (and horizontally greedy inside an
       // HStack), so a one-line status strip competed with the intended
       // flexible child and the stack never filled its proposal.
-      if let spacerStackAxis = node.drawMetadata.leafStackAxis, spacerStackAxis != axis {
+      if let spacerStackAxis = node.withLayoutRoleNode({ $0.drawMetadata.leafStackAxis }),
+        spacerStackAxis != axis
+      {
         return DirectMaximum(value: idealMain)
       }
       return DirectMaximum(value: nil)

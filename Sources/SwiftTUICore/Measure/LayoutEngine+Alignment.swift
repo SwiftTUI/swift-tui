@@ -420,6 +420,10 @@ extension LayoutEngine {
       index = 0
     case .decoration(let primaryIndex, _):
       index = primaryIndex
+    case .intrinsic where node.isTransitionContentBoundary:
+      // The boundary of a transition body has the guides of the view behind
+      // it.
+      index = 0
     default:
       return nil
     }
@@ -531,6 +535,13 @@ extension LayoutEngine {
               reference: reference.halfCellPosition(of: alignment.vertical))
           )
         case .offset, .decoration:
+          baseDimensions = propagatedViewDimensions(
+            size: levelMeasured.measuredSize,
+            from: child,
+            offsetX: 0,
+            offsetY: 0
+          )
+        case .intrinsic where levelResolved.isTransitionContentBoundary:
           baseDimensions = propagatedViewDimensions(
             size: levelMeasured.measuredSize,
             from: child,

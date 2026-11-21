@@ -85,8 +85,11 @@ extension LayoutEngine {
     }
   }
 
+  /// Whether `child` is a `Spacer` to the container that lays it out: a
+  /// `Spacer`, or the boundary a transition body put around one
+  /// (`ResolvedNode.withLayoutRoleNode`).
   package func isSpacer(_ child: ResolvedNode) -> Bool {
-    child.kind == .view(.spacer)
+    child.withLayoutRoleNode { $0.kind == .view(.spacer) }
   }
 
   /// Along-axis Spacers report an intrinsic size even when offered surplus.
@@ -98,6 +101,11 @@ extension LayoutEngine {
       // `.fixedSize()` merges onto the node it modifies, so a fixed Spacer
       // is one node: check the flag first or it never pins the Spacer.
       if isFixedSize(current.layoutMetadata, on: axis) { return false }
+      // The boundary of a transition body stands for the view behind it.
+      if current.isTransitionContentBoundary {
+        current = current.children[0]
+        continue
+      }
       if isSpacer(current) {
         return current.drawMetadata.leafStackAxis == nil
           || current.drawMetadata.leafStackAxis == axis

@@ -38,6 +38,13 @@ extension LayoutEngine {
     for node: ResolvedNode,
     passContext: LayoutPassContext?
   ) -> Spacing {
+    // The boundary of a transition body stands for the view behind it. Every
+    // other node is read where it is: this runs for each child of each stack
+    // that has no spacing of its own, so it copies neither the node nor its
+    // metadata.
+    if node.isTransitionContentBoundary {
+      return effectiveSpacing(behindBoundary: node, passContext: passContext)
+    }
     guard case .custom(let token) = node.layoutBehavior,
       let handle = token as? CustomLayoutHandle,
       let declared = handle.preferredSpacing(engine: self, node: node, passContext: passContext)
@@ -45,6 +52,21 @@ extension LayoutEngine {
       return node.layoutMetadata.spacing
     }
     return declared.merging(node.layoutMetadata.spacing)
+  }
+
+  private func effectiveSpacing(
+    behindBoundary boundary: ResolvedNode,
+    passContext: LayoutPassContext?
+  ) -> Spacing {
+    let role = boundary.viewBehindBoundary
+    let spacing = boundary.layoutMetadataThroughBoundary.spacing
+    guard case .custom(let token) = role.layoutBehavior,
+      let handle = token as? CustomLayoutHandle,
+      let declared = handle.preferredSpacing(engine: self, node: role, passContext: passContext)
+    else {
+      return spacing
+    }
+    return declared.merging(spacing)
   }
 
   package func preferredSpacingDistance(

@@ -7,10 +7,9 @@ extension LayoutEngine {
     axis: Axis
   ) -> Int {
     max(
-      minimumMainDimension(
-        for: child.layoutMetadata,
-        axis: axis
-      ) ?? 0,
+      child.withContainerLayoutMetadata {
+        minimumMainDimension(for: $0, axis: axis)
+      } ?? 0,
       derivedMinimumMainSize(
         for: child,
         idealMeasurement: idealMeasurement,
@@ -196,7 +195,7 @@ extension LayoutEngine {
     var minimums: [Identity: Int] = [:]
 
     while let frame = work.popLast() {
-      if isFixedSize(frame.node.layoutMetadata, on: axis) {
+      if frame.node.withContainerLayoutMetadata({ isFixedSize($0, on: axis) }) {
         minimums[frame.node.identity] = mainDimension(
           of: frame.idealMeasurement.measuredSize,
           for: axis
@@ -207,7 +206,8 @@ extension LayoutEngine {
         // Cross reconciliation may already have stretched this Spacer. Its
         // allocation is not a minimum; the intrinsic size retains minLength.
         minimums[frame.node.identity] = mainDimension(
-          of: frame.node.intrinsicSize ?? frame.idealMeasurement.measuredSize,
+          of: frame.node.withLayoutRoleNode { $0.intrinsicSize }
+            ?? frame.idealMeasurement.measuredSize,
           for: axis
         )
         continue
@@ -247,10 +247,9 @@ extension LayoutEngine {
       let childMinimums = childPairs.map { child, measurement in
         if ignoresSpacers && isSpacer(child) { return 0 }
         return max(
-          minimumMainDimension(
-            for: child.layoutMetadata,
-            axis: axis
-          ) ?? 0,
+          child.withContainerLayoutMetadata {
+            minimumMainDimension(for: $0, axis: axis)
+          } ?? 0,
           minimums[child.identity]
             ?? mainDimension(of: measurement.measuredSize, for: axis)
         )

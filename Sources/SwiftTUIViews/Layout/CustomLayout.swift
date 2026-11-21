@@ -54,17 +54,17 @@ public struct LayoutSubview {
 
   /// The child's declared layout priority.
   public var layoutPriority: Double {
-    child.layoutMetadata.layoutPriority
+    child.withContainerLayoutMetadata { $0.layoutPriority }
   }
 
   /// Whether the child resists horizontal compression.
   public var fixedSizeHorizontal: Bool {
-    child.layoutMetadata.fixedSizeHorizontal
+    child.withContainerLayoutMetadata { $0.fixedSizeHorizontal }
   }
 
   /// Whether the child resists vertical compression.
   public var fixedSizeVertical: Bool {
-    child.layoutMetadata.fixedSizeVertical
+    child.withContainerLayoutMetadata { $0.fixedSizeVertical }
   }
 
   /// The current pass's rendered frame for an already placed source. Layouts
@@ -86,10 +86,9 @@ public struct LayoutSubview {
   }
 
   public subscript<K: LayoutValueKey>(key: K.Type) -> K.Value {
-    child.layoutMetadata.layoutValue(
-      for: ObjectIdentifier(K.self),
-      as: K.Value.self
-    ) ?? K.defaultValue
+    child.withContainerLayoutMetadata {
+      $0.layoutValue(for: ObjectIdentifier(K.self), as: K.Value.self)
+    } ?? K.defaultValue
   }
 
   /// Measures the child under `proposal`.
