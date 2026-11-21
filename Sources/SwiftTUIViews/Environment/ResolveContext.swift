@@ -288,6 +288,11 @@ public struct ResolveContext: Equatable, Sendable {
     get { propagated.imageAssetResolver }
     set { propagated.imageAssetResolver = newValue }
   }
+  /// See ``PropagatedRegistries/elementTransition``.
+  package var elementTransition: ElementTransition? {
+    get { propagated.elementTransition }
+    set { propagated.elementTransition = newValue }
+  }
   package var frameInputs: FrameResolveInputBox? {
     get { propagated.frameInputs }
     set { propagated.frameInputs = newValue }
@@ -913,6 +918,17 @@ extension ResolveContext {
     /// stable live-state log, so evaluator closures captured on earlier
     /// frames keep reporting into the current frame's log.
     package var presentationTriggerObserver: PresentationTriggerObservationLog?
+    /// A transition with a body that was applied to a view that emits
+    /// several views (a `Group`, a `ForEach`, a view whose body has several
+    /// roots), on its way down to each of those views. The first view below
+    /// that is one view takes it, as if `.transition(_:)` had been written on
+    /// it, and resolves its content without it
+    /// (`TransitionDistribution.swift`). Inherited by every derived context,
+    /// because the views it is for are structural descendants.
+    ///
+    /// One reference, so that a context without one, which is nearly every
+    /// context, copies nothing for it.
+    package var elementTransition: ElementTransition?
 
     package init(
       resolveWorkTracker: ResolveWorkTracker? = nil,

@@ -7,7 +7,29 @@ func resolveViewWork<V: View>(
   authoringContextOverride: AuthoringContext? = nil,
   rebuilding: ViewEvaluationProducer<V>? = nil
 ) -> ResolveWork<ResolvedNode> {
-  .deferred {
+  // A transition that is travelling down to each view of several: this view
+  // takes it, as if `.transition(_:)` were written on it
+  // (`TransitionDistribution.swift`). Nearly every resolve has none, and
+  // pays this one test.
+  if context.elementTransition != nil,
+    let element = takingElementTransition(view, in: context)
+  {
+    let modifier = element.view.modifier
+    return resolveViewWork(
+      element.view,
+      in: element.context,
+      authoringContextOverride: authoringContextOverride,
+      rebuilding: rebuilding.map { producer in
+        ViewEvaluationProducer(
+          entityIdentity: producer.entityIdentity,
+          structuralPath: producer.structuralPath,
+          declaredChildReplayBoundary: producer.declaredChildReplayBoundary,
+          makeView: { producer.makeView($0).modifier(modifier) }
+        )
+      }
+    )
+  }
+  return .deferred {
     let forwardedPreparation = ForwardedDynamicPropertyPreparationScope.begin()
     let context = context.applyingCurrentFrameResolveInputs()
     // The producer owns the iteration's outer resolve. A forwarded exact-ID
@@ -262,7 +284,12 @@ func resolveViewWork<V: View>(
 package func resolveViewElementsWork<V: View>(
   _ view: V, in context: ResolveContext
 ) -> ResolveWork<[ResolvedNode]> {
-  .deferred {
+  if context.elementTransition != nil,
+    let element = takingElementTransition(view, in: context)
+  {
+    return resolveViewElementsWork(element.view, in: element.context)
+  }
+  return .deferred {
     // An enclosing `ModifiedContent` that animates as a whole has already
     // written this view's `animatableData`. The mark is for this view alone,
     // so it stops here whatever the view turns out to be.

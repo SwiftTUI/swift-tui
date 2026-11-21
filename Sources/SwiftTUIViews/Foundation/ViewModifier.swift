@@ -172,6 +172,27 @@ package struct ModifierContentInputs<Base: View> {
     }
   }
 
+  /// Resolves the base to the views it declares, as a container that the
+  /// base were written in would take them.
+  ///
+  /// A base that only arranges other views (a `Group`, the views of a
+  /// builder) gets no graph node of its own this way, as it gets none in a
+  /// container. With a node of its own, a base that emits one view hands
+  /// that view up stamped with the base's node, and the view changes graph
+  /// node whenever the number of views crosses between one and two. Any
+  /// other base resolves as ``resolveElementsWork(in:)`` resolves it.
+  package func resolveDeclaredElementsWork(
+    in context: ResolveContext
+  ) -> ResolveWork<[ResolvedNode]> {
+    guard base is any DeclaredChildrenView else {
+      return resolveElementsWork(in: context)
+    }
+    return applyAuthoringContext {
+      resolveDeclaredChildrenWork(
+        base, in: contentResolveContext(in: context), kindName: .group)
+    }
+  }
+
   /// Runs a user-authored closure carried by the modifier *value* under the
   /// authoring scope captured when the modifier was constructed (the
   /// enclosing body). Dynamic-property reads inside such closures must reach

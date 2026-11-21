@@ -30,6 +30,33 @@ public struct TransitionRegistrationModifier: IterativePrimitiveViewModifier, Se
     // body resolves; the content sits behind the boundary node the body's
     // `content` placement emits. A transition without one resolves the
     // content directly and adds no node.
+    // A body takes one view as its content. On content that emits several
+    // views the transition goes down to each of them instead, and each
+    // resolves as if this modifier were written on it
+    // (`TransitionDistribution.swift`). Nothing is registered here: each
+    // view registers its own.
+    if transition.bodyBox != nil, viewEmitsSeveralViews(Base.self) {
+      return content.resolveDeclaredElementsWork(in: context.distributing(transition)).map {
+        elements in
+        // The views stay in a group, however many there are, and the
+        // container this modifier is in takes them out of it. Handed up
+        // alone, a single view would be stamped with this modifier's graph
+        // node, and would change node, and seem to leave and arrive, when
+        // a view beside it comes or goes.
+        var views = elements
+        assignEntityIdentityOccurrences(to: &views)
+        return [
+          ResolvedNode(
+            identity: context.identity,
+            kind: .view(.group),
+            typeDiscriminator: ObjectIdentifier(SynthesizedGroupWrapperMarker.self),
+            children: views,
+            environmentSnapshot: context.environment,
+            transactionSnapshot: context.transaction
+          )
+        ]
+      }
+    }
     let elements: ResolveWork<[ResolvedNode]>
     if let bodyBox = transition.bodyBox {
       elements = bodyBox.resolveElementsWork(
