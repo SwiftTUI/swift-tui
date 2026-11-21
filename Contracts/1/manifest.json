@@ -4,7 +4,7 @@
   "profile": "swifttui.host-wire/1",
   "minimumReader": "full-v1-v2",
   "schemaDialect": "https://json-schema.org/draft/2020-12/schema",
-  "contentSHA256": "f5c5a078fd067a0dba85e6d254e23446f51b5ce74a8a49351448c7ea843b9713",
+  "contentSHA256": "3978417048618332b2820aa2e503e8f3e87d8a92564c6cfe64212b0a498888c9",
   "files": {
     "README.md": {
       "sha256": "b32803c21d7c0aad46916194c191fdaebadba024e4c8872924aed4d3ce451ade",
@@ -79,8 +79,8 @@
       "bytes": 3243
     },
     "profiles/swift-source.md": {
-      "sha256": "7e621643d38a9d731055883905fda394f2a184bae8189629b91d1c32f144fc9e",
-      "bytes": 5387
+      "sha256": "8e0492b5b3a1cbf9a600827909413c34ab73b090fc6f2239ef76d1916b4e777a",
+      "bytes": 6467
     },
     "profiles/terminal-cli.md": {
       "sha256": "0545089f914cb80026b8b1f4c407bc96f40820f2eb1e7bd93d61bc97ddd6f2bf",
@@ -119,8 +119,8 @@
       "bytes": 180
     },
     "swift/inventory.jsonl": {
-      "sha256": "665a485c3257d4018836c6c810f101c969c071b12ae68508efd7386176021439",
-      "bytes": 3376486
+      "sha256": "70271a782ba48fb3c29812d52c0d4e8c7d61a98376d5a5c3e83e817e01931592",
+      "bytes": 3385141
     }
   },
   "runner": "conformance/run.py",

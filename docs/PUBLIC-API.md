@@ -15,8 +15,10 @@ consistent new API.
 A machine-generated enumeration of every public symbol lives in
 `PUBLIC_API_BASELINE.md` (grouped) and `.public-api-baseline.txt` (flat). The
 `.spi-api-baseline.txt` file separately tracks the `@_spi` surface. The supported native host import is `@_spi(Host)`; `Runners` remains a bounded
-legacy/internal adapter. `@_spi(Testing)` exposes the external snapshot facade
-and hosted-frame test synchronization. `@_spi(StyleFixtures)` is the
+legacy/internal adapter. `@_spi(Testing)` exposes the external snapshot facade,
+hosted-frame test synchronization and the run-loop test harness
+(`RunLoopTestHarness` in `SwiftTUITestSupport`, see
+[Testing on the run loop](#testing-on-the-run-loop)). `@_spi(StyleFixtures)` is the
 style-library testing contract (the
 fixture initializers on every style configuration and captured slot;
 presentation values keep ordinary public initializers because styles
@@ -95,7 +97,8 @@ The canonical public surface is the API ordinary app code uses first:
   `AnyTransition` overload, and `Scripts/check_transition_consumer.sh` builds
   an external package whose library uses the whole surface with the
   `SwiftTUIViews` product alone, and runs that package's frame tests of six
-  demonstration transitions. What a custom body does today is the *Custom
+  demonstration transitions and its run-loop tests of two of them, which
+  use `RunLoopTestHarness`. What a custom body does today is the *Custom
   `Transition` bodies* entry in
   [Divergences-And-Gaps.md](../Sources/SwiftTUIViews/SwiftTUIViews.docc/Divergences-And-Gaps.md).
 - Runtime integration in `SwiftTUIRuntime`: `DefaultRenderer`, `RunLoop`,
@@ -303,6 +306,25 @@ wholly external in
 plumbing remains in `SwiftTUIPTYPrimitives`; terminal views ship from
 [`swift-tui-terminal-view`](https://github.com/SwiftTUI/swift-tui-terminal-view). Showcase and
 example targets never become products.
+
+## Testing on the run loop
+
+`RunLoopTestHarness` in the `SwiftTUITestSupport` product is ratified Testing
+SPI (`@_spi(Testing) import SwiftTUITestSupport`). It builds a view on the
+real run loop with a virtual frame clock, so a test in another package steps
+an animation or a transition frame by frame, sends keys, mouse events, pastes
+and resizes through the run loop's input dispatch, and reads each presented
+`RasterSurface`. Nothing sleeps. The developer guide is the DocC article
+[Driving-The-Run-Loop.md](../Sources/SwiftTUITestSupport/SwiftTUITestSupport.docc/Driving-The-Run-Loop.md).
+
+The harness is the whole seam. `RunLoop`'s frame clock, its package
+initializer and its frame drivers stay package-only, and the harness exposes
+no animation controller, scheduler or registry: a test reads frames, the
+virtual instant and the next armed frame, and nothing below them. It drives
+the synchronous frame path only. The asynchronous render modes, `.task`
+work, exit handling and views that read the wall clock are outside it.
+`Scripts/check_transition_consumer.sh` runs tests that use it from an
+external package.
 
 ## Removed From The Public Surface
 

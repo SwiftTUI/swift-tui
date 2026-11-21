@@ -1,6 +1,7 @@
 # ``SwiftTUITestSupport``
 
-Poll-free synchronization primitives for deterministic, flake-resistant tests.
+Poll-free synchronization primitives and a run-loop harness for deterministic,
+flake-resistant tests.
 
 ## Overview
 
@@ -24,6 +25,11 @@ Use a failure bound to stop a test that cannot make progress. These primitives
 measure the bound in *runtime stages*, not seconds. See ``StageClock``. A stage
 count is identical on fast and slow hardware. Thus, the bound is deterministic.
 
+A test of an animation, a transition or an input does not need to wait at
+all. ``RunLoopTestHarness`` builds a view on the real run loop with a virtual
+frame clock, so the test renders each frame at the instant it names. See
+<doc:Driving-The-Run-Loop>.
+
 Real-terminal journeys are the exception: a PTY is an operating-system
 resource outside the runtime stage model.
 ``waitForANSIVisibleScreen(on:screen:deadline:condition:)`` therefore combines
@@ -34,6 +40,10 @@ The package is exposed through `@_spi(Testing)`. It is test scaffolding, not
 part of the public SwiftTUI surface.
 
 ## Topics
+
+### Run Loop Harness
+
+- ``RunLoopTestHarness``
 
 ### Event Signals
 
@@ -63,4 +73,5 @@ part of the public SwiftTUI surface.
 
 ### Guides
 
+- <doc:Driving-The-Run-Loop>
 - <doc:Synchronising-Without-Polling>

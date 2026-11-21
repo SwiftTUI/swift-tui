@@ -23,7 +23,7 @@ platform qualification in addition to the complete macOS census.
 | `SwiftTUIViews` | Author views, styles and modifiers using ordinary public declarations classified canonical. |
 | `SwiftTUIRuntime` | Scenes, application configuration, committed raster/semantic values and public host roles. |
 | `@_spi(Host) import SwiftTUIRuntime` | Native-host operations below, without opting into broad runner internals. |
-| `@_spi(Testing) import SwiftTUITestSupport` | Synchronous snapshot facade and documented test synchronization/assistive-output helpers. |
+| `@_spi(Testing) import SwiftTUITestSupport` | Synchronous snapshot facade, run-loop test harness and documented test synchronization/assistive-output helpers. |
 | `@_spi(Testing) import SwiftTUIRuntime` | Hosted-frame test waiters and explicit retained-history initialization. |
 | `@_spi(StyleFixtures) import SwiftTUIViews` | Inert style configurations and captured slots for style tests. |
 
@@ -62,6 +62,21 @@ state without invalidating earlier snapshots. This is synchronous rendering;
 application tasks, event loops and user actions require the real runtime. Node
 counts and diagnostic labels are observational instrumentation, not fixed layout
 or complexity promises.
+
+`RunLoopTestHarness` builds a view on the real run loop, with a recording
+surface and a virtual frame clock that starts at `MonotonicInstant.zero` and
+moves only when the test moves it. `advance(by:)` renders every frame deadline
+inside the interval at its own instant, one exactly at its end included, and
+leaves the clock at the end of the interval. `advanceToNextWake()` renders the
+next armed frame, or returns `false` when none is armed. `press`, `send`,
+`paste` and `resize` deliver one event through the run loop's input dispatch
+at the current instant and render the frame it causes; a mouse event takes
+that instant as its timestamp. `render()` presents a frame for a change made
+outside the run loop. `shutdown()` cancels the scene's tasks and may be
+repeated; releasing the harness has the same effect. The harness presents
+frames, the virtual instant and the next armed frame, and no engine object. It
+drives the synchronous frame path: the asynchronous render modes, task work,
+exit handling and views that read the wall clock are outside it.
 
 Style fixture configurations have no live control routing identity. Their route
 wrappers preserve content but install no pointer/action route; activation and

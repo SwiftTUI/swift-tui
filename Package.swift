@@ -159,7 +159,9 @@ let packageProducts: [Product] =
     .library(name: "SwiftTUIWebHostCLI", targets: ["SwiftTUIWebHostCLI"]),
     .library(name: "SwiftTUIAndroidHost", targets: ["SwiftTUIAndroidHost"]),
     // Exported so example packages can synchronize their tests on
-    // the shared poll-free signals instead of timeout-based waiting.
+    // the shared poll-free signals instead of timeout-based waiting, and so
+    // a package outside swift-tui can step the run loop on a virtual clock
+    // with RunLoopTestHarness (STUI-1571).
     .library(name: "SwiftTUITestSupport", targets: ["SwiftTUITestSupport"]),
   ]
 
@@ -422,6 +424,9 @@ let package = Package(
         // runtime surface instead of each test target re-declaring private
         // doubles. Runtime transitively pulls Core+Views; Core is named
         // directly for its public IR types (RasterSurface, CellSize, KeyPress…).
+        // RunLoopTestHarness also reaches the run loop's package-level seams
+        // (the frame clock and the synchronous frame driver), which is why
+        // it lives in this package and not in a package of its own.
         "SwiftTUICore",
         "SwiftTUIRuntime",
       ],

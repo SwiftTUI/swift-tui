@@ -597,7 +597,9 @@ Sources/
   SwiftTUIPrimitives/  Geometry, Support, Pointer, Styling (values), Content
                        (value models), Draw (payload value cluster), Measure
                        (LayoutBehavior/LayoutMetadata), Animation (math)
-  SwiftTUITestSupport/ Published test helpers, autonomous-workload pacing, and their DocC catalog
+  SwiftTUITestSupport/ Published test helpers, the run-loop test harness
+                       (RunLoopTestHarness), autonomous-workload pacing, and
+                       their DocC catalog
   SwiftTUIGraph/       Resolve, Runtime, Pipeline/Scheduler, Animation (intent),
                        Semantics (regions/roles/AccessibilityAction), Geometry/AnchorTypes
   SwiftTUICore/        Measure, Place, Semantics (extractor/FocusTracker), Draw

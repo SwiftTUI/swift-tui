@@ -187,6 +187,11 @@ offers today:
 - **Stage budgets** — `StageClock`, `ProgressBudget`, and
   `withStageBudget` bound a wait in units of runtime progress rather than
   wall-clock seconds, so the bound is identical on fast and slow machines.
+- **Run-loop harness** — `RunLoopTestHarness` builds a view on the real run
+  loop with a virtual frame clock. A test steps an animation or a transition
+  frame by frame, sends keys, mouse events, pastes and resizes through the
+  run loop's input dispatch, and reads each presented frame as raster lines.
+  It needs no terminal and never waits.
 - **Real-terminal journey drivers** — `RealTerminalPTYPair` opens a PTY,
   `writeAllBytes` feeds input, `ANSIVisibleScreen` models what the bytes
   actually put on screen, and `waitForANSIVisibleScreen` waits on readable
@@ -240,5 +245,6 @@ struct GreetingJourneyTests {
 (Windows today), so gate journey suites accordingly. Start with
 `RenderOnce` fixtures for everything a single frame can prove, reach for
 `DefaultRenderer` when you need raster lines without terminal encoding,
-and keep the PTY journeys for the interactive paths only a live run loop
+use `RunLoopTestHarness` for animations, transitions and input on the run
+loop, and keep the PTY journeys for the paths only a real terminal
 exercises.

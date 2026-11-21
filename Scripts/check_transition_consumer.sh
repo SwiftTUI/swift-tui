@@ -14,6 +14,11 @@
 # transition-showcase executable plays them in a terminal. The build covers
 # all three targets, and the tests then run in the same copy.
 #
+# The tests also play two of the demonstrations on the framework's run loop
+# with RunLoopTestHarness, from the SwiftTUITestSupport product (STUI-1571).
+# They import it with @_spi(Testing) and nothing else, which proves that a
+# package outside swift-tui can step a transition frame by frame.
+#
 # The package is copied out of the tree first, so each run starts from fresh
 # consumer state and leaves no build products or resolved file beside the
 # fixture. Failed state is kept for diagnosis.

@@ -9,6 +9,21 @@ require 1.0.0. See [COMPATIBILITY.md](docs/COMPATIBILITY.md).
 
 ## [Unreleased]
 
+### Added
+
+- `RunLoopTestHarness` in the `SwiftTUITestSupport` product, as ratified
+  Testing SPI (`@_spi(Testing)`). It builds a view on the real run loop with
+  a virtual frame clock, so a test in a package outside swift-tui steps an
+  animation or a transition frame by frame with `advanceToNextWake()` and
+  `advance(by:)`, delivers keys, mouse events, pastes and resizes through the
+  run loop's input dispatch, renders a change made through a binding or an
+  observable model with `render()`, and reads each presented frame as a
+  `RasterSurface` or as lines of text. Nothing sleeps and nothing reads the
+  wall clock. It drives the synchronous frame path; the asynchronous render
+  modes and `.task` work are outside it. The new DocC article
+  `Driving-The-Run-Loop` is the guide, and the external transition consumer
+  fixture now tests two of its demonstrations on the run loop (STUI-1571).
+
 ### Fixed
 
 - A custom `Transition` on content that emits several views (a `Group`, a

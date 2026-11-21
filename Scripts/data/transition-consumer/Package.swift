@@ -17,6 +17,11 @@ import PackageDescription
 // one of them for a recording. Both depend on the `SwiftTUI` product, as an
 // application that uses the library would.
 //
+// The tests also depend on the `SwiftTUITestSupport` product (STUI-1571).
+// `DemonstrationRunLoopTests` plays two demonstrations on the framework's
+// run loop with `RunLoopTestHarness`, through `@_spi(Testing)` alone: a
+// package outside swift-tui can step a transition frame by frame.
+//
 // The framework is this checkout, three directories up. The gate script
 // copies the package to a directory at the same depth, so the same literal
 // path reaches the checkout from the copy.
@@ -63,6 +68,7 @@ let package = Package(
       dependencies: [
         "TransitionConsumer",
         .product(name: "SwiftTUI", package: "swift-tui"),
+        .product(name: "SwiftTUITestSupport", package: "swift-tui"),
       ],
       swiftSettings: consumerSwiftSettings
     ),
