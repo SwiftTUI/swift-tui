@@ -3775,8 +3775,16 @@ package final class AnimationController: Sendable {
     tracksVelocity: Bool,
     timestamp: MonotonicInstant
   ) {
-    // No change → nothing to do.
-    guard previous != current else { return }
+    // No change → nothing to do, except for the data of an `Animatable`
+    // shape whose animation is in flight. This is the path of nearly every
+    // slot of every frame, so it builds no key.
+    guard previous != current else {
+      if slot.holdsShapeData, let current {
+        refreshShapeDataDestination(
+          at: AnimationKey(identity: identity, slot: slot), with: current)
+      }
+      return
+    }
 
     let key = AnimationKey(identity: identity, slot: slot)
 
@@ -3846,6 +3854,30 @@ package final class AnimationController: Sendable {
         initialVelocity: initialVelocity
       )
     }
+  }
+
+  /// Gives the animation of an `Animatable` shape's data, in flight at
+  /// `key`, the shape the view now holds.
+  ///
+  /// The slot's value is the shape's data together with the way back from
+  /// data to geometry, which is the shape itself. Two values with equal data
+  /// are equal, so a change to a field of the shape that its
+  /// `animatableData` does not cover is no change of the slot, and starts
+  /// nothing. An animation in flight draws each sample through the shape of
+  /// its destination, though, and that is the shape as it was when the
+  /// animation started. So when the view resolves again with the same data,
+  /// the destination takes the value just resolved: every sample from this
+  /// frame on is drawn by the shape as it is now, and the data, the curve
+  /// and the timing of the animation are untouched (STUI-1577).
+  ///
+  /// An animation heading for other data is left alone. The view's data
+  /// then changed as well, and the slot change that follows retargets it.
+  private func refreshShapeDataDestination(at key: AnimationKey, with current: AnyAnimatable) {
+    guard let existing = activeAnimations[key],
+      case .property(let from, let to) = existing.kind,
+      to == current
+    else { return }
+    activeAnimations[key]?.kind = .property(from: from, to: current)
   }
 
   /// What an animation that interrupts `existing` takes over from it: the
