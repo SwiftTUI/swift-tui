@@ -1989,74 +1989,85 @@ package final class AnimationController: Sendable {
     // ancestor that is still in the new tree — that's the insertion
     // point — and capture the deepest disappearing ancestor as the
     // subtree to inject.  This way the entire wrapped unit fades out.
-    for removedNodeID in departedNodeIDs {
-      // O(1) dictionary guards run before the O(tree) previous-frame node
-      // search: bulk teardown departs many nodes at once, and most carry no
-      // transition registration and are not already animating out.
-      //
-      // Removal look-up uses the PREVIOUS frame's registrations: the
-      // disappearing view's `.transition()` modifier isn't evaluated in
-      // the current frame (its branch is gone), so `transitionsByNodeID`
-      // no longer contains an entry for it.  The previous frame captured
-      // the registration while the view was still present.
-      guard removingNodes[removedNodeID] == nil,
-        let transition = previousTransitionsByNodeID[removedNodeID],
-        let previousRoot = previousTreeRoot,
-        let previousNode = AnimationTreeQueries.findResolvedNode(
-          in: previousRoot,
-          viewNodeID: removedNodeID
-        )
-      else { continue }
-      planRemovalOverlay(
-        removedNodeID: removedNodeID,
-        identity: previousNode.identity,
-        transition: transition,
-        previousRoot: previousRoot,
-        newIdentities: newIdentities,
-        newLiveNodeIDs: newLiveNodeIDs,
-        matchedDestinationsByKey: matchedDestinationsByKey,
-        transactionPlan: transactionPlan,
-        timestamp: timestamp,
-        plannedSites: &plannedRemovalSites
-      )
-    }
+    //
+    // Both channels below find the views with a transition that left on this
+    // frame. They are collected first and planned afterwards, because what
+    // one of them plays depends on the others: a view inside another
+    // departing view with a transition is part of that view's removal and
+    // plans none of its own (``departingTransitionRoots(of:)``).
+    var removalCandidates: [RemovalCandidate] = []
+    if let previousRoot = previousTreeRoot {
+      for removedNodeID in departedNodeIDs {
+        // O(1) dictionary guards run before the O(tree) previous-frame node
+        // search: bulk teardown departs many nodes at once, and most carry no
+        // transition registration and are not already animating out.
+        //
+        // Removal look-up uses the PREVIOUS frame's registrations: the
+        // disappearing view's `.transition()` modifier isn't evaluated in
+        // the current frame (its branch is gone), so `transitionsByNodeID`
+        // no longer contains an entry for it.  The previous frame captured
+        // the registration while the view was still present.
+        guard removingNodes[removedNodeID] == nil,
+          let transition = previousTransitionsByNodeID[removedNodeID],
+          let previousNode = AnimationTreeQueries.findResolvedNode(
+            in: previousRoot,
+            viewNodeID: removedNodeID
+          )
+        else { continue }
+        removalCandidates.append(
+          RemovalCandidate(
+            nodeID: removedNodeID, identity: previousNode.identity, transition: transition,
+            channel: .departedNode))
+      }
 
-    // Second removal channel: adopted-slot conditional removals. Branch flips
-    // inside a structural slot ADOPT the slot's graph node for the incoming
-    // occupant, so the departing transition child's ViewNodeID stays live and
-    // the occurrence diff above cannot see it leave. The previous frame's
-    // registration map records exactly which identity the transition was
-    // authored for — if that identity left the identity set while its node
-    // survived, the conditional presence changed and the exit must play.
-    // A node re-registered THIS frame is a surviving transition node
-    // (reparent or value update), never a conditional removal, and real node
-    // departures already ran through the occurrence channel above.
-    for (nodeID, registeredIdentity) in previousTransitionIdentitiesByNodeID {
-      guard removingNodes[nodeID] == nil,
-        !departedNodeIDs.contains(nodeID),
-        !newIdentities.contains(registeredIdentity),
-        previousIdentities.contains(registeredIdentity),
-        !removingIdentitySet.contains(registeredIdentity),
-        transitionIdentitiesByNodeID[nodeID] == nil,
-        let transition = previousTransitionsByNodeID[nodeID],
-        let previousRoot = previousTreeRoot,
-        AnimationTreeQueries.findResolvedNode(
-          in: previousRoot,
-          identity: registeredIdentity
-        ) != nil
-      else { continue }
-      planRemovalOverlay(
-        removedNodeID: nodeID,
-        identity: registeredIdentity,
-        transition: transition,
-        previousRoot: previousRoot,
-        newIdentities: newIdentities,
-        newLiveNodeIDs: newLiveNodeIDs,
-        matchedDestinationsByKey: matchedDestinationsByKey,
-        transactionPlan: transactionPlan,
-        timestamp: timestamp,
-        plannedSites: &plannedRemovalSites
-      )
+      // Second removal channel: adopted-slot conditional removals. Branch flips
+      // inside a structural slot ADOPT the slot's graph node for the incoming
+      // occupant, so the departing transition child's ViewNodeID stays live and
+      // the occurrence diff above cannot see it leave. The previous frame's
+      // registration map records exactly which identity the transition was
+      // authored for — if that identity left the identity set while its node
+      // survived, the conditional presence changed and the exit must play.
+      // A node re-registered THIS frame is a surviving transition node
+      // (reparent or value update), never a conditional removal, and real node
+      // departures already ran through the occurrence channel above.
+      for (nodeID, registeredIdentity) in previousTransitionIdentitiesByNodeID {
+        guard removingNodes[nodeID] == nil,
+          !departedNodeIDs.contains(nodeID),
+          !newIdentities.contains(registeredIdentity),
+          previousIdentities.contains(registeredIdentity),
+          !removingIdentitySet.contains(registeredIdentity),
+          transitionIdentitiesByNodeID[nodeID] == nil,
+          let transition = previousTransitionsByNodeID[nodeID],
+          AnimationTreeQueries.findResolvedNode(
+            in: previousRoot,
+            identity: registeredIdentity
+          ) != nil
+        else { continue }
+        removalCandidates.append(
+          RemovalCandidate(
+            nodeID: nodeID, identity: registeredIdentity, transition: transition,
+            channel: .adoptedSlot))
+      }
+
+      for candidate in departingTransitionRoots(of: removalCandidates) {
+        // A removal planned earlier in this loop can have taken the node or
+        // the identity of a later candidate.
+        guard removingNodes[candidate.nodeID] == nil,
+          candidate.channel == .departedNode || !removingIdentitySet.contains(candidate.identity)
+        else { continue }
+        planRemovalOverlay(
+          removedNodeID: candidate.nodeID,
+          identity: candidate.identity,
+          transition: candidate.transition,
+          previousRoot: previousRoot,
+          newIdentities: newIdentities,
+          newLiveNodeIDs: newLiveNodeIDs,
+          matchedDestinationsByKey: matchedDestinationsByKey,
+          transactionPlan: transactionPlan,
+          timestamp: timestamp,
+          plannedSites: &plannedRemovalSites
+        )
+      }
     }
 
     // Unmarked presence boundaries use opacity. Select the topmost departed
@@ -2899,6 +2910,53 @@ package final class AnimationController: Sendable {
         timestamp: timestamp
       )
     }
+  }
+
+  /// A view with a transition that left the tree on the frame being
+  /// processed.
+  private struct RemovalCandidate {
+    enum Channel { case departedNode, adoptedSlot }
+
+    var nodeID: ViewNodeID
+    /// The identity the transition is registered for.
+    var identity: Identity
+    var transition: AnyTransition
+    var channel: Channel
+  }
+
+  /// The candidates that plan a removal, in the order they are planned.
+  ///
+  /// One removal is planned for each departing subtree. A view with a
+  /// transition that lies inside another departing view with a transition
+  /// did not leave by itself: its presence inside that view did not change,
+  /// and it goes with it. It plans no removal, as a view that appears
+  /// together with its container plays no insertion. Planned, it would draw
+  /// the same frozen subtree a second time and end the animations the outer
+  /// removal had just started for its body (STUI-1576).
+  ///
+  /// The order is that of the identities, so a frame plans its removals in
+  /// the same order in every run. The candidates arrive in the order of a
+  /// set of node ids, which differs from one tree to the next.
+  private func departingTransitionRoots(
+    of candidates: [RemovalCandidate]
+  ) -> [RemovalCandidate] {
+    guard candidates.count > 1 else { return candidates }
+    let departing = Set(candidates.map(\.identity))
+    return
+      candidates
+      .filter { candidate in
+        var ancestor = previousParentByIdentity[candidate.identity]
+        while let current = ancestor {
+          if departing.contains(current) { return false }
+          ancestor = previousParentByIdentity[current]
+        }
+        return true
+      }
+      .sorted { lhs, rhs in
+        // The departed-node channel first, as before; then by identity.
+        if lhs.channel != rhs.channel { return lhs.channel == .departedNode }
+        return lhs.identity < rhs.identity
+      }
   }
 
   /// Plans one removal overlay: resolves the injection point, captures the
