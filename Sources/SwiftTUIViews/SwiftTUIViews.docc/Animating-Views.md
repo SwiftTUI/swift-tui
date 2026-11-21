@@ -360,6 +360,20 @@ Every modifier a body applies to `content` lands on a boundary around the
 view, separate from the view's own modifiers. A body that places `content`
 twice mounts the view twice, each with its own state.
 
+The boundary does not change how the view is laid out. Its container reads
+what the view declares through the boundary (a layout priority, a fixed
+size, spacing, alignment guides, whether it is a ``Spacer``), so a view under
+a custom transition takes the place it takes without one.
+
+A transition applies to each view its content emits. On a ``Group`` of two
+views, on a ``ForEach``, or on a view whose body has several roots, the body
+is evaluated once for each view, as if `.transition(_:)` were written on
+each: every view has its own boundary and its own copy of the views the body
+adds, takes its own place in the container, and is inserted and removed by
+itself. Write the transition directly on the ``Group`` or the ``ForEach``;
+with another modifier between them and the transition, the views are one
+view to it.
+
 When the view is inserted inside an animation scope, it appears through the
 `willAppear` body and moves to the `identity` body. `Spotlight` fades in from
 an opacity of zero while its background goes from gray to blue. The views on

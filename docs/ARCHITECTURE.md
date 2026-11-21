@@ -698,7 +698,21 @@ preserves that per-style provenance while restoring the base transaction;
 closer base-view style writers clear or replace the provenance.
 
 A custom `Transition` body is resolved live in its identity phase only
-(`Animation/TransitionContent.swift`). The `.transition` host registers the
+(`Animation/TransitionContent.swift`). `content` resolves the view behind one
+boundary node, and the layout engine reads the view's role through that
+boundary (`SwiftTUICore/Measure/ResolvedNodeLayoutRole.swift`): its layout
+metadata, its alignment guides, and whether it is a `Spacer`. The role is
+read at layout time and never copied, so a boundary never holds the role a
+view had at an earlier evaluation. A body takes one view. When the content
+of a transition with a body is several views by its type (a `TupleView`, a
+`ForEach`, a `Group` or a conditional around one, a view whose body is one
+of those), the modifier does not evaluate the body: the transition travels
+down in the resolve context (`ResolveContext.elementTransition`) and the
+first view on each path that is one view resolves as if the modifier were
+written on it (`Animation/TransitionDistribution.swift`, hooked where a view
+resolves in `Foundation/ViewResolutionWork.swift`). Each view then has its
+own graph node, registration and boundary, which is the single-view case.
+The `.transition` host registers the
 transition together with its resolve context detached from the view graph
 (`Animation/TransitionBodyRegistration.swift`), so the animation controller
 can evaluate another phase as a plain resolved tree with no state storage,
@@ -712,7 +726,11 @@ The removal entry keeps that tree and owns the property animations of its
 views: their samples go to the entry, not to the live tree. Each frame, on
 the main actor before the frame tail, the same file lays the tree out at the
 frozen rect and puts the frozen placed content under each stand-in, so the
-tail receives a finished placed overlay.
+tail receives a finished placed overlay. One removal is planned for each
+departing subtree: the views with a transition that left on a frame are
+collected first, a view inside another of them plans nothing, and the rest
+are planned in the order of their identities
+(`AnimationController.departingTransitionRoots(of:)`).
 
 A view or a view modifier that conforms to `Animatable` is found where a
 body is about to be evaluated (`Foundation/ViewResolutionWork.swift`), with

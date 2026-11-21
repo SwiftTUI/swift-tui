@@ -9,6 +9,30 @@ require 1.0.0. See [COMPATIBILITY.md](docs/COMPATIBILITY.md).
 
 ## [Unreleased]
 
+### Fixed
+
+- A custom `Transition` on content that emits several views (a `Group`, a
+  `ForEach`, a view whose body has several roots) no longer draws the views
+  on top of each other. The transition now applies to each view, as in
+  SwiftUI: its body is evaluated once for each view, and each view takes the
+  place in its container that it takes without the transition and is
+  inserted and removed by itself. A body that places `content` twice, or
+  puts it inside a view of its own, therefore does so for each view
+  (STUI-1574).
+- A view under a custom `Transition` keeps its layout role. Its container
+  reads the view's layout priority, fixed size, spacing, alignment guides,
+  text baselines and layout values through the body, and a `Spacer` under a
+  custom transition expands (STUI-1575).
+- A view with a transition inside another view with a transition no longer
+  plans a removal of its own when the outer view leaves. The second removal
+  drew the departing view twice and, depending on the order of a set, ended
+  the animations of the outer view's `Transition` body. One removal now plays
+  for each view that leaves, and the removals of a frame are planned in a
+  fixed order (STUI-1576).
+- A shape that conforms to `Animatable` now draws a change to a field outside
+  its `animatableData` while the data animates. The animation in flight kept
+  the shape it started with until it ended (STUI-1577).
+
 ## [0.23.0] - 2026-11-20
 
 ### Added

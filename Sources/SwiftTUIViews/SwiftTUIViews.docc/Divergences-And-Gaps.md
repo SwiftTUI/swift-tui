@@ -957,7 +957,10 @@ are omitted even when SwiftUI exposes a corresponding API.
   An edge-relative move and a scale have no form inside a custom body. A body
   that places `content` or a conformer inside a view that resolves during
   layout does not animate there, and a conformer modifier around several
-  views that adds none of its own does not animate its data. A combination
+  views that adds none of its own does not animate its data. A transition
+  with a body on several views that have a modifier or an `AnyView` around
+  them, or that are the `content` of a `ViewModifier`, takes them as one
+  view. A combination
   plays one animation where SwiftUI animates each part with its own. An
   offset or a move restarts at an interruption. A timing curve does not keep
   its velocity through an interruption. The rest of this entry is how
@@ -1121,6 +1124,38 @@ are omitted even when SwiftUI exposes a corresponding API.
   removal starts. A body that places `content` more than once mounts the view
   once for each placement, with separate state, where SwiftUI draws one
   instance twice.
+  *Content that emits several views.* A transition applies to each view its
+  content emits, as in SwiftUI: a `Group` of two views, the rows of a
+  `ForEach`, the views of a `for` loop in a builder, the branches of an `if`
+  among them, or a view whose body has several roots. The body is evaluated
+  once for each view, as if `.transition(_:)` were written on each. Each
+  view takes its own place in the container, as it does without the
+  transition, has its own copy of the views the body adds, and is inserted
+  and removed by itself: a row that joins or leaves a `ForEach` under one
+  `.transition(_:)` plays the transition alone. Whether content is several
+  views is read from its type, so three shapes are one view to a transition
+  with a body, which is then evaluated once around all the views, laid out
+  inside it as the body lays several views out: several views with a
+  modifier around them (`Group { … }.padding().transition(_:)`), several
+  views in an `AnyView`, and the `content` of a `ViewModifier` (STUI-1581).
+  Write the transition directly on the `Group` or the `ForEach`, or on each
+  view. A transition without a body has no such limit.
+  *The layout role of the content.* A view under a custom transition is laid
+  out as the same view is without one. Its container reads what the view
+  declares through the body: a layout priority, a fixed size, a spacing
+  preference, alignment guides, text baselines, the values of a
+  `LayoutValueKey`, and whether it is a `Spacer`. A modifier of the body that
+  sets one of these on `content` takes precedence. A view the body puts
+  around `content` is the container's child in its own right, as it is
+  without a transition: a `padding` or a `frame` in a body hides a layout
+  priority exactly as `layoutPriority(_:)` followed by `padding(_:)` does.
+  *A transition inside a view that leaves.* One removal plays for each view
+  that leaves. A view with a transition that is inside another view with a
+  transition, when that outer view leaves, goes with it and plays nothing of
+  its own, as a view that appears together with its container plays no
+  insertion. This holds for built-in and custom transitions in any
+  combination, for a transition on a view the body adds, and when the outer
+  transition is `identity`.
   *Built-in transitions inside a body.* `apply(content:phase:)` on a built-in
   type applies its opacity and its fixed offset in every phase, and both
   animate. An edge-relative move and a scale act on placed bounds and have no
