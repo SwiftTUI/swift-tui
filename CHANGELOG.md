@@ -141,6 +141,10 @@ require 1.0.0. See [COMPATIBILITY.md](docs/COMPATIBILITY.md).
   outside them, unclamped. A removal that interrupts an insertion, and a
   re-insertion that interrupts a removal, continue the data from its current
   sample (STUI-1546).
+- `TermUIPerf` measures the new animation paths with two scenarios:
+  `synthetic-animatable-modifiers` (64 `Animatable` modifiers that tick
+  together) and `synthetic-custom-transition` (an 80×24 panel inserted and
+  removed through a clip shape that conforms to `Animatable`) (STUI-1546).
 
 ### Changed
 

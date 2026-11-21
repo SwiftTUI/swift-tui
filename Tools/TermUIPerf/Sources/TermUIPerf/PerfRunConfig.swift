@@ -124,6 +124,10 @@ public enum PerfScenarioName: String, CaseIterable, Equatable, Sendable {
   case syntheticOffscreenPhaseAnimator = "synthetic-offscreen-phase-animator"
   case syntheticContinuousAnimation = "synthetic-continuous-animation"
   case syntheticSingleTween = "synthetic-single-tween"
+  /// Measures 64 `Animatable` view modifiers ticking together in the single-tween tree.
+  case syntheticAnimatableModifiers = "synthetic-animatable-modifiers"
+  /// Measures a custom `Transition` that wipes a panel in and out with an `Animatable` clip shape.
+  case syntheticCustomTransition = "synthetic-custom-transition"
   case syntheticTextShimmer = "synthetic-text-shimmer"
   case syntheticNarrowInvalidation = "synthetic-narrow-invalidation"
   case syntheticDisjointDamage = "synthetic-disjoint-damage"
