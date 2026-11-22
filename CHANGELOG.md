@@ -9,6 +9,8 @@ require 1.0.0. See [COMPATIBILITY.md](docs/COMPATIBILITY.md).
 
 ## [Unreleased]
 
+## [0.24.0] - 2026-11-22
+
 ### Added
 
 - `RunLoopTestHarness` in the `SwiftTUITestSupport` product, as ratified
@@ -3197,7 +3199,8 @@ precomposition work (still images), cache hardening, and glyph-aware backdrops.
 See the GitHub releases for the full per-tag history:
 <https://github.com/SwiftTUI/swift-tui/releases>.
 
-[Unreleased]: https://github.com/SwiftTUI/swift-tui/compare/0.23.0...HEAD
+[Unreleased]: https://github.com/SwiftTUI/swift-tui/compare/0.24.0...HEAD
+[0.24.0]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.24.0
 [0.23.0]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.23.0
 [0.22.2]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.22.2
 [0.22.1]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.22.1
