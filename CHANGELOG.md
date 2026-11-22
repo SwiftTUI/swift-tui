@@ -54,6 +54,17 @@ require 1.0.0. See [COMPATIBILITY.md](docs/COMPATIBILITY.md).
   until something asks for a frame: an input, a state change, a signal or a
   timer. An insertion and a removal still start on the frame their view
   appears or leaves (STUI-1547).
+- The run loop no longer goes to sleep with a frame deadline that is due. A
+  deadline that came due in the few microseconds between the last frame of a
+  turn of the run loop and its decision to wait got no wake, when nothing in
+  that turn had asked for a frame. Its frame waited for the next input, state
+  change or signal. Several deadlines close together made this likely: the
+  ones a task leaves behind when it writes state while an animation plays.
+  Any frame deadline could wait this way, a long-press timer for example. The
+  run loop now decides whether to wait with one reading of the clock, and
+  starts its next turn at once when a frame is ready at that reading. During
+  a terminal handoff it waits, and the end of the handoff wakes it, also when
+  the terminal could not be given back (STUI-1585).
 
 ## [0.23.0] - 2026-11-20
 

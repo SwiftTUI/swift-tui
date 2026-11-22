@@ -153,6 +153,14 @@ public final class RunLoop<State: Equatable & Sendable, Content: View>:
   package var previousFramePressedIdentity: Identity?
   package var previousFramePointerPressedIdentity: Identity?
   package var nextRenderIntentGeneration: UInt64 = 1
+  /// `nextRenderIntentGeneration` as it was when the run loop last asked the
+  /// event pump for a wake at once. The generation moves on with each frame
+  /// the frame driver acquires, so an equal value means that none was
+  /// acquired since. See `requestNextWake(using:)`.
+  package var renderIntentGenerationAtLastImmediateWake: UInt64?
+  /// Puts a wake into the event pump of the session that is running, so the
+  /// run loop looks at the scheduler again. `nil` outside `run()`.
+  package var eventPumpWake: (@Sendable () -> Void)?
   package var pendingCoalescedEventBatches = 0
   package var pendingCoalescedWakeCauses: Set<WakeCause> = []
   package var cancelledRenderCount = 0
@@ -239,14 +247,20 @@ public final class RunLoop<State: Equatable & Sendable, Content: View>:
   /// world rather than about this frame.
   ///
   /// So are the *between-frames* readiness probes — `run()`'s
-  /// `hasPendingFrame(at:)` checks and the event pump's
+  /// `hasPendingFrame(at:)` checks, its wake request
+  /// (`requestNextWake(using:)`) and the event pump's
   /// `hadReadyFrameBeforeEvent` — which ask "is there work at all" with no
   /// frame in hand, and predate this seam. They are consistent in production
   /// (where this closure *is* the wall clock) but not under a pinned one: a
   /// far-future `frameClock` makes the drain consume frames the outer probe
-  /// says are not ready. Harmless today because every runtime test that pins
-  /// the clock drives the drain directly rather than through `run()` — but if
-  /// a test ever pins the clock *and* runs the full loop, route these through
+  /// says are not ready, and a `frameClock` behind the wall clock leaves a
+  /// deadline that the outer probe sees as due and the drain does not take.
+  /// For such a deadline the run loop wakes itself once and then waits, so a
+  /// test that pins the clock and runs the full loop does not spin. It gets
+  /// the deadline's frame by moving the clock and then asking the scheduler
+  /// for a frame, which wakes the loop. Most runtime tests that pin the clock
+  /// drive the drain directly rather than through `run()`. If one that runs
+  /// the full loop needs the two clocks to agree, route these probes through
   /// the seam rather than debugging the frame counts.
   /// See `swift-tui-org/docs/swift-tui/KNOWN-TEST-FLAKES.md`.
   package var frameClock: () -> MonotonicInstant = { .now() }
@@ -574,7 +588,10 @@ public final class RunLoop<State: Equatable & Sendable, Content: View>:
     #else
       let eventPump = makeEventPump()
     #endif
+    renderIntentGenerationAtLastImmediateWake = nil
+    eventPumpWake = eventPump.wakeNow
     defer {
+      eventPumpWake = nil
       eventPump.cancel()
     }
     var iterator = eventPump.stream.makeAsyncIterator()
@@ -599,7 +616,7 @@ public final class RunLoop<State: Equatable & Sendable, Content: View>:
     // This avoids full root re-evaluation when only small subtrees change.
     renderer.enableSelectiveEvaluation()
 
-    scheduleNextWakeIfNeeded(using: eventPump)
+    requestNextWake(using: eventPump)
 
     if let exitReason = consumeProgrammaticTerminationRequest() {
       // Startup callbacks can request termination without invalidating the
@@ -642,7 +659,7 @@ public final class RunLoop<State: Equatable & Sendable, Content: View>:
           exitReason: exitReason
         )
       }
-      scheduleNextWakeIfNeeded(using: eventPump)
+      requestNextWake(using: eventPump)
     }
 
     #if os(Android)
@@ -714,14 +731,7 @@ public final class RunLoop<State: Equatable & Sendable, Content: View>:
         #if os(Android)
           directPumpState.sync(loopFrames: &renderedFrames)
         #endif
-        if let nextWake = scheduler.nextWakeInstant(after: .now()),
-          nextWake > .now()
-        {
-          let sleepDuration = MonotonicInstant.now().duration(to: nextWake)
-          if sleepDuration > .zero {
-            eventPump.scheduleDeadlineWake(sleepDuration)
-          }
-        }
+        requestNextWake(using: eventPump)
         continue
       }
       let renderEventDrain = drainPendingRenderEvents(
@@ -790,14 +800,7 @@ public final class RunLoop<State: Equatable & Sendable, Content: View>:
       #if os(Android)
         directPumpState.sync(loopFrames: &renderedFrames)
       #endif
-      if let nextWake = scheduler.nextWakeInstant(after: .now()),
-        nextWake > .now()
-      {
-        let sleepDuration = MonotonicInstant.now().duration(to: nextWake)
-        if sleepDuration > .zero {
-          eventPump.scheduleDeadlineWake(sleepDuration)
-        }
-      }
+      requestNextWake(using: eventPump)
     }
 
     #if os(Android)

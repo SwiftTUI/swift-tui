@@ -21,6 +21,9 @@ extension RunLoop {
     var pendingBatchCount: () -> Int = { 0 }
     /// Enqueue instant of the oldest pending pump entry, if any.
     var oldestPendingArrival: () -> MonotonicInstant? = { nil }
+    /// Puts a wake into `stream` now, so the run loop's next wait for an
+    /// event returns at once. See ``RunLoop/requestNextWake(using:)``.
+    var wakeNow: @Sendable () -> Void = {}
   }
 
   package func makeEventPump(
@@ -220,6 +223,9 @@ extension RunLoop {
       },
       oldestPendingArrival: {
         buffer.oldestPendingArrival()
+      },
+      wakeNow: {
+        deadlineState.wakeNow()
       }
     )
   }

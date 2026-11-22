@@ -1,8 +1,9 @@
 import SwiftTUICore
 import Synchronization
 
-/// Manages a single deadline-wake task that sleeps until a future deadline
-/// and then yields into the event pump stream.
+/// Wakes the run loop on its own account: after a sleep, through a single
+/// deadline-wake task that yields into the event pump stream when a future
+/// deadline arrives, or at once.
 ///
 /// All mutable state is guarded by a `Mutex`, making this type safe for
 /// concurrent access from multiple tasks.
@@ -28,6 +29,14 @@ package final class DeadlineWakeState: Sendable {
         continuation?.yield()
       }
     }
+  }
+
+  /// Yields into the event pump stream now. The stream buffers one wake, so
+  /// this joins a wake that is already waiting there. A pending
+  /// deadline-wake task is left alone: the run loop asks for its next wake
+  /// again at the end of the turn this one starts.
+  func wakeNow() {
+    state.withLock { $0.continuation }?.yield()
   }
 
   func cancel() {

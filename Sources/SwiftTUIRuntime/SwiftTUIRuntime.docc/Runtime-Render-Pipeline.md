@@ -486,6 +486,17 @@ work stays in the scheduler for the next pass. The deadline-arm cut also defers
 deadlines armed during the pass. Both bounds are needed: periodic state writes
 can keep invalidating faster than frames render, without consuming a deadline.
 
+After a drain, the run loop waits for an event: input, a signal, a request to
+the scheduler, or the scheduler's next deadline. One reading of the clock
+decides how. With nothing pending and nothing armed, the run loop waits. With
+a deadline later than the reading, it sets a timer for the time between the
+two. With a frame that is ready at the reading, it starts its next turn at
+once. A frame is ready there when the drain left work for the next pass, and
+when a deadline came due after the drain's last look at the scheduler. Such a
+turn has to acquire a frame before the run loop starts another one this way.
+During a terminal handoff no frame can be acquired, so the run loop waits, and
+the end of the handoff wakes it.
+
 Startup establishes the first converged presentation without cancellable
 acquisition. It settles synchronous appearance, focus and callback follow-ups,
 then returns to input before draining unrelated producer writes. The optional

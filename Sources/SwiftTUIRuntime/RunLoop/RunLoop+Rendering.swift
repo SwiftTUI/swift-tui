@@ -198,7 +198,8 @@ extension RunLoop {
   /// deadlines armed before it began; deadlines armed during the pass
   /// (animation and momentum re-arms) are withheld — not lost — and the outer
   /// loop's live `hasPendingFrame`/`nextWakeInstant` view re-enters a fresh
-  /// pass for them promptly.
+  /// pass for them promptly: `requestNextWake(using:)` wakes the loop at once
+  /// for a deadline that is due when the pass has ended.
   private func beginDeadlineDrainPass() -> (
     scheduler: any DrainPassDeadlineCutting, cut: DeadlineArmCut
   ) {

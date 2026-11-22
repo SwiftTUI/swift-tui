@@ -2546,6 +2546,10 @@
       "category": "test-support",
       "reason": "Tests shared synchronization, soundness or clock support used by runtime tests."
     },
+    "Tests/SwiftTUITests/RunLoopWakeDecisionTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
     "Tests/SwiftTUITests/RuntimeIssueScreenRoutingTests.swift": {
       "category": "source-policy",
       "reason": "Reads repository sources or manifests to check a structural contract."

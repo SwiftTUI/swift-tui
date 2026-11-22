@@ -145,6 +145,12 @@ extension RunLoop {
       if restoredTerminal {
         scheduler.requestExternalWake(reason: "terminal-handoff-restored")
       }
+      // The frame driver rendered nothing during the handoff, and the run
+      // loop does not keep waking itself for a frame it cannot render. A
+      // frame that came due in that time is owed now. The wake above covers
+      // it when the terminal came back; this one also covers the handoff
+      // that could not give the terminal back and asked for no frame.
+      eventPumpWake?()
     }
 
     await waitForTerminalRenderPassToFinish()

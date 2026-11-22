@@ -19,12 +19,14 @@ import Testing
 /// rest with nothing armed, all without input.
 ///
 /// In the noisy tests a task of the scene writes state from each key press
-/// until the transition is over. Nothing times the writer: it writes once
-/// for each event the run loop records (`AsyncIdlePacer`), and it runs when
-/// the run loop next suspends. That is often while a frame waits for its
-/// tail, so a write often asks for a new frame while the frame before is in
-/// flight. The run loop then cancels that frame before its tail starts, and
-/// the transition has to make its way through frames that never commit.
+/// until the completion of the transition. Nothing times the writer: it
+/// writes once for each event the run loop records (`AsyncIdlePacer`), and
+/// it runs when the run loop next suspends. That is often while a frame
+/// waits for its tail, so a write often asks for a new frame while the frame
+/// before is in flight. The run loop then cancels that frame before its tail
+/// starts, and the transition has to make its way through frames that never
+/// commit. The frames the writer forced leave frame deadlines behind, and
+/// the run loop has to serve those on its own before it comes to rest.
 ///
 /// No wait reads a clock. The script waits on a signal: the surface
 /// presenting a frame, or the frame driver ending a pass. The writer waits
@@ -82,7 +84,7 @@ struct TransitionIdleFrameDeadlineAsyncTests {
     let rootIdentity = testIdentity(
       "TransitionIdleAsync", kind.rawValue, isNoisy ? "noisy" : "quiet")
     let scheduler = FrameScheduler()
-    let pacer = isNoisy ? AsyncIdlePacer(scheduler: scheduler) : nil
+    let pacer = isNoisy ? AsyncIdlePacer() : nil
     let probe = RunLoopProgressProbe()
     let watch = AsyncIdleRestWatch(probe: probe, scheduler: scheduler, pacer: pacer)
     let script = AsyncIdleScript(
@@ -377,20 +379,13 @@ private final class AsyncIdleRestWatch {
 /// cancelled, by the next key press or by the end of the run loop, the wait
 /// returns at once: the condition signal resumes a cancelled waiter.
 ///
-/// The writer stops when the completion of its transition has fired and the
-/// scheduler holds nothing. It does not stop at the completion, because of
-/// what its frames leave behind. Each frame it forces while the transition
-/// plays arms a frame deadline of its own, so when the completion fires a
-/// train of deadlines is still pending, a fraction of a millisecond apart.
-/// While the writer goes on, its frames take them as they come due. Left to
-/// the run loop alone, the train meets a gap that these tests are not
-/// about. A deadline can come due in the few microseconds between the end
-/// of a frame-driver pass and the run loop's request for its next wake. If
-/// nothing in that pass asked for a frame, the deadline gets no wake and
-/// stays pending until something else asks for one.
+/// The writer stops when the completion of its transition has fired. Each
+/// frame it forced while the transition played armed a frame deadline of
+/// its own, so a train of deadlines is still pending then, a fraction of a
+/// millisecond apart. The run loop serves them on its own after the writer
+/// has stopped, and comes to rest when the last one is gone.
 @MainActor
 private final class AsyncIdlePacer {
-  private let scheduler: FrameScheduler
   private let signal = MainActorConditionSignal()
   /// How many progress events the run loop has recorded.
   private(set) var steps = 0
@@ -402,10 +397,6 @@ private final class AsyncIdlePacer {
   private(set) var writes = 0
   /// How many times the writer has stopped.
   private(set) var finishedBursts = 0
-
-  init(scheduler: FrameScheduler) {
-    self.scheduler = scheduler
-  }
 
   /// The counts in words, for the message of a failed expectation.
   var summary: String {
@@ -433,15 +424,6 @@ private final class AsyncIdlePacer {
 
   func writerDidFinish() {
     finishedBursts += 1
-  }
-
-  /// Whether the writer of the `transition`th transition may stop: the
-  /// completion has fired, and the scheduler has no frame pending and no
-  /// deadline armed.
-  func isOver(_ transition: Int) -> Bool {
-    guard completedTransitions >= transition else { return false }
-    let now = MonotonicInstant.now()
-    return scheduler.nextWakeInstant(after: now) == nil && !scheduler.hasPendingFrame(at: now)
   }
 
   /// Waits until the run loop has recorded an event after the `seen`th.
@@ -535,9 +517,9 @@ private struct AsyncIdleShift: ViewModifier, Animatable {
 /// transition that the `t` key inserts and removes inside a 120 ms linear
 /// animation with a completion. The first row counts the completions.
 ///
-/// With a pacer the scene is noisy: from each key press until its
-/// transition is over, a task writes the state of the last row, once for
-/// each step of the run loop.
+/// With a pacer the scene is noisy: from each key press until the
+/// completion of its transition, a task writes the state of the last row,
+/// once for each step of the run loop.
 private struct AsyncIdleScene: View {
   @State private var isShown = false
   @State private var inserted = 0
@@ -565,10 +547,9 @@ private struct AsyncIdleScene: View {
     .task(id: burst) {
       guard let pacer, burst > 0 else { return }
       // The writer. It writes one value for each step of the run loop, from
-      // the key press until the transition is over and the scheduler holds
-      // nothing.
+      // the key press until the completion of the transition it started.
       let transition = pacer.startedTransitions
-      while !pacer.isOver(transition) {
+      while pacer.completedTransitions < transition {
         // Read the step count before the write, so that every event the run
         // loop records from the write on ends the wait below.
         let seen = pacer.steps
