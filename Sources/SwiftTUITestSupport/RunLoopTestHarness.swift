@@ -27,10 +27,16 @@ public import SwiftTUIRuntime
 /// ```
 ///
 /// A loop like this one ends because the animation arms nothing after its
-/// last frame. It does not end on a scene that has a view under
-/// `.transition(_:)` on screen: the engine currently keeps a frame armed for
-/// such a view for as long as it is present. Step that scene a known number
-/// of times, or with ``advance(by:)``.
+/// last frame. A scene at rest has no frame armed, a scene with a view under
+/// `.transition(_:)` in it included, so the loop ends on every scene whose
+/// animations and transitions end. The frame that draws the end state
+/// is not always the last one: an insertion that moves or scales the view,
+/// every removal and a matched-geometry travel arm one more frame after it.
+/// So step a transition until ``advanceToNextWake()`` returns `false`, and
+/// not by the length of its curve.
+///
+/// The loop does not end on a scene with an animation that repeats forever.
+/// Step that scene a known number of times, or with ``advance(by:)``.
 ///
 /// ## What runs
 ///
@@ -192,10 +198,15 @@ public import SwiftTUIRuntime
   /// change made outside the run loop and before ``render()``, a frame is
   /// due and this is ``now`` itself. It is `nil` after ``shutdown()``.
   ///
-  /// This is what the scheduler has armed, whatever armed it. The engine
-  /// currently keeps a deadline armed for a view under `.transition(_:)` for
-  /// as long as the view is present, so this is not `nil` while such a view
-  /// is on screen.
+  /// This is what the scheduler has armed, whatever armed it: an animation
+  /// or a transition in flight, a gesture's timer, a scroll that is coming
+  /// to rest. A scene at rest has nothing armed and this is `nil`, with a
+  /// view under `.transition(_:)` in the scene as without one.
+  ///
+  /// It can still be an instant on the frame that draws the end state of a
+  /// transition. An insertion that moves or scales the view, every removal
+  /// and a matched-geometry travel arm one more frame after that one, which
+  /// draws the same picture and arms nothing.
   @_spi(Testing) public var nextWake: MonotonicInstant? {
     guard !isShutDown else {
       return nil

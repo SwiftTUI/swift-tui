@@ -471,18 +471,14 @@ struct RunLoopTestHarnessTests {
       #expect(log.completions == (tick == 25 ? 1 : 0), "insertion, tick \(tick)")
     }
 
-    // The insertion has ended and a deadline is still armed, one frame
-    // ahead: a view under a transition keeps the 33 ms frame deadline armed
-    // for as long as it is present. That is a filed defect (STUI-1547:
-    // `requiresContinuedAnimationFrames` stays true while a transition is
-    // registered), pinned here as what the run loop does today. Those
-    // frames draw the view at rest.
-    #expect(harness.nextWake == harness.now.advanced(by: .milliseconds(33)))
-    #expect(try harness.advanceToNextWake())
+    // The insertion has ended and nothing is armed: a view at rest under a
+    // transition asks for no frame.
+    #expect(harness.nextWake == nil)
+    #expect(try harness.advanceToNextWake() == false)
     try Self.expectShift(in: harness, log, at: 1, "at rest")
 
-    // Removal, on a frame of that cadence. The first frame without the view
-    // still draws all of it, and each deadline shows `1 - elapsed / 800`.
+    // Removal. The first frame without the view still draws all of it, and
+    // each deadline shows `1 - elapsed / 800`.
     try harness.press(Self.toggleKey)
     let removed = harness.now
     try Self.expectShift(in: harness, log, at: 1, "removal, 0 ms")
@@ -556,9 +552,8 @@ struct RunLoopTestHarnessTests {
     try Self.expectShift(in: harness, log, at: 1, "at rest")
     #expect(log.completions == 1)
 
-    // It starts to leave, on a frame of the cadence its transition keeps
-    // armed while it is present (STUI-1547).
-    #expect(try harness.advanceToNextWake())
+    // It starts to leave. Nothing was armed while it was at rest.
+    #expect(try harness.advanceToNextWake() == false)
     try harness.press(Self.toggleKey)
     for tick in 1...13 {
       #expect(try harness.advanceToNextWake())
@@ -851,8 +846,11 @@ struct RunLoopTestHarnessTests {
   }
 
   /// After a removal has ended the run loop comes to rest. The frame that
-  /// ends the removal still arms one deadline, 33 ms on. That frame draws
-  /// nothing of the view and arms nothing, so stepping ends there.
+  /// ends the removal still arms one deadline, 33 ms on: the run loop asks
+  /// for the next frame after the commit, from the tick result the frame
+  /// head produced before the placed pass ended the removal's curve. That
+  /// next frame drops the removal's overlay. It draws nothing of the view
+  /// and arms nothing, so stepping ends there.
   private static func expectRest<Content: View>(_ harness: RunLoopTestHarness<Content>) throws {
     let ended = harness.now
     #expect(harness.nextWake == ended.advanced(by: .milliseconds(33)))

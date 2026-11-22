@@ -579,11 +579,12 @@ private final class SiteRemovalJourney {
   }
 
   /// Moves the clock to the turn the scheduler already has armed, if any, so
-  /// that a write made next is answered by that turn's frame. A mounted
-  /// `.transition` keeps the 33 ms animation deadline armed at this pin; a
-  /// write made off that grid would start a second deadline chain and double
-  /// the frames per interval. No assertion depends on the cadence, but one
-  /// frame per interval keeps the ordinals easy to read.
+  /// that a write made next is answered by that turn's frame. An animation
+  /// in flight keeps the 33 ms deadline armed; a write made off that grid
+  /// would start a second deadline chain and double the frames per interval.
+  /// A mounted `.transition` at rest arms nothing, and the clock then stays
+  /// where it is. No assertion depends on the cadence, but one frame per
+  /// interval keeps the ordinals easy to read.
   private func rideArmedTurn() {
     if let wake = harness.runLoop.scheduler.nextWakeInstant(after: clock.now) {
       clock.now = wake

@@ -612,8 +612,8 @@ private final class TransitionProbe {
   }
 
   /// Runs two seconds of armed turns, which is longer than any animation
-  /// here. A registered transition keeps a frame deadline armed while its
-  /// view is present, so there is no quiescent scheduler to wait for.
+  /// here, and renders a frame at the end of them. The animations have ended
+  /// by then, so the scene is at rest.
   func settle() throws {
     try advance(to: clock.now.advanced(by: .seconds(2)))
   }

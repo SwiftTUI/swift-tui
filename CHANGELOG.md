@@ -47,6 +47,13 @@ require 1.0.0. See [COMPATIBILITY.md](docs/COMPATIBILITY.md).
 - A shape that conforms to `Animatable` now draws a change to a field outside
   its `animatableData` while the data animates. The animation in flight kept
   the shape it started with until it ended (STUI-1577).
+- An app with a view under `.transition(_:)` no longer wakes about 30 times a
+  second while nothing animates. A transition that was only registered, with
+  no insertion or removal in flight, kept a frame armed every 33 ms for as
+  long as its view was in the scene, visible or not. The run loop now sleeps
+  until something asks for a frame: an input, a state change, a signal or a
+  timer. An insertion and a removal still start on the frame their view
+  appears or leaves (STUI-1547).
 
 ## [0.23.0] - 2026-11-20
 

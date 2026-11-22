@@ -195,6 +195,11 @@ extension RunLoop {
     // completion and its deferred completion never fires — a `PhaseAnimator` loop
     // would advance one phase and then stall. Keep the pump alive until live is
     // genuinely drained.
+    //
+    // The predicate counts work only. A `.transition()` registration is not
+    // work, so a view at rest under a transition arms nothing here, and the
+    // run loop sleeps until the scheduler gets its next request: an input, a
+    // state write from a task, a signal, or a deadline armed elsewhere.
     if renderer.internalAnimationController.requiresContinuedAnimationFrames {
       scheduler.requestDeadline(
         now.advanced(by: renderer.internalAnimationController.animationFrameInterval)
@@ -239,7 +244,9 @@ extension RunLoop {
     // guard was introduced for (`7dcddf11` — switching away from a
     // still-animating tab kept the pump hot) was phantom orphaned work,
     // root-fixed by the departed-identity prune in
-    // `AnimationController.processResolvedTree`, which keeps this method's
+    // `AnimationController.processResolvedTree`. That prune, and a predicate
+    // whose terms are animations, removal overlays and completions that
+    // wait, and never a `.transition()` registration, keep this method's
     // `requiresContinuedAnimationFrames` entry condition truthful.
     scheduler.requestDeadline(nextTick)
   }

@@ -108,9 +108,18 @@ A frame deadline is not only an animation's next tick. A long press arms its
 timer as one, and so does a scroll that is coming to rest.
 
 ``RunLoopTestHarness/nextWake`` reports what the scheduler has armed,
-whatever armed it. The engine currently keeps a deadline armed for a view
-under `.transition(_:)` for as long as the view is present, so
-``RunLoopTestHarness/nextWake`` is not `nil` while such a view is on screen.
+whatever armed it. A scene at rest has nothing armed and it is `nil`, with a
+view under `.transition(_:)` in the scene as without one.
+
+The frame that draws the end state of a transition is not always its last
+frame. An insertion that moves or scales the view, every removal and a
+matched-geometry travel arm one more frame after it. That frame draws the
+same picture and arms nothing. So do not expect
+``RunLoopTestHarness/nextWake`` to be `nil` after the length of the curve.
+To run a transition to its end, step until
+``RunLoopTestHarness/advanceToNextWake()`` returns `false`.
+
+A scene with an animation that repeats forever always has a frame armed.
 Step such a scene a known number of times, or by a duration, and not until
 nothing is armed.
 

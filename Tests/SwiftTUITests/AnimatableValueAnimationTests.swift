@@ -889,8 +889,8 @@ final class AnimatableValueProbe<Content: View> {
     return frames
   }
 
-  /// Renders the next `count` armed wakes. For a view under a transition,
-  /// which keeps a frame deadline armed for as long as it is present.
+  /// Renders the next armed wakes, `count` at most. It stops when the
+  /// scheduler has none left.
   func steps(_ count: Int) throws -> [AnimatableValueFrame] {
     var frames: [AnimatableValueFrame] = []
     for _ in 0..<count {
@@ -898,6 +898,34 @@ final class AnimatableValueProbe<Content: View> {
       frames.append(frame)
     }
     return frames
+  }
+
+  /// Renders `count` frames the test asks for, 33 ms apart, the first one
+  /// 33 ms after the current instant, and returns them.
+  ///
+  /// A scene at rest has no frame armed, so ``steps(_:)`` and
+  /// ``runToEnd(maxTurns:)`` render nothing there. A test that pins what a
+  /// frame at rest does, or does not do, asks for the frames with this.
+  func framesAtRest(_ count: Int) throws -> [AnimatableValueFrame] {
+    var frames: [AnimatableValueFrame] = []
+    for _ in 0..<count {
+      let before = (log.values.count, log.secondary.count)
+      clock.now = clock.now.advanced(by: .milliseconds(33))
+      harness.runLoop.scheduler.requestDeadline(clock.now)
+      _ = try harness.render()
+      frames.append(record(since: before))
+    }
+    return frames
+  }
+
+  /// Renders `count` frames, 33 ms apart: the armed wakes while the
+  /// scheduler has one, and then frames at rest that this asks for.
+  ///
+  /// For a test that pins what happens after an animation has ended, on
+  /// frames the animation no longer arms.
+  func frames(_ count: Int) throws -> [AnimatableValueFrame] {
+    let armed = try steps(count)
+    return armed + (try framesAtRest(count - armed.count))
   }
 
   /// Renders every armed wake before `milliseconds` after the last write,

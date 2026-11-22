@@ -233,7 +233,11 @@ struct AdversarialSetAAnimationRuntimeTests {
       #expect(
         p.events == ["finished"], "Disabled insertion should complete on its committed input frame")
       #expect(c.activeAnimationCount == 0)
+      // The disabled insertion arms nothing, so no turn falls in the next
+      // second. Render a frame at its end: the checks below then read the
+      // scene after a frame at rest.
       try clock.advance(by: .seconds(1))
+      try clock.renderFrame()
     }
     #expect(h.frame.contains("Inserted"))
     #expect(p.events == ["finished"])
@@ -484,6 +488,13 @@ private final class SetAAnimationClock<V: View> {
     }
     #expect(turns < 2_000, "Animation fixture did not drain its scheduled turns")
     time.now = target
+  }
+
+  /// Renders a frame now that the test asks for, whether or not the
+  /// scheduler has one armed.
+  func renderFrame() throws {
+    harness.runLoop.scheduler.requestDeadline(time.now)
+    _ = try harness.render()
   }
 }
 

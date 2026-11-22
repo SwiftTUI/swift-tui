@@ -172,7 +172,7 @@ struct TransitionBodyAnimatableTests {
       #expect(probe.frame.contains("ROW 0") && !probe.frame.contains("ROW 1"))
       _ = try probe.step()
       // A second row arrives: its site runs from 0 to 1.
-      let inserted = [try probe.set(2, animation: Self.linear)] + (try probe.steps(27))
+      let inserted = [try probe.set(2, animation: Self.linear)] + (try probe.frames(27))
       for frame in inserted where frame.milliseconds <= 825 {
         let value = try #require(frame.values.last)
         #expect(abs(value - min(1, Double(frame.milliseconds) / 800)) < 1e-9, "\(value)")
@@ -191,7 +191,7 @@ struct TransitionBodyAnimatableTests {
 
       // The row leaves: its site runs from 1 to 0 in the body the removal
       // draws, and the row that stays is not evaluated for it.
-      let removed = [try probe.set(1, animation: Self.linear)] + (try probe.steps(27))
+      let removed = [try probe.set(1, animation: Self.linear)] + (try probe.frames(27))
       let drawn = removed.filter { $0.milliseconds < 800 }
       #expect(drawn.count == 25)
       for frame in drawn {
@@ -221,7 +221,7 @@ struct TransitionBodyAnimatableTests {
     defer { probe.shutdown() }
     try probe.run { _ in
       _ = try probe.step()
-      let frames = [try probe.set(1, animation: Self.linear)] + (try probe.steps(27))
+      let frames = [try probe.set(1, animation: Self.linear)] + (try probe.frames(27))
       // Two sites animate on the frame of the change: the new view's, from 0
       // to 1, and the old view's, from 1 to 0 in the body its removal draws.
       #expect(frames.first?.animationKeys == 2)
@@ -277,7 +277,7 @@ struct TransitionBodyAnimatableTests {
       }
       #expect(removed.last?.line(0) == dots, "\(removed.last?.line(0) ?? "")")
 
-      let inserted = [try probe.set(1, animation: Self.linear)] + (try probe.steps(27))
+      let inserted = [try probe.set(1, animation: Self.linear)] + (try probe.frames(27))
       for frame in inserted where frame.milliseconds <= 825 {
         let value = try #require(frame.values.last)
         #expect(abs(value - min(1, Double(frame.milliseconds) / 800)) < 1e-9, "\(value)")
@@ -402,8 +402,10 @@ struct TransitionBodyAnimatableTests {
       var keys: [Set<AnimationKey>] = []
       var inserted = [try probe.set(1, animation: Self.linear)]
       keys.append(probe.controller.debugStateSnapshot().activeAnimationKeys)
+      // Twenty-seven frames: the ones the insertion arms, and then frames
+      // at rest.
       for _ in 0..<27 {
-        inserted.append(try #require(try probe.step()))
+        inserted += try probe.frames(1)
         keys.append(probe.controller.debugStateSnapshot().activeAnimationKeys)
       }
       try Self.expectLinearInsertion(inserted, in: probe, propertyAnimations: 1)
@@ -690,7 +692,7 @@ struct TransitionBodyAnimatableTests {
       // declares the transition, does not run.
       _ = try probe.step()
       _ = try probe.set(0.75, animation: Self.linear)
-      let ticks = try probe.steps(27)
+      let ticks = try probe.frames(27)
       #expect(ticks.compactMap(\.values.last).contains { $0 < 1 && $0 > 0.75 })
       #expect(probe.log.values.last == 0.75)
       #expect(probe.controller.debugStateSnapshot().transitionIdentities.count == 2)
@@ -724,7 +726,7 @@ struct TransitionBodyAnimatableTests {
     try probe.run { _ in
       // A plain state write: the transition's own 400 ms curve plays.
       var inserted = [try probe.set(1, animation: nil)]
-      inserted += try probe.steps(16)
+      inserted += try probe.frames(16)
       #expect(inserted.first?.values.last == 0)
       let running = inserted.filter { $0.milliseconds <= 429 }
       #expect(running.count == 14, "\(inserted.map(\.milliseconds))")
@@ -899,7 +901,10 @@ struct TransitionBodyAnimatableTests {
         #expect(inserted.values == [1], "\(policy): \(inserted.values)")
         #expect(inserted.animationKeys == 0, "\(policy)")
         #expect(inserted.line(0) == "PRESENT", "\(policy)")
-        for frame in try probe.steps(4) {
+        // The snapped insertion arms nothing, and a frame rendered after it
+        // does not evaluate the site again.
+        #expect(try probe.steps(4).isEmpty, "\(policy)")
+        for frame in try probe.framesAtRest(4) {
           Self.expectNoFurtherSample(frame, "\(policy)")
         }
         // Removal: the view leaves at once and no sample follows.
@@ -908,7 +913,10 @@ struct TransitionBodyAnimatableTests {
         #expect(removed.animationKeys == 0, "\(policy)")
         #expect(probe.controller.debugStateSnapshot().removingNodeIDs.isEmpty, "\(policy)")
         let after = probe.log.values.count
-        _ = try probe.runToEnd()
+        // The snapped removal arms nothing either, and frames rendered after
+        // it evaluate no site.
+        #expect(try probe.runToEnd().isEmpty, "\(policy)")
+        _ = try probe.framesAtRest(2)
         #expect(probe.log.values.count == after, "\(policy)")
         #expect(probe.log.values.allSatisfy { $0 == 0 || $0 == 1 }, "\(policy)")
         #expect(probe.log.completions == 2, "\(policy)")
@@ -937,7 +945,10 @@ struct TransitionBodyAnimatableTests {
         #expect(turn.animationKeys == 0, "\(policy)")
         #expect(turn.completions == 1, "\(policy)")
         #expect(turn.line(0) == "PRESENT", "\(policy): \(turn.line(0))")
-        for frame in try probe.steps(4) {
+        // The insertion ended on that frame and arms nothing. A frame
+        // rendered after it does not evaluate the site again.
+        #expect(try probe.steps(4).isEmpty, "\(policy)")
+        for frame in try probe.framesAtRest(4) {
           Self.expectNoFurtherSample(frame, "\(policy)")
         }
       }
@@ -970,7 +981,10 @@ struct TransitionBodyAnimatableTests {
         #expect(probe.controller.debugStateSnapshot().removingNodeIDs.isEmpty, "\(policy)")
         #expect(turn.completions == 1, "\(policy)")
         let after = probe.log.values.count
-        _ = try probe.runToEnd()
+        // The removal has ended and arms nothing. Frames rendered after it
+        // evaluate no site.
+        #expect(try probe.runToEnd().isEmpty, "\(policy)")
+        _ = try probe.framesAtRest(2)
         #expect(probe.log.values.count == after, "\(policy)")
       }
     }
@@ -996,7 +1010,10 @@ struct TransitionBodyAnimatableTests {
         #expect(inserted.values == [1], "\(inserted.values)")
         #expect(inserted.animationKeys == 0)
         #expect(inserted.line(0) == "PRESENT")
-        for frame in try probe.steps(4) {
+        // The plain insertion arms nothing, and a frame rendered after it
+        // does not evaluate the site again.
+        #expect(try probe.steps(4).isEmpty)
+        for frame in try probe.framesAtRest(4) {
           Self.expectNoFurtherSample(frame, "plain")
         }
         // The view leaves at once. No body of the transition runs for it.
@@ -1004,7 +1021,10 @@ struct TransitionBodyAnimatableTests {
         #expect(removed.values.isEmpty, "\(removed.values)")
         #expect(!removed.frame.contains("PRESENT"))
         #expect(probe.controller.debugStateSnapshot().removingNodeIDs.isEmpty)
-        _ = try probe.runToEnd()
+        // The plain removal arms nothing, and frames rendered after it run
+        // no body of the transition.
+        #expect(try probe.runToEnd().isEmpty)
+        _ = try probe.framesAtRest(2)
         #expect(Set(probe.log.values) == [1], "\(probe.log.values)")
         if animatableProbeEvaluatesSelectively {
           #expect(probe.log.values == [1], "\(probe.log.values)")
@@ -1035,11 +1055,13 @@ struct TransitionBodyAnimatableTests {
       let unrelated = try #require(probe.log.evaluations["unrelated"])
       let content = try #require(probe.log.evaluations["content"])
 
-      let ticks = try probe.steps(26)
+      // The 24 frames the insertion still arms, and two frames at rest.
+      let ticks = try probe.frames(26)
+      #expect(ticks.map(\.milliseconds).suffix(3) == [825, 858, 891])
       #expect(probe.log.values.last == 1)
       if animatableProbeEvaluatesSelectively {
-        // One evaluation of the site for each tick of the animation, and
-        // none of the views beside it.
+        // One evaluation of the site for each tick of the animation, none
+        // on a frame at rest, and none of the views beside it.
         #expect(ticks.last?.values.isEmpty == true)
         #expect(ticks.allSatisfy { $0.values.count <= 1 }, "\(ticks.map(\.values))")
         #expect(probe.log.evaluations["root"] == root)
@@ -1207,7 +1229,7 @@ struct TransitionBodyAnimatableTests {
       }
       #expect(probe.log.evaluations["didDisappear"] == nil)
       // Each tick runs the live body once. No other phase is evaluated.
-      _ = try probe.steps(27)
+      _ = try probe.frames(27)
       #expect(probe.log.evaluations["willAppear"] == 1)
       if animatableProbeEvaluatesSelectively {
         #expect(probe.log.evaluations["identity"] == 2 + 25)
@@ -1384,7 +1406,7 @@ struct TransitionBodyAnimatableTests {
             probe.controller.activeAnimationCount == 1,
             "flip \(flip): \(state.activeAnimationKeys.map { "\($0.identity.path) \($0.scope)" })")
         }
-        _ = try probe.steps(27)
+        _ = try probe.frames(27)
         let settled = probe.controller.debugStateSnapshot()
         #expect(settled.removingNodeIDs.isEmpty, "flip \(flip)")
         #expect(settled.activeAnimationKeys.isEmpty, "flip \(flip)")
@@ -1579,7 +1601,10 @@ struct TransitionBodyAnimatableTests {
       #expect(state.completionClosureBatchIDs.isEmpty)
       #expect(state.removingNodeIDs.isEmpty)
       #expect(probe.controller.valueSiteCount == 0)
-      _ = try probe.runToEnd()
+      // The removal snapped, so nothing is armed. Frames rendered after it
+      // fire no further completion.
+      #expect(try probe.runToEnd().isEmpty)
+      _ = try probe.framesAtRest(2)
       #expect(probe.log.completions == 1)
     }
   }
@@ -1681,7 +1706,7 @@ struct TransitionBodyAnimatableTests {
       // Nothing writes the preference yet.
       #expect(probe.frame.contains("level -100"), "\(probe.frame)")
       var frames = [try probe.set(1, animation: Self.linear)]
-      frames += try probe.steps(27)
+      frames += try probe.frames(27)
       // The view above reads what the site's body wrote for the data the
       // frame presents, from the first frame on: the origin, then each
       // sample.
@@ -1726,7 +1751,7 @@ struct TransitionBodyAnimatableTests {
       try Self.flip(badge, in: probe, animation: Self.linear)
       #expect(probe.controller.valueSiteCount == 1)
       #expect(probe.controller.activeValueAnimationCount == 0)
-      _ = try probe.steps(27)
+      _ = try probe.frames(27)
       #expect(probe.frame.contains("PRESENT") && !probe.frame.contains("BADGE"), "\(probe.frame)")
       #expect(probe.controller.debugStateSnapshot().removingNodeIDs.isEmpty)
       #expect(Set(probe.log.values) == [1], "\(probe.log.values)")
@@ -1903,18 +1928,20 @@ struct TransitionBodyAnimatableTests {
   }
 
   /// Inserts the view and renders the frame of the write and `ticks` more.
-  /// A present view under a transition keeps a frame deadline armed, so the
-  /// run does not end by itself.
+  /// The first of them are the frames the insertion arms. It arms none
+  /// after it has settled, since a view at rest under a transition arms
+  /// nothing, so the rest are frames at rest that this asks for.
   private static func insertion<Content: View>(
     _ probe: AnimatableValueProbe<Content>,
     _ animation: Animation,
     ticks: Int = 27
   ) throws -> [AnimatableValueFrame] {
-    [try probe.set(1, animation: animation)] + (try probe.steps(ticks))
+    [try probe.set(1, animation: animation)] + (try probe.frames(ticks))
   }
 
-  /// Removes the view on a frame of the cadence its transition keeps armed,
-  /// and renders every frame until the scheduler has none left.
+  /// Removes the view and renders every frame until the scheduler has none
+  /// left. The step before the write renders the frame that is still armed
+  /// then, if there is one.
   private static func removal<Content: View>(
     _ probe: AnimatableValueProbe<Content>,
     _ animation: Animation
@@ -1964,12 +1991,16 @@ struct TransitionBodyAnimatableTests {
     // The completion fires once, on the frame that reaches the target.
     #expect(running.dropLast().allSatisfy { $0.completions == 0 })
     #expect(running.last?.completions == 1)
-    // Nothing follows.
-    for frame in frames where frame.milliseconds > 825 {
+    // Nothing follows. The insertion arms no frame after its end, so the
+    // frames after 825 ms are ones the caller asked for.
+    let following = frames.filter { $0.milliseconds > 825 }
+    #expect(!following.isEmpty, "\(frames.map(\.milliseconds))")
+    for frame in following {
       if animatableProbeEvaluatesSelectively {
         #expect(frame.values.isEmpty, "\(frame.milliseconds) ms: \(frame.values)")
       }
       #expect(frame.completions == 1)
+      #expect(frame.animationKeys == 0)
     }
   }
 

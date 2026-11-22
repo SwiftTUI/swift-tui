@@ -1304,14 +1304,31 @@ package final class AnimationController: Sendable {
   /// animation active but no deadline is armed, the run loop idles, and the
   /// deferred completion (e.g. a `PhaseAnimator` loop's per-phase completion)
   /// never fires until an unrelated event wakes the loop.
+  ///
+  /// Every term names work: an animation in flight (`activeAnimations`), a
+  /// removal overlay (`removingNodes`), a completion that waits for its time
+  /// (`pendingEmptyBatchCompletions`) and a completion that waits for its
+  /// frame head to finish (`deferredFrameHeadCompletions`). The first three
+  /// are also the gate of ``applyInterpolations(to:at:surfaceSize:)``, which
+  /// returns at once unless one of them is non-empty. Not every entry ends
+  /// in that tick: a placed-level animation and a removal the placed pass
+  /// owns end in ``placedAnimationOverlaySnapshot(for:at:surfaceSize:adoption:)``,
+  /// and a value animation ends in ``beginValueSiteFrame(at:currentIdentity:)``.
+  ///
+  /// The `.transition()` registration maps are not among them. A registration
+  /// says what an insertion or a removal of its view will play. It is not
+  /// work: the insertion that plays puts its animations in `activeAnimations`
+  /// (``enqueueInsertionAnimation``, ``startInsertionValueSites``), and the
+  /// removal that plays puts its overlay in `removingNodes`
+  /// (``planRemovalOverlay``). A view at rest under a transition therefore
+  /// keeps no frame armed, and the run loop sleeps until the scheduler gets
+  /// its next request: an input, a state write from a task, a signal, or a
+  /// deadline some other part of the runtime armed, such as a gesture's.
   package var requiresContinuedAnimationFrames: Bool {
     if !activeAnimations.isEmpty
       || !pendingEmptyBatchCompletions.isEmpty
       || !deferredFrameHeadCompletions.isEmpty
       || !removingNodes.isEmpty
-      || !transitionsByNodeID.isEmpty
-      || !previousTransitionsByNodeID.isEmpty
-      || !pendingTransitionsByNodeID.isEmpty
     {
       return true
     }

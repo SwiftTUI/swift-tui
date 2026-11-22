@@ -44,10 +44,10 @@ struct DemonstrationRunLoopTests {
     }
     #expect(harness.now == MonotonicInstant(offset: .milliseconds(1320)))
 
-    // The panel is whole and stays whole. A view under a transition keeps
-    // the 33 ms frame deadline armed while it is present, which is what the
-    // run loop does today (STUI-1547), so these ten frames are rendered.
-    #expect(try harness.advance(by: Self.quarter) == 10)
+    // The panel is whole and stays whole. The transition has ended, so the
+    // run loop has no frame armed and renders none.
+    #expect(harness.nextWake == nil)
+    #expect(try harness.advance(by: Self.quarter) == 0)
     expect(harness, shows: demonstration, at: 1, "at rest")
   }
 

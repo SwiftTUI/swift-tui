@@ -1212,8 +1212,8 @@ private final class TransitionBodyProbe<Inserted: View> {
 
   /// Renders every armed turn before `target`, then one frame exactly at it.
   func advance(to target: MonotonicInstant) throws {
-    // Every frame rendered at an exact instant arms its own 33 ms cadence
-    // while a transition is registered, so a test that samples several
+    // Every frame rendered at an exact instant while an animation is in
+    // flight arms its own 33 ms cadence, so a test that samples several
     // instants meets several interleaved cadences afterwards.
     var turns = 0
     while let wake = harness.runLoop.scheduler.nextWakeInstant(after: clock.now), wake < target,
@@ -1230,9 +1230,8 @@ private final class TransitionBodyProbe<Inserted: View> {
   }
 
   /// Runs 1200 ms of armed turns, which is longer than any animation that
-  /// is in flight when a test settles. A registered transition keeps a frame
-  /// deadline armed while its view is present, so there is no quiescent
-  /// scheduler to wait for.
+  /// is in flight when a test settles, and renders a frame at the end of
+  /// them. The animations have ended by then, so the scene is at rest.
   func settle() throws {
     try advance(to: clock.now.advanced(by: .milliseconds(1200)))
   }
