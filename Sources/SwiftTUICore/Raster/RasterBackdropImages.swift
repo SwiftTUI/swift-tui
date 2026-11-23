@@ -35,19 +35,29 @@ final class RasterBackdropImages {
     }
   }
 
+  private let surface: CellRect
+
+  fileprivate init(surface: CellRect) { self.surface = surface }
+
   fileprivate var placements: [Placement] = []
   fileprivate var occurrences: [Key: [Int]] = [:]
   private var visited: [Key: Int] = [:]
 
   func next(_ attachment: RasterImageAttachment) -> Placement? {
-    let key = Key(
-      identity: attachment.identity, bounds: attachment.bounds, visible: attachment.visibleBounds)
+    // An unclipped native command retains its full offscreen destination.
+    // The discovery walk visits just the raster surface; compare in that space.
+    guard let visible = attachment.visibleBounds.intersection(surface) else { return nil }
+    let key = Key(identity: attachment.identity, bounds: attachment.bounds, visible: visible)
     guard let occurrences = occurrences[key] else { return nil }
     let index = visited[key, default: 0]
     visited[key] = index + 1
     guard occurrences.indices.contains(index) else { return nil }
     let placement = placements[occurrences[index]]
-    return placement.projected.isEmpty ? nil : placement
+    guard !placement.projected.isEmpty else { return nil }
+    if visible == attachment.visibleBounds { return placement }
+    var entire = Placement(native: [attachment.visibleBounds])
+    for rect in placement.projected { entire.project(rect) }
+    return entire
   }
 }
 
@@ -60,8 +70,8 @@ extension Rasterizer {
       case commands([DrawCommand], CellRect, Target)
       case flatten(Target, into: Target)
     }
-    let plan = RasterBackdropImages()
     let surface = CellRect(origin: .zero, size: size)
+    let plan = RasterBackdropImages(surface: surface)
     var stack: [Event] = [.visit(draw, surface, Target(), native: true)]
     while let event = stack.popLast() {
       switch event {

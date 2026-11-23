@@ -50,7 +50,7 @@ extension Rasterizer {
     if pass.targetsBackdrop || pass.shader.readsBackdrop || node.subtreeHasCellEffect {
       backdrop = cellLayer(
         cells: cells, capture: recorder?.cellCapture, absoluteBounds: viewport,
-        origin: origin, allowsLink: true, includeInherited: true)
+        origin: origin, allowsLink: true, backdropContext: context)
     } else {
       backdrop = CellLayer(bounds: .zero, readableBounds: .zero) { _ in .empty }
     }
@@ -120,6 +120,22 @@ extension Rasterizer {
       if let tiles { visibleIdentities.formUnion(tiles.visibleIdentities) }
     }
 
+    compositeCellLayer(
+      node, pass: pass, source: source, backdrop: backdrop, context: context,
+      output: output, target: target, blendMode: blendMode, effects: effects,
+      dirtyRows: dirtyRows, cells: &cells, recorder: recorder)
+  }
+
+  // Source capture above can recursively enter another effect on a 512 KiB
+  // worker. Allocate the evaluation and compositing frame after capture returns.
+  private func compositeCellLayer(
+    _ node: DrawNode, pass: CellEffectPass, source: CellLayer, backdrop: CellLayer,
+    context: CellEffectContext, output: CellRect, target: CellRect, blendMode: BlendMode?,
+    effects: [DrawEffect], dirtyRows: Set<Int>?, cells: inout [[RasterCell]],
+    recorder: RasterPresentationLayerRecorder?
+  ) {
+    let logicalOutput = context.outputBounds
+    let origin = node.bounds.origin
     let evaluate: (CellPoint) -> CellCompositeResult
     switch pass.shader.program {
     case .source(let shade):
@@ -176,30 +192,16 @@ extension Rasterizer {
           glyph.width <= output.maxX - localX, glyph.paint.coverage > 0
         else { continue }
         let x = localX + origin.x
-        var ink = glyph.paint.foreground.color(in: context.appearance)
-        var paper = glyph.paint.background.color(in: context.appearance)
-        let fraction = glyph.paint.coverage
+        var paint = glyph.paint
+        let fraction = paint.coverage
         let deferCoverage =
           recorder?.cellCapture?.defersCoverage == true
-          && recorder?.cellCapture?.written[y][x] == false
+          && recorder?.cellCapture?.columns[y][x].hasPaint == false
         if fraction < 1 && !deferCoverage {
           let under = cells[y][x].style?.backgroundColor ?? context.appearance.backgroundColor
-          let resolved = context.resolvedColors(
-            for: glyph.paint, emphasis: glyph.emphasis, over: under)
-          let mixedPaper = resolved.background.opacity(glyph.paint.coverage).composited(over: under)
-          let mixedInk = resolved.foreground.opacity(glyph.paint.coverage).composited(
-            over: mixedPaper)
-          ink = glyph.emphasis.contains(.reverse) ? mixedPaper : mixedInk
-          paper = glyph.emphasis.contains(.reverse) ? mixedInk : mixedPaper
+          paint = context.compositingCoverage(of: glyph, over: under)
         }
-        var result = ResolvedTextStyle(
-          foregroundColor: ink, backgroundColor: paper, emphasis: glyph.emphasis,
-          underlineStyle: glyph.underline, strikethroughStyle: glyph.strikethrough,
-          opacity: glyph.originalOpacity)
-        if fraction == 1 || deferCoverage {
-          result.foregroundPaletteIndex = glyph.paint.foreground.paletteIndex
-          result.backgroundPaletteIndex = glyph.paint.background.paletteIndex
-        }
+        let result = glyph.rasterStyle(for: paint, in: context.appearance)
         // A compositing result already names the final channels. Retaining
         // the old style here would blend it a second time or turn a requested
         // default channel back into the previous foreground/background.
@@ -244,5 +246,28 @@ extension Rasterizer {
           presentationEffects: effects)
       }
     }
+  }
+}
+
+extension CellEffectContext {
+  func compositingCoverage(of glyph: CellGlyph, over lowerPaper: Color) -> CellPaint {
+    let resolved = resolvedColors(for: glyph.paint, emphasis: glyph.emphasis, over: lowerPaper)
+    let paper = resolved.background.opacity(glyph.paint.coverage).composited(over: lowerPaper)
+    let ink = resolved.foreground.opacity(glyph.paint.coverage).composited(over: paper)
+    let reversed = glyph.emphasis.contains(.reverse)
+    return CellPaint(
+      foreground: .color(reversed ? paper : ink), background: .color(reversed ? ink : paper))
+  }
+}
+
+extension CellGlyph {
+  func rasterStyle(for paint: CellPaint, in appearance: TerminalAppearance) -> ResolvedTextStyle {
+    var style = ResolvedTextStyle(
+      foregroundColor: paint.foreground.color(in: appearance),
+      backgroundColor: paint.background.color(in: appearance), emphasis: emphasis,
+      underlineStyle: underline, strikethroughStyle: strikethrough, opacity: originalOpacity)
+    style.foregroundPaletteIndex = paint.foreground.paletteIndex
+    style.backgroundPaletteIndex = paint.background.paletteIndex
+    return style
   }
 }

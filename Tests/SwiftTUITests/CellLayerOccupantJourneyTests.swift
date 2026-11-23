@@ -258,3 +258,168 @@ extension CellLayerOccupantJourneyTests {
     }
   }
 }
+
+extension CellLayerOccupantJourneyTests {
+  @Test("Partially offscreen lower native image projects inside a reader's region")
+  func offscreenImageKeepsNativeRemainder() throws {
+    let bytes = try makePNGBytes(
+      width: 2, height: 2,
+      pixels: Array(repeating: rgbaPixel(red: 230, green: 20, blue: 80), count: 4))
+    let scene = ZStack(alignment: .topLeading) {
+      Text("01234")
+      Image(data: bytes).resizable().frame(width: 5, height: 1).offset(x: -2)
+      Spacer(minLength: 0).frame(width: 5, height: 1).layerEffect(
+        .compositing { point, _, lower, _ in
+          guard let glyph = lower.glyph(occupying: point) else { return .keepDestination }
+          return .replace(.glyph(glyph))
+        }.drawing(in: .rect(.init(origin: .zero, size: .init(width: 1, height: 1)))),
+        maxSampleOffset: .zero)
+    }
+    let active = DefaultRenderer().render(scene, proposal: .init(width: 5, height: 1)).rasterSurface
+    #expect(active.cells[0][0].character == "▀")
+    #expect(active.imageAttachments.allSatisfy { !$0.visibleBounds.contains(CellPoint.zero) })
+  }
+
+  @Test("Group flattens an explicit default space in front of a backdrop reader")
+  func groupFlattensPaintedSpace() {
+    let scene = ZStack(alignment: .topLeading) {
+      Text("A")
+      Text(" ").compositingGroup()
+      Spacer(minLength: 0).frame(width: 1, height: 1).layerEffect(
+        .compositing { point, _, lower, _ in
+          guard let glyph = lower.glyph(occupying: point) else { return .keepDestination }
+          return .replace(.glyph(CellGlyph(glyph.character == " " ? "Y" : "N")))
+        }, maxSampleOffset: .zero)
+    }
+    let active = DefaultRenderer().render(scene, proposal: .init(width: 1, height: 1)).rasterSurface
+    #expect(active.cells[0][0].character == "Y")
+  }
+}
+
+extension CellLayerOccupantJourneyTests {
+  @Test(
+    "A nested compositing shader sees whole-span repair when a narrow sibling overwrites inherited wide lower paint",
+    arguments: [0, 1])
+  func nestedReaderRepairsInheritedSpan(_ occupied: Int) {
+    let scene = ZStack(alignment: .topLeading) {
+      Text("界")
+      ZStack(alignment: .topLeading) {
+        Text("X").offset(x: occupied)
+        Spacer(minLength: 0).frame(width: 2, height: 1).layerEffect(
+          .compositing { point, _, lower, _ in
+            guard point.x == 1 - occupied else { return .keepDestination }
+            let correct = lower.sample(at: point) == .empty && lower.glyph(occupying: point) == nil
+            return .replace(.glyph(CellGlyph(correct ? "Y" : "N")))
+          }, maxSampleOffset: .zero)
+      }.layerEffect(maxSampleOffset: .zero) { point, layer, _ in layer.sample(at: point) }
+    }
+    let active = DefaultRenderer().render(scene, proposal: .init(width: 2, height: 1)).rasterSurface
+    #expect(active.cells[0][1 - occupied].character == "Y")
+  }
+}
+
+extension CellLayerOccupantJourneyTests {
+  @Test(
+    "An offscreen implicit capture keeps the whole enclosing backdrop readable to nested layerBounds kernels"
+  )
+  func offscreenCapturePreservesEnclosingReads() {
+    let scene = ZStack(alignment: .topLeading) {
+      Text("abcd")
+      Text("XY").fixedSize()
+        .layerEffect(
+          .compositing { _, _, lower, context in
+            .replace(lower.sample(at: .init(x: context.viewport.maxX - 1, y: 0)))
+          }, maxSampleOffset: .layerBounds
+        )
+        .layerEffect(maxSampleOffset: .layerBounds) { point, layer, _ in layer.sample(at: point) }
+        .offset(x: -1)
+    }
+    let active = DefaultRenderer().render(scene, proposal: .init(width: 4, height: 1)).rasterSurface
+    #expect(active.cells[0][0].character == "d")
+  }
+}
+
+extension CellLayerOccupantJourneyTests {
+  @Test("Nested backdrop resolves the same paint over the enclosing paper as the direct sibling")
+  func nestedReaderResolvesEarlierFractionalCoverage() throws {
+    let content = ZStack(alignment: .topLeading) {
+      Text("B").foregroundStyle(Color.blue)
+        .layerEffect(maxSampleOffset: .zero) { point, layer, _ in
+          guard var glyph = layer.glyph(occupying: point) else { return .empty }
+          glyph.paint.coverage = 0.5
+          return .glyph(glyph)
+        }
+      Spacer(minLength: 0).frame(width: 1, height: 1).layerEffect(
+        .compositing { point, _, lower, _ in
+          guard let glyph = lower.glyph(occupying: point) else { return .keepDestination }
+          return .replace(
+            .glyph(CellGlyph(glyph.paint.coverage == 1 ? "Y" : "N", paint: glyph.paint)))
+        }, maxSampleOffset: .zero)
+    }
+    func render(_ nested: Bool) -> RasterCell {
+      let scene = ZStack(alignment: .topLeading) {
+        Text("A").background(Color.red)
+        content.layerEffect(maxSampleOffset: .zero, isEnabled: nested) { point, layer, _ in
+          layer.sample(at: point)
+        }
+      }
+      return DefaultRenderer().render(scene, proposal: .init(width: 1, height: 1)).rasterSurface
+        .cells[0][0]
+    }
+    let direct = render(false)
+    let ink = try #require(direct.style?.foregroundColor)
+    #expect(direct.character == "Y" && ink.red > 0.1 && ink.blue > 0.1)
+    #expect(render(true) == direct)
+  }
+}
+
+extension CellLayerOccupantJourneyTests {
+  @Test(
+    "A nested destination distinguishes ordinary ink from an explicit default replacement",
+    arguments: [false, true])
+  func nestedReaderPreservesInheritedPaper(_ replace: Bool) {
+    func render(_ nested: Bool) -> RasterCell {
+      let content = ZStack(alignment: .topLeading) {
+        Text("X").layerEffect(
+          .compositing { _, _, _, _ in
+            .replace(.glyph(CellGlyph("X")))
+          }, maxSampleOffset: .zero, isEnabled: replace)
+        Spacer(minLength: 0).frame(width: 1, height: 1).layerEffect(
+          .compositing { point, _, lower, _ in
+            guard let glyph = lower.glyph(occupying: point) else { return .keepDestination }
+            let correct =
+              replace ? glyph.paint.background == .default : glyph.paint.background == .color(.red)
+            return .replace(.glyph(CellGlyph(correct ? "Y" : "N")))
+          }, maxSampleOffset: .zero)
+      }
+      let scene = ZStack(alignment: .topLeading) {
+        Text("A").background(Color.red)
+        content.layerEffect(maxSampleOffset: .zero, isEnabled: nested) { point, layer, _ in
+          layer.sample(at: point)
+        }
+      }
+      return DefaultRenderer().render(scene, proposal: .init(width: 1, height: 1)).rasterSurface
+        .cells[0][0]
+    }
+    #expect(render(false).character == "Y")
+    #expect(render(true).character == "Y")
+  }
+}
+
+extension CellLayerOccupantJourneyTests {
+  @Test("An explicit default space synthesized by an effect survives group flattening")
+  func groupFlattensSynthesizedDefaultSpace() {
+    let scene = ZStack(alignment: .topLeading) {
+      Text("A")
+      Text("B").layerEffect(maxSampleOffset: .zero) { _, _, _ in .glyph(CellGlyph(" ")) }
+        .compositingGroup()
+      Spacer(minLength: 0).frame(width: 1, height: 1).layerEffect(
+        .compositing { point, _, lower, _ in
+          guard let glyph = lower.glyph(occupying: point) else { return .keepDestination }
+          return .replace(.glyph(CellGlyph(glyph.character == " " ? "Y" : "N")))
+        }, maxSampleOffset: .zero)
+    }
+    let active = DefaultRenderer().render(scene, proposal: .init(width: 1, height: 1)).rasterSurface
+    #expect(active.cells[0][0].character == "Y")
+  }
+}

@@ -1,7 +1,12 @@
 /// Actual writes into a paint target. A written default space and an unwritten column
 /// have identical RasterCell values. This plane exists only while a cell effect needs it.
 final class RasterCellCapture {
-  var written: [[Bool]]
+  enum Column {
+    case untouched, cleared, painted, replaced
+    var hasPaint: Bool { self == .painted || self == .replaced }
+  }
+
+  var columns: [[Column]]
   let inheritedBackdrop: CellLayer?
   let viewport: CellRect?
   /// Full logical paint target, in scratch coordinates, across all tiles.
@@ -21,17 +26,22 @@ final class RasterCellCapture {
     self.projectsImages = projectsImages
     self.originInRoot = originInRoot
     self.defersCoverage = defersCoverage
-    written = Array(repeating: Array(repeating: false, count: size.width), count: size.height)
+    columns = Array(repeating: Array(repeating: .untouched, count: size.width), count: size.height)
     self.inheritedBackdrop = inheritedBackdrop
   }
 
   func mark(x: Int, y: Int, width: Int, written value: Bool = true) {
-    guard written.indices.contains(y) else { return }
+    guard columns.indices.contains(y) else { return }
     let start = max(0, x)
-    let end = min(written[y].count, SaturatingConversion.adding(x, width))
+    let end = min(columns[y].count, SaturatingConversion.adding(x, width))
     guard start < end else { return }
     for column in start..<end {
-      written[y][column] = value
+      if value {
+        let previous = columns[y][column]
+        columns[y][column] = previous == .cleared || previous == .replaced ? .replaced : .painted
+      } else {
+        columns[y][column] = .cleared
+      }
       if !fractionalCoverage.isEmpty {
         fractionalCoverage.removeValue(forKey: .init(x: column, y: y))
       }
@@ -43,19 +53,46 @@ extension Rasterizer {
   /// Retains Swift array snapshots. Writers detach touched rows on their next write.
   func cellLayer(
     cells: [[RasterCell]], capture: RasterCellCapture?, absoluteBounds: CellRect,
-    origin: CellPoint, allowsLink: Bool, includeInherited: Bool
+    origin: CellPoint, allowsLink: Bool, backdropContext: CellEffectContext? = nil
   ) -> CellLayer {
     let bounds = absoluteBounds.relative(to: origin)
-    let written = capture?.written
+    let columns = capture?.columns
     let coverage = capture?.fractionalCoverage ?? [:]
-    let inherited = includeInherited ? capture?.inheritedBackdrop : nil
+    let inherited = backdropContext == nil ? nil : capture?.inheritedBackdrop
     return CellLayer(bounds: bounds, readableBounds: bounds) { point in
       let x = SaturatingConversion.adding(point.x, origin.x)
       let y = SaturatingConversion.adding(point.y, origin.y)
-      guard cells.indices.contains(y), cells[y].indices.contains(x) else { return .empty }
-      if let written, !written[y][x] {
-        return inherited?.sample(at: .init(x: x, y: y)) ?? .empty
+      let inScratch = cells.indices.contains(y) && cells[y].indices.contains(x)
+      if !inScratch || columns?[y][x] == .untouched {
+        guard let inherited else { return .empty }
+        let point = CellPoint(x: x, y: y)
+        let sample = inherited.sample(at: point)
+        let lead: Int
+        let width: Int
+        switch sample {
+        case .empty: return .empty
+        case .glyph(let glyph):
+          lead = x
+          width = glyph.width
+        case .continuation(let back):
+          guard let glyph = inherited.glyph(occupying: point) else { return .empty }
+          lead = SaturatingConversion.subtracting(x, back)
+          width = glyph.width
+        }
+        let end = SaturatingConversion.adding(lead, width)
+        guard lead >= absoluteBounds.origin.x, end <= absoluteBounds.maxX else { return .empty }
+        // Local writes take ownership of complete inherited spans, including
+        // the other half of a wide glyph at the edge of a scratch tile.
+        if width > 1, let columns, columns.indices.contains(y) {
+          let left = max(0, lead)
+          let right = min(end, columns[y].count)
+          if left < right, columns[y][left..<right].contains(where: { $0 != .untouched }) {
+            return .empty
+          }
+        }
+        return sample
       }
+      if columns?[y][x] == .cleared { return .empty }
       let cell = cells[y][x]
       let lead = cell.continuationLeadX ?? x
       guard cells[y].indices.contains(lead), lead <= x, lead >= absoluteBounds.origin.x else {
@@ -68,6 +105,24 @@ extension Rasterizer {
       var glyph = CellGlyph(cell, allowsLink: allowsLink)
       if !coverage.isEmpty, let fraction = coverage[.init(x: x, y: y)] {
         glyph.paint.coverage = fraction
+        if let backdropContext {
+          // Source readers retain coverage for subsequent masks. Destination
+          // readers see the earlier glyph as painted over the enclosing paper.
+          let lower = inherited?.glyph(occupying: .init(x: x, y: y))
+          let paper =
+            lower?.paint.background.color(in: backdropContext.appearance)
+            ?? backdropContext.appearance.backgroundColor
+          glyph.paint = backdropContext.compositingCoverage(of: glyph, over: paper)
+        }
+      } else if let backdropContext, columns?[y][x] == .painted,
+        let lower = inherited?.glyph(occupying: .init(x: x, y: y))
+      {
+        // Ordinary sibling paint inherits lower channels. Explicit replacements
+        // already name their final channels and retain authored defaults.
+        var visible = cell
+        let underlay = lower.rasterStyle(for: lower.paint, in: backdropContext.appearance)
+        visible.style = (cell.style ?? Self.emptyCompositingStyle).composited(over: underlay)
+        glyph = CellGlyph(visible, allowsLink: allowsLink)
       }
       return .glyph(glyph)
     }

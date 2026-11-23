@@ -37,20 +37,18 @@ public struct SwapColumns: CellRegionKernel {
 
 extension View {
   public func lowerColumn(inline: Bool) -> some View {
-    let shader: CellLayerShader =
-      inline
-      ? .compositing { point, source, backdrop, context in
-        LowerColumn().composite(at: point, source: source, backdrop: backdrop, context: context)
-      } : .compositing(LowerColumn())
+    let composite: CellLayerShader.CompositingFunction = { point, source, backdrop, context in
+      LowerColumn().composite(at: point, source: source, backdrop: backdrop, context: context)
+    }
+    let shader = inline ? CellLayerShader.compositing(composite) : .compositing(LowerColumn())
     return layerEffect(shader, maxSampleOffset: .zero)
   }
 
   public func swapColumnsBehind(inline: Bool, isEnabled: Bool = true) -> some View {
-    let shader: CellLayerShader =
-      inline
-      ? .region { source, buffer, context in
-        SwapColumns().apply(source: source, to: &buffer, context: context)
-      } : .region(SwapColumns())
+    let region: CellLayerShader.RegionFunction = { source, buffer, context in
+      SwapColumns().apply(source: source, to: &buffer, context: context)
+    }
+    let shader = inline ? CellLayerShader.region(region) : .region(SwapColumns())
     return backdropEffect(shader, in: .viewport, maxSampleOffset: .zero, isEnabled: isEnabled)
   }
 }

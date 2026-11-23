@@ -83,7 +83,7 @@ extension Rasterizer {
     return cellLayer(
       cells: sourceCells, capture: scratch.cellCapture,
       absoluteBounds: sourceBounds.relative(to: scratchOrigin),
-      origin: sourceNode.bounds.origin, allowsLink: !node.isTransient, includeInherited: false)
+      origin: sourceNode.bounds.origin, allowsLink: !node.isTransient)
 
   }
 }

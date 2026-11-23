@@ -437,7 +437,9 @@ extension Rasterizer {
       lineArms: LineArmsTable()
     )
     layer.capture =
-      presentationRecorder?.cellCapture?.projectsImages == true ? scratch.cellCapture : nil
+      (isolatedNode.subtreeHasCellEffect
+        || presentationRecorder?.cellCapture?.projectsImages == true)
+      ? scratch.cellCapture : nil
     compositeLayer(
       layer,
       effects: split.effectsAfterGroup,
@@ -549,7 +551,7 @@ extension Rasterizer {
         }
         let source = layer.cells[y][x]
         guard source.spanWidth > 0,
-          !source.isEmpty || layer.capture?.written[y][x] == true
+          !source.isEmpty || layer.capture?.columns[y][x].hasPaint == true
         else {
           continue
         }
