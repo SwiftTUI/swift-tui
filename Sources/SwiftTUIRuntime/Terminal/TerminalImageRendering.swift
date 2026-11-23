@@ -639,6 +639,25 @@ final class TerminalImageRenderer: Sendable {
     return payload
   }
 
+  // Create the fallback cache only when a cell shader first samples an image.
+  private static let effectImageRenderer = TerminalImageRenderer(
+    repository: sharedImageAssetRepository)
+
+  static func effectProjection(for attachment: RasterImageAttachment, background: Color)
+    -> (bounds: CellRect, cells: [[RasterCell?]])?
+  {
+    let renderer = effectImageRenderer
+    let variant = renderer.presentationVariant(for: attachment, fallbackBackground: background)
+    let display = variant?.attachment ?? attachment
+    guard
+      let overlay = renderer.fallbackOverlay(
+        for: display,
+        sourceReference: attachment.resolvedReference, variant: variant,
+        capabilityProfile: .trueColor)
+    else { return nil }
+    return (display.bounds, overlay.cells)
+  }
+
   private func presentationVariant(
     for attachment: RasterImageAttachment,
     outputSize: PixelSize? = nil,

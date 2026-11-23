@@ -82,6 +82,8 @@ public struct RasterSurface: Equatable, Sendable {
   public var imageAttachments: [RasterImageAttachment]
   public var metadata: [String: String]
   package var presentationLayers: [RasterPresentationLayer]
+  // Retain the previous dependency extent for an effect that disappears on this frame.
+  package var hadCellEffect = false
 
   public init(
     size: CellSize = .zero,
@@ -104,7 +106,8 @@ public struct RasterSurface: Equatable, Sendable {
     attachments: [String] = [],
     imageAttachments: [RasterImageAttachment] = [],
     metadata: [String: String] = [:],
-    presentationLayers: [RasterPresentationLayer] = []
+    presentationLayers: [RasterPresentationLayer] = [],
+    hadCellEffect: Bool = false
   ) {
     self.size = size
     self.cells = cells
@@ -112,6 +115,7 @@ public struct RasterSurface: Equatable, Sendable {
     self.imageAttachments = imageAttachments
     self.metadata = metadata
     self.presentationLayers = presentationLayers
+    self.hadCellEffect = hadCellEffect
   }
 
   public init(

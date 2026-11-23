@@ -253,6 +253,15 @@ and its `CellEffectContext` operate in the mounted view’s integer cell space.
   and link. Each ink or paper `CellChannel` can be default, explicit or indexed.
 - `CellDrawingRegion` selects the permitted output through
   `CellLayerShader.drawing(in:)`. The default is the subject’s bounds.
+- `CellColorKernel` and `CellColorShader` power `View.colorEffect`. A color
+  program changes paint for each covered lead, including a painted space.
+- `CellDistortionKernel` and `CellDistortionShader` power `View.distortionEffect`.
+  A mapping returns a source position for each output column, or `nil` for an
+  open column. Its shader also supports `drawing(in:)`. Both modifiers accept
+  a named shader or trailing closure and an enable switch.
+- `ResolvedTextStyle.foregroundPaletteIndex` and `backgroundPaletteIndex` expose
+  the terminal palette tokens alongside the resolved colors. Replacing a
+  resolved color clears that channel's token.
 
 The [Cell effects guide](../Sources/SwiftTUIViews/SwiftTUIViews.docc/Cell-Effects.md)
 gives both authoring forms and the span and enablement contracts.

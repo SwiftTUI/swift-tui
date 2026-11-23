@@ -175,7 +175,7 @@ struct TerminalCellTextRenderer {
       )
     }
 
-    return ResolvedTextStyle(
+    var resolved = ResolvedTextStyle(
       foregroundColor: style.foregroundColor.map {
         colorResolvedForTerminal($0, over: foregroundBackdrop)
       },
@@ -185,6 +185,13 @@ struct TerminalCellTextRenderer {
       strikethroughStyle: style.strikethroughStyle,
       opacity: style.opacity
     )
+    if style.foregroundColor?.alpha == 1 {
+      resolved.foregroundPaletteIndex = style.foregroundPaletteIndex
+    }
+    if style.backgroundColor?.alpha == 1 {
+      resolved.backgroundPaletteIndex = style.backgroundPaletteIndex
+    }
+    return resolved
   }
 
   private func colorResolvedForTerminal(
@@ -290,12 +297,16 @@ struct TerminalCellTextRenderer {
 
     // Foreground color codes (inlined from former colorCodes).
     if let fg = style.foregroundColor {
-      appendColorCodes(for: fg, isBackground: false, into: &seq, hasCodes: &hasCodes)
+      appendColorCodes(
+        for: fg, index: style.foregroundPaletteIndex, isBackground: false, into: &seq,
+        hasCodes: &hasCodes)
     }
 
     // Background color codes.
     if let bg = style.backgroundColor {
-      appendColorCodes(for: bg, isBackground: true, into: &seq, hasCodes: &hasCodes)
+      appendColorCodes(
+        for: bg, index: style.backgroundPaletteIndex, isBackground: true, into: &seq,
+        hasCodes: &hasCodes)
     }
 
     // Underline color.
@@ -314,6 +325,7 @@ struct TerminalCellTextRenderer {
   /// Appends SGR color codes for `color` directly into `seq`.
   private func appendColorCodes(
     for color: Color,
+    index: UInt8?,
     isBackground: Bool,
     into seq: inout String,
     hasCodes: inout Bool
@@ -323,6 +335,22 @@ struct TerminalCellTextRenderer {
       if hasCodes { seq += ";" }
       seq += String(code)
       hasCodes = true
+    }
+
+    if let index {
+      switch capabilityProfile.colorLevel {
+      case .trueColor, .ansi256:
+        appendCode(isBackground ? 48 : 38)
+        appendCode(5)
+        appendCode(Int(index))
+        return
+      case .ansi16 where index < 16:
+        let code = index < 8 ? 30 + Int(index) : 90 + Int(index) - 8
+        appendCode(isBackground ? backgroundCode(forForegroundCode: code) : code)
+        return
+      default:
+        break
+      }
     }
 
     switch capabilityProfile.colorLevel {

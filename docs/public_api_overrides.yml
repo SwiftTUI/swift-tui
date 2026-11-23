@@ -688,6 +688,10 @@ classifications:
     - SwiftTUICore.CanvasPixelGridDrawing
     - SwiftTUICore.CanvasPixelGridMode
     - SwiftTUIPrimitives.CellChannel
+    - SwiftTUIPrimitives.CellColorKernel
+    - SwiftTUIPrimitives.CellColorShader
+    - SwiftTUIPrimitives.CellDistortionKernel
+    - SwiftTUIPrimitives.CellDistortionShader
     - SwiftTUIPrimitives.CellDrawingRegion
     - SwiftTUIPrimitives.CellEffectContext
     - SwiftTUIPrimitives.CellGlyph

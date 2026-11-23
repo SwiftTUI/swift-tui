@@ -117,3 +117,51 @@ from zero to one for the whole glyph. Zero exposes the lower layer.
 `resolvedColors(for:emphasis:over:)` resolves ink and paper in display order
 using the context’s appearance, the glyph’s emphasis, and an optional lower
 paper color. Read the stored channels directly when preserving palette tokens.
+
+## Recolor or move a glyph
+
+Use `colorEffect` to change ink, paper or coverage. The program receives
+the stored paint of each glyph’s lead column, including a painted space.
+It preserves the character, width, decorations and link. This example
+changes the ink of every covered glyph to ANSI palette entry 196.
+
+```swift
+struct PaletteInk: CellColorKernel {
+  var index: UInt8
+
+  func shade(at position: CellPoint, paint: CellPaint, context: CellEffectContext) -> CellPaint {
+    var result = paint
+    result.foreground = .indexed(index)
+    return result
+  }
+}
+
+let label = Text("Warning").colorEffect(CellColorShader(PaletteInk(index: 196)))
+```
+
+The `colorEffect(isEnabled:_:)` trailing closure receives the same three
+arguments. The rendered `ResolvedTextStyle` includes both the resolved
+`foregroundColor` or `backgroundColor` and the corresponding
+`foregroundPaletteIndex` or `backgroundPaletteIndex` for an indexed channel.
+Assigning a new resolved color clears that channel’s index. A capable terminal
+can emit the index directly. Color-only hosts receive its resolved color.
+
+Use `distortionEffect` to move source cells. For each output column, return
+the absolute position of the input column to read, in subject-local
+coordinates. Returning `nil` leaves that output open. For example, move the
+first four letters of a label one column right inside its existing extent.
+
+```swift
+let shifted = Text("HELLO").distortionEffect(maxSampleOffset: .cells(x: 1, y: 0)) {
+  destination, _ in
+  guard destination.x > 0 else { return nil }
+  return CellPoint(x: destination.x - 1, y: destination.y)
+}
+```
+
+A `CellDistortionKernel` implements `sourcePosition(for:context:)`. Wrap
+the value in `CellDistortionShader` to pass it to
+`distortionEffect(_:maxSampleOffset:isEnabled:)`. Its `drawing(in:)`
+method selects the output region, so a motion can travel past the subject.
+Color and distortion shaders use the same kernel-value and closure-identity
+equality rules as layer shaders.

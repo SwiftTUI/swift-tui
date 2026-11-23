@@ -3,8 +3,20 @@
 final class RasterCellCapture {
   var written: [[Bool]]
   let inheritedBackdrop: CellLayer?
+  let viewport: CellRect?
+  let originInRoot: CellPoint
+  let projectsImages: Bool
+  let defersCoverage: Bool
+  var fractionalCoverage: [CellPoint: Double] = [:]
 
-  init(size: CellSize, inheritedBackdrop: CellLayer? = nil) {
+  init(
+    size: CellSize, inheritedBackdrop: CellLayer? = nil, originInRoot: CellPoint = .zero,
+    defersCoverage: Bool = false, projectsImages: Bool = false, viewport: CellRect? = nil
+  ) {
+    self.viewport = viewport
+    self.projectsImages = projectsImages
+    self.originInRoot = originInRoot
+    self.defersCoverage = defersCoverage
     written = Array(repeating: Array(repeating: false, count: size.width), count: size.height)
     self.inheritedBackdrop = inheritedBackdrop
   }
@@ -14,7 +26,12 @@ final class RasterCellCapture {
     let start = max(0, x)
     let end = min(written[y].count, SaturatingConversion.adding(x, width))
     guard start < end else { return }
-    for column in start..<end { written[y][column] = value }
+    for column in start..<end {
+      written[y][column] = value
+      if !fractionalCoverage.isEmpty {
+        fractionalCoverage.removeValue(forKey: .init(x: column, y: y))
+      }
+    }
   }
 }
 
@@ -26,6 +43,7 @@ extension Rasterizer {
   ) -> CellLayer {
     let bounds = absoluteBounds.relative(to: origin)
     let written = capture?.written
+    let coverage = capture?.fractionalCoverage ?? [:]
     let inherited = includeInherited ? capture?.inheritedBackdrop : nil
     return CellLayer(bounds: bounds, readableBounds: bounds) { point in
       let x = SaturatingConversion.adding(point.x, origin.x)
@@ -42,9 +60,12 @@ extension Rasterizer {
       let width = cells[y][lead].spanWidth
       let end = SaturatingConversion.adding(lead, width)
       guard end > x, end <= min(cells[y].count, absoluteBounds.maxX) else { return .empty }
-      return lead == x
-        ? .glyph(CellGlyph(cell, allowsLink: allowsLink))
-        : .continuation(columnsBack: x - lead)
+      if lead != x { return .continuation(columnsBack: x - lead) }
+      var glyph = CellGlyph(cell, allowsLink: allowsLink)
+      if !coverage.isEmpty, let fraction = coverage[.init(x: x, y: y)] {
+        glyph.paint.coverage = fraction
+      }
+      return .glyph(glyph)
     }
   }
 }

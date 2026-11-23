@@ -130,3 +130,33 @@ struct CellLayerOccupantJourneyTests {
     #expect(frame.lines == ["--"])
   }
 }
+
+extension CellLayerOccupantJourneyTests {
+  @Test("A text-over-image source uses the shared fallback until bypass restores native placement")
+  func mixedImageOrder() throws {
+    let bytes = try makePNGBytes(
+      width: 2, height: 2,
+      pixels: Array(repeating: rgbaPixel(red: 230, green: 20, blue: 80), count: 4))
+    func scene(_ enabled: Bool) -> some View {
+      ZStack(alignment: .topLeading) {
+        Text("LOW")
+        Image(data: bytes).resizable().frame(width: 3, height: 1)
+        Text("T")
+      }
+      .layerEffect(maxSampleOffset: .zero, isEnabled: enabled) { p, layer, _ in layer.sample(at: p)
+      }
+    }
+    let renderer = DefaultRenderer()
+    let size = ProposedSize(width: 3, height: 1)
+    let active = renderer.render(scene(true), proposal: size).rasterSurface
+    #expect(active.imageAttachments.isEmpty)
+    #expect(active.cells[0].map(\.character) == ["T", "▀", "▀"])
+    let imageInk = try #require(active.cells[0][1].style?.foregroundColor)
+    #expect(Int((imageInk.red * 255).rounded()) == 230)
+    #expect(active.cells[0][1].style?.backgroundColor == imageInk)
+    let restored = renderer.render(scene(false), proposal: size).rasterSurface
+    #expect(restored.imageAttachments.count == 1)
+    #expect(restored == DefaultRenderer().render(scene(false), proposal: size).rasterSurface)
+    #expect(restored.cells[0].map(\.character) == ["T", "O", "W"])
+  }
+}

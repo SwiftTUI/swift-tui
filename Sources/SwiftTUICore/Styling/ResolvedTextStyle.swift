@@ -33,7 +33,7 @@ extension ResolvedTextStyle {
         }
       }
 
-    return .init(
+    var result = Self(
       foregroundColor: compositedColor(
         source: foregroundColor,
         over: underlay.foregroundColor,
@@ -45,6 +45,18 @@ extension ResolvedTextStyle {
       strikethroughStyle: strikethroughStyle,
       opacity: opacity
     )
+    // A missing channel inherits its lower token. Blending two specified channels
+    // produces new RGB and severs the palette reference.
+    result.foregroundPaletteIndex =
+      foregroundColor == nil
+      ? underlay.foregroundPaletteIndex
+      : (blendMode == nil || underlay.foregroundColor == nil ? foregroundPaletteIndex : nil)
+    result.backgroundPaletteIndex =
+      backgroundColor == nil
+      ? underlay.backgroundPaletteIndex
+      : (underlay.backgroundColor == nil || (blendMode == nil && backgroundColor?.alpha == 1)
+        ? backgroundPaletteIndex : nil)
+    return result
   }
 
   private func compositedTranslucentBackground(_ overlay: Color, over under: Color) -> Color {

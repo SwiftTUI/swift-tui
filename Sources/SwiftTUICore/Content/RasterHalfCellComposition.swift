@@ -7,9 +7,10 @@ package func compositeVerticalBlockCell(
   guard source.spanWidth == 1, source.character == "▀" || source.character == "▄" else {
     return nil
   }
-  func halves(_ cell: RasterCell) -> (Color?, Color?) {
-    let foreground = cell.style?.foregroundColor
-    let background = cell.style?.backgroundColor
+  typealias Half = (color: Color?, index: UInt8?)
+  func halves(_ cell: RasterCell) -> (Half, Half) {
+    let foreground: Half = (cell.style?.foregroundColor, cell.style?.foregroundPaletteIndex)
+    let background: Half = (cell.style?.backgroundColor, cell.style?.backgroundPaletteIndex)
     switch cell.character {
     case "▀": return (foreground, background)
     case "▄": return (background, foreground)
@@ -17,10 +18,13 @@ package func compositeVerticalBlockCell(
     default: return (background, background)
     }
   }
-  func composed(_ color: Color?, over backdrop: Color?) -> Color? {
-    ResolvedTextStyle(backgroundColor: color).composited(
-      over: .init(backgroundColor: backdrop), blendMode: blendMode
-    ).backgroundColor
+  func composed(_ source: Half, over under: Half) -> Half {
+    var top = ResolvedTextStyle(backgroundColor: source.color)
+    top.backgroundPaletteIndex = source.index
+    var lower = ResolvedTextStyle(backgroundColor: under.color)
+    lower.backgroundPaletteIndex = under.index
+    let blended = top.composited(over: lower, blendMode: blendMode)
+    return (blended.backgroundColor, blended.backgroundPaletteIndex)
   }
   let (sourceTop, sourceBottom) = halves(source)
   let (underTop, underBottom) = halves(underlay)
@@ -28,19 +32,24 @@ package func compositeVerticalBlockCell(
   let bottom = composed(sourceBottom, over: underBottom)
   var style = source.style ?? .init()
   let character: Character
-  if source.character == "▄", let bottom {
+  if source.character == "▄", bottom.color != nil {
     // Preserve the authored glyph orientation. Both channel assignments encode
     // the same coverage, but controls and copied text still carry this glyph.
     character = "▄"
-    style.foregroundColor = bottom
-    style.backgroundColor = top
-  } else if let top {
+    style.foregroundColor = bottom.color
+    style.foregroundPaletteIndex = bottom.index
+    style.backgroundColor = top.color
+    style.backgroundPaletteIndex = top.index
+  } else if top.color != nil {
     character = "▀"
-    style.foregroundColor = top
-    style.backgroundColor = bottom
-  } else if let bottom {
+    style.foregroundColor = top.color
+    style.foregroundPaletteIndex = top.index
+    style.backgroundColor = bottom.color
+    style.backgroundPaletteIndex = bottom.index
+  } else if bottom.color != nil {
     character = "▄"
-    style.foregroundColor = bottom
+    style.foregroundColor = bottom.color
+    style.foregroundPaletteIndex = bottom.index
     style.backgroundColor = nil
   } else {
     return underlay

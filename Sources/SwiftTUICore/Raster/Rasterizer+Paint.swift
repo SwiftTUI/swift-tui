@@ -21,6 +21,7 @@ extension Rasterizer {
     var bounds: CellRect
     var cells: [[RasterCell]]
     var imageAttachments: [RasterImageAttachment]
+    var capture: RasterCellCapture?
   }
 
   private struct CompositingGroupSplit {
@@ -192,7 +193,7 @@ extension Rasterizer {
           visibleIdentities.insert(node.identity)
         }
 
-        if let dirtySpans = nodeContext.dirtySpans {
+        if !node.subtreeDrawsInViewport, let dirtySpans = nodeContext.dirtySpans {
           // O(log k) span-overlap check on the SUBTREE's absolute painted-row
           // span, not this node's own bounds. `.offset`/`.position` bake their
           // translation into the child's absolute bounds while the wrapper keeps
@@ -241,11 +242,17 @@ extension Rasterizer {
         }
 
         if let groupSplit = splitAtFirstCompositingGroup(node.drawEffects) {
+          let groupBounds =
+            node.subtreeDrawsInViewport
+            ? nodeContext.clip
+              ?? CellRect(
+                origin: .zero,
+                size: .init(width: cells.first?.count ?? 0, height: cells.count))
+            : nodeContext.clip.flatMap { intersect(node.subtreeBounds, $0) } ?? node.subtreeBounds
           paintCompositingGroup(
             node,
             split: groupSplit,
-            visibleBounds: nodeContext.clip.flatMap { intersect(node.subtreeBounds, $0) }
-              ?? node.subtreeBounds,
+            visibleBounds: groupBounds,
             context: nodeContext,
             cells: &cells,
             imageAttachments: &imageAttachments,
@@ -309,7 +316,7 @@ extension Rasterizer {
       // descendant paints inside this clip. Cull only the whole subtree;
       // keep the wrapper's own visible extent empty (the visibility set
       // records it through its subtree).
-      guard intersect(node.subtreeBounds, clip) != nil else {
+      guard node.subtreeDrawsInViewport || intersect(node.subtreeBounds, clip) != nil else {
         return nil
       }
       bounds = intersect(node.paintBounds, clip) ?? CellRect(origin: clip.origin, size: .zero)
@@ -405,7 +412,10 @@ extension Rasterizer {
     let scratch = RasterPresentationLayerRecorder.scratchOnly()
     if presentationRecorder?.cellCapture != nil {
       scratch.cellCapture = RasterCellCapture(
-        size: .init(width: cells.first?.count ?? 0, height: cells.count))
+        size: .init(width: cells.first?.count ?? 0, height: cells.count),
+        originInRoot: presentationRecorder?.cellCapture?.originInRoot ?? .zero,
+        projectsImages: presentationRecorder?.cellCapture?.projectsImages == true,
+        viewport: presentationRecorder?.cellCapture?.viewport)
     }
     paint(
       node: isolatedNode,
@@ -421,6 +431,8 @@ extension Rasterizer {
       // other and not with the strokes beneath the layer.
       lineArms: LineArmsTable()
     )
+    layer.capture =
+      presentationRecorder?.cellCapture?.projectsImages == true ? scratch.cellCapture : nil
     compositeLayer(
       layer,
       effects: split.effectsAfterGroup,
@@ -455,12 +467,20 @@ extension Rasterizer {
           dirtySpans: context.dirtySpans
         )
       )
+      let scratch = RasterPresentationLayerRecorder.scratchOnly()
+      if let capture = layer.capture {
+        scratch.cellCapture = RasterCellCapture(
+          size: .init(width: layer.cells.first?.count ?? 0, height: layer.cells.count),
+          originInRoot: capture.originInRoot, projectsImages: capture.projectsImages,
+          viewport: capture.viewport)
+      }
       compositeLayerCells(
         from: layer,
         into: &intermediate.cells,
         context: innerContext,
-        presentationRecorder: .scratchOnly()
+        presentationRecorder: scratch
       )
+      intermediate.capture = scratch.cellCapture
       compositeLayer(
         intermediate,
         effects: nestedGroup.effectsAfterGroup,
@@ -523,7 +543,9 @@ extension Rasterizer {
           continue
         }
         let source = layer.cells[y][x]
-        guard source.spanWidth > 0, !source.isEmpty else {
+        guard source.spanWidth > 0,
+          !source.isEmpty || layer.capture?.written[y][x] == true
+        else {
           continue
         }
         write(
@@ -1067,6 +1089,12 @@ extension Rasterizer {
           opacity: payload.opacity,
           compositing: compositing
         )
+        if presentationRecorder?.cellCapture?.projectsImages == true {
+          paintEffectImage(
+            attachment, appearance: environment.appearance, cells: &cells,
+            recorder: presentationRecorder, effects: presentationEffects)
+          continue
+        }
         imageAttachments.append(attachment)
         presentationRecorder?.appendImageAttachment(
           attachment,

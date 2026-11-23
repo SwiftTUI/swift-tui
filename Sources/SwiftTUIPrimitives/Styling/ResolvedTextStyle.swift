@@ -29,8 +29,18 @@ public struct TextLineStyle: Equatable, Sendable {
 
 /// A fully resolved text style with concrete colors.
 public struct ResolvedTextStyle: Equatable, Sendable {
-  public var foregroundColor: Color?
-  public var backgroundColor: Color?
+  public var foregroundColor: Color? {
+    didSet { foregroundPaletteIndex = nil }
+  }
+  public var backgroundColor: Color? {
+    didSet { backgroundPaletteIndex = nil }
+  }
+
+  /// The original terminal palette entry when the resolved ink is still unmodified.
+  public package(set) var foregroundPaletteIndex: UInt8?
+
+  /// The original terminal palette entry when the resolved paper is still unmodified.
+  public package(set) var backgroundPaletteIndex: UInt8?
   public var emphasis: TextStyle.TextEmphasis
   public var underlineStyle: TextLineStyle?
   public var strikethroughStyle: TextLineStyle?

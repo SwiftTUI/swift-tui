@@ -21,7 +21,7 @@ For products, supported imports, and re-export reachability, see [PUBLIC_MODULE_
 | `SwiftTUI` | 1 | 4 |
 | `SwiftTUIRuntime` | 60 | 531 |
 | `SwiftTUIProfiling` | 9 | 52 |
-| `SwiftTUIViews` | 431 | 2654 |
+| `SwiftTUIViews` | 431 | 2658 |
 | `SwiftTUIAnimatedImage` | 5 | 36 |
 | `SwiftTUIArguments` | 5 | 61 |
 | `SwiftTUIPTYPrimitives` | 7 | 40 |
@@ -33,7 +33,7 @@ For products, supported imports, and re-export reachability, see [PUBLIC_MODULE_
 | `SwiftTUIWebHostCLI` | 2 | 8 |
 | `SwiftTUIAndroidHost` | 20 | 49 |
 | `SwiftTUICore` | 43 | 296 |
-| `SwiftTUIPrimitives` | 186 | 1638 |
+| `SwiftTUIPrimitives` | 190 | 1653 |
 | `SwiftTUIGraph` | 78 | 598 |
 | `SwiftTUIPTYCPrimitives` | 0 | 0 |
 | `SwiftTUIPlatformIO` | 1 | 19 |
@@ -544,7 +544,7 @@ For products, supported imports, and re-export reachability, see [PUBLIC_MODULE_
 - `VerticalAlignmentGuideModifier` — struct
 - `VerticalControlGroupStyle` — struct — 3 members
 - `VerticalEdge` — enum — 1 member
-- `View` — protocol — 230 members
+- `View` — protocol — 234 members
 - `ViewBuilder` — enum — 10 members
 - `ViewModifier` — protocol — 7 members
 - `ViewModifierContent` — struct — 1 member
@@ -728,7 +728,7 @@ For products, supported imports, and re-export reachability, see [PUBLIC_MODULE_
 > carry `public` access but do not establish a supported direct import.
 > See the module map for re-export paths and symbol classifications below.
 
-### Canonical surface (184)
+### Canonical surface (188)
 
 - `AccessibilityColorProfile` — enum — 6 members
 - `AccessibilityPreferences` — struct — 8 members
@@ -761,6 +761,10 @@ For products, supported imports, and re-export reachability, see [PUBLIC_MODULE_
 - `CanvasGrid` — struct — 19 members
 - `CanvasPayload` — struct — 4 members
 - `CellChannel` — enum — 3 members
+- `CellColorKernel` — protocol — 1 member
+- `CellColorShader` — struct — 3 members
+- `CellDistortionKernel` — protocol — 1 member
+- `CellDistortionShader` — struct — 4 members
 - `CellDrawingRegion` — enum — 4 members
 - `CellEffectContext` — struct — 8 members
 - `CellGlyph` — struct — 10 members
@@ -851,7 +855,7 @@ For products, supported imports, and re-export reachability, see [PUBLIC_MODULE_
 - `Rect` — struct — 9 members
 - `ReferenceWhite` — struct — 12 members
 - `ResolvedImageAsset` — struct — 5 members
-- `ResolvedTextStyle` — struct — 8 members
+- `ResolvedTextStyle` — struct — 10 members
 - `resolveStyleColorResult(style:theme:appearance:depthLimit:)` — func
 - `RGBColorProfile` — struct — 22 members
 - `RGBPrimaries` — struct — 5 members

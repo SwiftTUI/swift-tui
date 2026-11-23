@@ -110,3 +110,23 @@ struct TerminalCellEncodingTests {
     #expect(renderer.renderRowBatch(row: 0, currentRow: row, spans: [0..<0]) == nil)
   }
 }
+
+extension TerminalCellEncodingTests {
+  @Test("Capable terminals retain the source palette entry with both color profiles")
+  func explicitPaletteEntries() {
+    var style = ResolvedTextStyle(foregroundColor: .red, backgroundColor: .blue)
+    style.foregroundPaletteIndex = 70
+    style.backgroundPaletteIndex = 8
+    for profile in [TerminalCapabilityProfile.ansi256, .trueColor] {
+      let renderer = TerminalCellTextRenderer(capabilityProfile: profile)
+      var state = TerminalCellTextRenderer.RenderState()
+      var text = ""
+      renderer.appendRenderedCells(
+        in: [RasterCell(character: "P", style: style)], from: 0, to: 1,
+        into: &text, state: &state)
+      #expect(text == "\u{1b}[38;5;70;48;5;8mP")
+    }
+    style.foregroundColor = .blue
+    #expect(style.foregroundPaletteIndex == nil && style.backgroundPaletteIndex == 8)
+  }
+}

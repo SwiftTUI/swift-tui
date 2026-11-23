@@ -102,6 +102,10 @@ public struct DefaultRenderer {
     self.layoutEngine = layoutEngine
     self.semanticExtractor = semanticExtractor
     self.drawExtractor = drawExtractor
+    var rasterizer = rasterizer
+    rasterizer.effectImageProjection = { attachment, background in
+      TerminalImageRenderer.effectProjection(for: attachment, background: background)
+    }
     self.rasterizer = rasterizer
     self.commitPlanner = commitPlanner
     imageRepository = sharedImageAssetRepository

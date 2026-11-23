@@ -1,5 +1,9 @@
 /// Converts draw commands into a terminal cell surface.
 package struct Rasterizer: Sendable {
+  /// Hosts supply one cached, true-color cell projection for sampled images.
+  package var effectImageProjection:
+    (@Sendable (RasterImageAttachment, Color) -> (bounds: CellRect, cells: [[RasterCell?]])?)?
+
   internal static let emptyCompositingStyle = ResolvedTextStyle()
 
   package enum IncrementalRasterVerificationPolicy: Sendable {
@@ -300,7 +304,7 @@ package struct Rasterizer: Sendable {
         size: surfaceSize,
         cells: cells,
         imageAttachments: imageAttachments,
-        presentationLayers: presentationRecorder.layers
+        presentationLayers: presentationRecorder.layers, hadCellEffect: draw.subtreeHasCellEffect
       ),
       visibleIdentities,
       nil,
@@ -326,7 +330,8 @@ package struct Rasterizer: Sendable {
     // from the dirty set; a declined blit leaves this path byte-identical to
     // the plain incremental raster.
     var translatedRows: [Int] = []
-    if let translation, !draw.subtreeHasCellEffect {
+    let needsEffectDamage = previousSurface.hadCellEffect || draw.subtreeHasCellEffect
+    if let translation, !needsEffectDamage {
       translatedRows = applyTranslationBlit(
         translation,
         previousSurface: previousSurface,
@@ -359,7 +364,7 @@ package struct Rasterizer: Sendable {
     // `write`'s compositing), so damage never has to grow to cover a
     // painter's reads.
     let closedDirtyRows =
-      draw.subtreeHasCellEffect
+      needsEffectDamage
       ? Set(0..<surfaceSize.height)
       : presentationOrderDamageClosure(
         dirtyRows,
@@ -435,7 +440,7 @@ package struct Rasterizer: Sendable {
       imageAttachments: canonicallyOrderedImageAttachments(imageAttachments, draw: draw),
       presentationLayers: presentationRecorder.layers.sorted { lhs, rhs in
         lhs.order < rhs.order
-      }
+      }, hadCellEffect: draw.subtreeHasCellEffect
     )
     if incrementalVerificationPolicy == .verifySoundDamage || verifyIncrementalRasterDamage {
       // F13: when damage suppresses painting, verify against a fresh raster

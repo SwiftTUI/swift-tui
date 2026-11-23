@@ -181,3 +181,158 @@ struct CellEffectRasterTests {
     #expect(rasterizer.rasterize(lower).cells[0][0].character == "E")
   }
 }
+
+extension CellEffectRasterTests {
+  @Test("A viewport mapping gathers an offscreen glyph and invalidates the old output on bypass")
+  func displacedSource() {
+    let ink = CellRect(origin: .init(x: -3, y: -1), size: .init(width: 3, height: 1))
+    var child = DrawNode(
+      identity: testIdentity("offscreen"), bounds: ink,
+      commands: [
+        TextPaintFamily.rich.command(
+          bounds: ink, lines: ["界x"], style: .init(foregroundStyle: .color(.red)))
+      ])
+    let mapping = CellDistortionShader { point, context in
+      guard context.originInRoot == .init(x: -3, y: -1), point.y == 2 else { return nil }
+      return .init(x: point.x - 6, y: 0)
+    }.drawing(in: .viewport)
+    child.drawEffects = .init([.cellLayer(.init(mapping.layer, offset: .layerBounds))])
+    var root = DrawNode(
+      identity: testIdentity("parent"), bounds: bounds, clipBounds: bounds, children: [child])
+    let rasterizer = Rasterizer(incrementalVerificationPolicy: .verifySoundDamage)
+    let first = rasterizer.rasterize(root)
+    #expect(first.cells[1][3].character == "界")
+    #expect(first.cells[1][4].continuationLeadX == 3)
+    #expect(first.cells[1][5].character == "x")
+    #expect(first.cells[1][3].style?.foregroundColor == .red)
+    child.drawEffects = .init()
+    root.children = [child]
+    let next = rasterizer.rasterizeCollectingVisibleIdentities(
+      root, minimumSize: bounds.size,
+      previousSurface: first, damage: .init(dirtyRows: [0]))
+    #expect(next.path == .incremental && next.incrementalMismatch == nil)
+    #expect(next.surface == rasterizer.rasterize(root))
+    #expect(next.surface.cells[1].allSatisfy { $0 == .empty })
+  }
+
+  @Test("Two fractional masks compound before final ink and paper resolution")
+  func chainedCoverage() {
+    let half = CellColorShader { _, paint, _ in
+      var result = paint
+      result.coverage *= 0.5
+      return result
+    }
+    let quarter = CellColorShader { _, paint, _ in
+      var result = paint
+      result.coverage *= 0.25
+      return result
+    }
+    var back = subject("lower", style: .init(backgroundStyle: .color(.blue)))
+    var front = subject(
+      "X ", style: .init(foregroundStyle: .color(.yellow), backgroundStyle: .color(.red)))
+    let rasterizer = Rasterizer()
+    front.drawEffects = .init([pass(half.layer), pass(half.layer)])
+    back.children = [front]
+    let chained = rasterizer.rasterize(back)
+    front.drawEffects = .init([pass(quarter.layer)])
+    back.children = [front]
+    #expect(chained == rasterizer.rasterize(back))
+    #expect(chained.cells[0][0].character == "X" && chained.cells[0][1].character == " ")
+    #expect(chained.cells[0][0].style?.backgroundColor != .red)
+  }
+
+  @Test("Only enabled passes take a source snapshot")
+  func captureCounts() {
+    let probe = RasterWorkProbe()
+    Rasterizer.$workProbe.withValue(probe) {
+      var scene = subject("X")
+      let shader = CellLayerShader { point, layer, _ in layer.sample(at: point) }
+      let plain = Rasterizer().rasterize(scene)
+      #expect(probe.snapshot().cellEffectCaptures == 0)
+      scene.drawEffects = .init([pass(shader)])
+      #expect(Rasterizer().rasterize(scene) == plain)
+      #expect(probe.snapshot().cellEffectCaptures == 1)
+      scene.drawEffects = .init()
+      #expect(Rasterizer().rasterize(scene) == plain)
+      #expect(probe.snapshot().cellEffectCaptures == 1)
+    }
+  }
+}
+
+extension CellEffectRasterTests {
+  @Test("Nested source passes keep the viewport and the inner shader's displaced output")
+  func nestedViewport() {
+    let frame = CellRect(origin: .init(x: 2, y: 0), size: .init(width: 1, height: 1))
+    var child = DrawNode(
+      identity: testIdentity("shift"), bounds: frame,
+      commands: [TextPaintFamily.plain.command(bounds: frame, lines: ["A"], style: .init())])
+    let shift = CellDistortionShader { p, context in
+      guard context.viewport.size.width == 12, context.originInRoot.x == 2 else { return nil }
+      return CellPoint(x: p.x - 1, y: p.y)
+    }.drawing(in: .viewport)
+    let copy = CellLayerShader { p, source, _ in source.sample(at: p) }
+    child.drawEffects = .init([
+      .cellLayer(.init(shift.layer, offset: .cells(x: 1, y: 0))),
+      pass(copy),
+    ])
+    let scene = DrawNode(identity: testIdentity("scene"), bounds: bounds, children: [child])
+    let cells = Rasterizer().rasterize(scene).cells[0]
+    #expect(cells[2].character == " " && cells[3].character == "A")
+  }
+}
+
+extension CellEffectRasterTests {
+  @Test("Full-layer reading reaches beyond the dense surface budget, including an occupying lead")
+  func sparseLayerBounds() {
+    let far = 65_567
+    let extent = CellRect(origin: .zero, size: .init(width: far + 2, height: 1))
+    let ink = CellRect(origin: .init(x: far, y: 0), size: .init(width: 2, height: 1))
+    let copy = CellLayerShader { p, source, _ in
+      guard p.x == 0, var glyph = source.glyph(occupying: .init(x: far + 1, y: 0)),
+        glyph.character == "界"
+      else { return .empty }
+      glyph.character = "X"
+      return .glyph(glyph)
+    }.drawing(in: .rect(.init(origin: .zero, size: .init(width: 1, height: 1))))
+    let node = DrawNode(
+      identity: testIdentity("long"), bounds: extent,
+      drawEffects: .init([.cellLayer(.init(copy, offset: .layerBounds))]),
+      commands: [TextPaintFamily.rich.command(bounds: ink, lines: ["界"], style: .init())])
+    let frame = Rasterizer().rasterizeCollectingVisibleIdentities(
+      node,
+      minimumSize: bounds.size, maximumSize: bounds.size, previousSurface: nil, damage: nil)
+    #expect(frame.surface.cells[0][0].character == "X")
+    #expect(frame.surface.cells[0][0].hyperlink != nil)
+  }
+}
+
+extension CellEffectRasterTests {
+  @Test("A transient output cannot republish a link sampled while the node was live")
+  func outgoingCachedLink() {
+    let retained = CellGlyph(
+      RasterCell(character: "L", hyperlink: "https://example.org/live"), allowsLink: true)
+    let shader = CellLayerShader { _, _, _ in .glyph(retained) }
+    for transient in [false, true] {
+      let node = DrawNode(
+        identity: testIdentity("retained"), bounds: bounds,
+        drawEffects: .init([pass(shader)]), isTransient: transient)
+      let cell = Rasterizer().rasterize(node).cells[0][0]
+      #expect(cell.character == "L")
+      #expect(cell.hyperlink == (transient ? nil : "https://example.org/live"))
+    }
+  }
+
+  @Test("An outset wider than an integer extent is intersected with the finite viewport")
+  func veryLargeOutset() {
+    let shader = CellLayerShader { _, _, _ in .glyph(CellGlyph("O")) }.drawing(
+      in: .outset(x: .max, y: 0))
+    let node = DrawNode(
+      identity: testIdentity("outset"),
+      bounds: .init(origin: .zero, size: .init(width: 1, height: 1)),
+      drawEffects: .init([pass(shader)]))
+    let parent = DrawNode(
+      identity: testIdentity("viewport"), bounds: bounds, clipBounds: bounds, children: [node])
+    let surface = Rasterizer().rasterize(parent)
+    #expect(surface.cells[0].allSatisfy { $0.character == "O" })
+  }
+}

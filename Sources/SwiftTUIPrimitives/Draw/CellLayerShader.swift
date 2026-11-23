@@ -1,3 +1,5 @@
+import Synchronization
+
 /// A reusable cell program whose configuration participates in draw equality.
 public protocol CellLayerKernel: Equatable, Sendable {
   nonisolated func shade(
@@ -66,11 +68,36 @@ public struct CellLayerShader: Equatable, Sendable {
 /// Heap storage keeps the ordered draw descriptor compact on the raster worker stack.
 package final class CellEffectPass: Equatable, Sendable {
   package let shader: CellLayerShader
+  #if DEBUG
+    private let didReport = Mutex(false)
+  #endif
+
+  package func reportInvalidRead() {
+    #if DEBUG
+      let first = didReport.withLock { reported in
+        if reported { return false }
+        reported = true
+        return true
+      }
+      if first {
+        DebugLogRouter.emit(
+          "SwiftTUI cell effect: a negative distance or a read beyond maxSampleOffset.\n",
+          toFileAt: DebugLogRouter.resolvedFilePath(
+            override: nil, bundleFileName: "cell-effects.log"),
+          fallback: .safeStandardError)
+      }
+    #endif
+  }
+
   package let offset: CellSampleOffset
 
   package init(_ shader: CellLayerShader, offset: CellSampleOffset) {
     self.shader = shader
     self.offset = offset
+    #if DEBUG
+      if case .cells(let x, let y) = offset, x < 0 || y < 0 { reportInvalidRead() }
+      if case .outset(let x, let y) = shader.region, x < 0 || y < 0 { reportInvalidRead() }
+    #endif
   }
 
   package static func == (lhs: CellEffectPass, rhs: CellEffectPass) -> Bool {

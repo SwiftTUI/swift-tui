@@ -4,6 +4,11 @@ public enum CellChannel: Equatable, Sendable {
   case color(Color)
   case indexed(UInt8)
 
+  package var paletteIndex: UInt8? {
+    if case .indexed(let index) = self { return index }
+    return nil
+  }
+
   package func color(in appearance: TerminalAppearance) -> Color? {
     switch self {
     case .default: return nil
@@ -72,8 +77,10 @@ public struct CellGlyph: Equatable, Sendable {
     character = cell.character
     width = cell.spanWidth
     paint = CellPaint(
-      foreground: style?.foregroundColor.map(CellChannel.color) ?? .default,
-      background: style?.backgroundColor.map(CellChannel.color) ?? .default)
+      foreground: style?.foregroundPaletteIndex.map(CellChannel.indexed) ?? style?.foregroundColor
+        .map(CellChannel.color) ?? .default,
+      background: style?.backgroundPaletteIndex.map(CellChannel.indexed) ?? style?.backgroundColor
+        .map(CellChannel.color) ?? .default)
     emphasis = style?.emphasis ?? []
     underline = style?.underlineStyle
     strikethrough = style?.strikethroughStyle
@@ -101,6 +108,9 @@ public enum CellSample: Equatable, Sendable {
 public struct CellLayer: Sendable {
   public let bounds: CellRect
   public let readableBounds: CellRect
+  #if DEBUG
+    private var diagnostic: CellEffectPass?
+  #endif
   private let read: @Sendable (CellPoint) -> CellSample
 
   package init(
@@ -112,13 +122,27 @@ public struct CellLayer: Sendable {
     self.read = read
   }
 
-  package func restricted(to window: CellRect) -> Self {
-    Self(bounds: bounds, readableBounds: readableBounds.intersection(window) ?? .zero, read: read)
+  package func restricted(to window: CellRect, pass: CellEffectPass? = nil) -> Self {
+    let layer = Self(
+      bounds: bounds, readableBounds: readableBounds.intersection(window) ?? .zero, read: read)
+    #if DEBUG
+      var checked = layer
+      checked.diagnostic = pass
+      return checked
+    #else
+      return layer
+    #endif
   }
 
   /// Reads the lead, continuation or hole at a column inside the declared window.
   public func sample(at point: CellPoint) -> CellSample {
-    readableBounds.contains(point) ? read(point) : .empty
+    guard readableBounds.contains(point) else {
+      #if DEBUG
+        if bounds.contains(point) { diagnostic?.reportInvalidRead() }
+      #endif
+      return .empty
+    }
+    return read(point)
   }
 
   /// Returns the whole occupying glyph, even when its lead lies outside the read window.

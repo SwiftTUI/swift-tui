@@ -316,10 +316,11 @@ package struct DrawNode: Equatable, Sendable {
   // Pack extraction context in the low bit and the shape-clip flag in the sign
   // without widening this hot value beyond its 256-byte stack budget.
   private var subtreeNodeSummary: Int
-  package var subtreeNodeCount: Int { abs(subtreeNodeSummary) >> 3 }
+  package var subtreeNodeCount: Int { abs(subtreeNodeSummary) >> 4 }
   package var hasInheritedDrawContext: Bool { abs(subtreeNodeSummary) & 1 != 0 }
   package var subtreeHasCellEffect: Bool { abs(subtreeNodeSummary) & 2 != 0 }
   package var isTransient: Bool { abs(subtreeNodeSummary) & 4 != 0 }
+  package var subtreeDrawsInViewport: Bool { abs(subtreeNodeSummary) & 8 != 0 }
   package var subtreeHasShapeClip: Bool { subtreeNodeSummary < 0 }
   /// The absolute union of this node's layout and paint bounds and every descendant's
   /// `subtreeBounds`. `.offset`/`.position` bake their translation into the
@@ -355,7 +356,7 @@ package struct DrawNode: Equatable, Sendable {
     self.commands = commands
     self.postCommands = postCommands
     self.children = children
-    subtreeNodeSummary = 8 | (hasInheritedDrawContext ? 1 : 0) | (isTransient ? 4 : 0)
+    subtreeNodeSummary = 16 | (hasInheritedDrawContext ? 1 : 0) | (isTransient ? 4 : 0)
     subtreeBounds = bounds
     recomputeSubtreeAggregates()
   }
@@ -367,6 +368,31 @@ package struct DrawNode: Equatable, Sendable {
     for command in commands + postCommands {
       for ink in command.inkRects { result = result.union(ink) }
     }
+    for effect in drawEffects.ordered {
+      guard case .cellLayer(let pass) = effect else { continue }
+      switch pass.shader.region {
+      case .source, .viewport: break
+      case .rect(let local):
+        result = result.union(
+          CellRect(
+            origin: .init(
+              x: SaturatingConversion.adding(bounds.origin.x, local.origin.x),
+              y: SaturatingConversion.adding(bounds.origin.y, local.origin.y)), size: local.size))
+      case .outset(let x, let y):
+        let dx = max(0, x)
+        let dy = max(0, y)
+        let left = SaturatingConversion.subtracting(bounds.origin.x, dx)
+        let top = SaturatingConversion.subtracting(bounds.origin.y, dy)
+        let right = SaturatingConversion.adding(bounds.maxX, dx)
+        let bottom = SaturatingConversion.adding(bounds.maxY, dy)
+        result = result.union(
+          CellRect(
+            origin: .init(x: left, y: top),
+            size: .init(
+              width: SaturatingConversion.subtracting(right, left),
+              height: SaturatingConversion.subtracting(bottom, top))))
+      }
+    }
     return result
   }
 
@@ -376,16 +402,34 @@ package struct DrawNode: Equatable, Sendable {
     var hasCellEffect = drawEffects.ordered.contains {
       if case .cellLayer = $0 { true } else { false }
     }
+    var drawsInViewport = drawEffects.ordered.contains {
+      guard case .cellLayer(let pass) = $0 else { return false }
+      switch pass.shader.region {
+      case .viewport: return true
+      case .outset(let dx, let dy):
+        // An extent wider than Int.max cannot be represented by a CellRect.
+        // Defer the cull to the viewport-clipped region calculation.
+        func overflows(_ start: Int, _ end: Int, _ distance: Int) -> Bool {
+          let left = SaturatingConversion.subtracting(start, max(0, distance))
+          let right = SaturatingConversion.adding(end, max(0, distance))
+          return right.subtractingReportingOverflow(left).overflow
+        }
+        return overflows(bounds.origin.x, bounds.maxX, dx)
+          || overflows(bounds.origin.y, bounds.maxY, dy)
+      default: return false
+      }
+    }
     var extent = paintBounds
     for child in children {
       count += child.subtreeNodeCount
       hasShapeClip = hasShapeClip || child.subtreeHasShapeClip
       hasCellEffect = hasCellEffect || child.subtreeHasCellEffect
+      drawsInViewport = drawsInViewport || child.subtreeDrawsInViewport
       extent = extent.union(child.subtreeBounds)
     }
     let summary =
-      (count << 3) | (hasInheritedDrawContext ? 1 : 0) | (hasCellEffect ? 2 : 0)
-      | (isTransient ? 4 : 0)
+      (count << 4) | (hasInheritedDrawContext ? 1 : 0) | (hasCellEffect ? 2 : 0)
+      | (isTransient ? 4 : 0) | (drawsInViewport ? 8 : 0)
     subtreeNodeSummary = hasShapeClip ? -summary : summary
     subtreeBounds = extent
   }

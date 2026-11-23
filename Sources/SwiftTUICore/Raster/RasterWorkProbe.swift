@@ -8,6 +8,8 @@ import Synchronization
 package struct RasterWorkCounters: Equatable, Sendable {
   /// Fill commands that reached the cell walk.
   package var fills = 0
+  /// Source captures created for active cell passes.
+  package var cellEffectCaptures = 0
   /// Actual iterations of a text painter's line loop, including clean rows it rejects.
   ///
   /// Counts traversal of all lines before the dirty-row check. For example, if
@@ -33,6 +35,7 @@ package struct RasterWorkCounters: Equatable, Sendable {
   package init() {}
 
   package static func += (lhs: inout RasterWorkCounters, rhs: RasterWorkCounters) {
+    lhs.cellEffectCaptures += rhs.cellEffectCaptures
     lhs.fills += rhs.fills
     lhs.textLineVisits += rhs.textLineVisits
     lhs.visitedCells += rhs.visitedCells
