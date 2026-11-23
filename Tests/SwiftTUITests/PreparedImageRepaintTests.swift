@@ -84,7 +84,7 @@ struct PreparedImageRepaintTests {
     let blue = try makePNGBytes(
       width: 2, height: 2,
       pixels: Array(repeating: rgbaPixel(red: 25, green: 40, blue: 228), count: 4))
-    func scene(prepared: Bool) -> some View {
+    func scene(_ read: PreparedImageRead, prepared: Bool) -> some View {
       ZStack(alignment: .topLeading) {
         Text("0123456")
         Image(data: red).resizable().frame(width: 5, height: 1)
@@ -100,8 +100,31 @@ struct PreparedImageRepaintTests {
       }
     }
     let size = ProposedSize(width: 7, height: 1)
-    let baseline = DefaultRenderer().render(scene(prepared: false), proposal: size).rasterSurface
-    let result = DefaultRenderer().render(scene(prepared: true), proposal: size).rasterSurface
+    let renderer = DefaultRenderer(
+      rasterizer: .init(incrementalVerificationPolicy: .verifySoundDamage))
+    let before = MonotonicInstant(offset: .seconds(100))
+    let now = before.advanced(by: .milliseconds(35))
+    let previous = renderer.render(
+      scene(read == .source ? .composite : .source, prepared: true), proposal: size,
+      frameInstant: before)
+    let current = renderer.render(scene(read, prepared: true), proposal: size, frameInstant: now)
+    let baseline = DefaultRenderer().render(scene(read, prepared: false), proposal: size)
+      .rasterSurface
+    let result = current.rasterSurface
+    var raster = renderer.rasterizer
+    raster.cellPreparationFrame = CellPreparationFrame(at: now)
+    let damage = PresentationDamage(textRows: [.init(row: 0, columnRanges: [1..<3])])
+    let repaint = raster.rasterizeCollectingVisibleIdentities(
+      current.drawTree, minimumSize: .init(width: 7, height: 1),
+      previousSurface: previous.rasterSurface, damage: damage)
+    #expect(repaint.surface == result)
+    #expect(repaint.incrementalMismatch == nil)
+    let retry = raster.rasterizeCollectingVisibleIdentities(
+      current.drawTree, minimumSize: .init(width: 7, height: 1),
+      previousSurface: previous.rasterSurface, damage: damage)
+    #expect(retry.path == .incremental)
+    #expect(retry.surface == result)
+    #expect(retry.incrementalMismatch == nil)
     func stripe(_ x: Int, _ width: Int) -> CellRect {
       .init(origin: .init(x: x, y: 0), size: .init(width: width, height: 1))
     }
