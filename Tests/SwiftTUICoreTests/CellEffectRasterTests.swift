@@ -336,3 +336,19 @@ extension CellEffectRasterTests {
     #expect(surface.cells[0].allSatisfy { $0.character == "O" })
   }
 }
+
+extension CellEffectRasterTests {
+  @Test("An empty subject requesting viewport drawing takes no snapshot")
+  func emptySource() {
+    let shader = CellLayerShader { _, _, _ in .glyph(CellGlyph("X")) }.drawing(in: .viewport)
+    let node = DrawNode(
+      identity: testIdentity("empty"), bounds: .zero,
+      drawEffects: .init([.cellLayer(.init(shader, offset: .layerBounds))]))
+    let probe = RasterWorkProbe()
+    let frame = Rasterizer.$workProbe.withValue(probe) {
+      Rasterizer().rasterize(node, minimumSize: bounds.size)
+    }
+    #expect(frame.cells.flatMap { $0 }.allSatisfy { $0 == .empty })
+    #expect(probe.snapshot().cellEffectCaptures == 0)
+  }
+}

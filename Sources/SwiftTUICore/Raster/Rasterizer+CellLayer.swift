@@ -6,6 +6,7 @@ extension Rasterizer {
     effects: [DrawEffect], dirtyRows: Set<Int>?, cells: inout [[RasterCell]],
     visibleIdentities: inout Set<Identity>, recorder: RasterPresentationLayerRecorder?
   ) {
+    guard !node.bounds.isEmpty else { return }
     let size = CellSize(width: cells.first?.count ?? 0, height: cells.count)
     let surface = CellRect(origin: .zero, size: size)
     guard let target = surface.intersection(clip ?? surface) else { return }
