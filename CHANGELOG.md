@@ -9,6 +9,16 @@ require 1.0.0. See [COMPATIBILITY.md](docs/COMPATIBILITY.md).
 
 ## [Unreleased]
 
+### Added
+
+- Views can shade glyph paint with `colorEffect`, move cells with
+  `distortionEffect`, and sample a mounted subtree with `layerEffect`.
+  Each accepts a named kernel or a closure. `CellLayer` distinguishes an
+  unpainted column, a painted space and the trailing column of a wide glyph.
+  Sampling a glyph preserves its ink, paper, decorations and link. Indexed
+  channels retain their palette slots on capable terminals and resolve to the
+  selected palette on RGB hosts. See the [cell effects guide](Sources/SwiftTUIViews/SwiftTUIViews.docc/Cell-Effects.md).
+
 ## [0.24.0] - 2026-11-22
 
 ### Added

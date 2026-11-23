@@ -69,7 +69,8 @@ extension Rasterizer {
       originInRoot: .init(
         x: SaturatingConversion.adding(targetOrigin.x, scratchOrigin.x),
         y: SaturatingConversion.adding(targetOrigin.y, scratchOrigin.y)), defersCoverage: true,
-      projectsImages: true, viewport: viewport.relative(to: scratchOrigin))
+      projectsImages: true, viewport: viewport.relative(to: scratchOrigin),
+      paintDomain: sourceBounds.relative(to: scratchOrigin))
     var sourceCells = Array(
       repeating: Array(repeating: RasterCell.empty, count: scratchSize.width),
       count: scratchSize.height)

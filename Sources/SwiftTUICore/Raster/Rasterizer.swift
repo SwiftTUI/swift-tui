@@ -357,12 +357,9 @@ package struct Rasterizer: Sendable {
         }
       }
     }
-    // Close the dirty set over rows the retained presentation-layer order
-    // needs re-recorded (`presentationOrderDamageClosure`). It is the only
-    // closure: no painter reads a cell outside the row it writes (a stroke
-    // with no explicit background keeps the background beneath it through
-    // `write`'s compositing), so damage never has to grow to cover a
-    // painter's reads.
+    // Ordinary painters depend only on their current row and retained paint
+    // order. A cell shader can gather across rows or move output outside its
+    // layout. Repaint the whole grid while it runs and on its first bypass.
     let closedDirtyRows =
       needsEffectDamage
       ? Set(0..<surfaceSize.height)

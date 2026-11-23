@@ -385,12 +385,15 @@ package struct DrawNode: Equatable, Sendable {
         let top = SaturatingConversion.subtracting(bounds.origin.y, dy)
         let right = SaturatingConversion.adding(bounds.maxX, dx)
         let bottom = SaturatingConversion.adding(bounds.maxY, dy)
+        let width = right.subtractingReportingOverflow(left)
+        let height = bottom.subtractingReportingOverflow(top)
+        // The viewport flag handles an unrepresentable outset. A truncated
+        // rectangle here could displace the finite subtree entirely offscreen.
+        guard !width.overflow, !height.overflow else { continue }
         result = result.union(
           CellRect(
             origin: .init(x: left, y: top),
-            size: .init(
-              width: SaturatingConversion.subtracting(right, left),
-              height: SaturatingConversion.subtracting(bottom, top))))
+            size: .init(width: width.partialValue, height: height.partialValue)))
       }
     }
     return result

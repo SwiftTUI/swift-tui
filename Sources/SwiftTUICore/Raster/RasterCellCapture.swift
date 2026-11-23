@@ -4,6 +4,8 @@ final class RasterCellCapture {
   var written: [[Bool]]
   let inheritedBackdrop: CellLayer?
   let viewport: CellRect?
+  /// Full logical paint target, in scratch coordinates, across all tiles.
+  let paintDomain: CellRect?
   let originInRoot: CellPoint
   let projectsImages: Bool
   let defersCoverage: Bool
@@ -11,9 +13,11 @@ final class RasterCellCapture {
 
   init(
     size: CellSize, inheritedBackdrop: CellLayer? = nil, originInRoot: CellPoint = .zero,
-    defersCoverage: Bool = false, projectsImages: Bool = false, viewport: CellRect? = nil
+    defersCoverage: Bool = false, projectsImages: Bool = false, viewport: CellRect? = nil,
+    paintDomain: CellRect? = nil
   ) {
     self.viewport = viewport
+    self.paintDomain = paintDomain
     self.projectsImages = projectsImages
     self.originInRoot = originInRoot
     self.defersCoverage = defersCoverage

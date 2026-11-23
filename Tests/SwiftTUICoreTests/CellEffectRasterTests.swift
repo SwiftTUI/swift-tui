@@ -326,14 +326,55 @@ extension CellEffectRasterTests {
   func veryLargeOutset() {
     let shader = CellLayerShader { _, _, _ in .glyph(CellGlyph("O")) }.drawing(
       in: .outset(x: .max, y: 0))
-    let node = DrawNode(
+    var node = DrawNode(
       identity: testIdentity("outset"),
       bounds: .init(origin: .zero, size: .init(width: 1, height: 1)),
       drawEffects: .init([pass(shader)]))
-    let parent = DrawNode(
-      identity: testIdentity("viewport"), bounds: bounds, clipBounds: bounds, children: [node])
-    let surface = Rasterizer().rasterize(parent)
-    #expect(surface.cells[0].allSatisfy { $0.character == "O" })
+    let copy = CellLayerShader { p, source, _ in source.sample(at: p) }
+    for outer in [false, true] {
+      if outer { node.drawEffects = .init(node.drawEffects.ordered + [pass(copy)]) }
+      let parent = DrawNode(
+        identity: testIdentity("viewport"), bounds: bounds, clipBounds: bounds, children: [node])
+      let surface = Rasterizer().rasterize(parent)
+      #expect(surface.cells[0].allSatisfy { $0.character == "O" })
+    }
+  }
+}
+
+extension CellEffectRasterTests {
+  @Test("A sparse source gives its inner viewport shader the same output extent as a dense source")
+  func tiledContext() {
+    let painter = CellLayerShader { _, _, context in
+      .glyph(CellGlyph(context.outputBounds.size.width == 80 ? "A" : "B"))
+    }.drawing(in: .viewport)
+    let reader = CellLayerShader { _, layer, _ in layer.sample(at: .zero) }
+      .drawing(in: .rect(.init(origin: .zero, size: .init(width: 1, height: 1))))
+    let size = CellSize(width: 80, height: 1)
+    for width in [80, 65_537] {
+      let node = DrawNode(
+        identity: testIdentity("tiled"),
+        bounds: .init(origin: .zero, size: .init(width: width, height: 1)),
+        drawEffects: .init([pass(painter), .cellLayer(.init(reader, offset: .layerBounds))]))
+      let frame = Rasterizer().rasterizeCollectingVisibleIdentities(
+        node, minimumSize: size, maximumSize: size, previousSurface: nil, damage: nil)
+      #expect(frame.surface.cells[0][0].character == "A")
+    }
+  }
+
+  @Test("Group isolation preserves the ancestor viewport of a source kernel")
+  func groupedViewport() {
+    let painter = CellLayerShader { _, _, context in
+      .glyph(CellGlyph(context.viewport.size.width == 12 ? "A" : "B"))
+    }
+    for group in [false, true] {
+      let node = DrawNode(
+        identity: testIdentity("group"),
+        bounds: .init(origin: .zero, size: .init(width: 1, height: 1)),
+        drawEffects: .init(group ? [pass(painter), .compositingGroup] : [pass(painter)]))
+      let parent = DrawNode(
+        identity: testIdentity("root"), bounds: bounds, clipBounds: bounds, children: [node])
+      #expect(Rasterizer().rasterize(parent).cells[0][0].character == "A")
+    }
   }
 }
 

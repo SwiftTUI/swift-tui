@@ -415,13 +415,14 @@ extension Rasterizer {
         size: .init(width: cells.first?.count ?? 0, height: cells.count),
         originInRoot: presentationRecorder?.cellCapture?.originInRoot ?? .zero,
         projectsImages: presentationRecorder?.cellCapture?.projectsImages == true,
-        viewport: presentationRecorder?.cellCapture?.viewport)
+        viewport: presentationRecorder?.cellCapture?.viewport,
+        paintDomain: presentationRecorder?.cellCapture?.paintDomain)
     }
     paint(
       node: isolatedNode,
       cells: &layer.cells,
       imageAttachments: &layer.imageAttachments,
-      clip: visibleBounds,
+      clip: isolatedNode.subtreeHasCellEffect ? context.clip : visibleBounds,
       dirtyRows: context.dirtyRows,
       dirtySpans: context.dirtySpans,
       visibleIdentities: &visibleIdentities,
@@ -472,7 +473,7 @@ extension Rasterizer {
         scratch.cellCapture = RasterCellCapture(
           size: .init(width: layer.cells.first?.count ?? 0, height: layer.cells.count),
           originInRoot: capture.originInRoot, projectsImages: capture.projectsImages,
-          viewport: capture.viewport)
+          viewport: capture.viewport, paintDomain: capture.paintDomain)
       }
       compositeLayerCells(
         from: layer,

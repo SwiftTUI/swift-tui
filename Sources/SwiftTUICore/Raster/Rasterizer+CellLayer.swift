@@ -22,11 +22,12 @@ extension Rasterizer {
     // Captures must be able to paint offscreen source before a later mapping
     // brings it back into view. An explicitly requested viewport remains the
     // real enclosing viewport regardless of the current scratch dimensions.
-    let writeBounds =
-      pass.shader.region == .viewport ? target.intersection(viewport) ?? .zero : target
-    let output = pass.shader.region.bounds(
-      source: localSource, viewport: writeBounds.relative(to: origin))
-    guard !output.isEmpty else { return }
+    let domain = recorder?.cellCapture?.paintDomain ?? surface
+    let clippedDomain = clip.map { domain.intersection($0) ?? .zero } ?? domain
+    let logicalOutput = pass.shader.region.bounds(
+      source: localSource,
+      viewport: (pass.shader.region == .viewport ? viewport : clippedDomain).relative(to: origin))
+    guard let output = logicalOutput.intersection(target.relative(to: origin)) else { return }
     if let probe = RasterWorkProbe.active() {
       var work = RasterWorkCounters()
       work.cellEffectCaptures = 1
@@ -38,7 +39,7 @@ extension Rasterizer {
       x: SaturatingConversion.adding(targetOrigin.x, origin.x),
       y: SaturatingConversion.adding(targetOrigin.y, origin.y))
     let context = CellEffectContext(
-      sourceBounds: localSource, outputBounds: output, viewport: localViewport,
+      sourceBounds: localSource, outputBounds: logicalOutput, viewport: localViewport,
       originInRoot: rootOrigin, appearance: style.appearance,
       cellPixelMetrics: style.cellPixelMetrics)
 

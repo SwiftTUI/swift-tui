@@ -110,6 +110,10 @@ Ancestor clipping limits the output. Read reach and output extent are
 independent. For example, a shader moving an entire row across a panel can
 select a viewport output and declare `.layerBounds` for its reads.
 
+The context describes the same logical rectangles throughout a paint, even
+when the renderer gathers a large source in tiles. A compositing group
+isolates its paint while preserving the enclosing viewport.
+
 `CellPaint.foreground` and `background` each carry a `CellChannel`. Keep
 `.default` to inherit terminal defaults, use `.color(_:)` for an explicit
 color, or use `.indexed(_:)` for a palette entry. `CellPaint.coverage` varies
