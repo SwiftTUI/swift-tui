@@ -687,9 +687,19 @@ classifications:
     - SwiftTUIPrimitives.CanvasPayload
     - SwiftTUICore.CanvasPixelGridDrawing
     - SwiftTUICore.CanvasPixelGridMode
+    - SwiftTUIPrimitives.CellChannel
+    - SwiftTUIPrimitives.CellDrawingRegion
+    - SwiftTUIPrimitives.CellEffectContext
+    - SwiftTUIPrimitives.CellGlyph
+    - SwiftTUIPrimitives.CellLayer
+    - SwiftTUIPrimitives.CellLayerKernel
+    - SwiftTUIPrimitives.CellLayerShader
+    - SwiftTUIPrimitives.CellPaint
     - SwiftTUIPrimitives.CellPixelMetrics
     - SwiftTUIPrimitives.CellPoint
     - SwiftTUIPrimitives.CellRect
+    - SwiftTUIPrimitives.CellSample
+    - SwiftTUIPrimitives.CellSampleOffset
     - SwiftTUIPrimitives.CellSize
     - SwiftTUIPrimitives.ChromaticAdaptationMethod
     - SwiftTUIPrimitives.Chromaticity

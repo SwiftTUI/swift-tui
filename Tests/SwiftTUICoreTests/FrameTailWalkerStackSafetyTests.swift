@@ -63,6 +63,23 @@ struct FrameTailWalkerStackSafetyTests {
     }
   }
 
+  @Test("Nested cell passes paint on the frame-tail worker stack")
+  func nestedCellPasses() async {
+    let bounds = CellRect(origin: .zero, size: .init(width: 4, height: 1))
+    let copy = CellLayerShader { point, source, _ in source.sample(at: point) }
+    let pass = DrawEffect.cellLayer(.init(copy, offset: .zero))
+    let leaf = DrawNode(
+      identity: testIdentity("stack", "effect"), bounds: bounds,
+      drawEffects: .init(Array(repeating: pass, count: 8)),
+      commands: [TextPaintFamily.plain.command(bounds: bounds, lines: ["OK"])])
+    let result = Mutex<[String]>([])
+    await runOnSmallStack {
+      let surface = Rasterizer().rasterize(leaf)
+      result.withLock { $0 = surface.lines }
+    }
+    #expect(result.withLock { $0 } == ["OK"])
+  }
+
   // MARK: - Fixtures
 
   /// A single-child chain of `depth` nodes, the shape a node-hosted collection

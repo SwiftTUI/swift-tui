@@ -294,7 +294,9 @@ package struct DrawNode: Equatable, Sendable {
   package var metadata: DrawMetadata {
     didSet { recomputeSubtreeAggregates() }
   }
-  package var drawEffects: DrawEffects
+  package var drawEffects: DrawEffects {
+    didSet { recomputeSubtreeAggregates() }
+  }
   package var commands: [DrawCommand] {
     didSet { recomputeSubtreeAggregates() }
   }
@@ -314,8 +316,10 @@ package struct DrawNode: Equatable, Sendable {
   // Pack extraction context in the low bit and the shape-clip flag in the sign
   // without widening this hot value beyond its 256-byte stack budget.
   private var subtreeNodeSummary: Int
-  package var subtreeNodeCount: Int { abs(subtreeNodeSummary) >> 1 }
+  package var subtreeNodeCount: Int { abs(subtreeNodeSummary) >> 3 }
   package var hasInheritedDrawContext: Bool { abs(subtreeNodeSummary) & 1 != 0 }
+  package var subtreeHasCellEffect: Bool { abs(subtreeNodeSummary) & 2 != 0 }
+  package var isTransient: Bool { abs(subtreeNodeSummary) & 4 != 0 }
   package var subtreeHasShapeClip: Bool { subtreeNodeSummary < 0 }
   /// The absolute union of this node's layout and paint bounds and every descendant's
   /// `subtreeBounds`. `.offset`/`.position` bake their translation into the
@@ -338,7 +342,8 @@ package struct DrawNode: Equatable, Sendable {
     commands: [DrawCommand] = [],
     postCommands: [DrawCommand] = [],
     children: [DrawNode] = [],
-    hasInheritedDrawContext: Bool = false
+    hasInheritedDrawContext: Bool = false,
+    isTransient: Bool = false
   ) {
     self.viewNodeID = viewNodeID
     self.identity = identity
@@ -350,7 +355,7 @@ package struct DrawNode: Equatable, Sendable {
     self.commands = commands
     self.postCommands = postCommands
     self.children = children
-    subtreeNodeSummary = 2 | (hasInheritedDrawContext ? 1 : 0)
+    subtreeNodeSummary = 8 | (hasInheritedDrawContext ? 1 : 0) | (isTransient ? 4 : 0)
     subtreeBounds = bounds
     recomputeSubtreeAggregates()
   }
@@ -368,13 +373,19 @@ package struct DrawNode: Equatable, Sendable {
   private mutating func recomputeSubtreeAggregates() {
     var count = 1
     var hasShapeClip = !metadata.shapeClips.isEmpty
+    var hasCellEffect = drawEffects.ordered.contains {
+      if case .cellLayer = $0 { true } else { false }
+    }
     var extent = paintBounds
     for child in children {
       count += child.subtreeNodeCount
       hasShapeClip = hasShapeClip || child.subtreeHasShapeClip
+      hasCellEffect = hasCellEffect || child.subtreeHasCellEffect
       extent = extent.union(child.subtreeBounds)
     }
-    let summary = (count << 1) | (hasInheritedDrawContext ? 1 : 0)
+    let summary =
+      (count << 3) | (hasInheritedDrawContext ? 1 : 0) | (hasCellEffect ? 2 : 0)
+      | (isTransient ? 4 : 0)
     subtreeNodeSummary = hasShapeClip ? -summary : summary
     subtreeBounds = extent
   }
@@ -400,6 +411,7 @@ extension DrawNode {
       && clipBounds == other.clipBounds
       && metadata == other.metadata
       && drawEffects == other.drawEffects
+      && isTransient == other.isTransient
       && commands == other.commands
       && postCommands == other.postCommands
       && environmentSnapshot == other.environmentSnapshot

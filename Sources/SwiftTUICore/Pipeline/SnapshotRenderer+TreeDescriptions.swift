@@ -339,6 +339,8 @@ extension SnapshotRenderer {
     switch effect {
     case .blendMode(let blendMode):
       return "blendMode(\(blendMode.rawValue))"
+    case .cellLayer:
+      return "cellLayer"
     case .compositingGroup:
       return "compositingGroup"
     }

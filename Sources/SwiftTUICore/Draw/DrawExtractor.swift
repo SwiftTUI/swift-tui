@@ -40,6 +40,7 @@ private struct DrawPhaseProjection {
   var bounds: CellRect
   var layoutMetadata: LayoutMetadata
   var drawMetadata: DrawMetadata
+  var isTransient: Bool
   var drawEffects: DrawEffects
   var drawPayload: DrawPayload
   var layoutBehavior: LayoutBehavior
@@ -554,7 +555,8 @@ extension DrawExtractor {
         ) : [],
       postCommands: paints ? postCommands : [],
       children: clippedChildNodes,
-      hasInheritedDrawContext: inheritedBorderMask != nil || isInBackgroundSubtree
+      hasInheritedDrawContext: inheritedBorderMask != nil || isInBackgroundSubtree,
+      isTransient: projection.isTransient
     )
   }
 
@@ -568,6 +570,7 @@ extension DrawExtractor {
       bounds: placed.bounds,
       layoutMetadata: placed.layoutMetadata,
       drawMetadata: placed.drawMetadata,
+      isTransient: placed.isTransient,
       drawEffects: placed.drawEffects,
       drawPayload: placed.drawPayload,
       layoutBehavior: placed.layoutBehavior,

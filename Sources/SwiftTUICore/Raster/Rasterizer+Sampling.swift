@@ -392,10 +392,12 @@ extension Rasterizer {
     for targetX in x..<min(x + glyphWidth, rowWidth) {
       let existing = targetX == x ? underlayCell : cells[y][targetX]
       if existing.isContinuation || existing.spanWidth > 1 {
-        clearExistingGlyph(atX: targetX, y: y, cells: &cells)
+        clearExistingGlyph(
+          atX: targetX, y: y, cells: &cells, capture: presentationRecorder?.cellCapture)
       }
     }
 
+    presentationRecorder?.cellCapture?.mark(x: x, y: y, width: glyphWidth)
     cells[y][x] = RasterCell(
       character: finalCharacter,
       spanWidth: glyphWidth,
@@ -437,7 +439,8 @@ extension Rasterizer {
   internal func clearExistingGlyph(
     atX x: Int,
     y: Int,
-    cells: inout [[RasterCell]]
+    cells: inout [[RasterCell]],
+    capture: RasterCellCapture? = nil
   ) {
     guard y >= 0, y < cells.count, x >= 0, x < cells[y].count else {
       return
@@ -445,28 +448,31 @@ extension Rasterizer {
 
     let cell = cells[y][x]
     if let leadX = cell.continuationLeadX {
-      clearLeadGlyph(atX: leadX, y: y, cells: &cells)
+      clearLeadGlyph(atX: leadX, y: y, cells: &cells, capture: capture)
       return
     }
 
     if cell.spanWidth > 1 {
-      clearLeadGlyph(atX: x, y: y, cells: &cells)
+      clearLeadGlyph(atX: x, y: y, cells: &cells, capture: capture)
       return
     }
 
+    capture?.mark(x: x, y: y, width: 1, written: false)
     cells[y][x] = .empty
   }
 
   internal func clearLeadGlyph(
     atX x: Int,
     y: Int,
-    cells: inout [[RasterCell]]
+    cells: inout [[RasterCell]],
+    capture: RasterCellCapture? = nil
   ) {
     guard y >= 0, y < cells.count, x >= 0, x < cells[y].count else {
       return
     }
 
     let spanWidth = max(1, cells[y][x].spanWidth)
+    capture?.mark(x: x, y: y, width: spanWidth, written: false)
     for offset in 0..<spanWidth {
       let targetX = x + offset
       guard targetX >= 0, targetX < cells[y].count else {

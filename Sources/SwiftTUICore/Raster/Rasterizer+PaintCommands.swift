@@ -1065,6 +1065,7 @@ extension Rasterizer {
       cell.attributes = tinted
     }
     cells[y][x] = cell
+    presentationRecorder?.cellCapture?.mark(x: x, y: y, width: max(1, cell.spanWidth))
     presentationRecorder?.appendCellFragment(
       from: cells,
       x: x,

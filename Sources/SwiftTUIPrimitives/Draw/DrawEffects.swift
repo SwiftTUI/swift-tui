@@ -2,6 +2,7 @@
 package enum DrawEffect: Equatable, Sendable {
   case blendMode(BlendMode)
   case compositingGroup
+  case cellLayer(CellEffectPass)
 }
 
 /// Compact ordered draw-effect storage.

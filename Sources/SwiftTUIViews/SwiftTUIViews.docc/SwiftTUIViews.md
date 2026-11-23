@@ -93,6 +93,7 @@ Lowering helpers remain package-only implementation details.
 
 ### Input And Drawing
 
+- <doc:Cell-Effects>
 - ``Canvas``
 - ``CanvasClosureDrawing``
 - ``DragGesture``

@@ -854,6 +854,13 @@ are omitted even when SwiftUI exposes a corresponding API.
   `CanvasGrid` boundary. `GridSample` and direct `CellPoint` writes remain
   explicit escape hatches for sample and terminal-cell operations.
 
+- **`layerEffect` takes a Swift cell shader.** *Ratified.* SwiftTUI preserves
+  SwiftUI’s modifier name, read-distance declaration, and enable switch. SwiftUI
+  accepts a Metal shader operating on pixels. Here a `CellLayerShader` runs a
+  Swift function over terminal columns. Its inputs include full glyphs,
+  continuations, independently painted ink and paper, decorations, and links.
+  A trailing closure supplies the same operation inline. See <doc:Cell-Effects>.
+
 ## Animation and transitions
 
 - **Custom animation state accepts legacy string keys.** *Provisional.*

@@ -513,7 +513,7 @@ public struct DrawMetadataModifier: IterativePrimitiveViewModifier, Sendable, Eq
 }
 
 package struct DrawEffectModifier: IterativePrimitiveViewModifier, Sendable, Equatable {
-  package var effect: DrawEffect
+  package var effect: DrawEffect?
 
   package func makeResolveWork<Base: View>(
     content: ModifierContentInputs<Base>,
@@ -521,6 +521,7 @@ package struct DrawEffectModifier: IterativePrimitiveViewModifier, Sendable, Equ
   ) -> ResolveWork<[ResolvedNode]> {
     return content.resolveWork(in: context).map { completed in
       var node = completed
+      guard let effect else { return [node] }
       node.drawEffects.append(effect)
       if effect == .compositingGroup {
         node.surfaceComposition = .init(

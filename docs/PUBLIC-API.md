@@ -236,6 +236,27 @@ always supported. `Canvas` is the public arbitrary-drawing escape hatch:
 prefer value drawings conforming to `CanvasDrawing` for stable structural
 equality. The closure-backed `Canvas { ... }` compares by identity.
 
+## Cell effects
+
+An author importing `SwiftTUIViews` can transform a mounted subtree’s cells with
+`View.layerEffect(_:maxSampleOffset:isEnabled:)`. The trailing-closure overload
+is `layerEffect(maxSampleOffset:isEnabled:_:)`. Both are canonical. The kernel
+and its `CellEffectContext` operate in the mounted view’s integer cell space.
+
+- `CellLayerShader` wraps a `CellLayerKernel` value or a `CellLayerShader.Function`.
+  Kernel equality includes concrete type and configuration. Copies of a closure
+  shader share its identity.
+- `CellSampleOffset` bounds reads from the immutable `CellLayer`. Its
+  `sample(at:)` returns a `CellSample`, and `glyph(occupying:)` looks up the
+  complete glyph from any readable column of its span.
+- `CellGlyph` carries a character, width, `CellPaint`, decorations, emphasis
+  and link. Each ink or paper `CellChannel` can be default, explicit or indexed.
+- `CellDrawingRegion` selects the permitted output through
+  `CellLayerShader.drawing(in:)`. The default is the subject’s bounds.
+
+The [Cell effects guide](../Sources/SwiftTUIViews/SwiftTUIViews.docc/Cell-Effects.md)
+gives both authoring forms and the span and enablement contracts.
+
 ## Action scopes and commands
 
 The full ActionScope/commands surface is public:

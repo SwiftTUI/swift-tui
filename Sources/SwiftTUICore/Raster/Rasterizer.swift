@@ -275,6 +275,9 @@ package struct Rasterizer: Sendable {
     var imageAttachments: [RasterImageAttachment] = []
     var visibleIdentities: Set<Identity> = []
     let presentationRecorder = RasterPresentationLayerRecorder()
+    if draw.subtreeHasCellEffect {
+      presentationRecorder.cellCapture = RasterCellCapture(size: surfaceSize)
+    }
 
     paint(
       node: draw,
@@ -323,7 +326,7 @@ package struct Rasterizer: Sendable {
     // from the dirty set; a declined blit leaves this path byte-identical to
     // the plain incremental raster.
     var translatedRows: [Int] = []
-    if let translation {
+    if let translation, !draw.subtreeHasCellEffect {
       translatedRows = applyTranslationBlit(
         translation,
         previousSurface: previousSurface,
@@ -355,11 +358,14 @@ package struct Rasterizer: Sendable {
     // with no explicit background keeps the background beneath it through
     // `write`'s compositing), so damage never has to grow to cover a
     // painter's reads.
-    let closedDirtyRows = presentationOrderDamageClosure(
-      dirtyRows,
-      previousLayers: previousSurface.presentationLayers,
-      surfaceHeight: surfaceSize.height
-    ).dirtyRows
+    let closedDirtyRows =
+      draw.subtreeHasCellEffect
+      ? Set(0..<surfaceSize.height)
+      : presentationOrderDamageClosure(
+        dirtyRows,
+        previousLayers: previousSurface.presentationLayers,
+        surfaceHeight: surfaceSize.height
+      ).dirtyRows
     let closureRows = closedDirtyRows.subtracting(dirtyRows)
     if !closureRows.isEmpty {
       dirtyRows = closedDirtyRows
@@ -382,6 +388,9 @@ package struct Rasterizer: Sendable {
         !visibleBounds(layer.bounds, intersectsAnyOf: dirtyRows)
       }
     )
+    if draw.subtreeHasCellEffect {
+      presentationRecorder.cellCapture = RasterCellCapture(size: surfaceSize)
+    }
     clear(cells: &cells, for: damage, surfaceWidth: surfaceSize.width)
 
     // Coalesced once per incremental raster, then reused by every cull

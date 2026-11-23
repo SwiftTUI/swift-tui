@@ -223,6 +223,23 @@ extension Rasterizer {
           }
         }
 
+        if let boundary = node.drawEffects.ordered.lastIndex(where: { effect in
+          if case .cellLayer = effect { return true }
+          return effect == .compositingGroup
+        }), case .cellLayer(let pass) = node.drawEffects.ordered[boundary] {
+          var source = node
+          source.drawEffects = DrawEffects(Array(node.drawEffects.ordered[..<boundary]))
+          let outside = DrawEffects(Array(node.drawEffects.ordered.suffix(from: boundary + 1)))
+          let outputContext = applyingUngroupedEffects(outside, to: nodeContext)
+          paintCellLayer(
+            source, pass: pass, clip: outputContext.clip,
+            blendMode: outputContext.activeBlendMode, effects: outputContext.presentationEffects,
+            dirtyRows: outputContext.dirtyRows, cells: &cells,
+            visibleIdentities: &visibleIdentities,
+            recorder: presentationRecorder)
+          continue
+        }
+
         if let groupSplit = splitAtFirstCompositingGroup(node.drawEffects) {
           paintCompositingGroup(
             node,
@@ -319,7 +336,7 @@ extension Rasterizer {
           return false
         }
         updated.presentationEffects.append(.blendMode(blendMode))
-      case .compositingGroup:
+      case .cellLayer, .compositingGroup:
         // Callers normally split groups before this helper. If a future
         // segment still contains a group marker, it has no streaming effect
         // by itself; only the split/flatten step changes painting behavior.
@@ -332,6 +349,13 @@ extension Rasterizer {
   private func splitAtFirstCompositingGroup(
     _ effects: DrawEffects
   ) -> CompositingGroupSplit? {
+    if effects.ordered.contains(where: { if case .cellLayer = $0 { true } else { false } }),
+      let boundary = effects.ordered.lastIndex(of: .compositingGroup)
+    {
+      return .init(
+        effectsInsideGroup: DrawEffects(Array(effects.ordered[..<boundary])),
+        effectsAfterGroup: DrawEffects(Array(effects.ordered.suffix(from: boundary + 1))))
+    }
     var effectsBeforeGroup: [DrawEffect] = []
     var effectsAfterGroup: [DrawEffect] = []
     var foundGroup = false
@@ -378,6 +402,11 @@ extension Rasterizer {
       imageAttachments: []
     )
 
+    let scratch = RasterPresentationLayerRecorder.scratchOnly()
+    if presentationRecorder?.cellCapture != nil {
+      scratch.cellCapture = RasterCellCapture(
+        size: .init(width: cells.first?.count ?? 0, height: cells.count))
+    }
     paint(
       node: isolatedNode,
       cells: &layer.cells,
@@ -387,7 +416,7 @@ extension Rasterizer {
       dirtySpans: context.dirtySpans,
       visibleIdentities: &visibleIdentities,
       // A layer's writes are not paint events of the destination surface.
-      presentationRecorder: .scratchOnly(),
+      presentationRecorder: scratch,
       // A layer paints into its own cells, so its strokes merge with each
       // other and not with the strokes beneath the layer.
       lineArms: LineArmsTable()
@@ -1208,8 +1237,10 @@ extension Rasterizer {
                 presentationEffects: presentationEffects
               )
             } else {
-              clearExistingGlyph(atX: x, y: y, cells: &cells)
+              clearExistingGlyph(
+                atX: x, y: y, cells: &cells, capture: presentationRecorder?.cellCapture)
               cells[y][x] = copied
+              presentationRecorder?.cellCapture?.mark(x: x, y: y, width: 1)
               presentationRecorder?.appendCellFragment(
                 from: cells,
                 x: x,

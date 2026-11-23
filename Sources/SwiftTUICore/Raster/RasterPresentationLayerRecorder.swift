@@ -11,6 +11,7 @@ final class RasterPresentationLayerRecorder {
   private let recordsLayers: Bool
   /// The recorder is the one per-raster object every cell writer receives, so
   /// it also carries the scratch that lets a run of cells share attributes.
+  var cellCapture: RasterCellCapture?
   let attributeMemo = RasterAttributeMemo()
 
   init(layers: [RasterPresentationLayer] = []) {
