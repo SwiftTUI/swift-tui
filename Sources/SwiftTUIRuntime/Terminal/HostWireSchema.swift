@@ -186,6 +186,9 @@ package enum HostWireSchema {
       .init(
         "presentationLayers",
         wire: .notSerialized("package-internal compositing intermediates, flattened into cells")),
+      .init(
+        "hadCellEffect",
+        wire: .notSerialized("retained by the rasterizer to compute damage on the next frame")),
     ],
     "RasterCell": [
       .init(
@@ -207,6 +210,8 @@ package enum HostWireSchema {
     "ResolvedTextStyle": [
       .init("foregroundColor", wire: .key("fg")),
       .init("backgroundColor", wire: .key("bg")),
+      .init("foregroundPaletteIndex", wire: .derived("selected palette RGB in fg")),
+      .init("backgroundPaletteIndex", wire: .derived("selected palette RGB in bg")),
       .init(
         "emphasis",
         wire: .key("em")),
