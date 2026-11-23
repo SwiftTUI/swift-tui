@@ -21,7 +21,7 @@ For products, supported imports, and re-export reachability, see [PUBLIC_MODULE_
 | `SwiftTUI` | 1 | 4 |
 | `SwiftTUIRuntime` | 60 | 531 |
 | `SwiftTUIProfiling` | 9 | 52 |
-| `SwiftTUIViews` | 431 | 2658 |
+| `SwiftTUIViews` | 431 | 2659 |
 | `SwiftTUIAnimatedImage` | 5 | 36 |
 | `SwiftTUIArguments` | 5 | 61 |
 | `SwiftTUIPTYPrimitives` | 7 | 40 |
@@ -33,7 +33,7 @@ For products, supported imports, and re-export reachability, see [PUBLIC_MODULE_
 | `SwiftTUIWebHostCLI` | 2 | 8 |
 | `SwiftTUIAndroidHost` | 20 | 49 |
 | `SwiftTUICore` | 43 | 296 |
-| `SwiftTUIPrimitives` | 190 | 1653 |
+| `SwiftTUIPrimitives` | 194 | 1674 |
 | `SwiftTUIGraph` | 78 | 598 |
 | `SwiftTUIPTYCPrimitives` | 0 | 0 |
 | `SwiftTUIPlatformIO` | 1 | 19 |
@@ -544,7 +544,7 @@ For products, supported imports, and re-export reachability, see [PUBLIC_MODULE_
 - `VerticalAlignmentGuideModifier` — struct
 - `VerticalControlGroupStyle` — struct — 3 members
 - `VerticalEdge` — enum — 1 member
-- `View` — protocol — 234 members
+- `View` — protocol — 235 members
 - `ViewBuilder` — enum — 10 members
 - `ViewModifier` — protocol — 7 members
 - `ViewModifierContent` — struct — 1 member
@@ -728,7 +728,7 @@ For products, supported imports, and re-export reachability, see [PUBLIC_MODULE_
 > carry `public` access but do not establish a supported direct import.
 > See the module map for re-export paths and symbol classifications below.
 
-### Canonical surface (188)
+### Canonical surface (192)
 
 - `AccessibilityColorProfile` — enum — 6 members
 - `AccessibilityPreferences` — struct — 8 members
@@ -763,18 +763,22 @@ For products, supported imports, and re-export reachability, see [PUBLIC_MODULE_
 - `CellChannel` — enum — 3 members
 - `CellColorKernel` — protocol — 1 member
 - `CellColorShader` — struct — 3 members
+- `CellCompositeResult` — enum — 2 members
+- `CellCompositingKernel` — protocol — 1 member
 - `CellDistortionKernel` — protocol — 1 member
 - `CellDistortionShader` — struct — 4 members
 - `CellDrawingRegion` — enum — 4 members
+- `CellEffectBuffer` — struct — 7 members
 - `CellEffectContext` — struct — 8 members
 - `CellGlyph` — struct — 10 members
 - `CellLayer` — struct — 4 members
 - `CellLayerKernel` — protocol — 1 member
-- `CellLayerShader` — struct — 5 members
+- `CellLayerShader` — struct — 11 members
 - `CellPaint` — struct — 4 members
 - `CellPixelMetrics` — struct — 9 members
 - `CellPoint` — struct — 4 members
 - `CellRect` — struct — 11 members
+- `CellRegionKernel` — protocol — 1 member
 - `CellSample` — enum — 3 members
 - `CellSampleOffset` — enum — 3 members
 - `CellSize` — struct — 4 members

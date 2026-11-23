@@ -7,6 +7,25 @@ public protocol CellLayerKernel: Equatable, Sendable {
   ) -> CellSample
 }
 
+/// How an ordered shader changes the destination at the current paint position.
+public enum CellCompositeResult: Equatable, Sendable {
+  case keepDestination
+  case replace(CellSample)
+}
+
+/// Reads the subject and the lower paint in the same coordinate system.
+public protocol CellCompositingKernel: Equatable, Sendable {
+  nonisolated func composite(
+    at destination: CellPoint, source: CellLayer, backdrop: CellLayer, context: CellEffectContext
+  ) -> CellCompositeResult
+}
+
+/// Mutates one bounded output buffer in the author's traversal order.
+public protocol CellRegionKernel: Equatable, Sendable {
+  nonisolated func apply(
+    source: CellLayer, to buffer: inout CellEffectBuffer, context: CellEffectContext)
+}
+
 private protocol ShaderKey: AnyObject, Sendable {
   func matches(_ other: any ShaderKey) -> Bool
 }
@@ -27,30 +46,55 @@ private final class KernelKey<K: Equatable & Sendable>: ShaderKey {
 /// An immutable cell program. Copies of a closure shader share its identity.
 public struct CellLayerShader: Equatable, Sendable {
   public typealias Function = @Sendable (CellPoint, CellLayer, CellEffectContext) -> CellSample
-  package typealias RasterFunction =
+  public typealias CompositingFunction =
     @Sendable (
       CellPoint, CellLayer, CellLayer, CellEffectContext
-    ) -> CellSample
+    ) -> CellCompositeResult
+  public typealias RegionFunction =
+    @Sendable (CellLayer, inout CellEffectBuffer, CellEffectContext) -> Void
 
+  package enum Program: Sendable {
+    case source(Function)
+    case composite(CompositingFunction)
+    case ordered(RegionFunction)
+  }
   private let key: any ShaderKey
-  package let raster: RasterFunction
+  package let program: Program
   package private(set) var region: CellDrawingRegion = .source
-  package private(set) var readsBackdrop = false
+  package var readsBackdrop: Bool {
+    if case .composite = program { return true }
+    return false
+  }
+
+  private init(key: any ShaderKey, program: Program) {
+    self.key = key
+    self.program = program
+  }
 
   public init<K: CellLayerKernel>(_ kernel: K) {
-    key = KernelKey(kernel)
-    raster = { point, source, _, context in kernel.shade(at: point, in: source, context: context) }
+    self.init(key: KernelKey(kernel), program: .source(kernel.shade))
   }
 
   public init(_ shade: @escaping Function) {
-    key = ClosureKey()
-    raster = { point, source, _, context in shade(point, source, context) }
+    self.init(key: ClosureKey(), program: .source(shade))
   }
 
-  package init(readingBackdrop raster: @escaping RasterFunction) {
-    key = ClosureKey()
-    self.raster = raster
-    readsBackdrop = true
+  /// Composites the source against the current lower paint.
+  public static func compositing<K: CellCompositingKernel>(_ kernel: K) -> Self {
+    Self(key: KernelKey(kernel), program: .composite(kernel.composite))
+  }
+
+  public static func compositing(_ composite: @escaping CompositingFunction) -> Self {
+    Self(key: ClosureKey(), program: .composite(composite))
+  }
+
+  /// Runs an ordered program with a stable input and a writable output.
+  public static func region<K: CellRegionKernel>(_ kernel: K) -> Self {
+    Self(key: KernelKey(kernel), program: .ordered(kernel.apply))
+  }
+
+  public static func region(_ apply: @escaping RegionFunction) -> Self {
+    Self(key: ClosureKey(), program: .ordered(apply))
   }
 
   /// Selects where this shader may write. It uses the source bounds by default.
@@ -61,7 +105,11 @@ public struct CellLayerShader: Equatable, Sendable {
   }
 
   public static func == (lhs: Self, rhs: Self) -> Bool {
-    lhs.key.matches(rhs.key) && lhs.region == rhs.region
+    guard lhs.key.matches(rhs.key), lhs.region == rhs.region else { return false }
+    switch (lhs.program, rhs.program) {
+    case (.source, .source), (.composite, .composite), (.ordered, .ordered): return true
+    default: return false
+    }
   }
 }
 
@@ -91,7 +139,10 @@ package final class CellEffectPass: Equatable, Sendable {
 
   package let offset: CellSampleOffset
 
-  package init(_ shader: CellLayerShader, offset: CellSampleOffset) {
+  package let targetsBackdrop: Bool
+
+  package init(_ shader: CellLayerShader, offset: CellSampleOffset, targetsBackdrop: Bool = false) {
+    self.targetsBackdrop = targetsBackdrop
     self.shader = shader
     self.offset = offset
     #if DEBUG
@@ -101,6 +152,8 @@ package final class CellEffectPass: Equatable, Sendable {
   }
 
   package static func == (lhs: CellEffectPass, rhs: CellEffectPass) -> Bool {
-    lhs === rhs || (lhs.shader == rhs.shader && lhs.offset == rhs.offset)
+    lhs === rhs
+      || (lhs.shader == rhs.shader && lhs.offset == rhs.offset
+        && lhs.targetsBackdrop == rhs.targetsBackdrop)
   }
 }

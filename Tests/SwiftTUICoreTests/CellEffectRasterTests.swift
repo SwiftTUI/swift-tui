@@ -96,14 +96,14 @@ struct CellEffectRasterTests {
         ])
     }
     for progress in [0.25, 0.75] {
-      let shader = CellLayerShader(readingBackdrop: { point, source, backdrop, _ in
+      let shader = CellLayerShader.compositing({ point, source, backdrop, _ in
         guard let front = source.glyph(occupying: point),
           let back = backdrop.glyph(occupying: point),
           case .color(let backInk) = back.paint.foreground,
           case .color(let backPaper) = back.paint.background,
           case .color(let frontInk) = front.paint.foreground,
           case .color(let frontPaper) = front.paint.background
-        else { return .empty }
+        else { return .keepDestination }
         func mix(_ a: Color, _ b: Color, _ t: Double) -> Color {
           func channel(_ x: Double, _ y: Double) -> Double {
             let start = (x * 255).rounded()
@@ -119,7 +119,7 @@ struct CellEffectRasterTests {
         result.paint.foreground = .color(
           progress < 0.5
             ? mix(backInk, bg, progress * 2) : mix(bg, frontInk, progress * 2 - 1))
-        return .glyph(result)
+        return .replace(.glyph(result))
       })
       var top = text("B", foreground: 0x1048C0, background: 0xC41838, lower: false)
       top.drawEffects = .init([pass(shader)])
@@ -152,8 +152,8 @@ struct CellEffectRasterTests {
     let identity = CellLayerShader { p, source, _ in source.sample(at: p) }
     let rasterizer = Rasterizer()
     for early in [true, false] {
-      let reader = CellLayerShader(readingBackdrop: { p, source, lower, _ in
-        early ? lower.sample(at: p) : source.sample(at: p)
+      let reader = CellLayerShader.compositing({ p, source, lower, _ in
+        .replace(early ? lower.sample(at: p) : source.sample(at: p))
       })
       var previous: RasterSurface?
       for lowerGlyph in ["A", "C"] {
@@ -171,8 +171,8 @@ struct CellEffectRasterTests {
       }
     }
 
-    let groupReader = CellLayerShader(readingBackdrop: { p, _, under, _ in
-      .glyph(CellGlyph(under.glyph(occupying: p) == nil ? "E" : "L"))
+    let groupReader = CellLayerShader.compositing({ p, _, under, _ in
+      .replace(.glyph(CellGlyph(under.glyph(occupying: p) == nil ? "E" : "L")))
     })
     var lower = subject("A")
     var top = subject("B")
@@ -391,5 +391,66 @@ extension CellEffectRasterTests {
     }
     #expect(frame.cells.flatMap { $0 }.allSatisfy { $0 == .empty })
     #expect(probe.snapshot().cellEffectCaptures == 0)
+  }
+}
+
+extension CellEffectRasterTests {
+  @Test("Ordered scratch repairs both spans, copies holes, and can blit from itself")
+  func bufferBlits() {
+    let bounds = CellRect(origin: .init(x: -3, y: 2), size: .init(width: 7, height: 1))
+    let point: (Int) -> CellPoint = { .init(x: $0, y: 2) }
+    var buffer = CellEffectBuffer(bounds: bounds)
+    buffer.set(CellGlyph("界", paint: .init(foreground: .indexed(196))), at: point(-3))
+    buffer.set(CellGlyph("Q"), at: point(-1))
+    buffer.set(CellGlyph("語"), at: point(1))
+    let original = buffer.snapshot()
+    buffer.blit(
+      original, from: .init(origin: point(-3), size: .init(width: 5, height: 1)), to: point(-2))
+    #expect(buffer.sample(at: point(-3)) == .empty)
+    #expect(buffer.sample(at: point(-1)) == .continuation(columnsBack: 1))
+    #expect(buffer.snapshot().glyph(occupying: point(-1))?.paint.foreground == .indexed(196))
+    #expect(buffer.snapshot().glyph(occupying: point(0))?.character == "Q")
+    #expect(buffer.sample(at: point(1)) == .empty && buffer.sample(at: point(2)) == .empty)
+    #expect(original.glyph(occupying: point(2))?.character == "語")
+    buffer.set(CellGlyph("界"), at: point(3))
+    #expect(buffer.sample(at: point(3)) == .empty)
+    buffer.clear(at: point(100))
+    buffer.clear(at: point(-1))
+    #expect(buffer.sample(at: point(-2)) == .empty)
+  }
+
+  @Test(
+    "Two ordered writes collide and the next read forwards the first particle beyond the subject")
+  func orderedCollision() {
+    let rootBounds = CellRect(origin: .zero, size: .init(width: 6, height: 1))
+    var root = DrawNode(
+      identity: testIdentity("floor"), bounds: rootBounds,
+      commands: [
+        TextPaintFamily.plain.command(bounds: rootBounds, lines: ["......"], style: .init())
+      ])
+    let slot = CellRect(origin: .init(x: 1, y: 0), size: .init(width: 3, height: 1))
+    let shader = CellLayerShader.region { source, buffer, context in
+      #expect(buffer.bounds == context.viewport && source.readableBounds == context.sourceBounds)
+      let a = CellPoint.zero
+      let b = CellPoint(x: 1, y: 0)
+      let outside = CellPoint(x: 4, y: 0)
+      guard case .glyph(var first) = buffer.sample(at: a) else { return }
+      first.paint.foreground = .indexed(70)
+      buffer.set(first, at: b)
+      buffer.clear(at: a)
+      guard case .glyph(let moved) = buffer.sample(at: b) else { return }
+      buffer.set(moved, at: outside)
+      buffer.clear(at: b)
+      #expect(source.glyph(occupying: b)?.character == "B")
+    }.drawing(in: .viewport)
+    root.children = [
+      DrawNode(
+        identity: testIdentity("particles"), bounds: slot,
+        drawEffects: .init([pass(shader)]),
+        commands: [TextPaintFamily.plain.command(bounds: slot, lines: ["ABC"], style: .init())])
+    ]
+    let row = Rasterizer().rasterize(root).cells[0]
+    #expect(row.map(\.character) == Array("...C.A"))
+    #expect(row[5].style?.foregroundPaletteIndex == 70)
   }
 }

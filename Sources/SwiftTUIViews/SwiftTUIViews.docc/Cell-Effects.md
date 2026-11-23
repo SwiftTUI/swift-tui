@@ -169,3 +169,62 @@ the value in `CellDistortionShader` to pass it to
 method selects the output region, so a motion can travel past the subject.
 Color and distortion shaders use the same kernel-value and closure-identity
 equality rules as layer shaders.
+
+## Read lower paint at the current position
+
+A compositing shader receives the subject and a snapshot of everything drawn
+beneath it at this point in the frame. Both layers use subject-local positions.
+Each sampler enforces the declared read distance. At a continuation column,
+`glyph(occupying:)` returns the entire visible glyph even with a zero read
+distance. A compositing group starts a separate destination.
+
+```swift
+let alternate = CellLayerShader.compositing { point, source, lower, _ in
+  guard point.x.isMultiple(of: 2) else { return .keepDestination }
+  return .replace(source.sample(at: point))
+}
+Text("arrival").layerEffect(alternate, maxSampleOffset: .zero)
+```
+
+`CellCompositeResult.keepDestination` preserves the current lower glyph.
+`.replace(.empty)` clears its span from the current destination. An enclosing
+layer can show through the hole. For a reusable program, conform to
+`CellCompositingKernel` and implement `composite(at:source:backdrop:context:)`.
+`CellLayerShader.CompositingFunction` names the equivalent closure type.
+
+## Move cells in an ordered region
+
+Use `CellLayerShader.region` for ordered writes. The buffer initially contains
+the source contribution within `bounds`. Later reads see earlier writes.
+A snapshot retains what the buffer contained when you took it.
+
+```swift
+let move = CellLayerShader.region { _, buffer, _ in
+  let original = buffer.snapshot()
+  let first = buffer.bounds.origin
+  let next = CellPoint(x: first.x + 1, y: first.y)
+  buffer.clear(at: first)
+  if let glyph = original.glyph(occupying: first) {
+    buffer.set(glyph, at: next)
+  }
+}
+```
+
+`CellEffectBuffer(bounds:)` creates a buffer of holes. Its `sample(at:)`
+distinguishes leads, continuations and holes. Writing or clearing one column
+repairs the whole span underneath it. `blit(_:from:to:)` copies glyphs and
+holes from a stable layer, including an overlapping snapshot of the same
+buffer. A glyph cut by the source or destination rectangle contributes a
+hole. A region kernel can read the whole output rectangle with a zero offset.
+A finite offset expands that rectangle before intersecting the input bounds.
+`CellRegionKernel.apply(source:to:context:)` and
+`CellLayerShader.RegionFunction` provide the named and closure forms.
+
+Use `backdropEffect(_:in:maxSampleOffset:isEnabled:)` on a dialog to process
+the lower cells first and then paint the dialog. For example, applying
+`move` with `in: .viewport` lets it operate on the lower viewport beyond
+the dialog’s layout slot. If a compositing shader runs on this target, both
+input layers initially represent the designated lower region. Higher siblings
+paint afterwards. An image intersecting a backdrop read contributes its
+cell fallback at the original image command. The remainder retains its native
+placement. Disabling the descriptor restores the ordinary image path.

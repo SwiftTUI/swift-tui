@@ -25,12 +25,15 @@ private struct TailMarker: CellLayerKernel {
   }
 }
 
+private enum OccupantInput: CaseIterable { case source, backdrop, buffer }
+
 private struct OccupantJourneyRoot: View {
   let startingAt: Int
+  let input: OccupantInput
 
   var body: some View {
     VStack(alignment: .leading, spacing: 0) {
-      OccupantPanel(startingAt: startingAt)
+      OccupantPanel(startingAt: startingAt, input: input)
     }
   }
 }
@@ -38,7 +41,9 @@ private struct OccupantJourneyRoot: View {
 private struct OccupantPanel: View {
   @State private var step: Int
 
-  init(startingAt step: Int = 0) {
+  let input: OccupantInput
+  init(startingAt step: Int = 0, input: OccupantInput) {
+    self.input = input
     _step = State(wrappedValue: step)
   }
 
@@ -47,14 +52,41 @@ private struct OccupantPanel: View {
       Text("before")
       ZStack(alignment: .topLeading) {
         Text("................")
-        HStack(spacing: 0) {
+        let word = HStack(spacing: 0) {
           Text("       ")
           Text(step == 0 ? "界" : step < 3 ? "語" : "x")
             .foregroundStyle(step < 2 ? Color.red : Color.blue)
             .frame(width: 2, height: 1, alignment: .leading)
+        }.frame(width: 16, height: 1, alignment: .topLeading)
+        switch input {
+        case .source:
+          word.layerEffect(CellLayerShader(TailMarker()), maxSampleOffset: .zero)
+        case .backdrop:
+          word
+          Spacer(minLength: 0).frame(width: 16, height: 1)
+            .layerEffect(
+              .compositing { p, _, lower, context in
+                if p.x == 7, lower.glyph(occupying: p)?.width == 2 {
+                  return .replace(.glyph(CellGlyph(".")))
+                }
+                return .replace(TailMarker().shade(at: p, in: lower, context: context))
+              }, maxSampleOffset: .zero)
+        case .buffer:
+          word.layerEffect(
+            .region { _, buffer, _ in
+              let lead = CellPoint(x: 7, y: 0)
+              let tail = CellPoint(x: 8, y: 0)
+              let snapshot = buffer.snapshot()
+              guard case .continuation(columnsBack: 1) = snapshot.sample(at: tail),
+                var glyph = snapshot.glyph(occupying: tail)
+              else { return }
+              buffer.clear(at: tail)
+              #expect(buffer.sample(at: lead) == .empty)
+              glyph.character = glyph.character == "界" ? "J" : "G"
+              buffer.set(glyph, at: tail)
+              #expect(snapshot.glyph(occupying: tail)?.width == 2)
+            }, maxSampleOffset: .zero)
         }
-        .frame(width: 16, height: 1, alignment: .topLeading)
-        .layerEffect(CellLayerShader(TailMarker()), maxSampleOffset: .zero)
       }
       Text("after")
     }
@@ -72,20 +104,21 @@ private struct OccupantPanel: View {
 struct CellLayerOccupantJourneyTests {
   @Test(
     "A live run loop updates a marker on the far side of the lead's damage boundary",
-    arguments: 0..<3)
-  func occupantSurvivesIncrementalRaster(start: Int) async throws {
+    arguments: 0..<3, OccupantInput.allCases)
+  fileprivate func occupantSurvivesIncrementalRaster(start: Int, input: OccupantInput) async throws
+  {
     let size = CellSize(width: 24, height: 8)
     let identity = testIdentity("CellLayerOccupant")
     let journey = try await runSegmentedRowJourney(
       rootIdentity: identity, terminalSize: size, steps: [.keys([.arrowRight])]
-    ) { OccupantJourneyRoot(startingAt: start) }
+    ) { OccupantJourneyRoot(startingAt: start, input: input) }
 
     var environment = EnvironmentValues()
     environment.terminalSize = size
     let states = [start, start + 1]
     let fresh = states.map { step in
       DefaultRenderer().render(
-        OccupantJourneyRoot(startingAt: step),
+        OccupantJourneyRoot(startingAt: step, input: input),
         context: ResolveContext(identity: identity, environmentValues: environment),
         proposal: ProposedSize(width: size.width, height: size.height)
       ).rasterSurface.cells
@@ -158,5 +191,70 @@ extension CellLayerOccupantJourneyTests {
     #expect(restored.imageAttachments.count == 1)
     #expect(restored == DefaultRenderer().render(scene(false), proposal: size).rasterSurface)
     #expect(restored.cells[0].map(\.character) == ["T", "O", "W"])
+  }
+}
+
+extension CellLayerOccupantJourneyTests {
+  @Test(
+    "A sampled lower image is projected at its paint event and keeps native fragments outside the selected region"
+  )
+  func partialBackdropImage() throws {
+    let bytes = try makePNGBytes(
+      width: 2, height: 2,
+      pixels: Array(repeating: rgbaPixel(red: 230, green: 20, blue: 80), count: 4))
+    let read = CellRect(origin: .init(x: 1, y: 0), size: .init(width: 2, height: 1))
+    func scene(_ enabled: Bool) -> some View {
+      ZStack(alignment: .topLeading) {
+        Text("01234")
+        Image(data: bytes).resizable().frame(width: 5, height: 1)
+        Text("T").offset(x: 1)
+        Spacer(minLength: 0).frame(width: 5, height: 1).layerEffect(
+          .compositing { point, _, lower, _ in
+            guard var glyph = lower.glyph(occupying: point) else { return .keepDestination }
+            if glyph.character == "T" { glyph.character = "t" }
+            return .replace(.glyph(glyph))
+          }.drawing(in: .rect(read)), maxSampleOffset: .zero, isEnabled: enabled)
+        Text("H").offset(x: 3)
+      }
+    }
+    let renderer = DefaultRenderer()
+    let size = ProposedSize(width: 5, height: 1)
+    let active = renderer.render(scene(true), proposal: size).rasterSurface
+    #expect(active.cells[0].map(\.character) == Array("0t▀H4"))
+    #expect(active.cells[0][2].style?.foregroundColor?.hexString(format: .rrggbb) == "#E61450")
+    #expect(
+      active.imageAttachments.map(\.visibleBounds) == [
+        .init(origin: .zero, size: .init(width: 1, height: 1)),
+        .init(origin: .init(x: 3, y: 0), size: .init(width: 2, height: 1)),
+      ])
+    let bypass = renderer.render(scene(false), proposal: size).rasterSurface
+    #expect(
+      bypass.imageAttachments.map(\.visibleBounds) == [
+        .init(origin: .zero, size: .init(width: 5, height: 1))
+      ])
+    #expect(bypass == DefaultRenderer().render(scene(false), proposal: size).rasterSurface)
+    #expect(active == renderer.render(scene(true), proposal: size).rasterSurface)
+  }
+}
+
+extension CellLayerOccupantJourneyTests {
+  @Test("Disabling backdrop and region programs restores ordinary cells without a capture")
+  func disabledComposition() {
+    let probe = RasterWorkProbe()
+    let renderer = DefaultRenderer()
+    let size = ProposedSize(width: 6, height: 1)
+    let ordinary = renderer.render(Text("source"), proposal: size).rasterSurface
+    Rasterizer.$workProbe.withValue(probe) {
+      let program = CellLayerShader.region { _, _, _ in Issue.record("Disabled region ran") }
+      let view = Text("source")
+        .layerEffect(program, maxSampleOffset: .layerBounds, isEnabled: false)
+        .backdropEffect(
+          .compositing { _, _, _, _ in
+            Issue.record("Disabled compositing kernel ran")
+            return .keepDestination
+          }, in: .viewport, maxSampleOffset: .layerBounds, isEnabled: false)
+      #expect(renderer.render(view, proposal: size).rasterSurface == ordinary)
+      #expect(probe.snapshot().cellEffectCaptures == 0)
+    }
   }
 }

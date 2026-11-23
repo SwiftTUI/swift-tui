@@ -281,6 +281,7 @@ package struct Rasterizer: Sendable {
     let presentationRecorder = RasterPresentationLayerRecorder()
     if draw.subtreeHasCellEffect {
       presentationRecorder.cellCapture = RasterCellCapture(size: surfaceSize)
+      presentationRecorder.backdropImages = backdropImagePlan(for: draw, size: surfaceSize)
     }
 
     paint(
@@ -392,6 +393,7 @@ package struct Rasterizer: Sendable {
     )
     if draw.subtreeHasCellEffect {
       presentationRecorder.cellCapture = RasterCellCapture(size: surfaceSize)
+      presentationRecorder.backdropImages = backdropImagePlan(for: draw, size: surfaceSize)
     }
     clear(cells: &cells, for: damage, surfaceWidth: surfaceSize.width)
 
@@ -434,7 +436,8 @@ package struct Rasterizer: Sendable {
     let surface = RasterSurface(
       size: surfaceSize,
       cells: cells,
-      imageAttachments: canonicallyOrderedImageAttachments(imageAttachments, draw: draw),
+      imageAttachments: needsEffectDamage
+        ? imageAttachments : canonicallyOrderedImageAttachments(imageAttachments, draw: draw),
       presentationLayers: presentationRecorder.layers.sorted { lhs, rhs in
         lhs.order < rhs.order
       }, hadCellEffect: draw.subtreeHasCellEffect

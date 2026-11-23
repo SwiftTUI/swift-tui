@@ -263,6 +263,14 @@ and its `CellEffectContext` operate in the mounted view’s integer cell space.
   the terminal palette tokens alongside the resolved colors. Replacing a
   resolved color clears that channel's token.
 
+A `CellLayerShader.compositing` program receives immutable source and backdrop
+layers and returns a `CellCompositeResult`. A `CellLayerShader.region` program
+receives the source and an ordered, value-semantic `CellEffectBuffer`.
+Applications can supply a `CellCompositingKernel`, a `CellRegionKernel`, or
+the corresponding `CompositingFunction` or `RegionFunction` closure.
+`View.backdropEffect(_:in:maxSampleOffset:isEnabled:)` writes into a designated
+lower region before the subject paints. These forms are supported public API.
+
 The [Cell effects guide](../Sources/SwiftTUIViews/SwiftTUIViews.docc/Cell-Effects.md)
 gives both authoring forms and the span and enablement contracts.
 

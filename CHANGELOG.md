@@ -19,6 +19,10 @@ require 1.0.0. See [COMPATIBILITY.md](docs/COMPATIBILITY.md).
   channels retain their palette slots on capable terminals and resolve to the
   selected palette on RGB hosts. See the [cell effects guide](Sources/SwiftTUIViews/SwiftTUIViews.docc/Cell-Effects.md).
 
+- A compositing shader can read the lower glyph at the current paint position.
+  Region kernels can clear, copy and move whole spans with `CellEffectBuffer`.
+  Use `backdropEffect` to change cells behind a mounted view.
+
 ## [0.24.0] - 2026-11-22
 
 ### Added

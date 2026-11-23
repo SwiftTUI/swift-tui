@@ -690,9 +690,12 @@ classifications:
     - SwiftTUIPrimitives.CellChannel
     - SwiftTUIPrimitives.CellColorKernel
     - SwiftTUIPrimitives.CellColorShader
+    - SwiftTUIPrimitives.CellCompositeResult
+    - SwiftTUIPrimitives.CellCompositingKernel
     - SwiftTUIPrimitives.CellDistortionKernel
     - SwiftTUIPrimitives.CellDistortionShader
     - SwiftTUIPrimitives.CellDrawingRegion
+    - SwiftTUIPrimitives.CellEffectBuffer
     - SwiftTUIPrimitives.CellEffectContext
     - SwiftTUIPrimitives.CellGlyph
     - SwiftTUIPrimitives.CellLayer
@@ -702,6 +705,7 @@ classifications:
     - SwiftTUIPrimitives.CellPixelMetrics
     - SwiftTUIPrimitives.CellPoint
     - SwiftTUIPrimitives.CellRect
+    - SwiftTUIPrimitives.CellRegionKernel
     - SwiftTUIPrimitives.CellSample
     - SwiftTUIPrimitives.CellSampleOffset
     - SwiftTUIPrimitives.CellSize

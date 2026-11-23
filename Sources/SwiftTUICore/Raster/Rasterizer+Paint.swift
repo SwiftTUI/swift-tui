@@ -238,6 +238,9 @@ extension Rasterizer {
             dirtyRows: outputContext.dirtyRows, cells: &cells,
             visibleIdentities: &visibleIdentities,
             recorder: presentationRecorder)
+          if pass.targetsBackdrop {
+            stack.append(.visit(node: source, context: outputContext))
+          }
           continue
         }
 
@@ -410,6 +413,7 @@ extension Rasterizer {
     )
 
     let scratch = RasterPresentationLayerRecorder.scratchOnly()
+    scratch.backdropImages = presentationRecorder?.backdropImages
     if presentationRecorder?.cellCapture != nil {
       scratch.cellCapture = RasterCellCapture(
         size: .init(width: cells.first?.count ?? 0, height: cells.count),
@@ -1094,6 +1098,22 @@ extension Rasterizer {
           paintEffectImage(
             attachment, appearance: environment.appearance, cells: &cells,
             recorder: presentationRecorder, effects: presentationEffects)
+          continue
+        }
+        if let partition = presentationRecorder?.backdropImages?.next(attachment) {
+          for rect in partition.projected {
+            var part = attachment
+            part.visibleBounds = rect
+            paintEffectImage(
+              part, appearance: environment.appearance, cells: &cells,
+              recorder: presentationRecorder, effects: presentationEffects)
+          }
+          for rect in partition.native {
+            var part = attachment
+            part.visibleBounds = rect
+            imageAttachments.append(part)
+            presentationRecorder?.appendImageAttachment(part, effects: presentationEffects)
+          }
           continue
         }
         imageAttachments.append(attachment)

@@ -863,6 +863,12 @@ are omitted even when SwiftUI exposes a corresponding API.
   continuation columns, independently painted ink and paper, decorations and
   links. Each modifier also accepts a trailing closure. See <doc:Cell-Effects>.
 
+- **A view can transform earlier paint with `backdropEffect`.** *Ratified.*
+  This SwiftTUI companion modifier has no SwiftUI counterpart. The shader
+  receives lower cells within a selected drawing region before the view paints.
+  An explicit compositing group limits which lower layers it can see.
+  See <doc:Cell-Effects>.
+
 ## Animation and transitions
 
 - **Custom animation state accepts legacy string keys.** *Provisional.*

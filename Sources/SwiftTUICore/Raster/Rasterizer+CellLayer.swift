@@ -39,14 +39,15 @@ extension Rasterizer {
       x: SaturatingConversion.adding(targetOrigin.x, origin.x),
       y: SaturatingConversion.adding(targetOrigin.y, origin.y))
     let context = CellEffectContext(
-      sourceBounds: localSource, outputBounds: logicalOutput, viewport: localViewport,
+      sourceBounds: pass.targetsBackdrop ? logicalOutput : localSource, outputBounds: logicalOutput,
+      viewport: localViewport,
       originInRoot: rootOrigin, appearance: style.appearance,
       cellPixelMetrics: style.cellPixelMetrics)
 
     // A single source-only pass never depends on prior paint. Avoid retaining
     // destination rows and forcing a COW copy for every row we overwrite.
     let backdrop: CellLayer
-    if pass.shader.readsBackdrop || node.subtreeHasCellEffect {
+    if pass.targetsBackdrop || pass.shader.readsBackdrop || node.subtreeHasCellEffect {
       backdrop = cellLayer(
         cells: cells, capture: recorder?.cellCapture, absoluteBounds: viewport,
         origin: origin, allowsLink: true, includeInherited: true)
@@ -61,7 +62,13 @@ extension Rasterizer {
     case .cells(let dx, let dy):
       // A read at a continuation also needs the lead just outside the window.
       let reach = CellDrawingRegion.outset(x: SaturatingConversion.adding(max(0, dx), 2), y: dy)
-      let readBounds = reach.bounds(source: output, viewport: localSource)
+      let readOutput: CellRect
+      if case .ordered = pass.shader.program {
+        readOutput = logicalOutput
+      } else {
+        readOutput = output
+      }
+      let readBounds = reach.bounds(source: readOutput, viewport: localSource)
       input = .init(
         origin: .init(
           x: SaturatingConversion.adding(origin.x, readBounds.origin.x),
@@ -70,7 +77,23 @@ extension Rasterizer {
     let captureBounds = sourceBounds
     let tiles: RasterCellSourceTiles?
     let source: CellLayer
-    if Self.boundedSurfaceSize(input.size, maximum: nil) != input.size {
+    if pass.targetsBackdrop {
+      tiles = nil
+      source = CellLayer(bounds: logicalOutput, readableBounds: logicalOutput) { position in
+        let sample = backdrop.sample(at: position)
+        switch sample {
+        case .empty: return .empty
+        case .glyph(let glyph):
+          return glyph.width <= logicalOutput.maxX - position.x ? sample : .empty
+        case .continuation(let back):
+          guard back <= position.x - logicalOutput.origin.x,
+            let glyph = backdrop.glyph(occupying: position),
+            glyph.width - back <= logicalOutput.maxX - position.x
+          else { return .empty }
+          return sample
+        }
+      }
+    } else if Self.boundedSurfaceSize(input.size, maximum: nil) != input.size {
       let cache = RasterCellSourceTiles()
       tiles = cache
       source = CellLayer(bounds: localSource, readableBounds: localSource) { position in
@@ -97,22 +120,60 @@ extension Rasterizer {
       if let tiles { visibleIdentities.formUnion(tiles.visibleIdentities) }
     }
 
+    let evaluate: (CellPoint) -> CellCompositeResult
+    switch pass.shader.program {
+    case .source(let shade):
+      evaluate = { point in
+        let input = source.restricted(
+          to: pass.offset.window(around: point, in: source.bounds), pass: pass)
+        let sample = shade(point, input, context)
+        if sample == .empty && !pass.targetsBackdrop { return .keepDestination }
+        return .replace(sample)
+      }
+    case .composite(let composite):
+      let lower = pass.targetsBackdrop ? source : backdrop
+      evaluate = { point in
+        composite(
+          point,
+          source.restricted(to: pass.offset.window(around: point, in: source.bounds), pass: pass),
+          lower.restricted(to: pass.offset.window(around: point, in: lower.bounds), pass: pass),
+          context)
+      }
+    case .ordered(let apply):
+      let read: CellRect
+      switch pass.offset {
+      case .layerBounds: read = source.bounds
+      case .cells(let x, let y):
+        read = CellDrawingRegion.outset(x: x, y: y).bounds(
+          source: logicalOutput, viewport: source.bounds)
+      }
+      let input = source.restricted(to: read, pass: pass)
+      var buffer = CellEffectBuffer(bounds: logicalOutput, source: input)
+      apply(input, &buffer, context)
+      let result = buffer.snapshot()
+      evaluate = { point in
+        let sample = result.sample(at: point)
+        if sample == .empty && !pass.targetsBackdrop { return .keepDestination }
+        return .replace(sample)
+      }
+    }
+
     for localY in output.origin.y..<output.maxY {
       let y = localY + origin.y
       if let dirtyRows, !dirtyRows.contains(y) { continue }
       var claimedUntil = output.origin.x
       for localX in output.origin.x..<output.maxX {
         let position = CellPoint(x: localX, y: localY)
-        let window = pass.offset.window(around: position, in: source.bounds)
-        let lower =
-          pass.shader.readsBackdrop
-          ? backdrop.restricted(
-            to: pass.offset.window(around: position, in: backdrop.bounds), pass: pass)
-          : backdrop
-        let sample = pass.shader.raster(
-          position, source.restricted(to: window, pass: pass), lower, context)
-        guard localX >= claimedUntil, case .glyph(let glyph) = sample,
-          glyph.width > 0, glyph.width <= output.maxX - localX, glyph.paint.coverage > 0
+        guard case .replace(let sample) = evaluate(position), localX >= claimedUntil else {
+          continue
+        }
+        if case .empty = sample {
+          clearExistingGlyph(
+            atX: localX + origin.x, y: y, cells: &cells, capture: recorder?.cellCapture)
+          continue
+        }
+        guard case .glyph(let glyph) = sample, glyph.width > 0,
+          glyph.width <= output.maxX - localX, glyph.paint.coverage > 0
         else { continue }
         let x = localX + origin.x
         var ink = glyph.paint.foreground.color(in: context.appearance)
@@ -138,6 +199,12 @@ extension Rasterizer {
         if fraction == 1 || deferCoverage {
           result.foregroundPaletteIndex = glyph.paint.foreground.paletteIndex
           result.backgroundPaletteIndex = glyph.paint.background.paletteIndex
+        }
+        // A compositing result already names the final channels. Retaining
+        // the old style here would blend it a second time or turn a requested
+        // default channel back into the previous foreground/background.
+        if pass.targetsBackdrop || pass.shader.readsBackdrop, blendMode == nil {
+          clearExistingGlyph(atX: x, y: y, cells: &cells, capture: recorder?.cellCapture)
         }
         write(
           glyph.character, width: glyph.width, style: result.isDefault ? nil : result,

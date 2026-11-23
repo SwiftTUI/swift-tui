@@ -15,4 +15,17 @@ extension View {
   ) -> some View {
     layerEffect(CellLayerShader(shade), maxSampleOffset: maxSampleOffset, isEnabled: isEnabled)
   }
+
+  /// Transforms the selected lower paint immediately before drawing this view.
+  public func backdropEffect(
+    _ shader: CellLayerShader, in region: CellDrawingRegion,
+    maxSampleOffset: CellSampleOffset, isEnabled: Bool = true
+  ) -> some View {
+    modifier(
+      DrawEffectModifier(
+        effect: isEnabled
+          ? .cellLayer(
+            .init(shader.drawing(in: region), offset: maxSampleOffset, targetsBackdrop: true))
+          : nil))
+  }
 }
