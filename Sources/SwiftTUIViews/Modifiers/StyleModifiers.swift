@@ -1406,6 +1406,21 @@ extension View {
     )
   }
 
+  /// Applies a shader to this stroke at its normal paint position. Its source
+  /// contains only the cells actually written by the border, including joins.
+  public func border<S: ShapeStyle>(
+    _ style: S = SemanticShapeStyle.foreground,
+    style strokeStyle: StrokeStyle = .init(),
+    placement: BorderPlacement = .inset, sides: Edge.Set = .all,
+    effect shader: CellLayerShader, maxSampleOffset: CellSampleOffset, isEnabled: Bool = true
+  ) -> some View {
+    borderModified(
+      set: strokeStyle.borderSet, placement: placement,
+      foreground: BorderEdgeStyle(AnyShapeStyle(style)), background: nil, blend: nil,
+      blendPhase: 0, sides: sides, stroke: strokeStyle,
+      effect: isEnabled ? .init(shader, offset: maxSampleOffset) : nil)
+  }
+
   /// Draws a border around this view using a per-side foreground style.
   ///
   /// Stack single-side borders. Line strokes that share a cell join, so the
@@ -1512,7 +1527,7 @@ extension View {
     blend: BorderBlend?,
     blendPhase: Double,
     sides: Edge.Set,
-    stroke: StrokeStyle? = nil
+    stroke: StrokeStyle? = nil, effect: CellEffectPass? = nil
   ) -> some View {
     modifier(
       BorderModifier(
@@ -1523,7 +1538,7 @@ extension View {
         blend: blend,
         blendPhase: blendPhase,
         sides: sides,
-        stroke: stroke
+        stroke: stroke, effect: effect
       )
     )
   }

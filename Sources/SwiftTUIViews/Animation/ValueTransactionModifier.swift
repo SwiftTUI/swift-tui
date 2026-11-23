@@ -288,7 +288,7 @@ package struct ValueGateRecords {
   /// output `owner` committed last (a branch content without a node of its
   /// own). A branch that was replaced by its sibling is in neither.
   @MainActor
-  private static func isLive(
+  static func isLive(
     _ identity: Identity,
     owner: SwiftTUICore.ViewNode,
     in viewGraph: ViewGraph

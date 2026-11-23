@@ -1,5 +1,6 @@
 /// Converts draw commands into a terminal cell surface.
 package struct Rasterizer: Sendable {
+  package var cellPreparationFrame: CellPreparationFrame?
   /// Hosts supply one cached, true-color cell projection for sampled images.
   package var effectImageProjection:
     (@Sendable (RasterImageAttachment, Color) -> (bounds: CellRect, cells: [[RasterCell?]])?)?
@@ -203,6 +204,14 @@ package struct Rasterizer: Sendable {
     verifyIncrementalRasterDamage: Bool = false,
     translation: RasterTranslationPlan? = nil
   ) -> RasterizationResult {
+    if draw.subtreeHasPreparedCells, cellPreparationFrame == nil {
+      var frame = self
+      frame.cellPreparationFrame = .init(at: .now())
+      return frame.rasterizeCollectingVisibleIdentities(
+        draw, minimumSize: minimumSize,
+        maximumSize: maximumSize, previousSurface: previousSurface, damage: damage,
+        verifyIncrementalRasterDamage: verifyIncrementalRasterDamage, translation: translation)
+    }
     let surfaceSize = rasterSurfaceSize(
       for: draw, minimumSize: minimumSize, maximumSize: maximumSize)
     guard surfaceSize.width > 0, surfaceSize.height > 0 else {
@@ -270,7 +279,7 @@ package struct Rasterizer: Sendable {
 
   private func rasterizeFreshCollectingVisibleIdentities(
     _ draw: DrawNode,
-    surfaceSize: CellSize
+    surfaceSize: CellSize, includeUnknown: Bool = true
   ) -> RasterizationResult {
     var cells = Array(
       repeating: Array(repeating: RasterCell.empty, count: surfaceSize.width),
@@ -281,7 +290,8 @@ package struct Rasterizer: Sendable {
     let presentationRecorder = RasterPresentationLayerRecorder()
     if draw.subtreeHasCellEffect {
       presentationRecorder.cellCapture = RasterCellCapture(size: surfaceSize)
-      presentationRecorder.backdropImages = backdropImagePlan(for: draw, size: surfaceSize)
+      presentationRecorder.backdropImages = backdropImagePlan(
+        for: draw, size: surfaceSize, includeUnknown: includeUnknown)
     }
 
     paint(
@@ -295,6 +305,12 @@ package struct Rasterizer: Sendable {
       presentationRecorder: presentationRecorder,
       lineArms: LineArmsTable()
     )
+    if presentationRecorder.backdropImages?.needsPreparationReplay == true {
+      // The returned shader determines which lower images it can read. Paint
+      // again with the immutable receipt to restore every unrelated placement.
+      return rasterizeFreshCollectingVisibleIdentities(
+        draw, surfaceSize: surfaceSize, includeUnknown: false)
+    }
     RasterImageOcclusion.apply(
       to: &imageAttachments,
       layers: presentationRecorder.layers
@@ -433,6 +449,10 @@ package struct Rasterizer: Sendable {
       layers: presentationRecorder.layers
     )
 
+    if presentationRecorder.backdropImages?.needsPreparationReplay == true {
+      return rasterizeFreshCollectingVisibleIdentities(
+        draw, surfaceSize: surfaceSize, includeUnknown: false)
+    }
     let surface = RasterSurface(
       size: surfaceSize,
       cells: cells,

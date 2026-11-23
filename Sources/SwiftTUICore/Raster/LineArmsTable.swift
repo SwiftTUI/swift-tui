@@ -36,6 +36,21 @@ internal final class LineArmsTable {
 
   internal init() {}
 
+  /// Track joins tentatively until the shader emits the corresponding stroke.
+  func snapshot() -> LineArmsTable {
+    let copy = LineArmsTable()
+    copy.entries = entries
+    return copy
+  }
+
+  func adopt(_ source: LineArmsTable, at point: CellPoint, matching glyph: Character?) {
+    if let entry = source.entries[point], entry.glyph == glyph {
+      entries[point] = entry
+    } else {
+      entries[point] = nil
+    }
+  }
+
   /// The glyph a stroke draws in a cell, merged with any line stroke that drew
   /// there earlier in the pass.
   ///

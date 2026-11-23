@@ -183,6 +183,11 @@ private struct _AnimatableBox<T: Animatable & Equatable & Sendable>: _AnyAnimata
     // A text roll carries two strings and a phase; its `animatableData` is
     // the phase alone, so the generic path would drop the string it rolls
     // from. Route through the value's own roll so the sample keeps both.
+    if let from = value as? CellPlacementValue, var to = other.value as? CellPlacementValue {
+      to.previous = from.current
+      to.animatableData = t
+      return AnyAnimatable(to)
+    }
     if let selfRoll = value as? TextRollValue,
       let otherRoll = other.value as? TextRollValue
     {
@@ -224,7 +229,7 @@ private struct _AnimatableBox<T: Animatable & Equatable & Sendable>: _AnyAnimata
     else {
       return nil
     }
-    if value is TileStyle || value is TextRollValue
+    if value is TileStyle || value is TextRollValue || value is CellPlacementValue
       || animatableStructureDiffers(axisFrom.value, axisTo.value)
     {
       return nil

@@ -57,6 +57,7 @@ package enum AnimatableSlot: Hashable, Sendable {
   case clipShapePaths
   /// A `Text` node's content-transition roll (`TextRollValue`).
   case textRoll
+  case cellPlacement
   /// The `animatableData` of a shape that conforms to `Animatable`, drawn by
   /// a fill or a stroke (an `AnimatableShapeData`). A sample is turned back
   /// into geometry by the shape itself, on the main actor, and written where

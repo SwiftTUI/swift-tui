@@ -237,7 +237,7 @@ extension Rasterizer {
             blendMode: outputContext.activeBlendMode, effects: outputContext.presentationEffects,
             dirtyRows: outputContext.dirtyRows, cells: &cells,
             visibleIdentities: &visibleIdentities,
-            recorder: presentationRecorder)
+            recorder: presentationRecorder, lineArms: lineArms)
           if pass.targetsBackdrop {
             stack.append(.visit(node: source, context: outputContext))
           }

@@ -290,8 +290,12 @@ struct FrameTailInlineStageRenderer: Sendable {
   ) -> FrameTailRasterOutput {
     beforeRaster?()
     let previousSurface = input.retained.previousRasterSurface
+    var renderer = rasterizer
+    if draw.subtreeHasPreparedCells {
+      renderer.cellPreparationFrame = CellPreparationFrame(at: input.cellSampleInstant)
+    }
     let (rasterized, duration) = measurePhase(clock: clock) {
-      rasterizer.rasterizeCollectingVisibleIdentities(
+      renderer.rasterizeCollectingVisibleIdentities(
         draw,
         minimumSize: minimumRasterSurfaceSize(for: input.proposal),
         maximumSize: input.boundsRasterSurfaceToProposal

@@ -93,6 +93,7 @@ public struct ResolveContext: Equatable, Sendable {
   /// direct field: it resets at every identity boundary, a chain's copy of
   /// the context carries it forward, and it is excluded from `Equatable`.
   package var animatableSiteOrdinalCursor: Int = 0
+  package var cellPreparationOrdinal: Int = 0
   /// True for the resolve of a view whose `animatableData` an enclosing
   /// `ModifiedContent` already presents as part of its own. The view is then
   /// not a site: the outermost conformer animates the whole value. One-shot,

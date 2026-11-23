@@ -72,6 +72,7 @@ package struct DrawMetadata: Equatable, Sendable {
     var borderShapeStyle: AnyShapeStyle?
     var borderStrokeStyle: StrokeStyle?
     var layoutBorderStroke: StrokeStyle?
+    var layoutBorderEffect: CellEffectPass?
     var scrollIndicatorAxes: AxisSet?
     var focusedScrollIndicatorAxes: AxisSet?
     var scrollIndicatorForegroundStyle: AnyShapeStyle?
@@ -335,6 +336,12 @@ package struct DrawMetadata: Equatable, Sendable {
   package var borderStrokeStyle: StrokeStyle? {
     get { heavyFields.value.borderStrokeStyle }
     set { heavyFields.value.borderStrokeStyle = newValue }
+  }
+
+  /// An optional shader bound to the native layout border at its own paint position.
+  package var layoutBorderEffect: CellEffectPass? {
+    get { heavyFields.value.layoutBorderEffect }
+    set { heavyFields.value.layoutBorderEffect = newValue }
   }
 
   /// How a `LayoutBehavior.border` is drawn: its join, its dash and its dash

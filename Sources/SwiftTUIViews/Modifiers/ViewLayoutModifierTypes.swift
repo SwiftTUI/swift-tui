@@ -175,6 +175,7 @@ public struct BorderModifier: IterativePrimitiveViewModifier, Sendable, Equatabl
   /// The join, the dash and the dash phase. `nil` draws a solid border with
   /// the palette's own corners.
   package var stroke: StrokeStyle? = nil
+  package var effect: CellEffectPass? = nil
 
   @inline(never)
   package func makeResolveWork<Base: View>(
@@ -183,6 +184,7 @@ public struct BorderModifier: IterativePrimitiveViewModifier, Sendable, Equatabl
   ) -> ResolveWork<[ResolvedNode]> {
     var drawMetadata = DrawMetadata()
     drawMetadata.layoutBorderStroke = stroke
+    drawMetadata.layoutBorderEffect = effect
     return resolveModifierContent(
       content,
       in: context.child(component: .named("content"))

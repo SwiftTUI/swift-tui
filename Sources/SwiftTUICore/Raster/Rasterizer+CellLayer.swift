@@ -4,7 +4,8 @@ extension Rasterizer {
   func paintCellLayer(
     _ node: DrawNode, pass: CellEffectPass, clip: CellRect?, blendMode: BlendMode?,
     effects: [DrawEffect], dirtyRows: Set<Int>?, cells: inout [[RasterCell]],
-    visibleIdentities: inout Set<Identity>, recorder: RasterPresentationLayerRecorder?
+    visibleIdentities: inout Set<Identity>, recorder: RasterPresentationLayerRecorder?,
+    lineArms: LineArmsTable? = nil
   ) {
     guard !node.bounds.isEmpty else { return }
     let size = CellSize(width: cells.first?.count ?? 0, height: cells.count)
@@ -57,29 +58,40 @@ extension Rasterizer {
     // Reuse absolute coordinates for an on-screen capture. For off-screen
     // content the scratch origin travels to the needed source rectangle.
     let input: CellRect
-    switch pass.offset {
-    case .layerBounds: input = sourceBounds
-    case .cells(let dx, let dy):
-      // A read at a continuation also needs the lead just outside the window.
-      let reach = CellDrawingRegion.outset(x: SaturatingConversion.adding(max(0, dx), 2), y: dy)
-      let readOutput: CellRect
-      if case .ordered = pass.shader.program {
-        readOutput = logicalOutput
-      } else {
-        readOutput = output
+    if case .prepared = pass.shader.program {
+      input = sourceBounds
+    } else {
+      switch pass.offset {
+      case .layerBounds: input = sourceBounds
+      case .cells(let dx, let dy):
+        // A read at a continuation also needs the lead just outside the window.
+        let reach = CellDrawingRegion.outset(x: SaturatingConversion.adding(max(0, dx), 2), y: dy)
+        let readOutput: CellRect
+        if case .ordered = pass.shader.program {
+          readOutput = logicalOutput
+        } else {
+          readOutput = output
+        }
+        let readBounds = reach.bounds(source: readOutput, viewport: localSource)
+        input = .init(
+          origin: .init(
+            x: SaturatingConversion.adding(origin.x, readBounds.origin.x),
+            y: SaturatingConversion.adding(origin.y, readBounds.origin.y)), size: readBounds.size)
       }
-      let readBounds = reach.bounds(source: readOutput, viewport: localSource)
-      input = .init(
-        origin: .init(
-          x: SaturatingConversion.adding(origin.x, readBounds.origin.x),
-          y: SaturatingConversion.adding(origin.y, readBounds.origin.y)), size: readBounds.size)
     }
     let captureBounds = sourceBounds
     let tiles: RasterCellSourceTiles?
-    let source: CellLayer
+    let capture: CellLayer
+    let strokeArms = node.metadata.layoutBorderEffect == nil ? nil : lineArms?.snapshot()
+    let visibleStroke = strokeArms.map { arms in
+      captureSourceTile(
+        node: node, sourceBounds: captureBounds, viewport: viewport,
+        targetOrigin: targetOrigin, backdrop: backdrop, tile: surface,
+        visibleIdentities: &visibleIdentities, strokeBackdrop: cells, strokeArms: arms)
+    }
     if pass.targetsBackdrop {
       tiles = nil
-      source = CellLayer(bounds: logicalOutput, readableBounds: logicalOutput) { position in
+      capture = CellLayer(bounds: logicalOutput, readableBounds: logicalOutput) { position in
         let sample = backdrop.sample(at: position)
         switch sample {
         case .empty: return .empty
@@ -96,7 +108,7 @@ extension Rasterizer {
     } else if Self.boundedSurfaceSize(input.size, maximum: nil) != input.size {
       let cache = RasterCellSourceTiles()
       tiles = cache
-      source = CellLayer(bounds: localSource, readableBounds: localSource) { position in
+      capture = CellLayer(bounds: localSource, readableBounds: localSource) { position in
         cache.sample(position, in: localSource) { tile, identities in
           let absolute = CellRect(
             origin: .init(
@@ -111,19 +123,71 @@ extension Rasterizer {
     } else {
       tiles = nil
       let tile = input.intersection(surface) == input ? surface : input
-      source = captureSourceTile(
-        node: node, sourceBounds: captureBounds, viewport: viewport,
-        targetOrigin: targetOrigin, backdrop: backdrop, tile: tile,
-        visibleIdentities: &visibleIdentities)
+      if tile == surface, let visibleStroke {
+        capture = visibleStroke
+      } else {
+        capture = captureSourceTile(
+          node: node, sourceBounds: captureBounds, viewport: viewport,
+          targetOrigin: targetOrigin, backdrop: backdrop, tile: tile,
+          visibleIdentities: &visibleIdentities)
+      }
+    }
+    let source: CellLayer
+    if let visibleStroke {
+      let onSurface = surface.relative(to: origin)
+      source = CellLayer(bounds: localSource, readableBounds: localSource) { point in
+        onSurface.contains(point) ? visibleStroke.sample(at: point) : capture.sample(at: point)
+      }
+    } else {
+      source = capture
     }
     defer {
       if let tiles { visibleIdentities.formUnion(tiles.visibleIdentities) }
     }
 
-    compositeCellLayer(
+    evaluateCellPass(
       node, pass: pass, source: source, backdrop: backdrop, context: context,
-      output: output, target: target, blendMode: blendMode, effects: effects,
-      dirtyRows: dirtyRows, cells: &cells, recorder: recorder)
+      output: output, domain: clippedDomain.relative(to: origin), target: target,
+      blendMode: blendMode, effects: effects, dirtyRows: dirtyRows, cells: &cells,
+      recorder: recorder,
+      joins: strokeArms.flatMap { scratch in lineArms.map { ($0, scratch) } })
+  }
+
+  private func evaluateCellPass(
+    _ node: DrawNode, pass: CellEffectPass, source: CellLayer, backdrop: CellLayer,
+    context: CellEffectContext, output: CellRect, domain: CellRect, target: CellRect,
+    blendMode: BlendMode?, effects: [DrawEffect], dirtyRows: Set<Int>?, cells: inout [[RasterCell]],
+    recorder: RasterPresentationLayerRecorder?, joins: (LineArmsTable, LineArmsTable)?
+  ) {
+    var resolved = pass
+    var effective = context
+    var writeBounds = output
+    if case .prepared(let prepare) = pass.shader.program {
+      let geometry = CellEffectContext(
+        sourceBounds: source.bounds,
+        outputBounds: source.bounds.intersection(context.viewport) ?? .zero,
+        viewport: context.viewport,
+        originInRoot: context.originInRoot, appearance: context.appearance,
+        cellPixelMetrics: context.cellPixelMetrics)
+      let shader = prepare(source, geometry, cellPreparationFrame ?? .init(at: .now()))
+      resolved = .init(shader, offset: pass.offset)
+      let bounds = shader.region.bounds(
+        source: source.bounds,
+        viewport: shader.region == .viewport ? context.viewport : domain)
+      guard let visible = bounds.intersection(target.relative(to: node.bounds.origin)) else {
+        return
+      }
+      writeBounds = visible
+      effective = .init(
+        sourceBounds: source.bounds, outputBounds: bounds, viewport: context.viewport,
+        originInRoot: context.originInRoot, appearance: context.appearance,
+        cellPixelMetrics: context.cellPixelMetrics)
+    }
+    compositeCellLayer(
+      node, pass: resolved, source: source, backdrop: backdrop,
+      context: effective, output: writeBounds, target: target, blendMode: blendMode,
+      effects: effects,
+      dirtyRows: dirtyRows, cells: &cells, recorder: recorder, joins: joins)
   }
 
   // Source capture above can recursively enter another effect on a 512 KiB
@@ -132,12 +196,15 @@ extension Rasterizer {
     _ node: DrawNode, pass: CellEffectPass, source: CellLayer, backdrop: CellLayer,
     context: CellEffectContext, output: CellRect, target: CellRect, blendMode: BlendMode?,
     effects: [DrawEffect], dirtyRows: Set<Int>?, cells: inout [[RasterCell]],
-    recorder: RasterPresentationLayerRecorder?
+    recorder: RasterPresentationLayerRecorder?, joins: (LineArmsTable, LineArmsTable)?
   ) {
     let logicalOutput = context.outputBounds
     let origin = node.bounds.origin
     let evaluate: (CellPoint) -> CellCompositeResult
     switch pass.shader.program {
+    case .placement, .prepared:
+      // Descriptors are resolved at placement or before compositing.
+      return
     case .source(let shade):
       evaluate = { point in
         let input = source.restricted(
@@ -184,6 +251,9 @@ extension Rasterizer {
           continue
         }
         if case .empty = sample {
+          if let (targetArms, tentative) = joins {
+            targetArms.adopt(tentative, at: .init(x: localX + origin.x, y: y), matching: nil)
+          }
           clearExistingGlyph(
             atX: localX + origin.x, y: y, cells: &cells, capture: recorder?.cellCapture)
           continue
@@ -213,6 +283,11 @@ extension Rasterizer {
           hyperlink: node.isTransient ? nil : glyph.link?.rawValue, atX: x, y: y, cells: &cells,
           clip: target,
           blendMode: blendMode, presentationRecorder: recorder, presentationEffects: effects)
+        if let (targetArms, tentative) = joins {
+          let isOriginal = source.glyph(occupying: position)?.character == glyph.character
+          targetArms.adopt(
+            tentative, at: .init(x: x, y: y), matching: isOriginal ? glyph.character : nil)
+        }
         if fraction < 1 && deferCoverage {
           recorder?.cellCapture?.fractionalCoverage[.init(x: x, y: y)] = fraction
         }

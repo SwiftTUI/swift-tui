@@ -228,3 +228,34 @@ input layers initially represent the designated lower region. Higher siblings
 paint afterwards. An image intersecting a backdrop read contributes its
 cell fallback at the original image command. The remainder retains its native
 placement. Disabling the descriptor restores the ordinary image path.
+
+## Keep state across samples
+
+A `CellPreparedLayerKernel` owns its `State` for the lifetime of the mounted
+effect. Return the initial value from `makeState()`. In
+`prepare(_:source:context:)`, advance it using `context.delta` and return a
+shader that captures immutable values for this sample. The first call has
+zero elapsed time, zero delta and no previous bounds. A later call includes
+all time since the previous sample and the previous source bounds. A retry at
+the same logical time reuses the prepared shader. The source may be retained
+as an immutable snapshot. Drive the samples with your animation or timeline.
+
+## Draw a change of placement
+
+`placementEffect(maxSampleOffset:isEnabled:_:)` receives the previous and new
+layout rectangles of a view within the same parent. Its shader reads the new
+layout. Subtract the new origin from the previous origin for the displacement
+at the start. A spring can supply progress outside zero through one.
+Use `.drawing(in: .viewport)` when the flight leaves the view's bounds.
+A view at rest draws normally.
+
+## Shade a border stroke
+
+Pass a `CellLayerShader` to the stroke-style border. The shader receives the
+actual stroke glyphs, including joined line arms. Dash gaps and cells occupied
+only by the content are holes. A title overlaid on the border paints afterwards.
+
+```swift
+Text("Status").padding()
+  .border(Color.cyan, style: .rounded, effect: strokeShader, maxSampleOffset: .zero)
+```

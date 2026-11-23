@@ -1,6 +1,27 @@
 @_spi(Testing) package import SwiftTUICore
 package import SwiftTUIViews
 
+struct CellPlacementParent {
+  let identity: Identity
+  let nodeID: ViewNodeID?
+  let origin: CellPoint
+}
+
+struct CellPlacementValue: Animatable, Equatable, Sendable {
+  let parent: Identity?
+  let parentID: ViewNodeID?
+  let site: ViewNodeID?
+  let viewport: CellSize
+  let current: CellRect
+  var previous: CellRect? = nil
+  var animatableData = 1.0
+
+  func sharesSpace(with other: Self) -> Bool {
+    parent == other.parent && parentID == other.parentID && site == other.site
+      && viewport == other.viewport
+  }
+}
+
 package struct PlacedAnimationOverlaySnapshot: Sendable {
   package var removalOverlays: [PlacedRemovalOverlaySnapshot]
   package var insertionOffsets: [PlacedAnimationOverlayOffset]
@@ -14,6 +35,7 @@ package struct PlacedAnimationOverlaySnapshot: Sendable {
   package var adoptionOffsets: [PlacedAnimationOverlayOffset]
   /// Current text samples, including at-rest values that clear a cached roll.
   package var textRolls: [Identity: TextRollValue]
+  package var placements: [Identity: CellPlacementContext] = [:]
   package var tintStyles: [Identity: AnyShapeStyle]
 
   package init(
@@ -46,7 +68,7 @@ package struct PlacedAnimationOverlaySnapshot: Sendable {
   /// same way on every frame with the same layout and takes the incremental
   /// path.
   package var hasTransientDecoration: Bool {
-    !removalOverlays.isEmpty
+    !removalOverlays.isEmpty || !placements.isEmpty
       || !insertionOffsets.isEmpty
       || !insertionScales.isEmpty
       || !matchedGeometryOffsets.isEmpty
@@ -121,8 +143,15 @@ package func applyPlacedAnimationOverlaySnapshot(
   _ snapshot: PlacedAnimationOverlaySnapshot,
   to tree: inout PlacedNode
 ) {
-  if !snapshot.textRolls.isEmpty || !snapshot.tintStyles.isEmpty {
+  if !snapshot.textRolls.isEmpty || !snapshot.tintStyles.isEmpty || !snapshot.placements.isEmpty {
     func applyText(to node: inout PlacedNode) {
+      if let placement = snapshot.placements[node.identity], node.drawEffects.hasPlacement {
+        node.drawEffects.ordered = node.drawEffects.ordered.map { effect in
+          guard case .cellLayer(let pass) = effect, case .placement(let make) = pass.shader.program
+          else { return effect }
+          return .cellLayer(.init(make(placement), offset: pass.offset))
+        }
+      }
       if let roll = snapshot.textRolls[node.identity] {
         node.drawMetadata.textRoll = roll
       }

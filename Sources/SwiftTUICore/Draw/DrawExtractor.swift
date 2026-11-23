@@ -198,7 +198,7 @@ extension DrawExtractor {
     let bounds = projection.bounds
     let layoutMetadata = projection.layoutMetadata
     let drawMetadata = projection.drawMetadata
-    let drawEffects = projection.drawEffects
+    let drawEffects = projection.drawEffects.removingIdlePlacement
     let drawPayload = projection.drawPayload
     // The multiplicative cascade: every command this node emits carries the
     // product of the ancestor chain's `.opacity` factors including its own.
@@ -440,6 +440,7 @@ extension DrawExtractor {
     // `postCommands` so the rasterizer's paint walk visits them after
     // the subtree has been fully drawn.
     var postCommands: [DrawCommand] = []
+    var isolatedBorder: (node: DrawNode, placement: BorderPlacement)?
     if drawMetadata.scrollIndicatorAppearance?.reservesSpace == false {
       // An overlaid thumb paints after content so text cannot erase it.
       postCommands.append(contentsOf: indicatorCommands)
@@ -491,7 +492,17 @@ extension DrawExtractor {
         blendPhase: blendPhase,
         sides: sides
       )
-      if placement == .inset {
+      if let pass = drawMetadata.layoutBorderEffect {
+        var metadata = DrawMetadata()
+        metadata.layoutBorderEffect = pass
+        isolatedBorder = (
+          DrawNode(
+            identity: identity.child(.named("borderStroke")),
+            environmentSnapshot: environmentSnapshot, bounds: bounds, metadata: metadata,
+            drawEffects: .init([.cellLayer(pass)]), commands: [borderCommand],
+            isTransient: projection.isTransient), placement
+        )
+      } else if placement == .inset {
         postCommands.append(borderCommand)
       } else {
         commands.append(borderCommand)
@@ -537,6 +548,13 @@ extension DrawExtractor {
         clipBounds.map {
           $0.intersection(maskBounds) ?? CellRect(origin: bounds.origin, size: .zero)
         } ?? maskBounds
+    }
+    if paints, let border = isolatedBorder {
+      if border.placement == .inset {
+        clippedChildNodes.append(border.node)
+      } else {
+        clippedChildNodes.insert(border.node, at: 0)
+      }
     }
     return DrawNode(
       viewNodeID: projection.viewNodeID,

@@ -34,6 +34,11 @@ private final class ClosureKey: ShaderKey {
   func matches(_ other: any ShaderKey) -> Bool { self === other }
 }
 
+private struct PreparedKey<K: CellPreparedLayerKernel>: Equatable, Sendable {
+  let kernel: K
+  let run: ObjectIdentifier
+}
+
 private final class KernelKey<K: Equatable & Sendable>: ShaderKey {
   let value: K
   init(_ value: K) { self.value = value }
@@ -57,13 +62,17 @@ public struct CellLayerShader: Equatable, Sendable {
     case source(Function)
     case composite(CompositingFunction)
     case ordered(RegionFunction)
+    case prepared(any CellPreparationBinding)
+    case placement(@Sendable (CellPlacementContext) -> CellLayerShader)
   }
   private let key: any ShaderKey
   package let program: Program
   package private(set) var region: CellDrawingRegion = .source
   package var readsBackdrop: Bool {
-    if case .composite = program { return true }
-    return false
+    switch program {
+    case .composite, .prepared: return true
+    default: return false
+    }
   }
 
   private init(key: any ShaderKey, program: Program) {
@@ -77,6 +86,17 @@ public struct CellLayerShader: Equatable, Sendable {
 
   public init(_ shade: @escaping Function) {
     self.init(key: ClosureKey(), program: .source(shade))
+  }
+
+  package init<K: CellPreparedLayerKernel>(preparing kernel: K, run: CellPreparationRun<K>) {
+    self.init(
+      key: KernelKey(PreparedKey(kernel: kernel, run: ObjectIdentifier(run))),
+      program: .prepared(MountedCellPreparation(kernel: kernel, run: run)))
+    region = .viewport
+  }
+
+  package init(placement: @escaping @Sendable (CellPlacementContext) -> CellLayerShader) {
+    self.init(key: ClosureKey(), program: .placement(placement))
   }
 
   /// Composites the source against the current lower paint.
@@ -107,7 +127,9 @@ public struct CellLayerShader: Equatable, Sendable {
   public static func == (lhs: Self, rhs: Self) -> Bool {
     guard lhs.key.matches(rhs.key), lhs.region == rhs.region else { return false }
     switch (lhs.program, rhs.program) {
-    case (.source, .source), (.composite, .composite), (.ordered, .ordered): return true
+    case (.source, .source), (.composite, .composite), (.ordered, .ordered), (.prepared, .prepared),
+      (.placement, .placement):
+      return true
     default: return false
     }
   }

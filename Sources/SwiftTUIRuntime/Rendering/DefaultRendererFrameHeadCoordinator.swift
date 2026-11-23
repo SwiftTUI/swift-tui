@@ -160,6 +160,8 @@ struct DefaultRendererFrameHeadCoordinator {
       viewGraph.resolveDiagnostics.takeLifetimeAnchorTallies()
     )
 
+    var frameTailInput = frameProducts.frameTailInput
+    frameTailInput.cellSampleInstant = frameInstant
     return FrameHeadDraft(
       clock: clock,
       renderGeneration: renderGeneration,
@@ -167,7 +169,7 @@ struct DefaultRendererFrameHeadCoordinator {
       resolveContext: resolveContext,
       graphRootIdentity: portal.graphRootIdentity,
       frameContext: frameProducts.frameContext,
-      frameTailInput: frameProducts.frameTailInput,
+      frameTailInput: frameTailInput,
       runtimeIssues: [],
       animationTimestamp: frameInstant,
       resolveDuration: resolvedHead.resolveDuration,

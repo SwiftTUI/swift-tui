@@ -80,6 +80,33 @@ struct FrameTailWalkerStackSafetyTests {
     #expect(result.withLock { $0 } == ["OK"])
   }
 
+  @Test("Eight independent prepared layers paint on the frame-tail worker stack")
+  func nestedPreparedCellPasses() async {
+    struct Copy: CellPreparedLayerKernel {
+      func makeState() -> Int { 0 }
+      func prepare(_ state: inout Int, source: CellLayer, context: CellPreparationContext)
+        -> CellLayerShader
+      {
+        state += 1
+        return CellLayerShader { point, input, _ in input.sample(at: point) }
+      }
+    }
+    let bounds = CellRect(origin: .zero, size: .init(width: 4, height: 1))
+    let effects: [DrawEffect] = (0..<8).map { _ in
+      .cellLayer(.init(.init(preparing: Copy(), run: CellPreparationRun()), offset: .zero))
+    }
+    let leaf = DrawNode(
+      identity: testIdentity("stack", "prepared"), bounds: bounds,
+      drawEffects: .init(effects),
+      commands: [TextPaintFamily.plain.command(bounds: bounds, lines: ["OK"])])
+    let result = Mutex<[String]>([])
+    await runOnSmallStack {
+      let surface = Rasterizer().rasterize(leaf)
+      result.withLock { $0 = surface.lines }
+    }
+    #expect(result.withLock { $0 } == ["OK"])
+  }
+
   // MARK: - Fixtures
 
   /// A single-child chain of `depth` nodes, the shape a node-hosted collection

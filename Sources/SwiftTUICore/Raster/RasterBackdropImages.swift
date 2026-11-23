@@ -35,6 +35,7 @@ final class RasterBackdropImages {
     }
   }
 
+  fileprivate(set) var needsPreparationReplay = false
   private let surface: CellRect
 
   fileprivate init(surface: CellRect) { self.surface = surface }
@@ -62,7 +63,9 @@ final class RasterBackdropImages {
 }
 
 extension Rasterizer {
-  func backdropImagePlan(for draw: DrawNode, size: CellSize) -> RasterBackdropImages? {
+  func backdropImagePlan(for draw: DrawNode, size: CellSize, includeUnknown: Bool = true)
+    -> RasterBackdropImages?
+  {
     guard draw.subtreeHasCellEffect, hasImageCommands(draw) else { return nil }
     final class Target { var lower: [Int] = [] }
     enum Event {
@@ -109,12 +112,24 @@ extension Rasterizer {
             stack.append(.flatten(group, into: target))
             stack.append(.visit(node, clip, group, native: native))
           case .cellLayer(let pass):
-            if !node.bounds.isEmpty, pass.targetsBackdrop || pass.shader.readsBackdrop {
+            var shader = pass.shader
+            if case .prepared(let binding) = shader.program, !target.lower.isEmpty {
+              if let frame = cellPreparationFrame, let ready = binding.cached(in: frame) {
+                shader = ready
+              } else if includeUnknown {
+                plan.needsPreparationReplay = true
+              } else {
+                // No sample was produced in the conservative pass (e.g. an empty mask).
+                stack.append(.visit(node, clip, target, native: false))
+                continue
+              }
+            }
+            if !node.bounds.isEmpty, pass.targetsBackdrop || shader.readsBackdrop {
               var bounds = node.subtreeHasCellEffect ? node.subtreeBounds : node.bounds
               if node.subtreeDrawsInViewport { bounds = bounds.union(clip) }
               let origin = node.bounds.origin
               let viewport = clip.relative(to: origin)
-              let output = pass.shader.region.bounds(
+              let output = shader.region.bounds(
                 source: bounds.relative(to: origin), viewport: viewport)
               if !output.isEmpty {
                 let region: CellRect

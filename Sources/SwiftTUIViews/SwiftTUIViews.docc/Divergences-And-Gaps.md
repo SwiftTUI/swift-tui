@@ -869,6 +869,15 @@ are omitted even when SwiftUI exposes a corresponding API.
   An explicit compositing group limits which lower layers it can see.
   See <doc:Cell-Effects>.
 
+- **A view can shade its change of placement.** *Ratified.*
+  SwiftTUI's `placementEffect` receives parent-relative layout rectangles and
+  the progress of the transaction that moved the mounted view. SwiftUI has no
+  corresponding cell-placement modifier. See <doc:Cell-Effects>.
+
+- **A border can shade its own stroke.** *Ratified.* The stroke-style border
+  overload accepts a cell-layer shader. It preserves the position of the
+  original stroke in the drawing order. See <doc:Cell-Effects>.
+
 ## Animation and transitions
 
 - **Custom animation state accepts legacy string keys.** *Provisional.*

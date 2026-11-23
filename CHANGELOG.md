@@ -23,6 +23,11 @@ require 1.0.0. See [COMPATIBILITY.md](docs/COMPATIBILITY.md).
   Region kernels can clear, copy and move whole spans with `CellEffectBuffer`.
   Use `backdropEffect` to change cells behind a mounted view.
 
+- A prepared layer kernel can keep per-instance state and return a shader for
+  one logical sample. `placementEffect` draws the new content during an
+  animated layout change. The stroke-style `border` overload accepts a shader
+  that reads only that stroke's painted cells.
+
 ## [0.24.0] - 2026-11-22
 
 ### Added

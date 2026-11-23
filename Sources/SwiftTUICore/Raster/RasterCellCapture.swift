@@ -130,7 +130,7 @@ extension Rasterizer {
 }
 
 extension CellRect {
-  func relative(to point: CellPoint) -> Self {
+  package func relative(to point: CellPoint) -> Self {
     Self(
       origin: .init(
         x: SaturatingConversion.subtracting(origin.x, point.x),

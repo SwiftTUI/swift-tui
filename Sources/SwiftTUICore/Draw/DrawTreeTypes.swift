@@ -316,11 +316,12 @@ package struct DrawNode: Equatable, Sendable {
   // Pack extraction context in the low bit and the shape-clip flag in the sign
   // without widening this hot value beyond its 256-byte stack budget.
   private var subtreeNodeSummary: Int
-  package var subtreeNodeCount: Int { abs(subtreeNodeSummary) >> 4 }
+  package var subtreeNodeCount: Int { abs(subtreeNodeSummary) >> 5 }
   package var hasInheritedDrawContext: Bool { abs(subtreeNodeSummary) & 1 != 0 }
   package var subtreeHasCellEffect: Bool { abs(subtreeNodeSummary) & 2 != 0 }
   package var isTransient: Bool { abs(subtreeNodeSummary) & 4 != 0 }
   package var subtreeDrawsInViewport: Bool { abs(subtreeNodeSummary) & 8 != 0 }
+  package var subtreeHasPreparedCells: Bool { abs(subtreeNodeSummary) & 16 != 0 }
   package var subtreeHasShapeClip: Bool { subtreeNodeSummary < 0 }
   /// The absolute union of this node's layout and paint bounds and every descendant's
   /// `subtreeBounds`. `.offset`/`.position` bake their translation into the
@@ -356,7 +357,7 @@ package struct DrawNode: Equatable, Sendable {
     self.commands = commands
     self.postCommands = postCommands
     self.children = children
-    subtreeNodeSummary = 16 | (hasInheritedDrawContext ? 1 : 0) | (isTransient ? 4 : 0)
+    subtreeNodeSummary = 32 | (hasInheritedDrawContext ? 1 : 0) | (isTransient ? 4 : 0)
     subtreeBounds = bounds
     recomputeSubtreeAggregates()
   }
@@ -405,6 +406,12 @@ package struct DrawNode: Equatable, Sendable {
     var hasCellEffect = drawEffects.ordered.contains {
       if case .cellLayer = $0 { true } else { false }
     }
+    var hasPreparedCells =
+      hasCellEffect
+      && drawEffects.ordered.contains {
+        if case .cellLayer(let pass) = $0, case .prepared = pass.shader.program { return true }
+        return false
+      }
     var drawsInViewport = drawEffects.ordered.contains {
       guard case .cellLayer(let pass) = $0 else { return false }
       switch pass.shader.region {
@@ -427,12 +434,13 @@ package struct DrawNode: Equatable, Sendable {
       count += child.subtreeNodeCount
       hasShapeClip = hasShapeClip || child.subtreeHasShapeClip
       hasCellEffect = hasCellEffect || child.subtreeHasCellEffect
+      hasPreparedCells = hasPreparedCells || child.subtreeHasPreparedCells
       drawsInViewport = drawsInViewport || child.subtreeDrawsInViewport
       extent = extent.union(child.subtreeBounds)
     }
     let summary =
-      (count << 4) | (hasInheritedDrawContext ? 1 : 0) | (hasCellEffect ? 2 : 0)
-      | (isTransient ? 4 : 0) | (drawsInViewport ? 8 : 0)
+      (count << 5) | (hasInheritedDrawContext ? 1 : 0) | (hasCellEffect ? 2 : 0)
+      | (isTransient ? 4 : 0) | (drawsInViewport ? 8 : 0) | (hasPreparedCells ? 16 : 0)
     subtreeNodeSummary = hasShapeClip ? -summary : summary
     subtreeBounds = extent
   }

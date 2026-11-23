@@ -102,7 +102,8 @@ package struct PlacedNodeResolvedMetadata: Equatable, Sendable {
       layoutBehavior: resolved.layoutBehavior,
       isTransient: resolved.isTransient,
       matchedGeometry: resolved.matchedGeometry,
-      presentationAnimationTransaction: resolved.drawMetadata.contentTransition != nil
+      presentationAnimationTransaction: resolved.drawEffects.hasPlacement
+        || resolved.drawMetadata.contentTransition != nil
         || (resolved.drawPayload != .none && resolved.environmentSnapshot.style.tintStyle != nil)
         ? resolved.transactionSnapshot : nil
     )

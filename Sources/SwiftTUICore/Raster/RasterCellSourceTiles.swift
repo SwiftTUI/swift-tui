@@ -46,7 +46,8 @@ extension Rasterizer {
   func captureSourceTile(
     node: DrawNode, sourceBounds: CellRect, viewport: CellRect,
     targetOrigin: CellPoint, backdrop: CellLayer, tile: CellRect,
-    visibleIdentities: inout Set<Identity>
+    visibleIdentities: inout Set<Identity>, strokeBackdrop: [[RasterCell]]? = nil,
+    strokeArms: LineArmsTable? = nil
   ) -> CellLayer {
     let scratchOrigin = tile.origin
     let scratchSize = tile.size
@@ -71,15 +72,17 @@ extension Rasterizer {
         y: SaturatingConversion.adding(targetOrigin.y, scratchOrigin.y)), defersCoverage: true,
       projectsImages: true, viewport: viewport.relative(to: scratchOrigin),
       paintDomain: sourceBounds.relative(to: scratchOrigin))
-    var sourceCells = Array(
-      repeating: Array(repeating: RasterCell.empty, count: scratchSize.width),
-      count: scratchSize.height)
+    var sourceCells =
+      strokeBackdrop
+      ?? Array(
+        repeating: Array(repeating: RasterCell.empty, count: scratchSize.width),
+        count: scratchSize.height)
     var attachments: [RasterImageAttachment] = []
     paint(
       node: sourceNode, cells: &sourceCells, imageAttachments: &attachments,
       clip: nil,
       dirtyRows: nil, dirtySpans: nil, visibleIdentities: &visibleIdentities,
-      presentationRecorder: scratch, lineArms: LineArmsTable())
+      presentationRecorder: scratch, lineArms: strokeArms ?? LineArmsTable())
     return cellLayer(
       cells: sourceCells, capture: scratch.cellCapture,
       absoluteBounds: sourceBounds.relative(to: scratchOrigin),

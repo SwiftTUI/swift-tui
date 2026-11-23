@@ -21,7 +21,7 @@ For products, supported imports, and re-export reachability, see [PUBLIC_MODULE_
 | `SwiftTUI` | 1 | 4 |
 | `SwiftTUIRuntime` | 60 | 531 |
 | `SwiftTUIProfiling` | 9 | 52 |
-| `SwiftTUIViews` | 431 | 2659 |
+| `SwiftTUIViews` | 431 | 2662 |
 | `SwiftTUIAnimatedImage` | 5 | 36 |
 | `SwiftTUIArguments` | 5 | 61 |
 | `SwiftTUIPTYPrimitives` | 7 | 40 |
@@ -33,7 +33,7 @@ For products, supported imports, and re-export reachability, see [PUBLIC_MODULE_
 | `SwiftTUIWebHostCLI` | 2 | 8 |
 | `SwiftTUIAndroidHost` | 20 | 49 |
 | `SwiftTUICore` | 43 | 296 |
-| `SwiftTUIPrimitives` | 194 | 1674 |
+| `SwiftTUIPrimitives` | 197 | 1689 |
 | `SwiftTUIGraph` | 78 | 598 |
 | `SwiftTUIPTYCPrimitives` | 0 | 0 |
 | `SwiftTUIPlatformIO` | 1 | 19 |
@@ -544,7 +544,7 @@ For products, supported imports, and re-export reachability, see [PUBLIC_MODULE_
 - `VerticalAlignmentGuideModifier` — struct
 - `VerticalControlGroupStyle` — struct — 3 members
 - `VerticalEdge` — enum — 1 member
-- `View` — protocol — 235 members
+- `View` — protocol — 238 members
 - `ViewBuilder` — enum — 10 members
 - `ViewModifier` — protocol — 7 members
 - `ViewModifierContent` — struct — 1 member
@@ -728,7 +728,7 @@ For products, supported imports, and re-export reachability, see [PUBLIC_MODULE_
 > carry `public` access but do not establish a supported direct import.
 > See the module map for re-export paths and symbol classifications below.
 
-### Canonical surface (192)
+### Canonical surface (195)
 
 - `AccessibilityColorProfile` — enum — 6 members
 - `AccessibilityPreferences` — struct — 8 members
@@ -776,7 +776,10 @@ For products, supported imports, and re-export reachability, see [PUBLIC_MODULE_
 - `CellLayerShader` — struct — 11 members
 - `CellPaint` — struct — 4 members
 - `CellPixelMetrics` — struct — 9 members
+- `CellPlacementContext` — struct — 4 members
 - `CellPoint` — struct — 4 members
+- `CellPreparationContext` — struct — 5 members
+- `CellPreparedLayerKernel` — protocol — 3 members
 - `CellRect` — struct — 11 members
 - `CellRegionKernel` — protocol — 1 member
 - `CellSample` — enum — 3 members

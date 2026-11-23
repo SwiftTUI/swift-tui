@@ -397,6 +397,9 @@ package enum AnimationPropertyValueApplication {
       drawMetadata.shapeClips = clips
       node.drawMetadata = drawMetadata
 
+    case .cellPlacement:
+      // Parent-relative frames are known only after placement.
+      return
     case .textRoll:
       // The roll only decorates a node whose payload is the string it rolls
       // toward; a payload that moved on under an unanimated write keeps its

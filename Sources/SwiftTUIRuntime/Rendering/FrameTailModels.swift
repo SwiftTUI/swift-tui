@@ -126,6 +126,7 @@ struct RetainedFrameTailPhaseProducts: Sendable {
 /// data is previous committed baseline state; it is not a preview of any
 /// in-flight candidate.
 struct FrameTailInput {
+  var cellSampleInstant: MonotonicInstant = .zero
   var generation: RenderGeneration
   /// Canonical pre-animation resolved product. Tail stages that write back to
   /// ViewGraph must consume this value, never transient presentation overrides.

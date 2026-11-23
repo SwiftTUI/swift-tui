@@ -703,7 +703,10 @@ classifications:
     - SwiftTUIPrimitives.CellLayerShader
     - SwiftTUIPrimitives.CellPaint
     - SwiftTUIPrimitives.CellPixelMetrics
+    - SwiftTUIPrimitives.CellPlacementContext
     - SwiftTUIPrimitives.CellPoint
+    - SwiftTUIPrimitives.CellPreparationContext
+    - SwiftTUIPrimitives.CellPreparedLayerKernel
     - SwiftTUIPrimitives.CellRect
     - SwiftTUIPrimitives.CellRegionKernel
     - SwiftTUIPrimitives.CellSample

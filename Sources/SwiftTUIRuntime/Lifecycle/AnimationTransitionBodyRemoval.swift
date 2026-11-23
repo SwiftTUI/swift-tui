@@ -40,6 +40,7 @@ package struct RemovalBodyState: Sendable {
   /// stand-in where each placement of the content is. Its slots hold the
   /// values the removal ends at.
   package var workingRoot: ResolvedNode
+  var cellPreparations: RemovalCellPreparations?
   /// The placed rect the transition root had on screen. The working tree is
   /// laid out at its origin under its size.
   package var rootRect: CellRect

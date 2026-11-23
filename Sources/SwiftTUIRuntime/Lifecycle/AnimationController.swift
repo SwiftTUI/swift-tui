@@ -565,12 +565,16 @@ package final class AnimationController: Sendable {
       removalsWithAnimatingBody: removalsWithAnimatingBody,
       removalBodySnapshot: { viewNodeID, entry in
         guard var body = entry.body, let frozen = entry.placedSnapshot else { return nil }
-        if self.refreshRemovalWorkingTree(
+        let changed = self.refreshRemovalWorkingTree(
           &body, of: entry, at: timestamp, evaluations: &bodyEvaluations)
-        {
+        var placed = AnimationTransitionBodyRemoval.compose(body, in: frozen)
+        var preparations = body.cellPreparations ?? RemovalCellPreparations(frozen)
+        let rebound = preparations.bind(&placed)
+        if changed || rebound {
+          body.cellPreparations = preparations
           refreshedBodies[viewNodeID] = body
         }
-        return AnimationTransitionBodyRemoval.compose(body, in: frozen)
+        return placed
       }
     )
     for (viewNodeID, body) in refreshedBodies {
@@ -681,7 +685,7 @@ package final class AnimationController: Sendable {
     activeAnimations.keys.contains { key in
       guard case .property(let slot) = key.scope else { return false }
       switch slot {
-      case .padding, .offset, .position, .frameWidth, .frameHeight:
+      case .padding, .offset, .position, .frameWidth, .frameHeight, .cellPlacement:
         return true
       case .opacity, .foregroundShapeStyle, .backgroundShapeStyle, .borderShapeStyle,
         .borderBlendPhase, .borderForegroundStyle, .strokeDashPhase, .shapeTrim, .shapeFillStyle,
@@ -4333,19 +4337,32 @@ package final class AnimationController: Sendable {
   package func processRealizedPresentation(
     in placed: PlacedNode,
     transactionPlan: FrameAnimationTransactionPlan,
-    at timestamp: MonotonicInstant
-  ) -> (textRolls: [Identity: TextRollValue], tintStyles: [Identity: AnyShapeStyle]) {
+    at timestamp: MonotonicInstant, surfaceSize: CellSize? = nil
+  ) -> (
+    textRolls: [Identity: TextRollValue], tintStyles: [Identity: AnyShapeStyle],
+    placements: [Identity: CellPlacementContext]
+  ) {
     var targets: [AnimationKey: AnyAnimatable] = [:]
     var owners: [Identity: Identity] = [:]
     var samples: [AnimationKey: AnyAnimatable] = [:]
     var baselineTints: [Identity: AnyShapeStyle] = [:]
-    var pending: [(node: PlacedNode, resolvedOwner: Identity?)] = [(placed, nil)]
-    while let (node, inheritedOwner) = pending.popLast() {
+    var pending: [(PlacedNode, Identity?, CellPlacementParent?)] = [(placed, nil, nil)]
+    while let (node, inheritedOwner, parent) = pending.popLast() {
       guard !node.isTransient else { continue }
       let isResolved = previousIdentities.contains(node.identity)
       let owner = isResolved ? node.identity : inheritedOwner
-      pending.append(contentsOf: node.children.map { ($0, owner) })
+      let space = CellPlacementParent(
+        identity: node.identity, nodeID: node.viewNodeID,
+        origin: node.bounds.origin)
+      pending.append(contentsOf: node.children.map { ($0, owner, space) })
       var values: [AnimatableSlot: AnyAnimatable] = [:]
+      if node.drawEffects.hasPlacement {
+        values[.cellPlacement] = AnyAnimatable(
+          CellPlacementValue(
+            parent: parent?.identity, parentID: parent?.nodeID, site: node.viewNodeID,
+            viewport: surfaceSize ?? placed.bounds.size,
+            current: node.bounds.relative(to: parent?.origin ?? .zero)))
+      }
       if case .text(let text) = node.drawPayload,
         let transition = node.drawMetadata.contentTransition
       {
@@ -4360,7 +4377,7 @@ package final class AnimationController: Sendable {
       }
       for (slot, target) in values {
         let key = AnimationKey(identity: node.identity, slot: slot)
-        if isResolved {
+        if isResolved && slot != .cellPlacement {
           // Retained eager placement can carry an earlier head sample.
           let byNode = node.viewNodeID.flatMap {
             currentResolvedPresentationProjection.interpolatedByNodeID[$0]?[slot]
@@ -4398,9 +4415,16 @@ package final class AnimationController: Sendable {
         {
           registeredAnimations[box] = animation
         }
+        var previous = previousFrame.realizedPresentationTargets[key]
+        if slot == .cellPlacement,
+          let old = previous?.unwrap(as: CellPlacementValue.self),
+          let new = target.unwrap(as: CellPlacementValue.self), !old.sharesSpace(with: new)
+        {
+          previous = nil
+        }
         enqueueSlotChangeIfNeeded(
           identity: node.identity, viewNodeID: node.viewNodeID, slot: slot,
-          previous: previousFrame.realizedPresentationTargets[key], current: target,
+          previous: previous, current: target,
           request: transaction.animationRequest, batchID: transaction.animationBatchID,
           tracksVelocity: transaction.tracksVelocity, timestamp: timestamp)
       }
@@ -4457,8 +4481,15 @@ package final class AnimationController: Sendable {
     }
     var rolls: [Identity: TextRollValue] = [:]
     var tints: [Identity: AnyShapeStyle] = [:]
+    var placements: [Identity: CellPlacementContext] = [:]
     for (key, sample) in samples {
-      if key.scope == .property(.textRoll) {
+      if key.scope == .property(.cellPlacement) {
+        if let value = sample.unwrap(as: CellPlacementValue.self), let prior = value.previous {
+          placements[key.identity] = .init(
+            previousFrame: prior, currentFrame: value.current,
+            progress: value.animatableData)
+        }
+      } else if key.scope == .property(.textRoll) {
         rolls[key.identity] = sample.unwrap(as: TextRollValue.self)
       } else if let tint = AnimationPropertyValueApplication.unwrapShapeStyle(sample),
         tint != baselineTints[key.identity]
@@ -4466,7 +4497,7 @@ package final class AnimationController: Sendable {
         tints[key.identity] = tint
       }
     }
-    return (rolls, tints)
+    return (rolls, tints, placements)
   }
 
   private func retainBatch(_ batchID: AnimationBatchID?) {

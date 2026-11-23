@@ -271,6 +271,13 @@ the corresponding `CompositingFunction` or `RegionFunction` closure.
 `View.backdropEffect(_:in:maxSampleOffset:isEnabled:)` writes into a designated
 lower region before the subject paints. These forms are supported public API.
 
+`CellPreparedLayerKernel` and `CellPreparationContext` support mutable state
+owned by a mounted layer effect. Preparation returns one reusable shader per
+logical sample. `placementEffect` receives a `CellPlacementContext` with the
+previous and current frames in a shared parent and the transaction's progress.
+The stroke-style `border` accepts an isolated layer shader for its drawn stroke.
+These are supported public CPU rendering contracts.
+
 The [Cell effects guide](../Sources/SwiftTUIViews/SwiftTUIViews.docc/Cell-Effects.md)
 gives both authoring forms and the span and enablement contracts.
 
