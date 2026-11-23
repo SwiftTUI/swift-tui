@@ -114,6 +114,7 @@ private struct InnerValue: CellPreparedLayerKernel {
 }
 private struct SamplePast: CellPreparedLayerKernel {
   let value: Character
+  var point: CellPoint = .zero
   func makeState() -> CellLayer? { nil }
   func prepare(_ state: inout CellLayer?, source: CellLayer, context: CellPreparationContext)
     -> CellLayerShader
@@ -122,8 +123,8 @@ private struct SamplePast: CellPreparedLayerKernel {
     state = source
     return CellLayerShader { p, _, _ in
       guard let past else { return .empty }
-      if p.x == 0 { return source.sample(at: .zero) }
-      return past.sample(at: .zero)
+      if p.x == 0 { return source.sample(at: point) }
+      return past.sample(at: point)
     }
   }
 }
@@ -171,5 +172,47 @@ extension PreparedCaptureIsolationTests {
     }
     #expect(frame(.zero) == ["NN"])
     #expect(frame(.layerBounds) == ["YY"])
+  }
+}
+
+private struct TrailingHalf: Shape {
+  func path(in rect: Rect) -> Path {
+    var path = Path()
+    path.addRect(
+      .init(
+        origin: .init(x: rect.origin.x + rect.size.width / 2, y: rect.origin.y),
+        size: .init(width: rect.size.width / 2, height: rect.size.height)))
+    return path
+  }
+}
+
+extension PreparedCaptureIsolationTests {
+  @Test("A retained lazy source preserves a nested preparation hidden from the first paint tile")
+  func retainedMaskedPreparation() {
+    func verify(_ width: Int) -> [String] {
+      let renderer = DefaultRenderer()
+      func frame(_ value: Character, at ms: Int) -> [String] {
+        let view = HStack(spacing: 0) {
+          Text("x").frame(width: width, height: 1, alignment: .leading)
+            .layerEffect(InnerValue(value: value), maxSampleOffset: .zero)
+            .clipShape(TrailingHalf())
+        }
+        .frame(width: width, height: 1, alignment: .leading)
+        .layerEffect(
+          SamplePast(value: value, point: .init(x: width / 2 + 1, y: 0)),
+          maxSampleOffset: .layerBounds
+        )
+        .frame(width: 2, height: 1, alignment: .leading).clipped()
+        return renderer.render(
+          view, context: .init(identity: testIdentity("maskedHistory")),
+          proposal: .init(width: 2, height: 1),
+          frameInstant: .init(offset: .milliseconds(ms))
+        ).rasterSurface.lines
+      }
+      _ = frame("A", at: 100)
+      return frame("B", at: 200)
+    }
+    #expect(verify(8) == ["BA"])
+    #expect(verify(65_540) == ["BA"])
   }
 }
