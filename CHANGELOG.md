@@ -9,6 +9,8 @@ require 1.0.0. See [COMPATIBILITY.md](docs/COMPATIBILITY.md).
 
 ## [Unreleased]
 
+## [0.25.0] - 2026-11-23
+
 ### Added
 
 - Views can shade glyph paint with `colorEffect`, move cells with
