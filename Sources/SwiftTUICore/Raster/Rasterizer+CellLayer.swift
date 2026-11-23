@@ -2,7 +2,8 @@ extension Rasterizer {
   /// Applies one isolation boundary. Implicit capture keeps a snapshot of its enclosing
   /// destination available to nested readers. Explicit compositing groups start a new target.
   func paintCellLayer(
-    _ node: DrawNode, pass: CellEffectPass, clip: CellRect?, blendMode: BlendMode?,
+    _ node: DrawNode, pass: CellEffectPass, clip: CellRect?, maskFrame: CellRect?,
+    blendMode: BlendMode?,
     effects: [DrawEffect], dirtyRows: Set<Int>?, cells: inout [[RasterCell]],
     visibleIdentities: inout Set<Identity>, recorder: RasterPresentationLayerRecorder?,
     lineArms: LineArmsTable? = nil
@@ -12,7 +13,9 @@ extension Rasterizer {
     let surface = CellRect(origin: .zero, size: size)
     guard let target = surface.intersection(clip ?? surface) else { return }
     let inheritedViewport = recorder?.cellCapture?.viewport ?? surface
-    let viewport = clip.map { inheritedViewport.intersection($0) ?? .zero } ?? inheritedViewport
+    let logicalClip = maskFrame ?? clip
+    let viewport =
+      logicalClip.map { inheritedViewport.intersection($0) ?? .zero } ?? inheritedViewport
     let origin = node.bounds.origin
     // A previous pass can paint beyond layout. Preserve that ink for an outer
     // shader without changing the subject's local coordinate origin.
@@ -24,11 +27,19 @@ extension Rasterizer {
     // brings it back into view. An explicitly requested viewport remains the
     // real enclosing viewport regardless of the current scratch dimensions.
     let domain = recorder?.cellCapture?.paintDomain ?? surface
-    let clippedDomain = clip.map { domain.intersection($0) ?? .zero } ?? domain
+    let clippedDomain = logicalClip.map { domain.intersection($0) ?? .zero } ?? domain
     let logicalOutput = pass.shader.region.bounds(
       source: localSource,
       viewport: (pass.shader.region == .viewport ? viewport : clippedDomain).relative(to: origin))
-    guard let output = logicalOutput.intersection(target.relative(to: origin)) else { return }
+    // A prepared shader may return source ink outside the real viewport when
+    // a later pass gathers it back into view. Resolve before culling that ink.
+    let possibleOutput: CellRect
+    if case .prepared = pass.shader.program {
+      possibleOutput = logicalOutput.union(clippedDomain.relative(to: origin))
+    } else {
+      possibleOutput = logicalOutput
+    }
+    guard let output = possibleOutput.intersection(target.relative(to: origin)) else { return }
     if let probe = RasterWorkProbe.active() {
       var work = RasterWorkCounters()
       work.cellEffectCaptures = 1
@@ -106,6 +117,9 @@ extension Rasterizer {
         }
       }
     } else if Self.boundedSurfaceSize(input.size, maximum: nil) != input.size {
+      let sampler = deferredSourceRasterizer(
+        node: node, sourceBounds: captureBounds,
+        viewport: viewport, targetOrigin: targetOrigin, backdrop: backdrop)
       let cache = RasterCellSourceTiles()
       tiles = cache
       capture = CellLayer(bounds: localSource, readableBounds: localSource) { position in
@@ -114,7 +128,7 @@ extension Rasterizer {
             origin: .init(
               x: SaturatingConversion.adding(tile.origin.x, origin.x),
               y: SaturatingConversion.adding(tile.origin.y, origin.y)), size: tile.size)
-          return captureSourceTile(
+          return sampler.captureSourceTile(
             node: node, sourceBounds: captureBounds, viewport: viewport,
             targetOrigin: targetOrigin, backdrop: backdrop, tile: absolute,
             visibleIdentities: &identities)
@@ -165,11 +179,20 @@ extension Rasterizer {
     if case .prepared(let prepare) = pass.shader.program {
       let geometry = CellEffectContext(
         sourceBounds: source.bounds,
-        outputBounds: source.bounds.intersection(context.viewport) ?? .zero,
+        outputBounds: source.bounds.intersection(domain) ?? .zero,
         viewport: context.viewport,
         originInRoot: context.originInRoot, appearance: context.appearance,
         cellPixelMetrics: context.cellPixelMetrics)
-      let shader = prepare(source, geometry, cellPreparationFrame ?? .init(at: .now()))
+      let read: CellRect
+      switch pass.offset {
+      case .layerBounds: read = source.bounds
+      case .cells(let x, let y):
+        read = CellDrawingRegion.outset(x: x, y: y).bounds(
+          source: geometry.outputBounds, viewport: source.bounds)
+      }
+      let shader = prepare(
+        source.restricted(to: read, pass: pass), geometry,
+        cellPreparationFrame ?? .init(at: .now()))
       resolved = .init(shader, offset: pass.offset)
       let bounds = shader.region.bounds(
         source: source.bounds,

@@ -238,7 +238,11 @@ shader that captures immutable values for this sample. The first call has
 zero elapsed time, zero delta and no previous bounds. A later call includes
 all time since the previous sample and the previous source bounds. A retry at
 the same logical time reuses the prepared shader. The source may be retained
-as an immutable snapshot. Drive the samples with your animation or timeline.
+as an immutable snapshot. Its `bounds` describe the entire input. With a
+finite sample offset, `readableBounds` covers the source inside the enclosing
+paint domain plus the declared reach. Use `.layerBounds` to read the full input.
+All fragments of a shape mask share one preparation. Drive the samples with
+your animation or timeline.
 
 ## Draw a change of placement
 

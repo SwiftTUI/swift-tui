@@ -109,7 +109,7 @@ public struct CellLayer: Sendable {
   public let bounds: CellRect
   public let readableBounds: CellRect
   #if DEBUG
-    private var diagnostic: CellEffectPass?
+    private var diagnostic: CellReadDiagnostic?
   #endif
   private let read: @Sendable (CellPoint) -> CellSample
 
@@ -127,7 +127,7 @@ public struct CellLayer: Sendable {
       bounds: bounds, readableBounds: readableBounds.intersection(window) ?? .zero, read: read)
     #if DEBUG
       var checked = layer
-      checked.diagnostic = pass
+      checked.diagnostic = pass?.diagnostic
       return checked
     #else
       return layer

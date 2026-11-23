@@ -68,12 +68,12 @@ private struct PreparedCellEffectModifier<K: CellPreparedLayerKernel>:
   ) -> ResolveWork<[ResolvedNode]> {
     var next = context
     next.cellPreparationOrdinal += 1
-    let key = ValueGateRecords.Key(
+    let key = CellPreparationSite(
       identity: context.identity, position: context.cellPreparationOrdinal)
     let run: CellPreparationRun<K>?
     if let owner = ValueGateRecords.owner(in: context), let graph = context.viewGraph {
       let ordinal = StateSlotOrdinals.preparedCellEffects
-      typealias Runs = [ValueGateRecords.Key: CellPreparationRecord]
+      typealias Runs = [CellPreparationSite: CellPreparationRecord]
       var runs: Runs = [:]
       if let slot = owner.stateSlotStorage(ordinal: ordinal), slot.stores(Runs.self) {
         runs = slot.value(as: Runs.self)
@@ -86,12 +86,12 @@ private struct PreparedCellEffectModifier<K: CellPreparedLayerKernel>:
         // The visual owns the run, so a surviving flattened parent cannot keep
         // a removed view's offscreen history alive.
         runs = runs.filter { $0.value.run != nil }
-        run = enabled ? CellPreparationRun<K>() : nil
+        run = enabled ? CellPreparationRun<K>(at: key) : nil
         runs[key] = run.map(CellPreparationRecord.init)
         owner.setStateSlotSilently(ordinal: ordinal, value: runs)
       }
     } else {
-      run = enabled ? CellPreparationRun<K>() : nil
+      run = enabled ? CellPreparationRun<K>(at: key) : nil
     }
     return content.resolveWork(in: next).map { completed in
       var node = completed

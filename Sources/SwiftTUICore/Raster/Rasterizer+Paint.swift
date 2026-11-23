@@ -1,6 +1,8 @@
 extension Rasterizer {
   private struct PaintContext {
     var clip: CellRect?
+    // A shape mask paints disjoint rectangles. Effects see one logical clip across them.
+    var maskFrame: CellRect?
     var activeBlendMode: BlendMode?
     var presentationEffects: [DrawEffect]
     var dirtyRows: Set<Int>?
@@ -86,7 +88,8 @@ extension Rasterizer {
     dirtySpans: DirtyRowSpans?,
     visibleIdentities: inout Set<Identity>,
     presentationRecorder: RasterPresentationLayerRecorder?,
-    lineArms: LineArmsTable? = nil
+    lineArms: LineArmsTable? = nil,
+    maskFrame: CellRect? = nil
   ) {
     // Two frame kinds.  A `.visit` frame paints the node's `commands`
     // (pre-child commands) and then pushes its children plus, if the
@@ -105,7 +108,7 @@ extension Rasterizer {
     }
 
     let initialContext = PaintContext(
-      clip: clip,
+      clip: clip, maskFrame: maskFrame,
       activeBlendMode: nil,
       presentationEffects: [],
       dirtyRows: dirtyRows,
@@ -135,6 +138,9 @@ extension Rasterizer {
           continue
         }
         nodeContext.clip = visibility.clip
+        if let frame = context.maskFrame, let own = node.clipBounds {
+          nodeContext.maskFrame = frame.intersection(own) ?? .zero
+        }
 
         if !node.metadata.shapeClips.isEmpty {
           let surfaceBounds = CellRect(
@@ -151,6 +157,7 @@ extension Rasterizer {
           for region in shapeClipRegions(node: node, clip: maskClip).reversed() {
             var regionContext = nodeContext
             regionContext.clip = region
+            regionContext.maskFrame = nodeContext.maskFrame ?? visibility.clip ?? surfaceBounds
             stack.append(.visit(node: unclippedNode, context: regionContext))
           }
           continue
@@ -233,7 +240,7 @@ extension Rasterizer {
           let outside = DrawEffects(Array(node.drawEffects.ordered.suffix(from: boundary + 1)))
           let outputContext = applyingUngroupedEffects(outside, to: nodeContext)
           paintCellLayer(
-            source, pass: pass, clip: outputContext.clip,
+            source, pass: pass, clip: outputContext.clip, maskFrame: outputContext.maskFrame,
             blendMode: outputContext.activeBlendMode, effects: outputContext.presentationEffects,
             dirtyRows: outputContext.dirtyRows, cells: &cells,
             visibleIdentities: &visibleIdentities,
@@ -434,7 +441,7 @@ extension Rasterizer {
       presentationRecorder: scratch,
       // A layer paints into its own cells, so its strokes merge with each
       // other and not with the strokes beneath the layer.
-      lineArms: LineArmsTable()
+      lineArms: LineArmsTable(), maskFrame: context.maskFrame
     )
     layer.capture =
       (isolatedNode.subtreeHasCellEffect

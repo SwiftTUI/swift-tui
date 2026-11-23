@@ -92,8 +92,10 @@ struct FrameTailWalkerStackSafetyTests {
       }
     }
     let bounds = CellRect(origin: .zero, size: .init(width: 4, height: 1))
-    let effects: [DrawEffect] = (0..<8).map { _ in
-      .cellLayer(.init(.init(preparing: Copy(), run: CellPreparationRun()), offset: .zero))
+    let effects: [DrawEffect] = (0..<8).map { ordinal in
+      let site = CellPreparationSite(identity: testIdentity("stack", "prepared"), position: ordinal)
+      return .cellLayer(
+        .init(.init(preparing: Copy(), run: CellPreparationRun(at: site)), offset: .zero))
     }
     let leaf = DrawNode(
       identity: testIdentity("stack", "prepared"), bounds: bounds,

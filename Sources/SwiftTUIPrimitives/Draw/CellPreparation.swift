@@ -48,6 +48,12 @@ package final class CellPreparationFrame: Sendable {
     shaders.withLock { $0[ObjectIdentifier(run)] }
   }
 
+  func transfer(_ run: AnyObject, to destination: CellPreparationFrame) {
+    if let shader = cached(for: run) {
+      destination.shaders.withLock { $0[ObjectIdentifier(run)] = shader }
+    }
+  }
+
   func sample(for run: AnyObject, _ compute: () -> CellLayerShader) -> CellLayerShader {
     let key = ObjectIdentifier(run)
     if let cached = shaders.withLock({ $0[key] }) { return cached }
@@ -57,17 +63,30 @@ package final class CellPreparationFrame: Sendable {
   }
 }
 
+/// Resolve reserves this position even when the modifier is disabled.
+package struct CellPreparationSite: Hashable, Sendable {
+  package let identity: Identity
+  let position: Int
+  package init(identity: Identity, position: Int) {
+    self.identity = identity
+    self.position = position
+  }
+}
+
 package protocol CellPreparationBinding: Sendable {
+  var site: CellPreparationSite { get }
   func callAsFunction(
     _ source: CellLayer, _ geometry: CellEffectContext, _ frame: CellPreparationFrame
   ) -> CellLayerShader
   func cached(in frame: CellPreparationFrame) -> CellLayerShader?
+  func transfer(from: CellPreparationFrame, to: CellPreparationFrame)
   func continuing(_ older: any CellPreparationBinding) -> CellLayerShader?
 }
 
 struct MountedCellPreparation<K: CellPreparedLayerKernel>: CellPreparationBinding {
   let kernel: K
   let run: CellPreparationRun<K>
+  var site: CellPreparationSite { run.site }
 
   func callAsFunction(
     _ source: CellLayer, _ geometry: CellEffectContext, _ frame: CellPreparationFrame
@@ -76,6 +95,9 @@ struct MountedCellPreparation<K: CellPreparedLayerKernel>: CellPreparationBindin
   }
 
   func cached(in frame: CellPreparationFrame) -> CellLayerShader? { frame.cached(for: run) }
+  func transfer(from: CellPreparationFrame, to: CellPreparationFrame) {
+    from.transfer(run, to: to)
+  }
 
   func continuing(_ older: any CellPreparationBinding) -> CellLayerShader? {
     guard let original = older as? Self else { return nil }
@@ -94,7 +116,8 @@ package final class CellPreparationRun<K: CellPreparedLayerKernel>: Sendable {
     var shader: CellLayerShader
   }
   private let storage = Mutex<Storage?>(nil)
-  package init() {}
+  let site: CellPreparationSite
+  package init(at site: CellPreparationSite) { self.site = site }
 
   func shader(
     for kernel: K, source: CellLayer, geometry: CellEffectContext, frame: CellPreparationFrame

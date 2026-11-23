@@ -135,15 +135,12 @@ public struct CellLayerShader: Equatable, Sendable {
   }
 }
 
-/// Heap storage keeps the ordered draw descriptor compact on the raster worker stack.
-package final class CellEffectPass: Equatable, Sendable {
-  package let shader: CellLayerShader
-  #if DEBUG
+#if DEBUG
+  /// Retained layers can diagnose invalid reads without retaining the shader
+  /// or the run whose state may in turn retain that layer.
+  final class CellReadDiagnostic: Sendable {
     private let didReport = Mutex(false)
-  #endif
-
-  package func reportInvalidRead() {
-    #if DEBUG
+    func reportInvalidRead() {
       let first = didReport.withLock { reported in
         if reported { return false }
         reported = true
@@ -156,8 +153,16 @@ package final class CellEffectPass: Equatable, Sendable {
             override: nil, bundleFileName: "cell-effects.log"),
           fallback: .safeStandardError)
       }
-    #endif
+    }
   }
+#endif
+
+/// Heap storage keeps the ordered draw descriptor compact on the raster worker stack.
+package final class CellEffectPass: Equatable, Sendable {
+  package let shader: CellLayerShader
+  #if DEBUG
+    let diagnostic = CellReadDiagnostic()
+  #endif
 
   package let offset: CellSampleOffset
 
@@ -168,8 +173,10 @@ package final class CellEffectPass: Equatable, Sendable {
     self.shader = shader
     self.offset = offset
     #if DEBUG
-      if case .cells(let x, let y) = offset, x < 0 || y < 0 { reportInvalidRead() }
-      if case .outset(let x, let y) = shader.region, x < 0 || y < 0 { reportInvalidRead() }
+      if case .cells(let x, let y) = offset, x < 0 || y < 0 { diagnostic.reportInvalidRead() }
+      if case .outset(let x, let y) = shader.region, x < 0 || y < 0 {
+        diagnostic.reportInvalidRead()
+      }
     #endif
   }
 
