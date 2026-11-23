@@ -111,6 +111,11 @@ struct ResolveContextStorageTotalityTests {
       notCarriedReason:
         "one-shot by design: the cursor resets at every identity boundary"
     ),
+    "cellPreparationOrdinal": notEquated(
+      "tracks the next mounted cell-effect position within one modifier chain",
+      carried: false,
+      notCarriedReason: "each new identity begins its own preparation sites at zero"
+    ),
     "animatableSiteOrdinalCursor": notEquated(
       "documented Equatable exclusion: the per-identity position of the next "
         + "Animatable site must never gate reuse",
