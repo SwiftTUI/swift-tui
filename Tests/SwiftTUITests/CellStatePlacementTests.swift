@@ -278,6 +278,7 @@ private struct ReparentedTravel: View {
       log.travel.withLock { $0.append(context) }
       return CellLayerShader { point, source, _ in source.sample(at: point) }
     }
+    .transition(.identity)
   }
   var body: some View {
     HStack(spacing: 0) {
@@ -291,32 +292,36 @@ extension CellStatePlacementTests {
   @Test(
     "a reparented identity, reduced motion and an inner disabled transaction cannot start a flight")
   func bypassAndReparenting() {
-    let log = SampleLog()
-    let renderer = DefaultRenderer()
     var tx = TransactionSnapshot()
     tx.animationRequest = .animate(Animation.linear(duration: .seconds(1)).animationBox)
-    func draw<V: View>(_ view: V, id: String, moved: Bool) {
-      _ = renderer.render(
-        view, context: .init(identity: testIdentity(id), transaction: moved ? tx : .init()),
-        proposal: .init(width: 15, height: 1),
-        frameInstant: start.advanced(by: .milliseconds(moved ? 10 : 0)))
+
+    // Each independent scene has its own mounted root. Keep it across both frames.
+    func check<V: View>(_ id: String, content: (Bool, SampleLog) -> V) {
+      let log = SampleLog()
+      let renderer = DefaultRenderer()
+      let leaks = SoundnessProbeConfiguration.teardownCoherenceLeakCount
+      withAnimationSinks(renderer.internalAnimationController) {
+        for moved in [false, true] {
+          _ = renderer.render(
+            content(moved, log),
+            context: .init(identity: testIdentity(id), transaction: moved ? tx : .init()),
+            proposal: .init(width: 15, height: 1),
+            frameInstant: start.advanced(by: .milliseconds(moved ? 10 : 0)))
+        }
+        #expect(log.travel.withLock { $0.isEmpty })
+        #expect(!renderer.internalAnimationController.requiresContinuedAnimationFrames)
+        #expect(SoundnessProbeConfiguration.teardownCoherenceLeakCount == leaks)
+      }
     }
-    withAnimationSinks(renderer.internalAnimationController) {
-      for moved in [false, true] {
-        draw(ReparentedTravel(right: moved, log: log), id: "reparent", moved: moved)
-      }
-      for moved in [false, true] {
-        draw(
-          TravelingPanel(indent: moved ? 8 : 1, text: "X", log: log)
-            .environment(\.accessibilityReduceMotion, true), id: "reduce", moved: moved)
-      }
-      for moved in [false, true] {
-        draw(
-          TravelingPanel(indent: moved ? 8 : 1, text: "X", log: log)
-            .transaction { $0.animation = nil }, id: "disable", moved: moved)
-      }
-      #expect(log.travel.withLock { $0.isEmpty })
-      #expect(!renderer.internalAnimationController.requiresContinuedAnimationFrames)
+
+    check("reparent") { moved, log in ReparentedTravel(right: moved, log: log) }
+    check("reduce") { moved, log in
+      TravelingPanel(indent: moved ? 8 : 1, text: "X", log: log)
+        .environment(\.accessibilityReduceMotion, true)
+    }
+    check("disable") { moved, log in
+      TravelingPanel(indent: moved ? 8 : 1, text: "X", log: log)
+        .transaction { $0.animation = nil }
     }
   }
 
