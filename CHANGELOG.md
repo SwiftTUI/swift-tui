@@ -9,6 +9,14 @@ require 1.0.0. See [COMPATIBILITY.md](docs/COMPATIBILITY.md).
 
 ## [Unreleased]
 
+## [0.25.1] - 2026-11-23
+
+### Changed
+
+- Build and test with Swift 6.4.3 and its matching WASI and Android SDKs.
+  Swift Async Algorithms now resolves from 1.1.7. Swift Collections uses
+  1.7.5 because 1.7.6 traps when a WASI application creates an empty deque.
+
 ## [0.25.0] - 2026-11-23
 
 ### Added

@@ -51,7 +51,7 @@ if ! printf '%s' "$expected" | grep -Eq '^[0-9]+\.[0-9]+(\.[0-9]+)?$'; then
   exit 1
 fi
 actual="$(swiftly run swift --version 2>&1 | head -n 1)"
-# Release toolchains can print 6.4 for the exact 6.4.0 release pin.
+# Swift may omit a zero patch component from its version banner.
 escaped="$(printf '%s' "${expected%.0}" | sed 's/\./\\./g')"
 if [ "$expected" != "${expected%.0}" ]; then
   escaped="${escaped}(\\.0)?"

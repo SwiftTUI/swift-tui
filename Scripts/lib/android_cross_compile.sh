@@ -82,7 +82,7 @@ android_require_pinned_toolchain() {
       "Install it with: swiftly install $android_swift_version"
   fi
   android_toolchain_description="$(printf '%s\n' "$android_toolchain_output" | grep -E 'Swift version' | android_first_line || true)"
-  # Release toolchains can print 6.4 for the exact 6.4.0 release pin.
+  # Swift may omit a zero patch component from its version banner.
   android_escaped_version="$(printf '%s' "${android_swift_version%.0}" | sed 's/\./\\./g')"
   if [ "$android_swift_version" != "${android_swift_version%.0}" ]; then
     android_escaped_version="${android_escaped_version}(\\.0)?"
@@ -120,7 +120,7 @@ android_swift_sdk_list() {
 }
 
 # True when the pinned Swift SDK for Android is installed. The id must be a
-# whole line: a `swift-6.4.0-RELEASE_android-something` neighbour is not it.
+# whole line: a `swift-6.4.3-RELEASE_android-something` neighbour is not it.
 android_swift_sdk_is_installed() {
   android_installed_sdks="$(android_swift_sdk_list)" || return 1
   printf '%s\n' "$android_installed_sdks" | grep -Fx -- "$android_swift_sdk_id" >/dev/null

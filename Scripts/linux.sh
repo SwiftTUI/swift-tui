@@ -5,9 +5,9 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="$(cd -- "$SCRIPT_DIR/.." && pwd)"
 REPO_BASENAME="$(basename "$REPO_DIR")"
 
-WASM_SDK_ID="${WASM_SDK_ID:-swift-6.4.0-RELEASE_wasm}"
-WASM_SDK_URL="${WASM_SDK_URL:-https://download.swift.org/swift-6.4.0-release/wasm-sdk/swift-6.4.0-RELEASE/swift-6.4.0-RELEASE_wasm.artifactbundle.tar.gz}"
-WASM_SDK_CHECKSUM="${WASM_SDK_CHECKSUM:-f07b7be3c586d92d7a07051fc6d303b87ebea67eadc40640ba59d5a8b79aa86d}"
+WASM_SDK_ID="${WASM_SDK_ID:-swift-6.4.3-RELEASE_wasm}"
+WASM_SDK_URL="${WASM_SDK_URL:-https://download.swift.org/swift-6.4.3-release/wasm-sdk/swift-6.4.3-RELEASE/swift-6.4.3-RELEASE_wasm.artifactbundle.tar.gz}"
+WASM_SDK_CHECKSUM="${WASM_SDK_CHECKSUM:-5f24408dc9737ce4cb23b7e3ed4306cabfa02cc02f22ab260b14579b955d4b12}"
 SWIFTLY_VERSION="${SWIFTLY_VERSION:-1.1.4}"
 
 CONTAINER_TOOL=""
@@ -48,7 +48,7 @@ LINUX_SWIFT_SCRATCH_DIR="${LINUX_SWIFT_SCRATCH_DIR:-$CONTAINER_DIR/.build-linux}
 LINUX_IMAGE_DOCKERFILE="${LINUX_IMAGE_DOCKERFILE:-$SCRIPT_DIR/linux/Dockerfile}"
 LINUX_IMAGE_CONTEXT="${LINUX_IMAGE_CONTEXT:-$SCRIPT_DIR/linux}"
 LINUX_IMAGE_BUILD_TAG="${LINUX_IMAGE_BUILD_TAG:-$IMAGE}"
-LINUX_SWIFT_VERSION="${LINUX_SWIFT_VERSION:-6.4.0}"
+LINUX_SWIFT_VERSION="${LINUX_SWIFT_VERSION:-6.4.3}"
 
 usage() {
   cat <<EOF

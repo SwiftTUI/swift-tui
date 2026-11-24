@@ -150,7 +150,7 @@ jobs:
     name: Build native tests (${{ matrix.arch }})
     runs-on: ${{ matrix.runner }}
     container:
-      image: ghcr.io/swifttui/swift-tui-linux:swift-6.4.0
+      image: ghcr.io/swifttui/swift-tui-linux:swift-6.4.3
       options: --cap-add=SYS_PTRACE
     timeout-minutes: 35
     env:
@@ -229,7 +229,7 @@ jobs:
     name: Core lane (${{ matrix.arch }})
     runs-on: ${{ matrix.runner }}
     container:
-      image: ghcr.io/swifttui/swift-tui-linux:swift-6.4.0
+      image: ghcr.io/swifttui/swift-tui-linux:swift-6.4.3
       options: --cap-add=SYS_PTRACE
     timeout-minutes: 30
     env:
@@ -348,7 +348,7 @@ jobs:
     name: Runtime shard ${{ matrix.shard }} (${{ matrix.arch }})
     runs-on: ${{ matrix.runner }}
     container:
-      image: ghcr.io/swifttui/swift-tui-linux:swift-6.4.0
+      image: ghcr.io/swifttui/swift-tui-linux:swift-6.4.3
       options: --cap-add=SYS_PTRACE
     timeout-minutes: 30
     env:
@@ -450,7 +450,7 @@ jobs:
     name: wasm32-wasi cross-compile
     runs-on: ubuntu-24.04
     container:
-      image: ghcr.io/swifttui/swift-tui-linux:swift-6.4.0
+      image: ghcr.io/swifttui/swift-tui-linux:swift-6.4.3
     timeout-minutes: 20
 
     steps:
@@ -533,7 +533,7 @@ jobs:
     name: Android cross-compile
     runs-on: ubuntu-24.04
     container:
-      image: ghcr.io/swifttui/swift-tui-linux:swift-6.4.0
+      image: ghcr.io/swifttui/swift-tui-linux:swift-6.4.3
       options: --cap-add=SYS_PTRACE
     timeout-minutes: 30
     env:

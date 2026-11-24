@@ -2,7 +2,7 @@
 
 This directory owns the Linux build/test environment for SwiftTUI. It exists
 because most contributors develop on macOS, but the project ships on Linux
-(through Swift 6.4.0 on native amd64 and arm64 Ubuntu runners) and in browsers
+(through Swift 6.4.3 on native amd64 and arm64 Ubuntu runners) and in browsers
 (through the Wasm Swift SDK). Use this environment to reproduce a Linux failure
 on a Mac with one command.
 
@@ -67,7 +67,7 @@ Swiftly installs the pinned toolchain directly from Swift.org:
 | Tool          | Why it is preinstalled                                      |
 |---------------|-------------------------------------------------------------|
 | Swiftly       | Selects the repo-pinned Swift toolchain                     |
-| Swift 6.4.0   | Installed and selected through Swiftly                      |
+| Swift 6.4.3   | Installed and selected through Swiftly                      |
 | bun           | Runs the repo gate scripts                                  |
 | Wasm Swift SDK| Cross-compiles Swift packages to wasm32-unknown-wasi        |
 | binaryen      | Provides `wasm-opt` for local primary-repo Wasm diagnostics |
@@ -201,7 +201,7 @@ Each successful publish emits a manifest containing both `linux/amd64` and
 | Tag                | When                              | Purpose                       |
 |--------------------|-----------------------------------|-------------------------------|
 | `:latest`          | `main` only                       | What `linux.sh` defaults to   |
-| `:swift-6.4.0`     | successful publish from `main`            | Pin to a Swift toolchain      |
+| `:swift-6.4.3`     | successful publish from `main`            | Pin to a Swift toolchain      |
 | `:sha-<7-char-sha>` | successful publish from `main`            | Pin to an exact image build   |
 
 Pin to `:sha-…` from `linux.sh`:
@@ -412,7 +412,7 @@ command is:
 docker build \
   -f Scripts/linux/Dockerfile \
   -t ghcr.io/swifttui/swift-tui-linux:latest \
-  --build-arg SWIFT_VERSION=6.4.0 \
+  --build-arg SWIFT_VERSION=6.4.3 \
   --build-arg SWIFTLY_VERSION=1.1.4 \
   Scripts/linux
 ```

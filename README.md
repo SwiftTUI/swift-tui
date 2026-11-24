@@ -84,7 +84,7 @@ Add the package, depend on its `SwiftTUI` product, and `swift run`:
 
 ```swift
 // Package.swift
-.package(url: "https://github.com/SwiftTUI/swift-tui.git", .upToNextMajor(from: "0.25.0")),
+.package(url: "https://github.com/SwiftTUI/swift-tui.git", .upToNextMajor(from: "0.25.1")),
 // in your executable target:
 .product(name: "SwiftTUI", package: "swift-tui"),
 ```
@@ -209,7 +209,7 @@ Shipping something with SwiftTUI? Add it to
 [Projects using SwiftTUI](#projects-using-swifttui) so others can find it.
 
 Small, well-scoped issues and pull requests are easiest to review. The repo
-uses the pinned Swift 6.4.0 toolchain through `swiftly`: `swiftly run swift
+uses the pinned Swift 6.4.3 toolchain through `swiftly`: `swiftly run swift
 test` for the unit tests. Read [CONTRIBUTING.md](CONTRIBUTING.md)  
 Please join the [Discord](https://discord.gg/8j35kYDFxn) to discuss changes.
 

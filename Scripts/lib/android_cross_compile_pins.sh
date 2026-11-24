@@ -11,10 +11,10 @@
 # The gate refuses to run when .swift-version moves without them. The checksum
 # is the SHA-256 of the archive, which is also what `swift sdk install
 # --checksum` verifies.
-android_pin_swift_version="6.4.0"
-android_swift_sdk_id="swift-6.4.0-RELEASE_android"
-android_swift_sdk_url="https://download.swift.org/swift-6.4.0-release/android-sdk/swift-6.4.0-RELEASE/swift-6.4.0-RELEASE_android.artifactbundle.tar.gz"
-android_swift_sdk_sha256="21fb555122a3d801ad943d48df7ebffdd8824de61c25c180bb792d3edaee0b43"
+android_pin_swift_version="6.4.3"
+android_swift_sdk_id="swift-6.4.3-RELEASE_android"
+android_swift_sdk_url="https://download.swift.org/swift-6.4.3-release/android-sdk/swift-6.4.3-RELEASE/swift-6.4.3-RELEASE_android.artifactbundle.tar.gz"
+android_swift_sdk_sha256="a78839edf4ec161e03b9f1e22a0ef94e565ece3f3ce5c03e3c79246c6b71f0a9"
 
 # Android NDK. The Swift SDK bundle carries no NDK: its ndk-sysroot is linked
 # to a separately installed one by the bundle's own setup-android-sdk.sh. The

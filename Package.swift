@@ -91,14 +91,12 @@ let packageDependencies: [Package.Dependency] = [
   ),
   .package(
     url: "https://github.com/apple/swift-collections.git",
-    // 1.7.6's immortal empty Deque calls a mismatched WASI runtime shim in
-    // Swift 6.4, trapping at startup. Keep fresh consumers on working patches.
-    "1.7.2"..<"1.7.6"
+    // 1.7.6 traps in _swift_stdlib_immortalize on the Swift 6.4.3 WASI SDK.
+    "1.7.5"..<"1.7.6"
   ),
   .package(
     url: "https://github.com/apple/swift-async-algorithms.git",
-    // 1.1.5 is rejected by SwiftPM 6.3.3 because it disables undeclared default traits.
-    exact: "1.1.4"
+    from: "1.1.7"
   ),
   .package(
     url: "https://github.com/apple/swift-argument-parser.git",

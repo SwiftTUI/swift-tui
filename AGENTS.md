@@ -95,13 +95,13 @@ Internal source-layout context lives in
   `EnvFrameTraceSink` break in 0.0.26 also passed it. The repository gate now has a
   `wasm32-wasi cross-compile` lane for
   `SwiftTUIWASI`. Before you push a WASI-related change, run `swiftly run swift
-  build --swift-sdk swift-6.4.0-RELEASE_wasm --target SwiftTUIWASI`. Use
+  build --swift-sdk swift-6.4.3-RELEASE_wasm --target SwiftTUIWASI`. Use
   `--target`, not `--product`. A library-product build includes non-WASI PTY
   targets.
 - No host lane builds `#if os(Android)` code. The repository gate has an
   `Android cross-compile` lane for `SwiftTUIAndroidHost`. Before you push an
   Android-related change, run `Scripts/check_android_cross_compile.sh`. It
-  needs the `swift-6.4.0-RELEASE_android` Swift SDK and Android NDK
+  needs the `swift-6.4.3-RELEASE_android` Swift SDK and Android NDK
   `30.0.16248370`, and it fails when either is missing. On arm64 Linux, add
   `--triple aarch64-unknown-linux-android28 --build-system native`: Google
   ships Linux NDK host tools for x86_64 only.
@@ -128,7 +128,7 @@ Internal source-layout context lives in
 
 ## Swift Language Configuration
 
-- Swift 6.4.0, Swift 6 language mode, strict memory safety,
+- Swift 6.4.3, Swift 6 language mode, strict memory safety,
   `.defaultIsolation(.none)`.
 - Upcoming features enabled include `ExistentialAny`,
   `NonisolatedNonsendingByDefault`, `MemberImportVisibility`, and
