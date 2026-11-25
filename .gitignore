@@ -24,3 +24,7 @@ __pycache__/
 
 # Local tool managers
 mise.toml
+.claude
+.repowise
+.github/copilot-instructions.md
+
