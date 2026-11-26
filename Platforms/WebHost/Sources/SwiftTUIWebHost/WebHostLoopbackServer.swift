@@ -822,12 +822,6 @@ private func sessionURL(
   return components.url!
 }
 
-private func jsonString(
-  _ text: String
-) -> String {
-  JSONStringEncoding.quoted(text)
-}
-
 extension UInt16 {
   fileprivate init(
     webHostPort port: Int
