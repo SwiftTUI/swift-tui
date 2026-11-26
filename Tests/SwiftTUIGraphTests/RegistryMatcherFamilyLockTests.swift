@@ -19,12 +19,14 @@ struct RegistryMatcherFamilyLockTests {
     case focusDetachedOwner
     case identityPrefix
 
-    /// A marker unique to the family's matcher call. The paren-dot prefix on
-    /// the owner-key marker keeps it from matching inside the two free
-    /// functions' longer names.
+    /// A marker unique to the family's matcher call. The dot prefix and
+    /// lowercase `m` on the owner-key marker keep it from matching inside the
+    /// two free functions' longer names, while matching both a direct
+    /// `owner.matchesAnySubtreeRoot(` call and one on a parenthesized
+    /// fallback owner.
     var marker: String {
       switch self {
-      case .ownerKey: ").matchesAnySubtreeRoot("
+      case .ownerKey: ".matchesAnySubtreeRoot("
       case .focusDetachedOwner: "focusRegistrationMatchesAnySubtreeRoot("
       case .identityPrefix: "identityMatchesAnySubtreeRoot("
       }

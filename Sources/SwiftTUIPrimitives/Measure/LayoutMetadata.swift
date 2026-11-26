@@ -165,10 +165,6 @@ package struct LayoutMetadata: Sendable {
         }
       })
   }
-
-  package func viewDimensions(for size: CellSize) -> ViewDimensions {
-    applyingGuides(to: ViewDimensions(width: size.width, height: size.height))
-  }
 }
 
 extension LayoutMetadata: Equatable {

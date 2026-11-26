@@ -53,12 +53,6 @@ package struct StructuralFrameIndex: Equatable, Sendable {
     return matches.count == 1 ? matches[0] : nil
   }
 
-  package func runtimeIdentity(
-    for node: StructuralNodeKey
-  ) -> Identity? {
-    runtimeIdentityByNode[node]
-  }
-
   package func parentIdentity(
     of node: StructuralNodeKey
   ) -> Identity? {

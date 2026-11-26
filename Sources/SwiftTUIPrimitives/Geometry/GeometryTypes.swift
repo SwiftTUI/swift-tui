@@ -484,14 +484,6 @@ public struct ViewDimensions: Sendable {
     return value.map { ($0, evaluation.readsHalfCell) }
   }
 
-  /// Overrides guides with an integer provider; guides it does not answer
-  /// keep theirs.
-  package func overridingHorizontalGuides(
-    with provider: @escaping @Sendable (HorizontalAlignment) -> Int?
-  ) -> Self {
-    overridingHorizontalGuides(positions: { alignment in provider(alignment).map { ($0, false) } })
-  }
-
   package func overridingVerticalGuides(
     with provider: @escaping @Sendable (VerticalAlignment) -> Int?
   ) -> Self {

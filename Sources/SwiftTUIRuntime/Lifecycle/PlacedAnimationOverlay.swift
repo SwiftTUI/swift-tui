@@ -56,11 +56,6 @@ package struct PlacedAnimationOverlaySnapshot: Sendable {
     self.tintStyles = tintStyles
   }
 
-  /// No channel at all: the effective tree is the baseline.
-  package var isEmpty: Bool {
-    !hasTransientDecoration && adoptionOffsets.isEmpty && textRolls.isEmpty && tintStyles.isEmpty
-  }
-
   /// Whether an animation *sample* decorates the tree this frame: an exit
   /// overlay, an insertion offset or scale, or a matched-geometry offset.
   /// These are the channels the retained-products and incremental-raster

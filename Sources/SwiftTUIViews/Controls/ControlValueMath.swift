@@ -15,20 +15,13 @@ import SwiftTUICore
 // slider helpers) — so it stays `private` with zero access widening.
 
 protocol AdjustableControlValue: Comparable, SignedNumeric, Sendable {
-  init(_ value: Int)
   var controlDoubleValue: Double { get }
   static func accessibilityValue(_ value: Double) -> Self?
-  static func sanitizedControlStep(_ step: Self) -> Self
   static func steppedControlValue(
     from value: Self,
     delta: Int,
     step: Self,
     bounds: ClosedRange<Self>?
-  ) -> Self
-  static func controlValueFromTrack(
-    _ rawValue: Double,
-    bounds: ClosedRange<Self>,
-    step: Self
   ) -> Self
   static func controlFraction(_ value: Self, bounds: ClosedRange<Self>) -> Double
   static func controlValue(at fraction: Double, bounds: ClosedRange<Self>, step: Self) -> Self

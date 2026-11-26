@@ -93,7 +93,6 @@ public struct OutlineStyleConfiguration: Sendable {
 
 private protocol AnyOutlineStyleBox: AnyStyleBox {
   var snapshotLabel: String { get }
-  var debugDescription: String { get }
 
   @MainActor
   func presentation(for configuration: OutlineStyleConfiguration) -> OutlineStylePresentation
@@ -103,10 +102,6 @@ extension ConcreteStyleBox: AnyOutlineStyleBox where S: OutlineStyle {
 
   var snapshotLabel: String {
     style.snapshotLabel
-  }
-
-  var debugDescription: String {
-    String(reflecting: style)
   }
 
   @MainActor

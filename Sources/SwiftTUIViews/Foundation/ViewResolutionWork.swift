@@ -336,6 +336,17 @@ private func resolveBodyElements<V: View>(
   of bound: V,
   in context: ResolveContext
 ) -> ResolveWork<[ResolvedNode]> {
+  // Ambient-wins is load-bearing here: capture-hosted content (tab bodies,
+  // scoped payloads, dirty-frontier evaluator re-runs) deliberately
+  // evaluates under a reinstalled enclosing scope, and re-scoping at this
+  // boundary detaches those bodies' captured @State from their true owner
+  // (verified by ButtonFocusStabilityTests' TabView delete regression).
+  // The multi-mount aliasing this would otherwise allow (one view VALUE
+  // mounted at several identities sharing one state owner) is handled at
+  // the chain-content seam instead: an identity modifier's per-mount
+  // rebase survives the inner chains' capture reinstall via
+  // `AuthoringContext.rebasedFromOwnerNodeID` (see
+  // `ModifierContentInputs.applyAuthoringContext`).
   let authoring = currentAuthoringContext() ?? makeAuthoringContext(for: context)
   return withAuthoringContext(authoring) {
     #if DEBUG

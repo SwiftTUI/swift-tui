@@ -519,18 +519,6 @@ struct TerminalCellTextRenderer {
     }
   }
 
-  private func escapeSequence(
-    forCodes codes: [Int]
-  ) -> String {
-    escapeSequence(forCodeStrings: codes.map(String.init))
-  }
-
-  private func escapeSequence(
-    forCodeStrings codes: [String]
-  ) -> String {
-    "\u{001B}[\(codes.joined(separator: ";"))m"
-  }
-
   private func openHyperlinkSequence(
     for destination: LinkDestination
   ) -> String {

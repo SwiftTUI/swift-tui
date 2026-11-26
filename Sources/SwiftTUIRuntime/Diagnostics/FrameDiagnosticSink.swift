@@ -1,5 +1,3 @@
-import SwiftTUICore
-
 /// Neutral per-frame emit contract between the runtime and the profiling
 /// product.
 ///

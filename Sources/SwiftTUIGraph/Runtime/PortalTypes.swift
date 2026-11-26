@@ -175,13 +175,6 @@ package func portalOrderingPrecedes(
   return lhs.stableTieBreaker < rhs.stableTieBreaker
 }
 
-package func portalOrderingIsAbove(
-  _ lhs: PortalOrdering,
-  _ rhs: PortalOrdering
-) -> Bool {
-  portalOrderingPrecedes(rhs, lhs)
-}
-
 /// Dismiss route for an overlay entry.
 package struct DismissStackEntry<ID: Hashable & Sendable>: Sendable {
   package var id: ID

@@ -413,6 +413,7 @@ final class SceneRuntime {
   }
 }
 
+// periphery:ignore - thrown only in the Windows and fallback-platform branches
 enum SceneRuntimeError: Error, Equatable, Sendable, CustomStringConvertible {
   case secondaryScenesRequireAttachSubsystem
 

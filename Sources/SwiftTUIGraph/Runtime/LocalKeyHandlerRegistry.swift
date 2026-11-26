@@ -386,13 +386,6 @@ package final class LocalKeyHandlerRegistry: Equatable {
     }
   }
 
-  private func matchesAnySubtreeRoot(
-    _ identity: Identity,
-    roots: [Identity]
-  ) -> Bool {
-    (ownersByIdentity[identity] ?? .init(identity: identity)).matchesAnySubtreeRoot(roots)
-  }
-
   /// Evicts contributed buckets whose owning node has departed.
   ///
   /// One identity's handlers are contributed by several *live* nodes, so a

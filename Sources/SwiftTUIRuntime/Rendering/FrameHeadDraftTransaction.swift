@@ -389,13 +389,6 @@ package struct FrameHeadDraft {
   }
 
   var graphDraft: ViewGraphFrameDraft { transaction.graphDraft }
-  var registrationDraft: FrameHeadRegistrationDraft { transaction.registrationDraft }
-  var presentationPortalDraft: PresentationPortalDraft {
-    transaction.presentationPortalDraft
-  }
-  var observationDraft: ObservationBridgeDraft? { transaction.observationDraft }
   var animationDraft: AnimationFrameDraft { transaction.animationDraft }
-  /// The abort checkpoint bundle. `nil` for one-shot heads.
-  var checkpoints: FrameHeadCheckpoints? { transaction.checkpoints }
   @MainActor var headTimings: FrameHeadTimings { transaction.headTimings }
 }

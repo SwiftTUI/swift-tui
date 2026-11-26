@@ -54,10 +54,6 @@ package enum TextFigureSupport {
     return ()
   }()
 
-  package static var availableFonts: [TextFigureFont] {
-    TextFigureFont.allCases
-  }
-
   package static func layoutMetrics(
     for payload: TextFigurePayload
   ) -> TextFigureLayoutMetrics {

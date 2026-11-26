@@ -21,11 +21,4 @@
 package enum MeasurementGrade: Equatable, Sendable {
   case probe
   case commit
-
-  /// Sticky-downward composition: any request issued while executing a
-  /// probe-grade item is probe-grade; a commit-grade container issues at
-  /// its site's own grade.
-  package func effective(site: MeasurementGrade) -> MeasurementGrade {
-    self == .probe ? .probe : site
-  }
 }

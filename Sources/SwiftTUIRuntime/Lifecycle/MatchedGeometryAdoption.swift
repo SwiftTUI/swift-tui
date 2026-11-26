@@ -94,32 +94,6 @@ package enum MatchedGeometryAdoption {
     return pairs
   }
 
-  /// The placed deltas that move (and resize) each non-source onto its
-  /// source. `sourceRectOverrides` names the rect a source is *drawn* at
-  /// this frame when a live offset moves it (its own matched or insertion
-  /// animation), so an adoptee follows a source mid-flight; the time-free
-  /// capture passes none and reads the baseline.
-  package static func offsets(
-    for pairs: [MatchedGeometryAdoptionPair],
-    sourceRectOverrides: [Identity: CellRect] = [:]
-  ) -> [PlacedAnimationOverlayOffset] {
-    pairs.map { pair in
-      let target = sourceRectOverrides[pair.source] ?? pair.sourceBounds
-      let rect = adoptedRect(
-        nonSource: pair.nonSourceBounds,
-        source: target,
-        properties: pair.properties,
-        anchor: pair.anchor
-      )
-      return .init(
-        identity: pair.nonSource,
-        dx: rect.origin.x - pair.nonSourceBounds.origin.x,
-        dy: rect.origin.y - pair.nonSourceBounds.origin.y,
-        size: pair.properties.contains(.size) ? rect.size : nil
-      )
-    }
-  }
-
   /// The rect a non-source renders at: the non-source as if it had just
   /// received its key from `source` (progress 0 of a source→non-source
   /// match under the non-source's `properties`/`anchor`), so `.position`

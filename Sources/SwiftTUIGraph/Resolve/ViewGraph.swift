@@ -663,12 +663,6 @@ package final class ViewGraph {
     GraphNodeIndexQuery.identities(for: viewNodeIDs, in: index)
   }
 
-  private func nodeIDs(
-    for identities: Set<Identity>
-  ) -> Set<ViewNodeID> {
-    GraphNodeIndexQuery.nodeIDs(for: identities, in: index)
-  }
-
   private func applyResolvedNode(
     _ node: ViewNode,
     resolved: ResolvedNode,
@@ -2286,20 +2280,6 @@ package final class ViewGraph {
     return node.isEvaluating && node.identity != identity
   }
 
-  /// Whether `entityIdentity` currently routes to `node`. The explicit-`.id`
-  /// churn predicate uses this as a continuity signal: a slot whose resolved
-  /// identity re-rooted away from its structural identity is NOT churning when
-  /// the arriving modifier's entity already lives on this very node — that is
-  /// the steady state of a collapsed chain whose deeper `.id` re-rooted the
-  /// resolved identity (`.id(stable)` inside `.id(owner)`); treating it as
-  /// churn re-records a departure and suppresses reuse on every frame.
-  package func entityRouteIsBound(
-    _ entityIdentity: EntityIdentity,
-    to node: ViewNode
-  ) -> Bool {
-    entityRoutingTable.route(entityIdentity) == node.viewNodeID
-  }
-
   /// The entity currently claiming `node`: its committed value's attached
   /// entity, or the routing table's binding for it — the same derivation
   /// `prepareEntityRoutedOwner` uses to detect a foreign occupant. The
@@ -3295,16 +3275,6 @@ package final class ViewGraph {
       resolved: resolved,
       placed: placed
     )
-  }
-
-  package func previewLifecycleEvents(
-    resolved: ResolvedNode,
-    placed: ViewportVisibilitySummary?
-  ) -> [LifecycleEvent] {
-    previewLifecycleEventPlan(
-      resolved: resolved,
-      placed: placed
-    ).events
   }
 
   func teardownWorkSnapshot() -> TeardownWorkSnapshot {

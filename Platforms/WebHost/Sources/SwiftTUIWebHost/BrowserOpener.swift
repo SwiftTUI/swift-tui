@@ -31,6 +31,7 @@ package struct SystemBrowserOpener: BrowserOpening {
   }
 }
 
+// periphery:ignore - thrown only in the Windows and unsupported-platform branches
 package enum BrowserOpenerError: Error, Equatable, Sendable, CustomStringConvertible {
   case unsupportedPlatform
   case launchFailed(Int)

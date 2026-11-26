@@ -286,9 +286,6 @@ package final class AnimationController: Sendable {
 
   /// Target frame interval during active animation (30 FPS).
   private let frameInterval: Duration = .milliseconds(33)
-  /// Default duration used for transition animations when no explicit
-  /// animation is in the transaction.
-  private let defaultTransitionDuration: Duration = .milliseconds(250)
 
   package init() {}
 
@@ -432,12 +429,6 @@ package final class AnimationController: Sendable {
     previousMatchedKeyIdentities = capture.matchedIdentities
     previousAdoptionOffsets = capture.adoptionOffsets
     return capture.adoptionPairs
-  }
-
-  /// The identities adopted onto a source in the previously captured placed
-  /// tree. Test hook.
-  package var previousAdoptedIdentities: Set<Identity> {
-    Set(previousAdoptionOffsets.keys)
   }
 
   /// Number of matched-geometry animations currently in flight.
@@ -1629,71 +1620,6 @@ package final class AnimationController: Sendable {
         }
       }
       return nil
-    }
-
-    /// Walks two resolved trees in lockstep and names the first node path +
-    /// field where `==` diverges — the F66 skip-premise assert's forensic
-    /// payload, so a premise break names its divergent subtree instead of
-    /// requiring a live reproduction to localize.
-    package static func debugFirstDivergence(
-      _ lhs: ResolvedNode,
-      _ rhs: ResolvedNode,
-      path: String
-    ) -> String {
-      if lhs.identity != rhs.identity {
-        return "\(path): identity \(lhs.identity.path) vs \(rhs.identity.path)"
-      }
-      if lhs.structuralPath != rhs.structuralPath { return "\(path): structuralPath" }
-      if lhs.structuralEdgeRole != rhs.structuralEdgeRole { return "\(path): structuralEdgeRole" }
-      if lhs.entityIdentity != rhs.entityIdentity { return "\(path): entityIdentity" }
-      if lhs.entityStructuralPath != rhs.entityStructuralPath {
-        return "\(path): entityStructuralPath"
-      }
-      if lhs.declarationOwnerEdge != rhs.declarationOwnerEdge {
-        return "\(path): declarationOwnerEdge"
-      }
-      if lhs.kind != rhs.kind { return "\(path): kind \(lhs.kind) vs \(rhs.kind)" }
-      if !ResolvedNode.typeDiscriminatorsCompatible(lhs.typeDiscriminator, rhs.typeDiscriminator) {
-        return "\(path): typeDiscriminator"
-      }
-      if lhs.environmentSnapshot != rhs.environmentSnapshot {
-        return "\(path): environmentSnapshot"
-      }
-      if lhs.transactionSnapshot != rhs.transactionSnapshot {
-        return "\(path): transactionSnapshot"
-      }
-      if lhs.layoutBehavior != rhs.layoutBehavior { return "\(path): layoutBehavior" }
-      if lhs.layoutMetadata != rhs.layoutMetadata { return "\(path): layoutMetadata" }
-      if lhs.layoutRealizedContent?.equivalenceSignature
-        != rhs.layoutRealizedContent?.equivalenceSignature
-      {
-        return "\(path): layoutRealizedContent"
-      }
-      if lhs.drawMetadata != rhs.drawMetadata { return "\(path): drawMetadata" }
-      if lhs.drawEffects != rhs.drawEffects { return "\(path): drawEffects" }
-      if lhs.surfaceComposition != rhs.surfaceComposition { return "\(path): surfaceComposition" }
-      if lhs.semanticMetadata != rhs.semanticMetadata { return "\(path): semanticMetadata" }
-      if lhs.lifecycleMetadata != rhs.lifecycleMetadata { return "\(path): lifecycleMetadata" }
-      if lhs.drawPayload != rhs.drawPayload { return "\(path): drawPayload" }
-      if lhs.intrinsicSize != rhs.intrinsicSize { return "\(path): intrinsicSize" }
-      if lhs.indexedChildSource?.measurementSignature
-        != rhs.indexedChildSource?.measurementSignature
-      {
-        return "\(path): indexedChildSource"
-      }
-      if lhs.preferenceValues != rhs.preferenceValues { return "\(path): preferenceValues" }
-      if lhs.supportsRetainedReuse != rhs.supportsRetainedReuse {
-        return "\(path): supportsRetainedReuse"
-      }
-      if lhs.matchedGeometry != rhs.matchedGeometry { return "\(path): matchedGeometry" }
-      if lhs.isTransient != rhs.isTransient { return "\(path): isTransient" }
-      if lhs.children.count != rhs.children.count {
-        return "\(path): children.count \(lhs.children.count) vs \(rhs.children.count)"
-      }
-      for (index, (l, r)) in zip(lhs.children, rhs.children).enumerated() where l != r {
-        return debugFirstDivergence(l, r, path: "\(path)[\(index)]<\(l.identity.path)>")
-      }
-      return "\(path): (equal?)"
     }
   #endif
 

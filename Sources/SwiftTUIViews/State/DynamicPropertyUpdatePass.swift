@@ -207,11 +207,6 @@ package enum DynamicPropertyDescriptorCache {
     unsafe cachedUpdatePlan(for: type) != nil
   }
 
-  /// Test seam: drops all cached plans.
-  package static func resetForTesting() {
-    unsafe plansByType.removeAll(keepingCapacity: false)
-  }
-
   private static func buildDescriptor(from mirror: Mirror) -> DynamicPropertyDescriptor {
     var fields: [DynamicPropertyDescriptor.Field] = []
     for (index, child) in mirror.children.enumerated() where child.value is any DynamicProperty {

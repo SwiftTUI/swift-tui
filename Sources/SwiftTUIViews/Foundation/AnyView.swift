@@ -10,10 +10,6 @@ import SwiftTUICore
 public struct AnyView: PrimitiveView, IterativeResolvableView {
   private let storage: AnyViewStorage
 
-  package init<V: View & ResolvableView>(resolving view: V) {
-    storage = Self.makeStorage(view, authoringContext: nil)
-  }
-
   package init<V: View>(
     scoped view: V,
     authoringContext: AuthoringContext?
@@ -28,16 +24,6 @@ public struct AnyView: PrimitiveView, IterativeResolvableView {
   /// behavior.
   public init<V: View>(_ view: V) {
     storage = Self.makeStorage(view, authoringContext: nil)
-  }
-
-  package init<Node: ViewNode>(erasing view: Node) {
-    storage = .init(
-      typeID: .init(erasing: Node.self),
-      authoringContext: nil,
-      resolve: { context in
-        .deferred { .value(view.resolve(in: context)) }
-      }
-    )
   }
 
   public var body: Never {
@@ -130,12 +116,6 @@ public struct AnyView: PrimitiveView, IterativeResolvableView {
         )
       }
     )
-  }
-}
-
-extension AnyView: ViewNode {
-  package func resolve(in context: ResolveContext) -> ResolvedNode {
-    resolveView(self, in: context)
   }
 }
 

@@ -34,8 +34,4 @@ package enum EnvironmentKeyReuseClassification {
       return classification
     }
   }
-
-  package static func resetForTesting() {
-    classificationsByKey.withLock { $0.removeAll(keepingCapacity: false) }
-  }
 }

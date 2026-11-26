@@ -2420,7 +2420,6 @@ struct LayoutEngineTests {
   func customLayoutHandlesDefaultToMainActorExecution() {
     let handle = CustomLayoutHandle(NoOpCustomLayoutProxy())
 
-    #expect(handle.executionCapability == .mainActorOnly)
     #expect(!handle.canRunOnWorker)
     #expect(handle.workerProxy == nil)
   }
@@ -2433,7 +2432,6 @@ struct LayoutEngineTests {
       workerProxy: workerProxy
     )
 
-    #expect(handle.executionCapability == .worker)
     #expect(handle.canRunOnWorker)
     #expect(try #require(handle.workerProxy).debugName == "NoOpWorkerCustomLayoutProxy")
   }

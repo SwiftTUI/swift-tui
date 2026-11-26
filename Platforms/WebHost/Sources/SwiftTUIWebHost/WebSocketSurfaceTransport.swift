@@ -1,5 +1,4 @@
 @_spi(Runners) import SwiftTUIRuntime
-import SwiftTUIWASISurfaceBridge
 import Synchronization
 
 package protocol WebHostByteSink: Sendable {

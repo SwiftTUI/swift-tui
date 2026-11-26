@@ -8,10 +8,6 @@ extension ViewNode {
     package struct StateSlotSnapshot: Equatable {
       package var slot: StateSlotIdentifier
       package var storedTypeDescription: String
-
-      package var ordinal: Int {
-        slot.ordinal
-      }
     }
 
     package struct HandlerSnapshot: Equatable {

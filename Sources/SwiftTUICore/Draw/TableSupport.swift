@@ -52,25 +52,6 @@ package func borderedTableLineWidth(
   )
 }
 
-package func renderTableLine(
-  cells: [String],
-  widths: [Int],
-  columns: [TableColumnPayload],
-  usesTitleAlignment: Bool = false
-) -> String {
-  widths.enumerated().map { index, width in
-    let cell = index < cells.count ? cells[index] : ""
-    let alignment =
-      if index < columns.count {
-        usesTitleAlignment ? columns[index].titleAlignment : columns[index].alignment
-      } else {
-        TableCellAlignment.leading
-      }
-    return renderTableCell(cell, width: width, alignment: alignment)
-  }
-  .joined(separator: " | ")
-}
-
 package func renderTableCell(
   _ content: String,
   width: Int,

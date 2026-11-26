@@ -1,3 +1,4 @@
+// periphery:ignore - used by the Windows-only body below
 import SwiftTUICore
 
 #if canImport(ucrt)

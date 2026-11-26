@@ -90,8 +90,6 @@ package struct LayoutDependentContentRealization: Sendable {
 
 @MainActor
 package protocol LayoutDependentContentRealizer: AnyObject, Sendable {
-  var debugName: String { get }
-
   func realize(in context: LayoutRealizationContext) -> [ResolvedNode]
 }
 
@@ -104,12 +102,6 @@ package final class LayoutDependentContentHandle: Sendable {
     _ realizer: any LayoutDependentContentRealizer
   ) {
     self.realizer = realizer
-  }
-
-  package var debugName: String {
-    withCheckedMainActorAccess("LayoutDependentContentHandle.debugName") {
-      realizer.debugName
-    }
   }
 
   package func realize(
@@ -152,8 +144,6 @@ package struct LayoutRealizedContentBoundary: Sendable {
     "\(identity.path)#\(debugName)#\(sizingPolicy)"
   }
 }
-
-package typealias LayoutRealizationGeometry = LayoutRealizationContext
 
 extension ResolvedNode {
   package func applyingLayoutDependentRealizations(

@@ -77,14 +77,6 @@ package protocol WebHostServer: Sendable {
   ) async throws -> WebHostServerSession
 }
 
-extension WebHostServer {
-  package func start(
-    configuration: WebHostConfig, token: WebHostToken, scene: WebHostSceneDescriptor
-  ) async throws -> WebHostServerSession {
-    try await start(configuration: configuration, token: token, scenes: [scene])
-  }
-}
-
 package enum WebHostServerError: Error, Equatable, Sendable, CustomStringConvertible {
   case invalidScenes
   case unsupportedPort(Int)

@@ -132,9 +132,6 @@ package final class WebSocketInputReader: ScopedInputReading, Sendable {
   }
   private let scopedQueue = WebHostIngressQueue<ScopedInputEvent>()
   private let inputQueue = WebHostIngressQueue<InputEvent>()
-  package var ingressSnapshot: WebHostIngressQueue<ScopedInputEvent>.Snapshot {
-    scopedQueue.snapshot
-  }
 
   /// Internal because `WebSurfaceInputControlMessage` reaches this module
   /// through an internal import; the package-visible entry point is the

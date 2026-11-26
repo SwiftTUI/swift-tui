@@ -4,14 +4,9 @@ import SwiftTUICore
 //
 // These declare the contract every authored view satisfies — the public
 // `View` protocol consumers implement, plus the package-internal resolution
-// protocols (`ViewNode`, `PrimitiveView`, `ResolvableView`,
-// `DeclaredChildrenView`) the resolver dispatches through. The `Resolver`
-// itself lives in `ViewFoundation.swift`.
-
-@MainActor
-package protocol ViewNode {
-  func resolve(in context: ResolveContext) -> ResolvedNode
-}
+// protocols (`PrimitiveView`, `ResolvableView`, `DeclaredChildrenView`) the
+// resolver dispatches through. The `Resolver` itself lives in
+// `ViewFoundation.swift`.
 
 /// A declarative unit of terminal UI content.
 ///

@@ -19,26 +19,5 @@
 extension ViewNode {
   package var resolvedIdentity: Identity { committed.identity }
   package var kind: NodeKind { committed.kind }
-  package var environmentSnapshot: EnvironmentSnapshot { committed.environmentSnapshot }
-  package var transactionSnapshot: TransactionSnapshot { committed.transactionSnapshot }
-  package var layoutBehavior: LayoutBehavior { committed.layoutBehavior }
-  package var layoutRealizedContent: LayoutRealizedContentBoundary? {
-    committed.layoutRealizedContent
-  }
-  package var layoutMetadata: LayoutMetadata { committed.layoutMetadata }
-  package var drawMetadata: DrawMetadata { committed.drawMetadata }
-  package var semanticMetadata: SemanticMetadata { committed.semanticMetadata }
   package var lifecycleMetadata: LifecycleMetadata { committed.lifecycleMetadata }
-  package var drawPayload: DrawPayload { committed.drawPayload }
-  package var intrinsicSize: CellSize? { committed.intrinsicSize }
-  package var indexedChildSource: (any IndexedChildSource)? { committed.indexedChildSource }
-  package var preferenceValues: PreferenceValues { committed.preferenceValues }
-  package var supportsRetainedReuse: Bool { committed.supportsRetainedReuse }
-
-  /// Derived on demand from `committed.children`.  Previously a stored
-  /// field that was set in `apply()`; now computed so it can never drift
-  /// from its source.
-  package var childDescriptors: [ChildDescriptor] {
-    committed.children.map(ChildDescriptor.init)
-  }
 }

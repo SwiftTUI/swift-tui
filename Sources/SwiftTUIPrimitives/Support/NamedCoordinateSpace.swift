@@ -28,11 +28,6 @@ public struct NamedCoordinateSpace: Hashable, Sendable, CustomStringConvertible 
 
   private let storage: Storage
 
-  /// Type-sensitive identity: equal only for the same name type and value.
-  package var identity: AnyID {
-    storage.identity
-  }
-
   /// The name's diagnostic spelling.
   ///
   /// Stable for logs and frame diagnostics. Not an identity: distinct spaces

@@ -39,10 +39,6 @@ struct MatchedGeometryAnimationPlans {
   /// frame — the counterpart a departing instance's exit overlay travels
   /// toward while its transition plays.
   var destinationIdentityByKey: [MatchedGeometryKey: Identity]
-
-  var consumedKeys: Set<MatchedGeometryKey> {
-    Set(destinationIdentityByKey.keys)
-  }
 }
 
 enum AnimationResolvedTreeDiffing {

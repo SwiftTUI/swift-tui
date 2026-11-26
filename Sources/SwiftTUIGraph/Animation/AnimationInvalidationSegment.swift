@@ -130,10 +130,6 @@ package struct FrameAnimationTransactionPlan: Equatable, Sendable {
     !segments.isEmpty
   }
 
-  package var liveBatchIDs: [AnimationBatchID] {
-    AnimationInvalidationSegments.liveBatchIDs(in: segments)
-  }
-
   /// Every distinct transaction snapshot represented by this plan, base first.
   package var transactions: [TransactionSnapshot] {
     var result = [base]

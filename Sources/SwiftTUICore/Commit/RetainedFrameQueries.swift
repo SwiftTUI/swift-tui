@@ -423,10 +423,6 @@ package struct RetainedInvalidationSummary: Sendable {
     base.directlyInvalidated
   }
 
-  package var identitiesWithInvalidatedDescendants: Set<Identity> {
-    base.identitiesWithInvalidatedDescendants
-  }
-
   package init(
     invalidatedIdentities: Set<Identity>,
     previousFrameIndex: RetainedFrameIndex?

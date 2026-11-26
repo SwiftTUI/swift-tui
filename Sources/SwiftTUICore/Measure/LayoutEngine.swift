@@ -66,21 +66,6 @@ package struct LayoutEngine: Sendable {
     )
   }
 
-  /// Places a measured tree inside `bounds`.
-  package func place(
-    _ resolved: ResolvedNode,
-    measured: MeasuredNode,
-    in bounds: CellRect
-  ) -> PlacedNode {
-    let passContext = LayoutPassContext()
-    return place(
-      resolved,
-      measured: measured,
-      in: bounds,
-      passContext: passContext
-    )
-  }
-
   package func place(
     _ resolved: ResolvedNode,
     measured: MeasuredNode,
@@ -97,6 +82,7 @@ package struct LayoutEngine: Sendable {
     )
   }
 
+  /// Places a measured tree inside `bounds`.
   package func place(
     _ resolved: ResolvedNode,
     measured: MeasuredNode,

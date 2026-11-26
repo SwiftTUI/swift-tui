@@ -39,11 +39,6 @@ package struct PortalSurfacePresentation: Sendable {
   }
 
   @MainActor
-  package func resolve(_ item: PromptPresentationItem, in context: ResolveContext) -> ResolvedNode {
-    resolveBody(item, context).run()
-  }
-
-  @MainActor
   package func resolveWork(_ item: PromptPresentationItem, in context: ResolveContext)
     -> ResolveWork<ResolvedNode>
   {

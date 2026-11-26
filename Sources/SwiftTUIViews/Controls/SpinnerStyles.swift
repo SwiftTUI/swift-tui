@@ -268,7 +268,6 @@ public struct GlyphSpinnerStyle: SpinnerStyle, Equatable, Sendable {
 
 private protocol AnySpinnerStyleBox: AnyStyleBox {
   var snapshotLabel: String { get }
-  var debugDescription: String { get }
 
   @MainActor
   func presentation(for configuration: SpinnerStyleConfiguration) -> SpinnerStylePresentation
@@ -278,10 +277,6 @@ extension ConcreteStyleBox: AnySpinnerStyleBox where S: SpinnerStyle {
 
   var snapshotLabel: String {
     style.snapshotLabel
-  }
-
-  var debugDescription: String {
-    String(reflecting: style)
   }
 
   @MainActor

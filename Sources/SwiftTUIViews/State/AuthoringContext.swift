@@ -42,7 +42,7 @@ package struct AuthoringContext {
   var stateGraphScope: StateGraphScopeID?
   var ordinalTracker: AuthoringOrdinalTracker = .init()
   /// When this context is a per-mount rebase of a captured enclosing scope
-  /// (an identity modifier's `resolveOwned`), the owner the capture named
+  /// (an identity modifier's `resolveOwnedWork`), the owner the capture named
   /// before the rebase. A modifier chain about to reinstall a construction
   /// capture with this same owner is looking at the scope this context was
   /// derived from — the ambient rebase is the mount-specific refinement and

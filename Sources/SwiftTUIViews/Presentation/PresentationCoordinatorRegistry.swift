@@ -37,14 +37,6 @@ where C.Item: PortalPresentationItem, C.Item.ID: Sendable {
     instance().restoreCheckpoint(coordinatorCheckpoint)
   }
 
-  package var zIndex: Int {
-    C.zIndex
-  }
-
-  package var isActive: Bool {
-    coordinator?.isActive ?? false
-  }
-
   package var declaredSourceIdentities: Set<Identity> {
     coordinator?.declaredSourceIdentities ?? []
   }

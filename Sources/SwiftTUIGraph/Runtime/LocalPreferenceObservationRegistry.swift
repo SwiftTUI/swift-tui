@@ -47,8 +47,6 @@ package struct PreferenceObservationRegistrationSnapshot: Sendable {
 }
 
 private protocol PreferenceObservationBox: Sendable {
-  var valueSnapshot: String { get }
-
   func value<Value>(as type: Value.Type) -> Value?
   func changed(
     from previous: (any PreferenceObservationBox)?
@@ -60,10 +58,6 @@ private struct TypedPreferenceObservationBox<Key: PreferenceKey>: PreferenceObse
 where Key.Value: Equatable {
   let value: Key.Value
   let action: @MainActor (Key.Value) -> Void
-
-  var valueSnapshot: String {
-    String(reflecting: value)
-  }
 
   func value<Value>(as type: Value.Type) -> Value? {
     value as? Value

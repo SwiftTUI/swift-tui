@@ -1,5 +1,3 @@
-import SwiftTUICore
-
 /// Combines input at the scene owner. Browser departure never finishes the
 /// scene; secondary terminal readers can restart without restarting its graph.
 @MainActor

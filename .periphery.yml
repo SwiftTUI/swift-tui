@@ -1,0 +1,30 @@
+# Periphery dead-code scan configuration (https://github.com/peripheryapp/periphery).
+#
+# Run the scan through Scripts/scan_dead_code.sh: it builds the two index
+# stores named below, then calls `periphery scan`, which reads this file. The
+# script's header explains what the scan cannot see and how to mark code that
+# is unused on purpose.
+
+# Library products: public and SPI declarations are the contract, not dead code.
+retain_public: true
+
+# Read these stores instead of building. The macOS debug build with tests is
+# the baseline. The wasm32-wasi build of SwiftTUIWASI lets the scan see
+# WASI-only code and its callers.
+index_store_path:
+  - .build-periphery/out
+  - .build-periphery-wasm/out
+
+# Dependency checkouts under the two scratch paths are not this repository's code.
+index_exclude:
+  - "**/.build-periphery*/**/*"
+
+report_exclude:
+  # Contracts/1/generate.py emits the same constants for every language
+  # binding. Pruning them is a contract-kit decision.
+  - "**/*.generated.swift"
+  # Vendored third-party sources.
+  - "Vendor/**"
+
+relative_results: true
+disable_update_check: true

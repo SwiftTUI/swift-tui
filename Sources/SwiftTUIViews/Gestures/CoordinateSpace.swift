@@ -87,21 +87,6 @@ public struct CoordinateSpace: Equatable, Sendable {
   }
 
   /// Resolves a terminal-global continuous rect into this coordinate space,
-  /// using the named coordinate-space frames extracted for the current frame.
-  package func resolve(
-    terminalRect: Rect,
-    targetRect: CellRect,
-    namedCoordinateSpaces: [NamedCoordinateSpace: CellRect]
-  ) -> Rect {
-    resolve(
-      terminalRect: terminalRect,
-      targetRect: targetRect,
-      namedCoordinateSpaces: namedCoordinateSpaces,
-      diagnosticsRecorder: nil
-    )
-  }
-
-  /// Resolves a terminal-global continuous rect into this coordinate space,
   /// recording deterministic diagnostics for geometry-proxy fallbacks.
   package func resolve(
     terminalRect: Rect,

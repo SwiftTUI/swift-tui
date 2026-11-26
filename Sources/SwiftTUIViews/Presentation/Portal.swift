@@ -18,18 +18,6 @@ package struct PortalAttachmentContentPayload: Sendable {
 
   package init(
     hasDeclaredContent: Bool = true,
-    resolveElements:
-      @escaping @MainActor @Sendable (ResolveContext, ResolveContext) -> [ResolvedNode]
-  ) {
-    self.init(
-      hasDeclaredContent: hasDeclaredContent,
-      resolveElementsWork: { context, root in
-        .deferred { .value(resolveElements(context, root)) }
-      })
-  }
-
-  package init(
-    hasDeclaredContent: Bool = true,
     resolveElementsWork:
       @escaping @MainActor @Sendable (ResolveContext, ResolveContext) -> ResolveWork<[ResolvedNode]>
   ) {
@@ -111,20 +99,6 @@ package struct PortalAttachmentPayload: Sendable {
       authoringContext: authoringContext,
       content: content
     )
-  }
-
-  package func resolve(
-    in context: ResolveContext,
-    placementRoot: ResolveContext? = nil
-  ) -> ResolvedNode {
-    payload.resolve(in: context, placementRoot: placementRoot)
-  }
-
-  package func resolveElements(
-    in context: ResolveContext,
-    placementRoot: ResolveContext? = nil
-  ) -> [ResolvedNode] {
-    payload.resolveElements(in: context, placementRoot: placementRoot)
   }
 
   package func resolveElementsWork(in context: ResolveContext, placementRoot: ResolveContext? = nil)

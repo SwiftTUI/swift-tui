@@ -72,10 +72,6 @@ extension ViewGraph {
       identities(for: graphLocalDirtyNodeIDs)
     }
 
-    package var liveIdentities: Set<Identity> {
-      identities(for: liveNodeIDs)
-    }
-
     private func identities(
       for nodeIDs: Set<ViewNodeID>
     ) -> Set<Identity> {

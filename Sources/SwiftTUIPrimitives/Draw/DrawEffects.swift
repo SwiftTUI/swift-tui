@@ -38,10 +38,4 @@ package struct DrawEffects: Equatable, Sendable {
   package mutating func append(_ effect: DrawEffect) {
     ordered.append(effect)
   }
-
-  package func appending(_ effect: DrawEffect) -> Self {
-    var copy = self
-    copy.append(effect)
-    return copy
-  }
 }

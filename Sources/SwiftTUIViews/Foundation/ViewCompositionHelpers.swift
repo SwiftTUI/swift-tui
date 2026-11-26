@@ -26,27 +26,12 @@ package struct ScopedContentPayload: Sendable {
   }
 
   package init(
-    resolveElements:
-      @escaping @MainActor @Sendable (ResolveContext, ResolveContext) -> [ResolvedNode]
-  ) {
-    self.init(resolveElementsWork: { context, root in
-      .deferred { .value(resolveElements(context, root)) }
-    })
-  }
-
-  package init(
     resolveElementsWork:
       @escaping @MainActor @Sendable (ResolveContext, ResolveContext) -> ResolveWork<[ResolvedNode]>
   ) {
     elements = resolveElementsWork
     entityElements = resolveElementsWork
     declaredElements = resolveElementsWork
-  }
-
-  package func resolveDeclaredElements(in context: ResolveContext, placementRoot: ResolveContext)
-    -> [ResolvedNode]
-  {
-    resolveDeclaredElementsWork(in: context, placementRoot: placementRoot).run()
   }
 
   package func resolveDeclaredElementsWork(
@@ -67,12 +52,6 @@ package struct ScopedContentPayload: Sendable {
     elements(context.asEntityHost(), (placementRoot ?? context).asEntityHost())
   }
 
-  package func resolveElementsInEntityRoutedHost(
-    in context: ResolveContext, placementRoot: ResolveContext? = nil
-  ) -> [ResolvedNode] {
-    resolveElementsInEntityRoutedHostWork(in: context, placementRoot: placementRoot).run()
-  }
-
   package func resolveElementsInEntityRoutedHostWork(
     in context: ResolveContext, placementRoot: ResolveContext? = nil
   ) -> ResolveWork<[ResolvedNode]> {
@@ -91,15 +70,6 @@ package struct ScopedContentPayload: Sendable {
     resolveElementsWork(in: context, placementRoot: placementRoot).map {
       normalizeResolvedElements($0, in: context)
     }
-  }
-
-  package func resolveInEntityRoutedHost(
-    in context: ResolveContext, entityIdentity: EntityIdentity,
-    structuralIdentity: TabDormantPayloadStructuralIdentity?
-  ) -> ResolvedNode {
-    resolveInEntityRoutedHostWork(
-      in: context, entityIdentity: entityIdentity, structuralIdentity: structuralIdentity
-    ).run()
   }
 
   package func resolveInEntityRoutedHostWork(
@@ -235,14 +205,6 @@ package struct CapturedSubviewPayload: Sendable {
         }
       }))
   }
-
-  package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
-    payload.resolveElements(in: context)
-  }
-
-  package func resolve(in context: ResolveContext) -> ResolvedNode {
-    payload.resolve(in: context)
-  }
 }
 
 @MainActor
@@ -258,32 +220,6 @@ package struct CapturedSubviewView: PrimitiveView, IterativeResolvableView {
   package func makeResolveWork(in context: ResolveContext) -> ResolveWork<[ResolvedNode]> {
     let work = payload.resolveElementsWork(in: context)
     return isAccessibilityContent ? work.map(markingAccessibilityContent) : work
-  }
-}
-
-@MainActor
-package struct CapturedSubviewGroupView: PrimitiveView, IterativeResolvableView {
-  package var kindName: ViewKind
-  package var payloads: [CapturedSubviewPayload]
-
-  package init(
-    kindName: ViewKind,
-    payloads: [CapturedSubviewPayload]
-  ) {
-    self.kindName = kindName
-    self.payloads = payloads
-  }
-
-  package func makeResolveWork(in context: ResolveContext) -> ResolveWork<[ResolvedNode]> {
-    switch payloads.count {
-    case 0: return .value([])
-    case 1:
-      return resolveViewWork(CapturedSubviewView(payload: payloads[0]), in: context).map { [$0] }
-    default:
-      return resolveScopedContentGroupElementsWork(
-        kindName: kindName, payloads: payloads.map(\.payload), in: context
-      ).map { [$0] }
-    }
   }
 }
 
@@ -377,60 +313,9 @@ package struct LazySubviewPayload: Sendable {
       declarationStructuralPath: declarationStructuralPath
     )
   }
-
-  package func resolve(
-    in context: ResolveContext,
-    placementRoot: ResolveContext? = nil
-  ) -> ResolvedNode {
-    switch storage {
-    case .scopedContent(let payload):
-      return payload.resolve(in: context, placementRoot: placementRoot)
-    case .portal(let payload):
-      return payload.resolve(in: context, placementRoot: placementRoot)
-    }
-  }
-
-  package func resolveInEntityRoutedHost(
-    in context: ResolveContext,
-    entityIdentity: EntityIdentity,
-    structuralIdentity: TabDormantPayloadStructuralIdentity?
-  ) -> ResolvedNode {
-    switch storage {
-    case .scopedContent(let payload):
-      return payload.resolveInEntityRoutedHost(
-        in: context,
-        entityIdentity: entityIdentity,
-        structuralIdentity: structuralIdentity
-      )
-    case .portal(let payload):
-      return payload.resolve(in: context, placementRoot: context)
-    }
-  }
-
-  package func resolveElements(
-    in context: ResolveContext,
-    placementRoot: ResolveContext? = nil
-  ) -> [ResolvedNode] {
-    switch storage {
-    case .scopedContent(let payload):
-      return payload.resolveElements(in: context, placementRoot: placementRoot)
-    case .portal(let payload):
-      return payload.resolveElements(in: context, placementRoot: placementRoot)
-    }
-  }
 }
 
 package typealias NavigationDestinationPayload = LazySubviewPayload
-
-@MainActor
-package struct ScopedContentPayloadView: PrimitiveView, IterativeResolvableView {
-  package var payload: ScopedContentPayload
-  package var placementRoot: ResolveContext? = nil
-
-  package func makeResolveWork(in context: ResolveContext) -> ResolveWork<[ResolvedNode]> {
-    payload.resolveElementsWork(in: context, placementRoot: placementRoot)
-  }
-}
 
 @MainActor
 package struct ScopedContentPayloadGroupView: PrimitiveView, IterativeResolvableView {
@@ -489,9 +374,6 @@ extension CapturedSubviewPayload {
   package func resolveElementsWork(in context: ResolveContext) -> ResolveWork<[ResolvedNode]> {
     payload.resolveElementsWork(in: context)
   }
-  package func resolveWork(in context: ResolveContext) -> ResolveWork<ResolvedNode> {
-    payload.resolveWork(in: context)
-  }
 }
 
 extension LazySubviewPayload {
@@ -502,16 +384,6 @@ extension LazySubviewPayload {
     case .scopedContent(let payload):
       return payload.resolveWork(in: context, placementRoot: placementRoot)
     case .portal(let payload): return payload.resolveWork(in: context, placementRoot: placementRoot)
-    }
-  }
-  package func resolveElementsWork(in context: ResolveContext, placementRoot: ResolveContext? = nil)
-    -> ResolveWork<[ResolvedNode]>
-  {
-    switch storage {
-    case .scopedContent(let payload):
-      return payload.resolveElementsWork(in: context, placementRoot: placementRoot)
-    case .portal(let payload):
-      return payload.resolveElementsWork(in: context, placementRoot: placementRoot)
     }
   }
   package func resolveInEntityRoutedHostWork(

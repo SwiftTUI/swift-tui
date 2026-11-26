@@ -35,7 +35,7 @@ import SwiftTUICore
 // A container that resolves several candidates and places one
 // (`ViewThatFits`) is the one place a route legitimately appears more than
 // once in a resolve. Each candidate claims on its own alternative of the
-// ledger (`withStyleRouteAlternatives`), so sibling candidates do not report
+// ledger (`withStyleRouteAlternativesWork`), so sibling candidates do not report
 // against each other while a candidate re-installing an outer route still
 // does.
 
@@ -127,23 +127,7 @@ package enum StyleRouteInstallationLedgerStorage {
   @MainActor package static var forksPerDeclaredChild = false
 }
 
-/// Resolves the candidates of an alternatives container so that each declared
-/// child claims routes on its own alternative of the current ledger.
-@MainActor
-package func withStyleRouteAlternatives<Result>(_ body: () -> Result) -> Result {
-  guard let ledger = StyleRouteInstallationLedgerStorage.current else {
-    return body()
-  }
-  let previous = StyleRouteInstallationLedgerStorage.forksPerDeclaredChild
-  StyleRouteInstallationLedgerStorage.forksPerDeclaredChild = true
-  defer {
-    StyleRouteInstallationLedgerStorage.forksPerDeclaredChild = previous
-    ledger.absorbAlternatives()
-  }
-  return body()
-}
-
-/// Resolves one declared child. Inside `withStyleRouteAlternatives` the child
+/// Resolves one declared child. Inside `withStyleRouteAlternativesWork` the child
 /// gets its own alternative ledger; containers nested in it resolve normally.
 @MainActor
 package func resolvingStyleRouteAlternative<Result>(_ body: () -> Result) -> Result {
@@ -239,6 +223,8 @@ package struct StyleRouteView<Content: View>: PrimitiveView, IterativeResolvable
   }
 }
 
+/// Resolves the candidates of an alternatives container so that each declared
+/// child claims routes on its own alternative of the current ledger.
 @MainActor
 package func withStyleRouteAlternativesWork<Result>(_ body: () -> ResolveWork<Result>)
   -> ResolveWork<Result>

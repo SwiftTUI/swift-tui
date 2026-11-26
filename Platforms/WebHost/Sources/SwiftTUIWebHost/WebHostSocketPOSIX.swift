@@ -21,7 +21,6 @@
   enum WebHostSocket {
     static let invalidDescriptor: WebHostSocketDescriptor = -1
     static let readEvents = Int16(POLLIN)
-    static let writeEvents = Int16(POLLOUT)
     static var lastError: Int32 { errno }
     static func isValid(_ fd: WebHostSocketDescriptor) -> Bool { fd >= 0 }
     enum PollOutcome: Equatable {

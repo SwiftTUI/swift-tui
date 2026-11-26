@@ -339,13 +339,6 @@ package struct ResolvedListRow {
   var drawMetadata: DrawMetadata
 }
 
-func resolvedListRow(
-  from node: ResolvedNode
-) -> ResolvedListRow? {
-  let row = resolvedHostedListRow(from: node)
-  return row.tagCount == 1 ? row : nil
-}
-
 func resolvedHostedListRow(
   from node: ResolvedNode
 ) -> ResolvedListRow {

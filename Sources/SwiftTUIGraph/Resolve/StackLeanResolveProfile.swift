@@ -55,6 +55,7 @@ package let stackLeanExplicitEnvironmentChoice = FeatureFlags.booleanValue(
 /// floor runs the stack-lean profile instead of crashing.
 package let fullEngineStackReserveFloor = 8 << 20
 
+// periphery:ignore - read only in Windows builds
 /// Whether a below-floor Windows main-thread stack reserve armed the lean
 /// profile (as opposed to WASI's default or an explicit environment choice).
 /// The session launch path reads this to emit the loud debug diagnostic

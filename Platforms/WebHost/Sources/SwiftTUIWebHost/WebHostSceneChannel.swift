@@ -142,7 +142,6 @@ package actor WebHostSceneChannel: WebHostByteSink, WebHostByteSource {
   private var lastIssuedToken: UInt64 = 0
   private var sceneInputFinished = false
   private var receiveTasks: [UInt64: Task<Void, Never>] = [:]
-  package var activeReceiveTaskCount: Int { receiveTasks.count }
   private var processedInboundCallbacks: UInt64 = 0
   private var yieldedInboundEvents: UInt64 = 0
   private var yieldedOutputRecords: UInt64 = 0

@@ -409,7 +409,6 @@ These symbols still exist for internal reuse and narrow compatibility. They are
 not part of the public API story and must not shape app authoring:
 
 - `PrimitiveView` and `ResolvableView` — internal lowering protocols.
-- `ViewNode` — internal runtime plumbing.
 - Render phase products and engines — package-only implementation detail behind
   `DefaultRenderer` and `RunLoop`.
 - The local runtime registries and lifecycle replay helpers used by `RunLoop`.

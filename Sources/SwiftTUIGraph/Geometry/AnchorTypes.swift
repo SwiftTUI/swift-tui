@@ -343,10 +343,6 @@ package struct PlacedFrameTableFragment: Equatable, Sendable {
     self.translation = translation
   }
 
-  package var count: Int {
-    entries.count
-  }
-
   package func translated(
     by delta: CellPoint
   ) -> Self {

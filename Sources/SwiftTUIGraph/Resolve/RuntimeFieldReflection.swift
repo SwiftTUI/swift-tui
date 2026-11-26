@@ -20,6 +20,9 @@ private typealias FieldNameFreeFunc = @convention(c) (UnsafePointer<CChar>?) -> 
   let name: UnsafePointer<CChar>? = nil
   let freeFunc: FieldNameFreeFunc? = nil
   let isStrong: Bool = false
+  // Never read, but the runtime writes it: this struct must keep the exact
+  // layout `swift_reflectionMirror_recursiveChildMetadata` fills in.
+  // periphery:ignore - layout must match the runtime's field metadata
   let isVar: Bool = false
 }
 

@@ -38,19 +38,6 @@ package final class ViewNode {
     didSet { recordCheckpointMutation() }
   }
 
-  /// Read-only mirror of ``CommittedFreshness/hasStaleIslandDescendant``;
-  /// the set-rules and the freshness-vs-island rationale live on the module.
-  package var hasStaleIslandDescendant: Bool {
-    reuseState.freshness.hasStaleIslandDescendant
-  }
-
-  /// Read-only mirror of ``CommittedFreshness/hasForeignParentedChild``;
-  /// the set-rules, the memo exemption, and the orphaning rationale (the
-  /// gallery strip-click + Tab-wrap stamp-coherence crash) live on the module.
-  package var hasForeignParentedChild: Bool {
-    reuseState.freshness.hasForeignParentedChild
-  }
-
   /// Read-only mirror of
   /// ``CommittedFreshness/claimsOwnershipOfListedChildren``; the
   /// stranded-listing sweep's population predicate.
@@ -969,7 +956,7 @@ package final class ViewNode {
   /// (and the rest of the body) *before* the `.id` modifier resolved, so it is
   /// present in `dependencyTracker.currentDependencies.stateSlotReads` keyed to
   /// this node; the re-identified content's own slots are read strictly *after*
-  /// this runs (the content resolves in `content.resolveOwned`, downstream of
+  /// this runs (the content resolves in `content.resolveOwnedWork`, downstream of
   /// the reset). A full ``resetStateSlots()`` would wipe the enclosing state and
   /// oscillate it back to its seed every frame. Sparing the already-read,
   /// self-owned slots keeps the enclosing `@State` alive while still freshening
@@ -1099,16 +1086,6 @@ package final class ViewNode {
   /// bound control — is used only as a fallback when neither exists, so a
   /// change is never dropped.
   package func invalidateStateSlotReadersForRuntimeChange(
-    ordinal: Int,
-    registrationScope: Identity?
-  ) {
-    invalidateStateSlotReadersForRuntimeChange(
-      StateSlotIdentifier(ordinal: ordinal),
-      registrationScope: registrationScope
-    )
-  }
-
-  package func invalidateStateSlotReadersForRuntimeChange(
     _ identifier: StateSlotIdentifier,
     registrationScope: Identity?
   ) {
@@ -1145,13 +1122,6 @@ package final class ViewNode {
       nextTaskModifierOrdinal += 1
     }
     return nextTaskModifierOrdinal
-  }
-
-  package func claimValueAnimationModifierOrdinal() -> Int {
-    defer {
-      nextValueAnimationModifierOrdinal += 1
-    }
-    return nextValueAnimationModifierOrdinal
   }
 
   package func queueChangeHandler(
@@ -1666,24 +1636,6 @@ package final class ViewNode {
     for key in committed.differingValueDebugNames(from: current) {
       ReuseDenialTrace.recordEnvironmentKeyDiff("val:\(key)")
     }
-  }
-
-  package var hasDirtyAncestor: Bool {
-    var current = parent
-    var visited: Set<ObjectIdentifier> = []
-
-    while let node = current {
-      let nodeID = ObjectIdentifier(node)
-      guard visited.insert(nodeID).inserted else {
-        return false
-      }
-      if node.isDirty {
-        return true
-      }
-      current = node.parent
-    }
-
-    return false
   }
 
   package func beginRegistrationCapture() {
@@ -2373,26 +2325,6 @@ package final class ViewNode {
       ancestor = current.parent
     }
     return true
-  }
-
-  package func isDescendant(
-    of ancestor: ViewNode
-  ) -> Bool {
-    var current = parent
-    var visited: Set<ObjectIdentifier> = []
-
-    while let node = current {
-      let nodeID = ObjectIdentifier(node)
-      guard visited.insert(nodeID).inserted else {
-        return false
-      }
-      if node === ancestor {
-        return true
-      }
-      current = node.parent
-    }
-
-    return false
   }
 
   /// Seam-bridging variant of `isDescendant(of:)` for reuse-denial checks:

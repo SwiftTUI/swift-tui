@@ -790,12 +790,3 @@ private struct HostedCollectionWindowPlan {
   var measuredWindow: Range<Int>?
   var childProposal: ProposedSize
 }
-
-extension ProposedDimension {
-  fileprivate var isFinite: Bool {
-    if case .finite = self {
-      return true
-    }
-    return false
-  }
-}

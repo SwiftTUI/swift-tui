@@ -991,12 +991,6 @@ public struct DefaultRenderer {
     frameState.retainedReuseSuppressionScope = scope
   }
 
-  /// Suppresses retained reuse for every reached node on the next render.
-  @MainActor
-  package func suppressRetainedReuseForNextFrame() {
-    suppressRetainedReuseForNextFrame(.all)
-  }
-
   @MainActor
   package func runtimeFocusStateDependentIdentities() -> Set<Identity> {
     viewGraph.environmentDependentIdentities(

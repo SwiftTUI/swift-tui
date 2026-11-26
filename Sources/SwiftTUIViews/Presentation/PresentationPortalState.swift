@@ -30,10 +30,6 @@ package final class PresentationPortalState {
     Checkpoint(registry: registry.makeCheckpoint())
   }
 
-  package func restoreCheckpoint(_ checkpoint: Checkpoint) {
-    registry.restoreCheckpoint(checkpoint.registry)
-  }
-
   package func makeDraft() -> PresentationPortalDraft {
     PresentationPortalDraft(
       liveState: self,
@@ -157,13 +153,6 @@ package final class PresentationPortalState {
     )
   }
 
-  @discardableResult
-  package func reconcile(
-    _ declarations: [PresentationCoordinatorDeclaration]
-  ) -> Bool {
-    registry.reconcile(declarations)
-  }
-
   package func overlayEntries() -> [OverlayStackEntry] {
     registry.overlayEntries()
   }
@@ -226,11 +215,6 @@ package final class PresentationPortalDraft {
   package func declaredSourceIdentities() -> Set<Identity> {
     precondition(!didCommit && !didDiscard)
     return registry.declaredSourceIdentities()
-  }
-
-  package func dismissStack() -> DismissStack {
-    precondition(!didCommit && !didDiscard)
-    return registry.dismissStack()
   }
 
   package func commit() {

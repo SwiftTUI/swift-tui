@@ -60,7 +60,7 @@ package struct ModifierContentInputs<Base: View> {
     _ body: () -> Result
   ) -> Result {
     // An ambient context carrying a per-mount rebase of THIS chain's captured
-    // enclosing scope (an outer identity modifier's `resolveOwned`) must stay
+    // enclosing scope (an outer identity modifier's `resolveOwnedWork`) must stay
     // in effect: the construction capture is per view VALUE, so reinstalling
     // it under a value mounted at several identities would collapse every
     // mount's `@State` onto the one captured owner (stress state identity
@@ -158,10 +158,6 @@ package struct ModifierContentInputs<Base: View> {
     }
   }
 
-  package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
-    resolveElementsWork(in: context).run()
-  }
-
   package func resolveElementsWork(in context: ResolveContext) -> ResolveWork<[ResolvedNode]> {
     applyAuthoringContext {
       resolveViewWork(base, in: contentResolveContext(in: context)).map {
@@ -215,18 +211,10 @@ package struct ModifierContentInputs<Base: View> {
     }
   }
 
-  package func resolve(in context: ResolveContext) -> ResolvedNode {
-    resolveWork(in: context).run()
-  }
-
   package func resolveWork(in context: ResolveContext) -> ResolveWork<ResolvedNode> {
     applyAuthoringContext {
       resolveViewWork(base, in: contentResolveContext(in: context))
     }
-  }
-
-  package func resolveOwned(in context: ResolveContext) -> ResolvedNode {
-    resolveOwnedWork(in: context).run()
   }
 
   package func resolveOwnedWork(in context: ResolveContext) -> ResolveWork<ResolvedNode> {

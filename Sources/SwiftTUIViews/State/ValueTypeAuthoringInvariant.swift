@@ -1,5 +1,3 @@
-import SwiftTUIGraph
-
 // The value-type authoring invariant's runtime floor (plan 2026-08-29-001).
 //
 // `View`, `ViewModifier`, the four style protocols, `DynamicProperty`,
@@ -31,13 +29,5 @@ package enum ValueTypeAuthoringInvariant {
       "SwiftTUI views, view modifiers, styles, and dynamic properties must be value types "
         + "(a struct or an enum); \(type) is a class."
     )
-  }
-
-  /// Cold-path guard for a container type about to be given a plan.
-  @inline(__always)
-  package static func requireValueTypeContainer(_ type: Any.Type) {
-    if isClassKind(RuntimeFieldReflection.metadataKind(of: type)) {
-      rejectClassContainer(type)
-    }
   }
 }

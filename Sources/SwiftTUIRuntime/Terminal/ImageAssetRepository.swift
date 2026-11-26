@@ -589,6 +589,7 @@ func parseFileURL(
   return decoded
 }
 
+// periphery:ignore - called only from the Windows drive-letter branches above
 private func isASCIILetter(
   _ scalar: Unicode.Scalar
 ) -> Bool {

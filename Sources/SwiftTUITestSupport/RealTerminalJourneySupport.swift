@@ -1,5 +1,6 @@
 @unsafe @preconcurrency public import Dispatch
 public import SwiftTUICore
+// periphery:ignore - `POSIXReadinessSource` is used only in the Linux and Android branches
 import SwiftTUIPlatformIO
 import Synchronization
 

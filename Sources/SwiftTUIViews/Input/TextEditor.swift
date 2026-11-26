@@ -208,7 +208,6 @@ private struct TextEditorContentWidthProbe: PrimitiveView, IterativeResolvableVi
 
 @MainActor
 private final class TextEditorContentWidthRealizer: LayoutDependentContentRealizer {
-  let debugName = "TextEditorContentWidthProbe"
   private let measuredContentWidth: TextEditorMeasuredContentWidth
 
   init(

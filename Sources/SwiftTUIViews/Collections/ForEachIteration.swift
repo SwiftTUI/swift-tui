@@ -94,12 +94,6 @@ package struct ForEachIteration<Element> {
     )
   }
 
-  package func resolveElements<Content: View>(
-    content: @escaping @MainActor (Element) -> Content, consumingAs mode: ConsumptionMode
-  ) -> [ResolvedNode] {
-    resolveElementsWork(content: content, consumingAs: mode).run()
-  }
-
   package func resolveElementsWork<Content: View>(
     content: @escaping @MainActor (Element) -> Content,
     consumingAs mode: ConsumptionMode

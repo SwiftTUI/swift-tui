@@ -55,7 +55,6 @@ final class SpatialTapGestureRecognizer: GestureRecognizer {
   typealias Value = SpatialTapGesture.Value
 
   private let tap: TapGestureRecognizer
-  var requiredCount: Int { tap.requiredCount }
   private(set) var coordinateSpace: CoordinateSpace
   var phase: GestureRecognizerPhase { tap.phase }
   var isActive: Bool { tap.isActive }

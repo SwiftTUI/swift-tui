@@ -262,10 +262,6 @@ package final class CustomLayoutHandle: CustomLayoutToken {
     return proxy.debugName
   }
 
-  package var executionCapability: CustomLayoutExecutionCapability {
-    workerProxy == nil ? .mainActorOnly : .worker
-  }
-
   package var canRunOnWorker: Bool {
     workerProxy != nil
   }

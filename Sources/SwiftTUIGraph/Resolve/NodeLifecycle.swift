@@ -5,4 +5,3 @@ package enum NodeLifecycleState: Equatable, Sendable {
 }
 
 package typealias LifecycleEvent = LifecycleCommitEntry
-package typealias LifecycleOperation = LifecycleCommitOperation

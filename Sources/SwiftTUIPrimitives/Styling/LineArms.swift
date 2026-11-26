@@ -56,10 +56,6 @@ package struct LineArms: Equatable, Hashable, Sendable {
 
   package static let none = LineArms()
 
-  package var isEmpty: Bool {
-    self == .none
-  }
-
   package subscript(direction: LineDirection) -> LineWeight {
     get {
       switch direction {

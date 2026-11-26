@@ -123,24 +123,6 @@ extension AnimationAwareInvalidating {
       tracksVelocity: false
     )
   }
-
-  /// Back-compat shim for call sites that do not carry the velocity flag.
-  package func requestInvalidation(
-    of identities: Set<Identity>,
-    animation: AnimationRequest,
-    batchID: AnimationBatchID?,
-    isContinuous: Bool,
-    customValues: [ObjectIdentifier: AnyHashableSendable]
-  ) {
-    requestInvalidation(
-      of: identities,
-      animation: animation,
-      batchID: batchID,
-      isContinuous: isContinuous,
-      customValues: customValues,
-      tracksVelocity: false
-    )
-  }
 }
 
 // MARK: - AnimationBatchID

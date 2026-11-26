@@ -38,12 +38,6 @@ public struct Button<Label: View>: PrimitiveView, IterativeResolvableView {
     resolvedNode(in: context).map { [$0] }
   }
 
-  package func resolve(
-    in context: ResolveContext
-  ) -> ResolvedNode {
-    resolvedNode(in: context).run()
-  }
-
   /// Attaches a muted, right-aligned shortcut hint inside the button label area.
   /// Thus, the active control chrome covers the hint.
   /// This chrome includes the focus highlight, press state, and role color.

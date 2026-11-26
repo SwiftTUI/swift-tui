@@ -69,16 +69,6 @@ internal func _labToLCh(_ lab: LabColor) -> LChColor {
   return LChColor(l: lab.l, c: c, h: h, whitePoint: lab.whitePoint)
 }
 
-internal func _lchToLab(_ lch: LChColor) -> LabColor {
-  let radians = lch.h * .pi / 180.0
-  return LabColor(
-    l: lch.l,
-    a: lch.c * cos(radians),
-    b: lch.c * sin(radians),
-    whitePoint: lch.whitePoint
-  )
-}
-
 internal func _xyzD65ToOklab(_ xyz: XYZColor) -> OklabColor {
   precondition(xyz.whitePoint == .d65, "Oklab requires D65-referenced XYZ")
   let l = _PrismNumeric.cbrtSigned(

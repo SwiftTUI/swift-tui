@@ -113,7 +113,6 @@ public struct ListStyleConfiguration: Sendable {
 
 private protocol AnyListStyleBox: AnyStyleBox {
   var snapshotLabel: String { get }
-  var debugDescription: String { get }
 
   @MainActor
   func presentation(for configuration: ListStyleConfiguration) -> ListStylePresentation
@@ -123,10 +122,6 @@ extension ConcreteStyleBox: AnyListStyleBox where S: ListStyle {
 
   var snapshotLabel: String {
     style.snapshotLabel
-  }
-
-  var debugDescription: String {
-    String(reflecting: style)
   }
 
   @MainActor

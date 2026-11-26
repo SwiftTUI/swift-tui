@@ -80,10 +80,6 @@ package enum DynamicPropertyCaptureBindPlanCache {
     return unsafe built
   }
 
-  package static func resetForTesting() {
-    unsafe plansByType.removeAll(keepingCapacity: false)
-  }
-
   private static func buildPlan(for type: Any.Type) -> DynamicPropertyCaptureBindPlan {
     let kind = RuntimeFieldReflection.metadataKind(of: type)
     if ValueTypeAuthoringInvariant.isClassKind(kind) {

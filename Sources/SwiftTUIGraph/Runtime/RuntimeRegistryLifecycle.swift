@@ -141,7 +141,12 @@ package struct RuntimeRegistrationFingerprintBuilder {
 /// collision" semantics — see `NodeHandlers.absorbAdopted`.
 package protocol RuntimeNodeRecord {
   init()
+  // The two requirements below are never called through the protocol
+  // (`NodeHandlers` folds over its concrete records), but they are what
+  // forces a new family's record to implement both whole-bag operations.
+  // periphery:ignore - contract requirement enforced on every conformer
   var isEmpty: Bool { get }
+  // periphery:ignore - contract requirement enforced on every conformer
   mutating func absorbAdopted(_ departing: Self)
 }
 

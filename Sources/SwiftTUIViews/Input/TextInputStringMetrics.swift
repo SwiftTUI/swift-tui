@@ -68,13 +68,6 @@ package struct TextInputUTF16Map: Sendable {
 }
 
 package enum TextInputStringMetrics {
-  package static func clampedOffset(
-    _ offset: TextOffset,
-    in text: String
-  ) -> TextOffset {
-    TextOffset(min(offset.rawValue, text.count))
-  }
-
   package static func stringIndex(
     for offset: TextOffset,
     in text: String

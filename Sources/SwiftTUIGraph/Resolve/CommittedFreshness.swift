@@ -145,6 +145,7 @@ package struct CommittedFreshness: Equatable {
     return nil
   }
 
+  // periphery:ignore - read only in release builds (`ViewNode`, `#if DEBUG` else branch)
   /// Diagnostic mirror of ``admitsMemoWriteBack``.
   package var memoWriteBackDenialReason: ReuseDenialReason? {
     if hasStaleIslandDescendant { return .staleIslandDescendant }

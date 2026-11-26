@@ -1,5 +1,3 @@
-import SwiftTUICore
-
 /// Receives the run loop's progress events for *perf* consumption (an
 /// append-only event log), separate from the run loop's *quiescence* mechanism.
 ///

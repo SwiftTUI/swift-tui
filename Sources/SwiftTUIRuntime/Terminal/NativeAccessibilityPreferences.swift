@@ -73,6 +73,7 @@ package final class NativeAccessibilityPreferenceObserver {
       if let token { center.removeObserver(token) }
     }
   #else
+    // periphery:ignore:parameters surface,changed - stub for hosts without AppKit
     init?(
       surface: any PresentationSurfaceMetricsProvider,
       changed: @escaping @MainActor @Sendable () -> Void

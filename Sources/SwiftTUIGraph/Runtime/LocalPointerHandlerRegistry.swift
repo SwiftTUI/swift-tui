@@ -1,6 +1,10 @@
 package enum LocalPointerButton: Equatable, Sendable {
   case primary
+  // Mirrors the public `MouseButton` vocabulary. The run loop forwards only
+  // primary-button events today, so nothing constructs the two cases below.
+  // periphery:ignore - reserved for non-primary pointer dispatch
   case middle
+  // periphery:ignore - reserved for non-primary pointer dispatch
   case secondary
 }
 

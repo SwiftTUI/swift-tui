@@ -86,10 +86,6 @@ package struct ImageBlendCompositorCacheSnapshot: Sendable, Equatable {
       decodedImage?.pixels.count ?? 0
     }
 
-    var decodedPixelBytes: Int {
-      decodedPixelCount * MemoryLayout<RGBAImagePixel>.stride
-    }
-
     var encodedByteCount: Int {
       encodedBytes.count
     }

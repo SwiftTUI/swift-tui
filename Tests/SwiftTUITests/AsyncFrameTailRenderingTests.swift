@@ -785,7 +785,6 @@ struct AsyncFrameTailRenderingTests {
       Issue.record("expected custom layout root")
       return
     }
-    #expect(customLayoutHandle.executionCapability == .worker)
     #expect(customLayoutHandle.canRunOnWorker)
     #expect(customLayoutHandle.workerProxy != nil)
     #expect(workerTimings.layoutCompute != .zero)
@@ -847,7 +846,6 @@ struct AsyncFrameTailRenderingTests {
       Issue.record("expected custom layout root")
       return
     }
-    #expect(customLayoutHandle.executionCapability == .worker)
     #expect(customLayoutHandle.canRunOnWorker)
     #expect(customLayoutHandle.workerProxy != nil)
     #expect(workerLayoutState.measureCount >= 1)
@@ -1072,7 +1070,6 @@ struct AsyncFrameTailRenderingTests {
       Issue.record("expected custom layout root")
       return
     }
-    #expect(customLayoutHandle.executionCapability == .worker)
     #expect(customLayoutHandle.canRunOnWorker)
     #expect(customLayoutHandle.workerProxy != nil)
     #expect(layoutState.makeCacheCount == 1)

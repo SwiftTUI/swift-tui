@@ -11,20 +11,6 @@ public struct GeometryProxy: Equatable, Sendable {
   package var placedFrameTable: PlacedFrameTable
 
   package init(
-    size: CellSize,
-    safeAreaInsets: EdgeInsets = .zero,
-    cellPixelMetrics: CellPixelMetrics = .estimated,
-    pointerInputCapabilities: PointerInputCapabilities = .cellOnly
-  ) {
-    self.size = size
-    self.safeAreaInsets = safeAreaInsets
-    self.cellPixelMetrics = cellPixelMetrics
-    self.pointerInputCapabilities = pointerInputCapabilities
-    bounds = CellRect(origin: .zero, size: size)
-    placedFrameTable = .init()
-  }
-
-  package init(
     bounds: CellRect,
     safeAreaInsets: EdgeInsets = .zero,
     cellPixelMetrics: CellPixelMetrics = .estimated,
@@ -149,7 +135,6 @@ public struct GeometryReader<Content: View>: PrimitiveView, ResolvableView {
 private final class GeometryReaderLayoutDependentContent<Content: View>:
   LayoutDependentContentRealizer
 {
-  let debugName = "GeometryReader"
   private let content: (GeometryProxy) -> Content
   private let context: ResolveContext
   private let authoringContext: AuthoringContext?

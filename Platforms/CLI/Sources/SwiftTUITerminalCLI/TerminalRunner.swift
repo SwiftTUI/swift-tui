@@ -437,6 +437,7 @@ public enum TerminalRunner {
   #endif
 }
 
+// periphery:ignore - used only on platforms without the attach module
 /// Thrown (or printed, for the non-throwing verb) when an attach-bearing verb
 /// runs on a platform without the POSIX-only `SwiftTUICLIAttach` module.
 private struct SceneAttachUnavailableError: Error, CustomStringConvertible {

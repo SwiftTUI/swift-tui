@@ -126,7 +126,6 @@ public struct TableStyleConfiguration: Sendable {
 
 private protocol AnyTableStyleBox: AnyStyleBox {
   var snapshotLabel: String { get }
-  var debugDescription: String { get }
 
   @MainActor
   func presentation(for configuration: TableStyleConfiguration) -> TableStylePresentation
@@ -136,10 +135,6 @@ extension ConcreteStyleBox: AnyTableStyleBox where S: TableStyle {
 
   var snapshotLabel: String {
     style.snapshotLabel
-  }
-
-  var debugDescription: String {
-    String(reflecting: style)
   }
 
   @MainActor

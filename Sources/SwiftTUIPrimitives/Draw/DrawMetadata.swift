@@ -281,42 +281,6 @@ package struct DrawMetadata: Equatable, Sendable {
     }
   }
 
-  package var listRowSeparatorTopVisibility: Visibility? {
-    get { listStyle?.rowSeparatorTopVisibility }
-    set {
-      var updated = listStyle ?? .init()
-      updated.rowSeparatorTopVisibility = newValue
-      listStyle = updated.isDefault ? nil : updated
-    }
-  }
-
-  package var listRowSeparatorBottomVisibility: Visibility? {
-    get { listStyle?.rowSeparatorBottomVisibility }
-    set {
-      var updated = listStyle ?? .init()
-      updated.rowSeparatorBottomVisibility = newValue
-      listStyle = updated.isDefault ? nil : updated
-    }
-  }
-
-  package var listSectionSeparatorTopVisibility: Visibility? {
-    get { listStyle?.sectionSeparatorTopVisibility }
-    set {
-      var updated = listStyle ?? .init()
-      updated.sectionSeparatorTopVisibility = newValue
-      listStyle = updated.isDefault ? nil : updated
-    }
-  }
-
-  package var listSectionSeparatorBottomVisibility: Visibility? {
-    get { listStyle?.sectionSeparatorBottomVisibility }
-    set {
-      var updated = listStyle ?? .init()
-      updated.sectionSeparatorBottomVisibility = newValue
-      listStyle = updated.isDefault ? nil : updated
-    }
-  }
-
   package func merging(_ other: Self) -> Self {
     var merged = self
     merged.heavyFields.value = heavyFields.value.merging(other.heavyFields.value)

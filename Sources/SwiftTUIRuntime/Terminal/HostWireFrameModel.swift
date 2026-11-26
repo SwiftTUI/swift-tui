@@ -243,14 +243,6 @@ package struct HostWireFrameModel {
 
   // MARK: - Cell-surface derivations
 
-  /// Each row's characters joined, continuations included — the Android
-  /// wire's parallel plain-text `rows` array.
-  package func plainTextRows() -> [String] {
-    surface.cells.map { row in
-      String(row.map(\.character))
-    }
-  }
-
   /// Derives the hyperlink run table: deduplicated targets plus per-row runs
   /// of consecutive same-target cells (rows with no links are omitted).
   /// Continuation cells neither extend nor close a run — their lead cell's

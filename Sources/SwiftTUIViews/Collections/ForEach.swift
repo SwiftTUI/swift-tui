@@ -215,18 +215,6 @@ extension ForEach where Data == Range<Int>, ID == Int {
   }
 }
 
-package func makeEntityIdentities<Data, ID>(
-  for data: Data,
-  id: KeyPath<Data.Element, ID>,
-  scope: StructuralPath
-) -> [EntityIdentity]
-where Data: RandomAccessCollection, ID: Hashable & Sendable {
-  makeEntityIdentities(
-    ids: data.map { $0[keyPath: id] },
-    scope: scope
-  )
-}
-
 package func makeEntityIdentities<ID>(
   ids: [ID],
   scope: StructuralPath

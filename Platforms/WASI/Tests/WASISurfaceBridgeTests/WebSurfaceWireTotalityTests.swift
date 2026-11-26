@@ -3,8 +3,6 @@ import Foundation
 @_spi(Runners) import SwiftTUIRuntime
 import Testing
 
-@testable import SwiftTUIWASISurfaceBridge
-
 /// Pins the web `surface` wire against ``HostWireSchema`` in both directions:
 /// a fully-populated frame must emit exactly the manifest's key sets, so a
 /// field the encoder drops (the F19 class: `hyperlink`, accessibility
