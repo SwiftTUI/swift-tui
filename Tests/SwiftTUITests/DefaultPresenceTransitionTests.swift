@@ -1,3 +1,4 @@
+@_spi(Testing) import SwiftTUITestSupport
 import Testing
 
 @_spi(Testing) @testable import SwiftTUICore
@@ -34,6 +35,47 @@ struct DefaultPresenceTransitionTests {
     #expect(controller.debugStateSnapshot().removingIdentities.isEmpty == reduced)
     try await harness.wait { controller.debugStateSnapshot().removingIdentities.isEmpty }
     #expect(!harness.frame.contains("PRESENT"))
+  }
+
+  @Test("default removal respects each stack's value animation", arguments: [false, true])
+  func scopedRemoval(animatedWrite: Bool) throws {
+    struct Host: View {
+      @State private var visible = true
+      let animatedWrite: Bool
+
+      var body: some View {
+        VStack(spacing: 0) {
+          Button("Toggle") {
+            if animatedWrite {
+              withAnimation(.linear(duration: .seconds(2))) { visible.toggle() }
+            } else {
+              visible.toggle()
+            }
+          }
+          HStack {
+            Text("A")
+            if visible { Text("FADES") }
+          }
+          .animation(.linear(duration: .milliseconds(800)), value: visible)
+          HStack {
+            Text("B")
+            if visible { Text("SNAPS") }
+          }
+          .animation(nil, value: visible)
+        }
+      }
+    }
+    let harness = try RunLoopTestHarness(size: .init(width: 24, height: 4)) {
+      Host(animatedWrite: animatedWrite)
+    }
+    defer { harness.shutdown() }
+    #expect(harness.lines.contains { $0.contains("SNAPS") })
+    try harness.press(KeyPress(.return))
+    #expect(harness.lines.contains { $0.contains("FADES") })
+    #expect(!harness.lines.contains { $0.contains("SNAPS") })
+    try harness.advance(by: .seconds(1))
+    #expect(!harness.lines.contains { $0.contains("FADES") })
+    #expect(harness.nextWake == nil)
   }
 
   private struct Host: View {

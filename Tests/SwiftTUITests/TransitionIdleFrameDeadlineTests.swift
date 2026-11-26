@@ -135,7 +135,8 @@ struct TransitionIdleFrameDeadlineTests {
 
   @Test(
     "a removal starts on the frame of its key press, runs on the cadence and then arms nothing",
-    arguments: IdleTransition.allCases, [IdleChange.animated, .animatedWithCompletion])
+    arguments: IdleTransition.allCases,
+    [IdleChange.animated, .animatedWithCompletion, .valueAnimated])
   func removal(kind: IdleTransition, change: IdleChange) throws {
     let log = IdleLog()
     let harness = try RunLoopTestHarness(size: Self.size) {
@@ -539,6 +540,8 @@ enum IdleTransition: String, CaseIterable, Sendable, CustomTestStringConvertible
 enum IdleChange: String, Sendable, CustomTestStringConvertible {
   /// Outside any animation.
   case plain
+  /// A plain write under the enclosing stack's value animation.
+  case valueAnimated
   /// Inside an 800 ms linear animation.
   case animated
   /// Inside an 800 ms linear animation with a completion.
@@ -609,12 +612,13 @@ private struct IdleToggleScene: View {
         Text("PRESENT").transition(transition)
       }
     }
+    .animation(IdleTiming.linear, value: change == .valueAnimated && isShown)
     .frame(width: 24, height: 3, alignment: .topLeading)
   }
 
   private func toggle() {
     switch change {
-    case .plain:
+    case .plain, .valueAnimated:
       isShown.toggle()
     case .animated:
       withAnimation(IdleTiming.linear) {

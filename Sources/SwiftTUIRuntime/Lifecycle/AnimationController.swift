@@ -2084,7 +2084,9 @@ package final class AnimationController: Sendable {
           newIdentities: newIdentities,
           newLiveNodeIDs: newLiveNodeIDs,
           matchedDestinationsByKey: matchedDestinationsByKey,
-          transactionPlan: transactionPlan,
+          removalTransaction: transactionForDepartedIdentity(
+            candidate.identity, liveTransactions: newTransactionsByIdentity,
+            transactionPlan: transactionPlan),
           timestamp: timestamp,
           plannedSites: &plannedRemovalSites
         )
@@ -2096,15 +2098,17 @@ package final class AnimationController: Sendable {
     // the fade and make a bulk departure search the old tree for every leaf.
     // Explicit transitions anywhere within that boundary own its behavior,
     // including `.identity`, which intentionally suppresses the default.
-    if let previousRoot = previousTreeRoot,
-      transactionPlan.transactions.contains(where: { $0.animationRequest.animationBoxIfAny != nil })
-    {
+    if let previousRoot = previousTreeRoot, !resolvedDiff.removedIdentities.isEmpty {
       var pending = [previousRoot]
       while let previousNode = pending.popLast() {
         if !newIdentities.contains(previousNode.identity),
           let parent = previousParentByIdentity[previousNode.identity],
           newIdentities.contains(parent)
         {
+          let removalTransaction = transactionForDepartedIdentity(
+            previousNode.identity, liveTransactions: newTransactionsByIdentity,
+            transactionPlan: transactionPlan)
+          guard removalTransaction.animationRequest.animationBoxIfAny != nil else { continue }
           let subtreeIdentities = AnimationTreeQueries.collectIdentities(in: previousNode)
           let hasExplicitTransition = previousTransitionIdentitiesByNodeID.values.contains {
             subtreeIdentities.contains($0)
@@ -2120,7 +2124,7 @@ package final class AnimationController: Sendable {
               newIdentities: newIdentities,
               newLiveNodeIDs: newLiveNodeIDs,
               matchedDestinationsByKey: matchedDestinationsByKey,
-              transactionPlan: transactionPlan, timestamp: timestamp,
+              removalTransaction: removalTransaction, timestamp: timestamp,
               plannedSites: &plannedRemovalSites)
           }
           continue
@@ -3003,7 +3007,7 @@ package final class AnimationController: Sendable {
     newIdentities: Set<Identity>,
     newLiveNodeIDs: Set<ViewNodeID>,
     matchedDestinationsByKey: [MatchedGeometryKey: Identity],
-    transactionPlan: FrameAnimationTransactionPlan,
+    removalTransaction: TransactionSnapshot,
     timestamp: MonotonicInstant,
     plannedSites: inout [AnimationKey: AnimationTransitionBodyRemoval.LiveSite]
   ) {
@@ -3031,10 +3035,6 @@ package final class AnimationController: Sendable {
       snapBody()
       return
     }
-    let removalTransaction = transactionForDepartedIdentity(
-      identity,
-      transactionPlan: transactionPlan
-    )
     // Whether the removal has a curve. A body with none snaps, as an identity
     // transition does.
     let plays = Self.transitionPlays(
@@ -3443,25 +3443,26 @@ package final class AnimationController: Sendable {
     }
   }
 
-  /// Selects animation intent for a node that no longer exists in the current
-  /// resolved tree. Authored `.id` can rebase a child's public identity outside
-  /// its structural parent's identity path, so identity ancestry alone cannot
-  /// associate that departed child with the segment that caused its removal.
-  /// Walk the retained structural parent chain until a claimed identity is
-  /// found; live insertion/property paths instead carry their selected
-  /// transaction directly on the newly resolved node.
+  /// A departing child inherits the transaction its nearest surviving parent resolved
+  /// under this frame, including any `.animation(_:value:)` override. Follow structural
+  /// parents because an authored `.id` can rebase the child's identity. A frame segment
+  /// specific to the departing branch still owns that branch's transaction and batch.
   private func transactionForDepartedIdentity(
     _ identity: Identity,
+    liveTransactions: [Identity: TransactionSnapshot],
     transactionPlan: FrameAnimationTransactionPlan
   ) -> TransactionSnapshot {
-    var candidate: Identity? = identity
-    while let current = candidate {
-      if transactionPlan.segment(for: current) != nil {
+    var current = identity
+    while let parent = previousParentByIdentity[current] {
+      if let segment = transactionPlan.segment(for: current),
+        segment != transactionPlan.segment(for: parent)
+      {
         return transactionPlan.transaction(for: current)
       }
-      candidate = previousParentByIdentity[current]
+      if let transaction = liveTransactions[parent] { return transaction }
+      current = parent
     }
-    return transactionPlan.base
+    return transactionPlan.transaction(for: current)
   }
 
   /// Returns the currently interpolated value of the animation at
