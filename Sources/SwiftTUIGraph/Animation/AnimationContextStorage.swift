@@ -1,9 +1,10 @@
+import Synchronization
+
 /// Task-local storage for the current animation request.
 ///
 /// `withAnimation` (View module) sets this before executing the user's
 /// mutation closure.  State writes read it and forward the request through
 /// the invalidation path.
-@MainActor
 package enum AnimationContextStorage {
   @TaskLocal package static var currentRequest: AnimationRequest = .inherit
   /// Explicit transaction scopes also exist when every field is default.
@@ -33,9 +34,14 @@ package enum AnimationContextStorage {
 /// Tracks only synchronous writes submitted by one completion-bearing scope.
 /// Nested scopes replace this task local, so their writes do not claim an
 /// otherwise empty outer batch.
-@MainActor
-package final class AnimationCompletionScope {
-  package var didSubmitInvalidation = false
+package final class AnimationCompletionScope: Sendable {
+  private let submitted = Atomic(false)
+
+  package var didSubmitInvalidation: Bool {
+    get { submitted.load(ordering: .relaxed) }
+    set { submitted.store(newValue, ordering: .relaxed) }
+  }
+
   package init() {}
 }
 

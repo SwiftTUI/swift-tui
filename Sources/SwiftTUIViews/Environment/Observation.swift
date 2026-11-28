@@ -5,6 +5,35 @@ import Synchronization
 private struct PendingObservationChange: Sendable {
   var identity: Identity
   var pass: UInt64
+  var transaction: AnimationInvalidationSegment?
+
+  init(identity: Identity, pass: UInt64) {
+    self.identity = identity
+    self.pass = pass
+    let segment = AnimationInvalidationSegment(
+      identities: [identity],
+      animationRequest: AnimationContextStorage.currentRequest,
+      animationBatchID: AnimationContextStorage.currentBatchID,
+      isContinuous: AnimationContextStorage.currentIsContinuous,
+      customValues: AnimationContextStorage.currentCustomValues,
+      tracksVelocity: AnimationContextStorage.currentTracksVelocity)
+    transaction = segment.isExplicit ? segment : nil
+  }
+
+  /// Only a published write submitted in the completion scope claims its batch.
+  /// A draft fire has no published reader until its frame commits.
+  func submitTransaction(
+    to invalidator: (any Invalidating)?, completion: AnimationCompletionScope? = nil
+  ) -> Bool {
+    guard let transaction, let invalidator = invalidator as? any AnimationAwareInvalidating
+    else { return false }
+    completion?.didSubmitInvalidation = true
+    invalidator.requestInvalidation(
+      of: transaction.identities, animation: transaction.animationRequest,
+      batchID: transaction.animationBatchID, isContinuous: transaction.isContinuous,
+      customValues: transaction.customValues, tracksVelocity: transaction.tracksVelocity)
+    return true
+  }
 }
 
 private struct WeakSendableInvalidator: Sendable {
@@ -30,8 +59,9 @@ private struct ObservationMailbox {
   var drafts: [UInt64: Draft] = [:]
   var pendingChanges: [Identity: PendingObservationChange] = [:]
 
-  mutating func enqueue(identity: Identity, pass: UInt64) -> Bool {
-    let change = PendingObservationChange(identity: identity, pass: pass)
+  mutating func enqueue(_ change: PendingObservationChange) -> Bool {
+    let identity = change.identity
+    let pass = change.pass
     if published[identity]?.pass == pass {
       pendingChanges[identity] = change
       return true
@@ -153,11 +183,13 @@ package final class ObservationBridge: Equatable {
     identity: Identity,
     pass: UInt64
   ) {
-    let shouldWake = mailbox.withLock {
-      $0.enqueue(identity: identity, pass: pass)
-    }
-    if shouldWake {
-      wakeInvalidator.withLock { $0.value }?.requestInvalidation(of: [identity])
+    let change = PendingObservationChange(identity: identity, pass: pass)
+    guard mailbox.withLock({ $0.enqueue(change) }) else { return }
+    let invalidator = wakeInvalidator.withLock { $0.value }
+    if !change.submitTransaction(
+      to: invalidator, completion: AnimationContextStorage.currentCompletionScope)
+    {
+      invalidator?.requestInvalidation(of: [identity])
     }
   }
 
@@ -217,22 +249,26 @@ package final class ObservationBridge: Equatable {
     finishRecording(draft)
     currentPass = draft.pass
     viewGraph = draft.viewGraph
-    let promoted = mailbox.withLock { mailbox -> Set<Identity> in
+    let promoted = mailbox.withLock { mailbox -> [PendingObservationChange] in
       guard let pendingDraft = mailbox.drafts.removeValue(forKey: draft.pass) else {
         preconditionFailure("Cannot publish a retired observation draft")
       }
       for (identity, record) in pendingDraft.records {
         mailbox.published[identity] = record
       }
-      var promoted: Set<Identity> = []
+      var promoted: [PendingObservationChange] = []
       for (identity, change) in pendingDraft.heldChanges
       where mailbox.published[identity]?.pass == change.pass {
         mailbox.pendingChanges[identity] = change
-        promoted.insert(identity)
+        promoted.append(change)
       }
       return promoted
     }
-    if !promoted.isEmpty { invalidator?.requestInvalidation(of: promoted) }
+    let plain = Set(
+      promoted.compactMap {
+        $0.submitTransaction(to: invalidator) ? nil : $0.identity
+      })
+    if !plain.isEmpty { invalidator?.requestInvalidation(of: plain) }
   }
 
   fileprivate nonisolated func discardDraftWindowChanges(forPass pass: UInt64) {

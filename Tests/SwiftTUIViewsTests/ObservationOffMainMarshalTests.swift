@@ -81,6 +81,27 @@ struct ObservationOffMainMarshalTests {
   // next frame, no re-arm (the amd64 stack-lean cadence stall: frame latency
   // ≥ writer cadence puts every next write inside the window).
 
+  @Test("An observation fire held in a draft keeps the transaction from its write")
+  func draftWindowPreservesAnimation() throws {
+    let bridge = ObservationBridge()
+    let scheduler = FrameScheduler()
+    bridge.attachInvalidator(scheduler)
+    let identity = Identity(components: ["animated-draft"])
+    let model = MarshalModel()
+    let draft = bridge.makeDraft(attaching: nil)
+    _ = bridge.track(identity: identity) { model.count }
+
+    let curve = Animation.linear(duration: .milliseconds(800))
+    withAnimation(curve) { model.count += 1 }
+    #expect(scheduler.pendingInvalidatedIdentities.isEmpty)
+    draft.commit()
+
+    let frame = try #require(scheduler.consumeReadyFrame())
+    let segment = try #require(frame.animationSegments.first)
+    #expect(segment.identities == [identity])
+    #expect(segment.animationRequest == .animate(curve.animationBox))
+  }
+
   @Test("a write landing in the draft window survives to invalidate at publish")
   func draftWindowWritePromotesOnPublish() {
     let bridge = ObservationBridge()
