@@ -465,7 +465,7 @@ extension RunLoop {
       // A frame was genuinely applied: the pre-start cancel run is broken.
       consecutivePreStartCancelCount = 0
       let preferenceObservationChanged = localPreferenceObservationRegistry.applyChanges(
-        since: previousPreferenceObservations
+        since: previousPreferenceObservations, committedTree: artifacts.resolvedTree
       )
       previousPreferenceObservations = localPreferenceObservationRegistry.snapshot()
       flushPostActionInvalidations()

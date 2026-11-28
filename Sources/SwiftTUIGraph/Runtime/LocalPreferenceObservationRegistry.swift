@@ -33,16 +33,18 @@ package struct PreferenceObservationRegistrationSnapshot: Sendable {
   package var identity: Identity
   package var key: PreferenceObservationKey
   package var handlerID: String { "\(identity)#\(key.suffix)" }
-  fileprivate let box: any PreferenceObservationBox
+  fileprivate var box: any PreferenceObservationBox
+  fileprivate let observedSubtree: Boxed<ResolvedNode>?
 
   fileprivate init(
     identity: Identity,
     key: PreferenceObservationKey,
-    box: any PreferenceObservationBox
+    box: any PreferenceObservationBox, observedSubtree: ResolvedNode? = nil
   ) {
     self.identity = identity
     self.key = key
     self.box = box
+    self.observedSubtree = observedSubtree.map(Boxed.init)
   }
 }
 
@@ -51,6 +53,7 @@ private protocol PreferenceObservationBox: Sendable {
   func changed(
     from previous: (any PreferenceObservationBox)?
   ) -> Bool
+  func reading(_ preferences: PreferenceValues) -> any PreferenceObservationBox
   @MainActor func apply()
 }
 
@@ -73,6 +76,10 @@ where Key.Value: Equatable {
       return true
     }
     return previousValue != value
+  }
+
+  func reading(_ preferences: PreferenceValues) -> any PreferenceObservationBox {
+    Self(value: preferences[Key.self], action: action)
   }
 
   @MainActor
@@ -99,6 +106,7 @@ package final class LocalPreferenceObservationRegistry: Equatable {
     identity: Identity,
     key: K.Type,
     value: K.Value,
+    observedSubtree: ResolvedNode? = nil,
     action: @escaping @MainActor (K.Value) -> Void
   ) where K.Value: Equatable {
     let keyID = ObjectIdentifier(key)
@@ -119,7 +127,7 @@ package final class LocalPreferenceObservationRegistry: Equatable {
       box: TypedPreferenceObservationBox<K>(
         value: value,
         action: action
-      )
+      ), observedSubtree: observedSubtree
     )
     registrations[registrationKey] = registration
     ViewNodeContext.current?.recordPreferenceObservationRegistration(
@@ -128,14 +136,33 @@ package final class LocalPreferenceObservationRegistry: Equatable {
   }
 
   package func applyChanges(
-    since previous: [PreferenceObservationRegistrationSnapshot]
+    since previous: [PreferenceObservationRegistrationSnapshot],
+    committedTree: ResolvedNode? = nil
   ) -> Bool {
     let previousByID = Dictionary(
       uniqueKeysWithValues: previous.map { ($0.key, $0) }
     )
 
+    // The render head registers the value it can read then. GeometryReader
+    // supplies its children during layout, including on a resize that reuses
+    // the observer. Re-fold the observer's own subtree so preferences on
+    // modifiers outside that observation stay outside its value.
+    var realizations: [Identity: [ResolvedNode]] = [:]
+    if let committedTree, registrations.values.contains(where: { $0.observedSubtree != nil }) {
+      var pending = [committedTree]
+      while let node = pending.popLast() {
+        guard node.customLayoutFallbackSummary.layoutRealizedContentCount > 0 else { continue }
+        if node.layoutRealizedContent != nil { realizations[node.identity] = node.children }
+        pending.append(contentsOf: node.children)
+      }
+    }
     var appliedChange = false
-    for registration in sortedRegistrations() {
+    for var registration in sortedRegistrations() {
+      if let observed = registration.observedSubtree, !realizations.isEmpty {
+        let realized = observed.value.applyingLayoutDependentRealizations(realizations)
+        registration.box = registration.box.reading(realized.preferenceValues)
+        registrations[registration.key] = registration
+      }
       if registration.box.changed(from: previousByID[registration.key]?.box) {
         registration.box.apply()
         appliedChange = true

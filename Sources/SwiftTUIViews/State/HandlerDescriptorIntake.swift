@@ -473,6 +473,7 @@ package struct HandlerDescriptorIntake {
     identity: Identity,
     key: K.Type,
     value: K.Value,
+    observedSubtree: ResolvedNode? = nil,
     action: @escaping @MainActor (K.Value) -> Void
   ) where K.Value: Equatable {
     let scope = dispatchScope
@@ -480,6 +481,7 @@ package struct HandlerDescriptorIntake {
       identity: identity,
       key: key,
       value: value,
+      observedSubtree: observedSubtree,
       action: { newValue in
         withImperativeAuthoringContext(scope) {
           action(newValue)

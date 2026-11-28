@@ -212,6 +212,8 @@ where
         identity: node.identity,
         key: Key.self,
         value: node.preferenceValues[Key.self],
+        observedSubtree: node.customLayoutFallbackSummary.layoutRealizedContentCount > 0
+          ? node : nil,
         action: action
       )
       return [node]

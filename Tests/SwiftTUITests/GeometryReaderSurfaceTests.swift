@@ -9,6 +9,22 @@ import Testing
 @MainActor
 @Suite
 struct GeometryReaderSurfaceTests {
+  @Test("a preference tracks the reader width on resize during a transition")
+  func resizeDeliversRealizedPreference() throws {
+    let harness = try RunLoopTestHarness(size: .init(width: 30, height: 8)) {
+      WidthPreferenceScene()
+    }
+    defer { harness.shutdown() }
+    #expect(harness.lines.first?.contains("observed 30") == true)
+    try harness.press(KeyPress(.character("e")))
+    try harness.advance(by: .milliseconds(330))
+    try #require(harness.nextWake != nil)
+    try harness.resize(to: .init(width: 20, height: 8))
+    try harness.advance(by: .milliseconds(33))
+    #expect(harness.lines.contains { $0.contains("width 20") })
+    #expect(harness.lines.first?.contains("observed 20") == true)
+  }
+
   @Test("geometry reader exposes the current terminal surface size")
   func geometryReaderExposesTerminalSurfaceSize() {
     var environmentValues = EnvironmentValues()
@@ -601,5 +617,31 @@ private final class GeometryReaderAutonomousTaskQuitGate {
     didFinish = true
     continuation.yield(.key(KeyPress(.character("c"), modifiers: .ctrl)))
     continuation.finish()
+  }
+}
+
+private enum RealizedWidthPreference: PreferenceKey {
+  static let defaultValue = 0
+  static func reduce(value: inout Int, nextValue: () -> Int) { value = nextValue() }
+}
+
+private struct WidthPreferenceScene: View {
+  @State private var measured = 0
+  @State private var expanded = false
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Text("observed \(measured)").focusable().onKeyPress(.character("e")) { _ in
+        withAnimation(.linear(duration: .milliseconds(800))) { expanded.toggle() }
+        return .handled
+      }
+      GeometryReader { proxy in
+        Text("width \(proxy.size.width)").preference(
+          key: RealizedWidthPreference.self,
+          value: proxy.size.width)
+      }.frame(height: 1)
+      if expanded { Text("extra").transition(.move(edge: .leading)) }
+    }
+    .onPreferenceChange(RealizedWidthPreference.self) { measured = $0 }
   }
 }
