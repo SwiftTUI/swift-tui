@@ -300,26 +300,28 @@ extension Table {
 
         if let scrollCurrency {
           let indexedSource = resolvedContent.indexedSource
+          let rowIndex: @MainActor (ScrollTargetQuery) -> Int? = { query in
+            if let index = query.expectedCollectionRowIndex {
+              guard resolvedRows.indices.contains(index),
+                resolvedRows[index].identity == query.identity
+              else { return nil }
+              return index
+            }
+            if let indexedSource { return indexedSource.elementIndex(matching: query) }
+            return resolvedRows.firstIndex { row in
+              if let identity = query.identity { return row.identity == identity }
+              return query.explicitIDComponent == row.identity.lastComponent
+            }
+          }
           intake.registerScrollPosition(
             identity: context.identity,
             currentOffset: { scrollCurrency.currentOffset() },
             applyOffset: { scrollCurrency.applyOffset($0) },
             currentCollectionAnchor: { scrollCurrency.storedAnchor },
             revealTarget: { query, anchor in
-              scrollCurrency.revealTarget(for: query, anchor: anchor) { query in
-                if let index = query.expectedCollectionRowIndex {
-                  guard resolvedRows.indices.contains(index),
-                    resolvedRows[index].identity == query.identity
-                  else { return nil }
-                  return index
-                }
-                if let indexedSource { return indexedSource.elementIndex(matching: query) }
-                return resolvedRows.firstIndex { row in
-                  if let identity = query.identity { return row.identity == identity }
-                  return query.explicitIDComponent == row.identity.lastComponent
-                }
-              }
+              scrollCurrency.revealTarget(for: query, anchor: anchor, resolvingRow: rowIndex)
             },
+            collectionTargetIndex: rowIndex,
             scrollToEdge: { scrollCurrency.scroll(toEdge: $0) }
           )
 

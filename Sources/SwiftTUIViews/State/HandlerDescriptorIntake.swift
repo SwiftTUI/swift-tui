@@ -351,6 +351,7 @@ package struct HandlerDescriptorIntake {
     bindingSourceID: AnyID? = nil,
     currentCollectionAnchor: @escaping @MainActor () -> CollectionScrollAnchor? = { nil },
     revealTarget: (@MainActor (ScrollTargetQuery, UnitPoint?) -> Bool?)? = nil,
+    collectionTargetIndex: (@MainActor (ScrollTargetQuery) -> Int?)? = nil,
     scrollToEdge: (@MainActor (Edge) -> Bool)? = nil
   ) {
     let scope = dispatchScope
@@ -386,6 +387,7 @@ package struct HandlerDescriptorIntake {
         bindingSourceID: bindingSourceID,
         currentCollectionAnchor: currentCollectionAnchor,
         revealTarget: wrappedReveal,
+        collectionTargetIndex: collectionTargetIndex,
         scrollToEdge: wrappedEdge
       )
     }

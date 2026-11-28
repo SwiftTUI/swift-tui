@@ -140,7 +140,7 @@ package struct PlacedNodePlacementMetadata: Equatable, Sendable {
   /// tree and therefore may be absent from its retained index.
   package var lazyStackAllocationSnapshot: LazyStackAllocationSnapshot?
   /// The viewport that selected and refined the actual placed fragments.
-  package var lazyStackPlacementViewport: ScrollViewportContext?
+  package var indexedContainerPlacementViewport: ScrollViewportContext?
   package var scrollAnchorCorrection: LazyScrollAnchorCorrection? = nil
   package var hostedCollectionTableColumnWidths: [Int]?
   package var scrollViewportRect: CellRect?
@@ -152,7 +152,7 @@ package struct PlacedNodePlacementMetadata: Equatable, Sendable {
 
   package var isEmpty: Bool {
     lazyChildScrollEstimates == nil && lazyStackAllocationSnapshot == nil
-      && lazyStackPlacementViewport == nil
+      && indexedContainerPlacementViewport == nil
       && scrollAnchorCorrection == nil
       && hostedCollectionTableColumnWidths == nil
       && scrollViewportRect == nil && parentScrollViewportRect == nil

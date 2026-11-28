@@ -13,6 +13,81 @@ import Testing
 @Suite(.serialized)
 struct HostedCollectionHintWindowingTests {
   @Test(
+    "a scrolled collection after header content draws and routes its visible rows",
+    arguments: [false, true])
+  func headerBeforeHostedCollection(list: Bool) throws {
+    let box = SetDSelection<String?>(nil)
+    let rows = setDRows(400)
+    let harness = try SetDLiveHarness("HostedHeader-\(list)", size: .init(width: 30, height: 24)) {
+      ScrollViewReader { proxy in
+        VStack(spacing: 0) {
+          Button("jump") { _ = proxy.scrollTo(y: 80) }
+          ScrollView {
+            VStack(spacing: 0) {
+              Text("header").frame(height: 40)
+              if list {
+                List(rows, selection: box.binding) { Text($0.id) }
+              } else {
+                Table(rows, selection: box.binding, columns: [TableColumn("Name")]) { Text($0.id) }
+                  .tableHeaders(.hidden)
+              }
+            }
+          }.scrollIndicators(.hidden).frame(height: 22)
+        }
+      }
+    }
+    defer { harness.shutdown() }
+    try harness.clickText("jump")
+    let visible = harness.tokens(prefix: "r")
+    try #require(visible.count >= 8, "\(harness.frame)")
+    #expect(harness.actionRegistrationCount < 150)
+    let row = visible[visible.count - 2]
+    try harness.clickText(row)
+    #expect(box.value == row)
+  }
+
+  @Test("a hosted table after a lazy stack keeps a bounded interactive window")
+  func tableFollowingLazyStack() throws {
+    let rows = setDRows(200)
+    let box = SetDSelection<String?>(nil)
+    let harness = try SetDLiveHarness("HostedSibling", size: .init(width: 30, height: 24)) {
+      ScrollViewReader { proxy in
+        VStack(spacing: 0) {
+          Button("jump") { _ = proxy.scrollTo(edge: .bottom) }
+          ScrollView {
+            VStack(spacing: 0) {
+              LazyVStack { ForEach(0..<10, id: \.self) { Text("header \($0)") } }
+              Table(rows, selection: box.binding, columns: [TableColumn("Name")]) { Text($0.id) }
+                .tableHeaders(.hidden)
+            }
+          }.scrollIndicators(.hidden).frame(height: 22)
+        }
+      }
+    }
+    defer { harness.shutdown() }
+    #expect(harness.actionRegistrationCount < 150)
+    try harness.clickText("jump")
+    #expect(harness.tokens(prefix: "r").last == "r199")
+    #expect(harness.actionRegistrationCount < 150)
+    try harness.clickText("r199")
+    #expect(box.value == "r199")
+  }
+
+  @Test(
+    "scrollTo reveals an existing or newly appended row through an enclosing scroll view",
+    arguments: [false, true])
+  func revealHostedTableRow(appended: Bool) throws {
+    let harness = try SetDLiveHarness(
+      "HostedTarget-\(appended)", size: .init(width: 30, height: 12)
+    ) {
+      HostedTargetTable()
+    }
+    defer { harness.shutdown() }
+    try harness.clickText(appended ? "append" : "far")
+    #expect(harness.frame.contains(appended ? "r200" : "r150"), "\(harness.frame)")
+  }
+
+  @Test(
     "vacuous hosted hints cannot poison a later finite measurement",
     arguments: [false, true], [false, true])
   func vacuousHintDoesNotCacheExhaustiveRows(table: Bool, wrapped: Bool) throws {
@@ -338,4 +413,25 @@ private func tallRowFixtureLines(_ surface: String) -> [Int: Int] {
     }
   }
   return lines
+}
+
+private struct HostedTargetTable: View {
+  @State private var rows = setDRows(200)
+
+  var body: some View {
+    ScrollViewReader { proxy in
+      VStack(spacing: 0) {
+        HStack(spacing: 1) {
+          Button("far") { _ = proxy.scrollTo("r150") }
+          Button("append") {
+            rows.append(SetDRow(id: "r200"))
+            _ = proxy.scrollTo("r200")
+          }
+        }
+        ScrollView {
+          Table(rows, columns: [TableColumn("Name")]) { Text($0.id) }.tableHeaders(.hidden)
+        }.scrollIndicators(.hidden).frame(height: 10)
+      }
+    }
+  }
 }

@@ -44,6 +44,8 @@ package struct ScrollPositionRegistrationSnapshot {
   /// nil when the query matches nothing. Ordinary `ScrollView` uses cell
   /// geometry below, including allocation targets for its unrealized lazy rows.
   package var revealTarget: (@MainActor (ScrollTargetQuery, UnitPoint?) -> Bool?)?
+  /// Resolves a row on demand when a containing scroll view owns its viewport.
+  package var collectionTargetIndex: (@MainActor (ScrollTargetQuery) -> Int?)?
   /// Scrolls to an edge of content this route owns, reporting whether anything
   /// moved. A viewport-backed collection answers edges itself for the same
   /// reason it answers ``revealTarget``: its line model is not the cell
@@ -61,6 +63,7 @@ package struct ScrollPositionRegistrationSnapshot {
     bindingSourceID: AnyID? = nil,
     currentCollectionAnchor: @escaping @MainActor () -> CollectionScrollAnchor? = { nil },
     revealTarget: (@MainActor (ScrollTargetQuery, UnitPoint?) -> Bool?)? = nil,
+    collectionTargetIndex: (@MainActor (ScrollTargetQuery) -> Int?)? = nil,
     scrollToEdge: (@MainActor (Edge) -> Bool)? = nil
   ) {
     self.identity = identity
@@ -71,6 +74,7 @@ package struct ScrollPositionRegistrationSnapshot {
     self.applyOffset = applyOffset
     self.currentCollectionAnchor = currentCollectionAnchor
     self.bindingSourceID = bindingSourceID
+    self.collectionTargetIndex = collectionTargetIndex
     self.revealTarget = revealTarget
     self.scrollToEdge = scrollToEdge
   }
@@ -182,6 +186,7 @@ package final class LocalScrollPositionRegistry: Equatable {
     bindingSourceID: AnyID? = nil,
     currentCollectionAnchor: @escaping @MainActor () -> CollectionScrollAnchor? = { nil },
     revealTarget: (@MainActor (ScrollTargetQuery, UnitPoint?) -> Bool?)? = nil,
+    collectionTargetIndex: (@MainActor (ScrollTargetQuery) -> Int?)? = nil,
     scrollToEdge: (@MainActor (Edge) -> Bool)? = nil
   ) {
     let registration = ScrollPositionRegistrationSnapshot(
@@ -193,6 +198,7 @@ package final class LocalScrollPositionRegistry: Equatable {
       bindingSourceID: bindingSourceID,
       currentCollectionAnchor: currentCollectionAnchor,
       revealTarget: revealTarget,
+      collectionTargetIndex: collectionTargetIndex,
       scrollToEdge: scrollToEdge
     )
     registrations[identity] = registration
@@ -510,6 +516,10 @@ package final class LocalScrollPositionRegistry: Equatable {
       pendingExplicitScrollRoutes.insert(route.identity)
       // A later command on a route replaces its pending far edge.
       pendingFarEdges.removeValue(forKey: route.identity)
+      if let handled = revealHostedRow(query, anchor: anchor, in: route, registration: registration)
+      {
+        return handled
+      }
       if let handled = registration.revealTarget?(query, anchor) {
         recordCollectionTarget(query, anchor: anchor, registration: registration, changed: handled)
         return handled
@@ -542,17 +552,46 @@ package final class LocalScrollPositionRegistry: Equatable {
     where routeMatchesScope(route.identity, scopeIdentity: scopeIdentity)
       || hostChainMatchesScope(route, scopeIdentity: scopeIdentity)
     {
-      guard let registration = registrations[route.identity],
-        let handled = registration.revealTarget?(query, anchor)
-      else {
-        continue
+      guard let registration = registrations[route.identity] else { continue }
+      if let handled = revealHostedRow(query, anchor: anchor, in: route, registration: registration)
+      {
+        return handled
       }
+      guard let handled = registration.revealTarget?(query, anchor) else { continue }
       pendingExplicitScrollRoutes.insert(route.identity)
       pendingFarEdges.removeValue(forKey: route.identity)
       recordCollectionTarget(query, anchor: anchor, registration: registration, changed: handled)
       return handled
     }
     return nil
+  }
+
+  /// A collection laid out at its full content height has no internal
+  /// scrolling to do. Its row-line geometry gives the containing scroll
+  /// view a target even when the row has never been placed.
+  private func revealHostedRow(
+    _ query: ScrollTargetQuery, anchor: UnitPoint?, in route: ScrollRoute,
+    registration: ScrollPositionRegistrationSnapshot
+  ) -> Bool? {
+    guard let layout = route.collectionScrollLayout,
+      layout.visibleLines == 0..<layout.geometry.displayLineCount,
+      let containerTarget = latestScrollTargets.first(where: { $0.identity == route.identity }),
+      let parent = latestScrollRoutes.first(where: { $0.identity == containerTarget.scrollIdentity }
+      ),
+      let parentRegistration = registrations[parent.identity],
+      let index = registration.collectionTargetIndex?(query), index < layout.geometry.rowCount
+    else { return nil }
+    let lines = layout.geometry.lineRange(forRow: index)
+    let rect = CellRect(
+      origin: .init(
+        x: route.viewportRect.origin.x,
+        y: SaturatingConversion.adding(route.viewportRect.origin.y, lines.lowerBound)),
+      size: .init(width: route.viewportRect.size.width, height: lines.count))
+    pendingExplicitScrollRoutes.insert(parent.identity)
+    supersedePendingCommands(on: parent.identity, scopeIdentity: parent.identity)
+    return scrollTo(
+      rect: rect, anchor: anchor, route: parent, registration: parentRegistration,
+      placedAt: latestPlacedOffsets[parent.identity])
   }
 
   /// A relative or absolute command replaces every command still pending on

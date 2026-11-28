@@ -33,9 +33,11 @@ extension LayoutEngine {
       placedChildren: children
     )
     node.lazyStackAllocationSnapshot = measured.containerAllocationSnapshot?.lazyStack
-    if case .lazyStack = resolved.layoutBehavior {
+    if node.lazyStackAllocationSnapshot != nil
+      || measured.containerAllocationSnapshot?.hostedCollection?.measuredWindow != nil
+    {
       var metadata = node.placementMetadata
-      metadata.lazyStackPlacementViewport = viewportContext
+      metadata.indexedContainerPlacementViewport = viewportContext
       node.placementMetadata = metadata
     }
     node.hostedCollectionTableColumnWidths =

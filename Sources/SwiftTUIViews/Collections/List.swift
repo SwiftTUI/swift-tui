@@ -247,35 +247,37 @@ extension List {
           // scrolling is not a selection feature, and this registration is what
           // lets `ScrollViewProxy` reach the collection at all.
           let indexedSource = resolvedContent.indexedSource
+          let rowIndex: @MainActor (ScrollTargetQuery) -> Int? = { query in
+            if let index = query.expectedCollectionRowIndex {
+              guard rows.indices.contains(index), rows[index].identity == query.identity else {
+                return nil
+              }
+              return index
+            }
+            if let identity = query.identity,
+              let index = listRowIndex(parsedFrom: identity, container: context.identity),
+              rows.indices.contains(index)
+            {
+              return index
+            }
+            if let indexedSource { return indexedSource.elementIndex(matching: query) }
+            return rows.firstIndex { row in
+              if let identity = query.identity, row.identity == identity { return true }
+              if let component = query.explicitIDComponent {
+                return row.identity.lastComponent == component
+              }
+              return false
+            }
+          }
           intake.registerScrollPosition(
             identity: context.identity,
             currentOffset: { scrollCurrency.currentOffset() },
             applyOffset: { scrollCurrency.applyOffset($0) },
             currentCollectionAnchor: { scrollCurrency.storedAnchor },
             revealTarget: { query, anchor in
-              scrollCurrency.revealTarget(for: query, anchor: anchor) { query in
-                if let index = query.expectedCollectionRowIndex {
-                  guard rows.indices.contains(index), rows[index].identity == query.identity else {
-                    return nil
-                  }
-                  return index
-                }
-                if let identity = query.identity,
-                  let index = listRowIndex(parsedFrom: identity, container: context.identity),
-                  rows.indices.contains(index)
-                {
-                  return index
-                }
-                if let indexedSource { return indexedSource.elementIndex(matching: query) }
-                return rows.firstIndex { row in
-                  if let identity = query.identity, row.identity == identity { return true }
-                  if let component = query.explicitIDComponent {
-                    return row.identity.lastComponent == component
-                  }
-                  return false
-                }
-              }
+              scrollCurrency.revealTarget(for: query, anchor: anchor, resolvingRow: rowIndex)
             },
+            collectionTargetIndex: rowIndex,
             scrollToEdge: { scrollCurrency.scroll(toEdge: $0) }
           )
 

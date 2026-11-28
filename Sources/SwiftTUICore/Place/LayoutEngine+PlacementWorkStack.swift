@@ -65,6 +65,8 @@ extension LayoutEngine {
     work: inout [PlacementWorkItem],
     results: inout [PlacedNode]
   ) {
+    let measured = refinedHostedMeasurement(
+      node, measured: measured, bounds: bounds, viewport: viewportContext, passContext: passContext)
     if let retained = retainedPlacement(
       for: node,
       measured: measured,

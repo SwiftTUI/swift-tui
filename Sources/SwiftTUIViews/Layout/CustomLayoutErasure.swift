@@ -665,7 +665,7 @@ final class LayoutWorkerProxy<L: Layout>: WorkerCustomLayoutProxy,
             // movement to the scroll offset, preserving the header displacement
             // and the clamped local-zero case above the stack.
             let anchoredScrollOffset: Int
-            if let hint = snapshot.windowHint, hint.lazyStackContentOrigin != nil {
+            if let hint = snapshot.windowHint, hint.indexedContainerContentOrigin != nil {
               let localRequested =
                 snapshot.axis == .vertical ? hint.contentOffset.y : hint.contentOffset.x
               let scrollRequested = snapshot.axis == .vertical ? requested.y : requested.x

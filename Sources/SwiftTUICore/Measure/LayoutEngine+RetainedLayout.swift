@@ -66,7 +66,7 @@ extension LayoutEngine {
       guard let passContext,
         let storedHint = lazySnapshot.windowHint ?? lazySnapshot.claimedHint,
         let currentHint = passContext.currentMeasureViewportHint,
-        localLazyStackHint(
+        localIndexedContainerHint(
           currentHint, for: resolved, axis: lazySnapshot.axis,
           passContext: passContext) == storedHint,
         passContext.claimCurrentMeasureViewportHint(for: resolved.identity) == currentHint
@@ -95,7 +95,9 @@ extension LayoutEngine {
       guard let passContext,
         let rowStride = hostedSnapshot.estimatedRowStride,
         hostedCollectionHintWindow(
-          hint: passContext.currentMeasureViewportHint,
+          hint: passContext.currentMeasureViewportHint.map {
+            localIndexedContainerHint($0, for: resolved, axis: .vertical, passContext: passContext)
+          },
           count: resolved.indexedChildSource?.count ?? 0,
           rowStride: rowStride,
           tallRowHeights: hostedSnapshot.tallRowHeights,
@@ -103,7 +105,8 @@ extension LayoutEngine {
             from: hostedSnapshot.hiddenRowSeparatorEdges,
             rowCount: resolved.indexedChildSource?.count ?? 0)
         ) == storedWindow,
-        passContext.claimCurrentMeasureViewportHint(for: resolved.identity) != nil
+        passContext.claimCurrentMeasureViewportHint(
+          for: resolved.identity, allowsHostedSibling: true) != nil
       else {
         return nil
       }

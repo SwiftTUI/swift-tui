@@ -40,8 +40,8 @@ package struct ScrollViewportContext: Equatable, Sendable {
 /// size, which is what measurement is computing) — the window math clamps
 /// to the content range itself.
 package struct MeasureViewportHint: Equatable, Sendable {
-  /// Non-nil when the offset has been converted to a lazy stack's local space.
-  package var lazyStackContentOrigin: CellPoint?
+  /// Non-nil when the offset has been converted to the indexed container's local space.
+  package var indexedContainerContentOrigin: CellPoint?
   package var scrollIdentity: Identity?
   package var axes: AxisSet
   package var contentOffset: CellPoint
@@ -75,19 +75,14 @@ package enum LayoutPassPurpose: Sendable {
 }
 
 package final class LayoutPassContext: Sendable {
-  /// One entry of the measure-viewport hint stack. `claimedBy` records the
-  /// indexed container that anchored a window against this hint: the hint's
-  /// `contentOffset` is meaningful only at the scroll content's origin, so the
-  /// outermost indexed container on the hint's axis claims it and every deeper
-  /// (or later-sibling) container measures exhaustively instead of anchoring
-  /// `offset / ownStride` at its own origin — which parks a nested stack's
-  /// window at its end once the outer offset exceeds `count × stride`. The
-  /// claim is keyed by identity so a legitimate re-measure of the SAME
-  /// container inside one hint scope (an enclosing stack's flexibility
-  /// second round) windows again instead of degrading to exhaustive.
+  /// The first indexed container owns the lazy-stack hint for this scroll.
+  /// Hosted siblings can also window because placement checks the offset in
+  /// their own coordinate space. Descendants still defer to a claimed
+  /// ancestor. Identity keeps a flexibility re-measure on the same window.
   private struct MeasureViewportHintEntry: Sendable {
     var hint: MeasureViewportHint
     var claimedBy: Identity?
+    var hostedSiblingClaims: [Identity] = []
   }
 
   private struct MutableState: Sendable {
@@ -261,16 +256,10 @@ package final class LayoutPassContext: Sendable {
     state.withLock { $0.measureViewportHints.last?.hint }
   }
 
-  /// Atomically claims the innermost hint for the indexed container
-  /// `identity`: returns the hint when the entry is unclaimed or already
-  /// claimed by this same identity, or `nil` when a DIFFERENT container
-  /// holds the claim (the caller must fall back to exhaustive measurement).
-  /// Only the outermost indexed container on the hint's axis may window
-  /// against a hint — its `contentOffset` is origin-relative and unadjusted
-  /// for nesting depth — while same-identity re-claims keep an enclosing
-  /// stack's flexibility re-measure of the claimer windowed.
+  /// Claims the innermost hint for an indexed container. A hosted sibling
+  /// can share the hint with containers outside its own subtree.
   package func claimCurrentMeasureViewportHint(
-    for identity: Identity
+    for identity: Identity, allowsHostedSibling: Bool = false
   ) -> MeasureViewportHint? {
     state.withLock {
       guard let last = $0.measureViewportHints.indices.last else {
@@ -281,6 +270,16 @@ package final class LayoutPassContext: Sendable {
         $0.measureViewportHints[last].claimedBy = identity
         return $0.measureViewportHints[last].hint
       case identity:
+        return $0.measureViewportHints[last].hint
+      case let owner? where allowsHostedSibling:
+        // Hosted siblings validate their own displacement at placement. Nested
+        // indexed content still belongs to its outermost window.
+        let others = $0.measureViewportHints[last].hostedSiblingClaims
+        if others.contains(identity) { return $0.measureViewportHints[last].hint }
+        guard !owner.isAncestor(of: identity), !identity.isAncestor(of: owner),
+          !others.contains(where: { $0.isAncestor(of: identity) || identity.isAncestor(of: $0) })
+        else { return nil }
+        $0.measureViewportHints[last].hostedSiblingClaims.append(identity)
         return $0.measureViewportHints[last].hint
       default:
         return nil

@@ -1,6 +1,34 @@
 @_spi(Testing) import SwiftTUIPrimitives
 
 extension LayoutEngine {
+  /// Placement knows the actual offset after headers, siblings and wrappers.
+  /// If measurement selected a different band, use the local band for both
+  /// child placement and the line model published to drawing and routing.
+  func refinedHostedMeasurement(
+    _ node: ResolvedNode, measured: MeasuredNode, bounds: CellRect,
+    viewport: ScrollViewportContext?, passContext: LayoutPassContext?
+  ) -> MeasuredNode {
+    guard let viewport, let passContext,
+      let snapshot = measured.containerAllocationSnapshot?.hostedCollection,
+      let band = snapshot.measuredWindow, let stride = snapshot.estimatedRowStride,
+      let count = node.indexedChildSource?.count
+    else { return measured }
+    let offset = max(
+      0, SaturatingConversion.subtracting(viewport.viewportRect.origin.y, bounds.origin.y))
+    var hint = MeasureViewportHint(
+      axes: viewport.axes, contentOffset: .init(x: 0, y: offset),
+      viewportSize: viewport.viewportRect.size, scrollIdentity: viewport.scrollIdentity)
+    hint.indexedContainerContentOrigin = .zero
+    let expected = hostedCollectionHintWindow(
+      hint: hint, count: count, rowStride: stride, tallRowHeights: snapshot.tallRowHeights,
+      hiddenSeparators: hiddenTableSeparators(
+        from: snapshot.hiddenRowSeparatorEdges, rowCount: count))
+    guard let expected, !band.contains(expected) else { return measured }
+    return passContext.withMeasureViewportHint(hint) {
+      measure(node, proposal: measured.proposal, passContext: passContext)
+    }
+  }
+
   /// Admits a node to hosted-collection windowing. A non-empty `List` or
   /// `Table` container measures its realized rows out of line; every other
   /// node is answered `nil` from this small frame.
@@ -189,7 +217,11 @@ extension LayoutEngine {
     // against its own CONTENT height — as tall as the dataset. In both cases
     // the enclosing scroll layout's declared measure viewport is the better
     // information, so it wins.
-    let hint = passContext?.currentMeasureViewportHint
+    let hint = passContext.flatMap { context in
+      context.currentMeasureViewportHint.map {
+        localIndexedContainerHint($0, for: node, axis: .vertical, passContext: context)
+      }
+    }
     let viewportHeight = hint?.viewportSize.height ?? 0
     let usesLineModel: Bool
     switch effectiveProposal.height {
@@ -235,7 +267,8 @@ extension LayoutEngine {
       tallRowHeights: retainedTallRows,
       hiddenSeparators: hiddenTableSeparators(from: retainedHiddenEdges, rowCount: source.count)
     ),
-      passContext?.claimCurrentMeasureViewportHint(for: node.identity) != nil
+      passContext?.claimCurrentMeasureViewportHint(for: node.identity, allowsHostedSibling: true)
+        != nil
     {
       // Deriving the window from the hint — rather than from the line model
       // over the full content height — is the whole point: asking the line
@@ -243,8 +276,8 @@ extension LayoutEngine {
       // anything, which is the O(dataset) collapse this path exists to avoid.
       // The claim keeps a collection NESTED inside an outer windowed stack
       // from anchoring the outer scroll's offset at its own origin: the
-      // outermost indexed container per hint wins, everything deeper falls
-      // back (scroll-latency Stage 2, plan 2026-07-31-002).
+      // outermost indexed container wins over its descendants. Siblings
+      // validate separate windows using their actual placed bounds.
       sourceIndices = Array(window)
       measuredWindow = window
     } else {

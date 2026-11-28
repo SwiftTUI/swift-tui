@@ -125,7 +125,7 @@ extension LayoutEngine {
                 contentOffset: viewportContext.contentOffset, viewportSize: viewport.size)
             // This is already stack-local; measurement must not subtract the
             // retained displacement a second time.
-            hint.lazyStackContentOrigin = .zero
+            hint.indexedContainerContentOrigin = .zero
             hint.viewportSize = viewport.size
             if axis == .vertical {
               hint.contentOffset.y = max(0, offset)

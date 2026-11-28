@@ -88,15 +88,15 @@ extension LayoutEngine {
   /// Placement supplies the displacement missing during measurement. Reuse it
   /// as the next frame's estimate; placement still validates the actual origin,
   /// so moving headers or wrappers select a corrected band in that same frame.
-  func localLazyStackHint(
+  func localIndexedContainerHint(
     _ hint: MeasureViewportHint, for node: ResolvedNode, axis: Axis,
     passContext: LayoutPassContext
   ) -> MeasureViewportHint {
-    guard hint.lazyStackContentOrigin == nil,
+    guard hint.indexedContainerContentOrigin == nil,
       let retained = passContext.retainedLayout ?? passContext.measurementSeedSession,
       let placed = node.viewNodeID.flatMap({ retained.previousFrameIndex?.placedByNodeID[$0] })
         ?? retained.placedNode(for: node.identity),
-      let viewport = placed.placementMetadata.lazyStackPlacementViewport,
+      let viewport = placed.placementMetadata.indexedContainerPlacementViewport,
       viewport.scrollIdentity == hint.scrollIdentity, viewport.axes == hint.axes
     else { return hint }
     let origin = CellPoint(
@@ -107,7 +107,7 @@ extension LayoutEngine {
         placed.bounds.origin.y,
         SaturatingConversion.subtracting(viewport.viewportRect.origin.y, viewport.contentOffset.y)))
     var local = hint
-    local.lazyStackContentOrigin = origin
+    local.indexedContainerContentOrigin = origin
     if axis == .vertical {
       local.contentOffset.y = max(
         0, SaturatingConversion.subtracting(hint.contentOffset.y, origin.y))
@@ -132,7 +132,8 @@ extension LayoutEngine {
       mainDimension(of: scrollHint.viewportSize, for: axis) > 0,
       (spacing ?? 0) >= 0
     else { return false }
-    let hint = localLazyStackHint(scrollHint, for: node, axis: axis, passContext: passContext)
+    let hint = localIndexedContainerHint(
+      scrollHint, for: node, axis: axis, passContext: passContext)
     let context = WindowedLazyStackMeasurementContext(
       node: node, originalProposal: originalProposal, effectiveProposal: effectiveProposal,
       axis: axis, spacing: spacing, horizontalAlignment: horizontal, verticalAlignment: vertical,
