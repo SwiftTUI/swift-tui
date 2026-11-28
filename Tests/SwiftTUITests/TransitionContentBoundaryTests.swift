@@ -968,17 +968,14 @@ private final class BoundaryFlag {
   var binding: Binding<Bool>?
 }
 
-/// A text that owns the state deciding its layout priority. The state
-/// changes its length as well: a view that keeps its size and changes only
-/// what it declares to its container is not laid out again, with or without
-/// a transition (STUI-1579).
+/// A text whose own state changes only its parent-visible priority (STUI-1579).
 private struct BoundarySelfPriority: View {
   @State private var isWide = false
   let flag: BoundaryFlag
 
   var body: some View {
     let _ = capture()
-    Text(String(repeating: "b", count: isWide ? 22 : 20)).layoutPriority(isWide ? 1 : 0)
+    Text(String(repeating: "b", count: 20)).layoutPriority(isWide ? 1 : 0)
   }
 
   private func capture() {

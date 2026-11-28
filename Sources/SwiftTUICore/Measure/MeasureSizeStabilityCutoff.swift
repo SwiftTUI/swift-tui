@@ -203,9 +203,18 @@ extension LayoutEngine {
 
     guard
       let previousMeasured = session.measuredNode(for: root),
-      session.resolvedNode(for: root) != nil
+      let previousSubtree = session.resolvedNode(for: root)
     else {
       result.metrics.deniedNoBaseline += 1
+      return
+    }
+    // The parent consumes a child's declarations as well as its measured
+    // size. Patching the dirty root into the retained session would hide a
+    // priority or spacing change and serve the parent's old allocation.
+    let previousMetadata = previousSubtree.withContainerLayoutMetadata { $0 }
+    let currentMetadata = currentSubtree.withContainerLayoutMetadata { $0 }
+    guard !currentMetadata.hasExplicitAlignmentGuides, previousMetadata == currentMetadata else {
+      result.metrics.deniedIneligibleSpine += 1
       return
     }
     if previousMeasured.subtreeNodeCount * policy.subtreeShareDenominator > previousFrameNodeCount {

@@ -112,6 +112,38 @@ struct MeasureSizeStabilityCutoffTests {
     #expect(certificate.retainedProposal == retained.measuredNode(for: bIdentity)?.proposal)
   }
 
+  @Test(
+    "a size-stable dirty child must preserve its container declarations",
+    arguments: ["priority", "spacing", "minimum", "fixed", "guide", "value"])
+  func changedContainerDeclarationDenies(_ declaration: String) throws {
+    let engine = LayoutEngine(cache: MeasurementCache())
+    let identity = testIdentity("Root", "Inner", "B")
+    let previous = tree(leafBSize: .init(width: 4, height: 1))
+    let retained = session(for: engine, previousTree: previous, invalidated: [identity])
+    var current = previous
+    var metadata = LayoutMetadata()
+    switch declaration {
+    case "priority": metadata.layoutPriority = 1
+    case "spacing": metadata.spacing = .init(vertical: 3)
+    case "minimum": metadata.minimumHeight = 1
+    case "fixed": metadata.fixedSizeVertical = true
+    case "guide":
+      metadata = metadata.settingHorizontalAlignmentGuide(.leading, debugName: "leading") { _ in 2 }
+    default:
+      metadata = metadata.settingLayoutValue(
+        1, for: ObjectIdentifier(Int.self),
+        debugName: "count", debugValue: "1")
+    }
+    current.children[1].children[0].layoutMetadata = metadata
+    let result = try #require(
+      engine.preMeasureCutoffPrePass(
+        resolved: current,
+        passContext: LayoutPassContext(retainedLayout: retained, invalidatedIdentities: [identity]),
+        animationExcludedIdentities: []))
+    #expect(result.metrics.deniedIneligibleSpine == 1)
+    #expect(result.certificates.isEmpty)
+  }
+
   @Test("a dirty leaf whose fresh size drifts is denied as size-mismatch")
   func driftedSizeDeniesAsSizeMismatch() throws {
     let engine = LayoutEngine(cache: MeasurementCache())
