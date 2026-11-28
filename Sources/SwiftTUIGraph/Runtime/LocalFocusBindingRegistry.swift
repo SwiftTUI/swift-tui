@@ -266,7 +266,7 @@ package final class LocalDefaultFocusRegistry: Equatable {
     focusRegions: [FocusRegion]
   ) -> FocusBindingRequest {
     let regionByIdentity = Dictionary(
-      uniqueKeysWithValues: focusRegions.map { ($0.identity, $0) }
+      focusRegions.map { ($0.identity, $0) }, uniquingKeysWith: { first, _ in first }
     )
     let scopeIdentities =
       scopes

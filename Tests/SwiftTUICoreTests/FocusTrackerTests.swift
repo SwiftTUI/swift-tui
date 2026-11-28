@@ -96,6 +96,9 @@ struct FocusTrackerTests {
       focusRegion(first, y: 0, scopePath: [firstScope]),
       focusRegion(second, y: 1, scopePath: [firstScope]),
       focusRegion(fallback, y: 2, scopePath: [secondScope]),
+      // The first document occurrence belongs to the preferred scope. A
+      // later duplicate outside it must not hide that candidate.
+      focusRegion(second, y: 3, scopePath: []),
     ]
 
     #expect(

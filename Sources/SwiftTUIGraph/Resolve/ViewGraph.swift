@@ -2289,6 +2289,26 @@ package final class ViewGraph {
     return node.isEvaluating && node.identity != identity
   }
 
+  package func claimValueEntity(
+    _ entity: EntityIdentity, at path: StructuralPath, slot: Identity
+  ) -> EntityIdentity {
+    // A selective pass can visit a mounted duplicate ahead of its siblings.
+    let occupant = nodeIfExists(for: slot).flatMap { entityOccupant(of: $0) }
+    if let occupant, occupant.value == entity.value, occupant.occurrence > 0 {
+      return occupant
+    }
+    // A finished claim at another slot is a duplicate. Reentrant modifier
+    // resolution and reparenting from an earlier frame share the routed node.
+    var candidate = entity
+    while let routed = nodeForEntityIdentity(candidate),
+      !routed.isEvaluating, routed.visitedThisFrame(currentFrameID),
+      routed.identity != slot, routed.committed.entityStructuralPath != path
+    {
+      candidate = candidate.withOccurrence(candidate.occurrence + 1)
+    }
+    return candidate
+  }
+
   /// The entity currently claiming `node`: its committed value's attached
   /// entity, or the routing table's binding for it — the same derivation
   /// `prepareEntityRoutedOwner` uses to detect a foreign occupant. The

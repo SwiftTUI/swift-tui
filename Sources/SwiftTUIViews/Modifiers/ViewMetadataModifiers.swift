@@ -222,8 +222,8 @@ public struct IDModifier<ID: Hashable & Sendable>: IterativePrimitiveViewModifie
     content: ModifierContentInputs<Base>,
     in context: ResolveContext
   ) -> ResolveWork<[ResolvedNode]> {
+    let entityIdentity = resolveEntityRouteIdentity(in: context)
     let explicitIdentity = context.identity.explicitID(id)
-    let entityIdentity = EntityIdentity(id)
     let routedContext = context.replacingIdentity(with: explicitIdentity)
     let route = ResolveEntityRoute(
       identity: entityIdentity,
@@ -281,7 +281,9 @@ public struct IDModifier<ID: Hashable & Sendable>: IterativePrimitiveViewModifie
 
 extension IDModifier: EntityRouteProvidingModifier {
   package func resolveEntityRouteIdentity(in context: ResolveContext) -> EntityIdentity {
-    EntityIdentity(id)
+    let entity = EntityIdentity(id)
+    return context.viewGraph?.claimValueEntity(
+      entity, at: context.structuralPath, slot: context.identity) ?? entity
   }
 }
 
