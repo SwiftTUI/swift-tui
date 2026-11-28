@@ -1785,6 +1785,9 @@ package final class ViewGraph {
     // subtree in the frame draft before the new evaluator adopts any identities.
     if let root, root.identity != rootIdentity {
       removeSubtree(rootedAt: root)
+      // Descending through a routed entity normally defers its removal in
+      // case it moves elsewhere in this tree. No entity survives a root switch.
+      prunePendingEntityRoutedRemovals(activeEntities: [])
       self.root = nil
     }
     evaluationRootIdentity = rootIdentity
