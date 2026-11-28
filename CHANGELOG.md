@@ -9,6 +9,66 @@ require 1.0.0. See [COMPATIBILITY.md](docs/COMPATIBILITY.md).
 
 ## [Unreleased]
 
+## [0.26.0] - 2026-11-28
+
+### Breaking change for custom WebHost clients
+
+SwiftTUI 0.26.0 makes a security exception to the compatibility guarantee for
+the `swifttui.companion/1` profile. In 0.25.2, opening the launch URL set a
+cookie that also authorized the scene manifest and socket. In 0.26.0,
+cookie-only requests to those endpoints return HTTP 403 (STUI-878).
+
+If you maintain a custom companion client, retain the `token` query parameter
+from the launch URL. Include it as `?token=…` when fetching
+`/scene-manifest.json` and when opening or reconnecting to
+`/ws/scene/<id>` on the same server. The bundled browser client already does
+this. When serving a custom asset directory, WebHost sets a separate cookie
+that authorizes only static files.
+
+### Fixed
+
+- Custom transitions that add a background or overlay now render and animate
+  identified content with `.id` on either side of `.transition`. This fixes
+  a parent cycle in the view graph (STUI-1606).
+- The asynchronous renderer can present its first frame with a safe-area
+  inset. Switching a retained renderer to a different root releases the
+  departing view graph and gives reused child IDs fresh state (STUI-877,
+  STUI-1601).
+- Reading a custom `EnvironmentValues` key in a detached task is safe.
+  Observable-model writes inside `withAnimation` carry their animation into
+  the rendered frame. A `PhaseAnimator` with a single phase stays idle, and
+  consecutive equal phases skip redundant animations (STUI-719, STUI-1377,
+  STUI-739).
+- A `List` or `Table` below a header in a `ScrollView` realizes the visible
+  rows. Scrolling to a row also works after appending it. An empty lazy stack
+  keeps the next stack windowed, and a horizontal lazy stack with
+  variable-width children preserves its estimated extent across frames
+  (STUI-1359, STUI-1358, STUI-1329).
+- Stacks recompute their allocation when a child's layout priority changes.
+  Layout and drawing modifiers on a multi-view `Group` apply to each view.
+  A geometry preference observer receives the resized value during an active
+  transition (STUI-1579, STUI-1581, STUI-1589).
+- Realized rows in lazy stacks and lists interpolate opacity and offset
+  without realizing offscreen rows (STUI-1376).
+- Navigation destinations presented from a `ForEach($rows)` binding retain
+  their local state when returning to a tab. Alerts and confirmation dialogs
+  dismiss after an action writes another property on the same model, and an
+  action can explicitly present the prompt again (STUI-1372, STUI-1371).
+- Siblings with the same explicit ID receive distinct graph identities, and
+  ties for default focus resolve in document order. A sheet preserves an
+  explicit request to clear focus while it is open (STUI-764, STUI-770).
+- WebHost caps pending HTTP connections at 32 and gives each request ten
+  seconds to finish sending its headers (STUI-881).
+- Animated GIF decoding enforces input and decoded-pixel limits and composites
+  the frames in one pass. Curved shapes restrict Braille rasterization to
+  the visible clip, bounding memory use for large offscreen shapes
+  (STUI-828, STUI-802).
+- The terminal run loop services queued signals between frames and presents
+  accepted input before exiting. Debug checkpoint comparisons and lookups for
+  departed views do less repeated work. Under heavy CPU contention, a Debug
+  gallery tab switch can still take more than five seconds to finish after
+  SIGTERM (STUI-1236).
+
 ## [0.25.1] - 2026-11-23
 
 ### Changed
@@ -3228,7 +3288,8 @@ precomposition work (still images), cache hardening, and glyph-aware backdrops.
 See the GitHub releases for the full per-tag history:
 <https://github.com/SwiftTUI/swift-tui/releases>.
 
-[Unreleased]: https://github.com/SwiftTUI/swift-tui/compare/0.24.0...HEAD
+[Unreleased]: https://github.com/SwiftTUI/swift-tui/compare/0.26.0...HEAD
+[0.26.0]: https://github.com/SwiftTUI/swift-tui/compare/0.25.2...0.26.0
 [0.24.0]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.24.0
 [0.23.0]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.23.0
 [0.22.2]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.22.2
