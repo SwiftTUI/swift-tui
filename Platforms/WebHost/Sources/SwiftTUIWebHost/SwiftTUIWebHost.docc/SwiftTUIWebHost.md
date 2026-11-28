@@ -22,6 +22,10 @@ and WebHost graph, import `SwiftTUIWebHostCLI` directly.
 
 ## Request and resource boundaries
 
+The listener admits up to 32 simultaneous HTTP connections, reserving a slot
+until the socket closes or upgrades to an authenticated scene. A request head
+must finish within ten seconds of acceptance and fit in 64 KiB.
+
 The HTTP reader parses ASCII delimiters as octets and rejects malformed
 versions, field names, control bytes and duplicate singleton handshake
 headers. WebSocket upgrades require HTTP/1.1, exact protocol tokens and a

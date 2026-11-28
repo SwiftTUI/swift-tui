@@ -103,14 +103,20 @@
     }
 
     static func poll(_ fd: SOCKET, events: Int16, timeoutMilliseconds: Int32) -> PollOutcome {
+      let deadline = WebHostSocketDeadline(milliseconds: timeoutMilliseconds)
+      var remaining = timeoutMilliseconds
       while true {
         var descriptor = WSAPOLLFD(fd: fd, events: events, revents: 0)
-        let ready = unsafe WSAPoll(&descriptor, 1, timeoutMilliseconds)
+        let ready = unsafe WSAPoll(&descriptor, 1, remaining)
         if ready > 0 {
           return descriptor.revents & Int16(POLLNVAL) != 0 ? .invalidDescriptor : .ready
         }
         if ready == 0 { return .timedOut }
-        if lastError == WSAEINTR { continue }
+        if lastError == WSAEINTR {
+          guard let retry = deadline.remainingMilliseconds() else { return .timedOut }
+          remaining = retry
+          continue
+        }
         return .failed(errno: lastError)
       }
     }

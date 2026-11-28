@@ -147,9 +147,11 @@
       events: Int16,
       timeoutMilliseconds: Int32
     ) -> PollOutcome {
+      let deadline = WebHostSocketDeadline(milliseconds: timeoutMilliseconds)
+      var remaining = timeoutMilliseconds
       while true {
         var descriptor = pollfd(fd: fd, events: events, revents: 0)
-        let ready = unsafe systemPoll(&descriptor, 1, timeoutMilliseconds)
+        let ready = unsafe systemPoll(&descriptor, 1, remaining)
         if ready > 0 {
           if descriptor.revents & Int16(POLLNVAL) != 0 {
             return .invalidDescriptor
@@ -160,6 +162,8 @@
           return .timedOut
         }
         if errno == EINTR {
+          guard let retry = deadline.remainingMilliseconds() else { return .timedOut }
+          remaining = retry
           continue
         }
         return .failed(errno: errno)

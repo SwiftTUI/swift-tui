@@ -115,10 +115,41 @@ package struct WebHostLoopbackServer: WebHostServer {
   }
 }
 
+/// Only upgraded scene sockets may outlive the handshake admission budget.
+struct WebHostHandshakeBudget {
+  let limit: Int
+  private var pending: Set<ObjectIdentifier> = []
+
+  init(limit: Int = 32) { self.limit = limit }
+
+  mutating func admit(_ id: ObjectIdentifier) -> Bool {
+    guard pending.count < limit else { return false }
+    return pending.insert(id).inserted
+  }
+
+  mutating func release(_ id: ObjectIdentifier) { pending.remove(id) }
+}
+
+/// A monotonic deadline shared by all reads of one HTTP head.
+struct WebHostSocketDeadline {
+  let end: ContinuousClock.Instant
+
+  init(milliseconds: Int32, now: ContinuousClock.Instant = .now) {
+    end = now.advanced(by: .milliseconds(milliseconds))
+  }
+
+  func remainingMilliseconds(at now: ContinuousClock.Instant = .now) -> Int32? {
+    guard now < end else { return nil }
+    let milliseconds = (end - now) / .milliseconds(1)
+    return Int32(min(Double(Int32.max), milliseconds.rounded(.up)))
+  }
+}
+
 /// Owns the listener descriptor, the accept thread, and the live connections.
 final class WebHostConnectionCoordinator: Sendable {
   private struct State {
     var running = true
+    var handshakes = WebHostHandshakeBudget()
     var connections: [ObjectIdentifier: WebHostLoopbackConnection] = [:]
     var acceptThreadExited = false
     var acceptExitWaiters: [CheckedContinuation<Void, Never>] = []
@@ -185,6 +216,9 @@ final class WebHostConnectionCoordinator: Sendable {
       case .ready:
         let connectionFD = WebHostSocket.accept(listenerFD)
         guard WebHostSocket.isValid(connectionFD) else {
+          // Resource exhaustion can leave the listener readable while accept fails.
+          // Yield this dedicated thread before retrying or observing a concurrent stop.
+          Thread.sleep(forTimeInterval: 0.1)
           continue
         }
         WebHostSocket.configureNoSignalPipe(connectionFD)
@@ -211,22 +245,25 @@ final class WebHostConnectionCoordinator: Sendable {
       fd: connectionFD,
       routes: routes,
       channels: channels,
+      onUpgrade: { [weak self] connection in
+        self?.state.withLock { $0.handshakes.release(ObjectIdentifier(connection)) }
+      },
       onClose: { [weak self] connection in
         self?.state.withLock { state in
-          state.connections[ObjectIdentifier(connection)] = nil
+          let id = ObjectIdentifier(connection)
+          state.handshakes.release(id)
+          state.connections[id] = nil
         }
       }
     )
     let accepted = state.withLock { state in
-      guard state.running else {
-        return false
-      }
-      state.connections[ObjectIdentifier(connection)] = connection
+      let id = ObjectIdentifier(connection)
+      guard state.running, state.handshakes.admit(id) else { return false }
+      state.connections[id] = connection
       return true
     }
     guard accepted else {
-      // Raced a stop: the sweep already ran, so this descriptor is ours to
-      // retire before any thread starts.
+      // Retire an unadmitted descriptor before either worker starts.
       WebHostSocket.close(connectionFD)
       return
     }
@@ -257,12 +294,13 @@ final class WebHostLoopbackConnection: Sendable {
   private let fd: WebHostSocketDescriptor
   private let routes: WebHostRouteTable
   private let channels: [WindowIdentifier: WebHostSceneChannel]
+  private let headDeadline = WebHostSocketDeadline(milliseconds: 10_000)
+  private let onUpgrade: @Sendable (WebHostLoopbackConnection) -> Void
   private let onClose: @Sendable (WebHostLoopbackConnection) -> Void
   private let state = Mutex(State())
   private let outboxSignal = DispatchSemaphore(value: 0)
 
   private static let headByteLimit = 64 * 1024
-  private static let headReadTimeoutMilliseconds: Int32 = 10_000
   private static let writePollTimeoutMilliseconds: Int32 = 5_000
   private static let drainTimeoutMilliseconds: Int32 = 2_000
 
@@ -270,11 +308,13 @@ final class WebHostLoopbackConnection: Sendable {
     fd: WebHostSocketDescriptor,
     routes: WebHostRouteTable,
     channels: [WindowIdentifier: WebHostSceneChannel],
+    onUpgrade: @escaping @Sendable (WebHostLoopbackConnection) -> Void,
     onClose: @escaping @Sendable (WebHostLoopbackConnection) -> Void
   ) {
     self.fd = fd
     self.routes = routes
     self.channels = channels
+    self.onUpgrade = onUpgrade
     self.onClose = onClose
   }
 
@@ -417,6 +457,7 @@ final class WebHostLoopbackConnection: Sendable {
         finishWrites()
         return
       }
+      onUpgrade(self)
       enqueue(acceptResponse.serialized())
       runWebSocketSession(channel: channel)
       drainIncoming()
@@ -454,11 +495,12 @@ final class WebHostLoopbackConnection: Sendable {
     var bytes: [UInt8] = []
     var buffer = [UInt8](repeating: 0, count: 4096)
     while !bytes.suffix(4).elementsEqual([13, 10, 13, 10]) {
-      guard bytes.count <= Self.headByteLimit else {
+      guard bytes.count < Self.headByteLimit, let remaining = headDeadline.remainingMilliseconds()
+      else {
         return nil
       }
       switch WebHostSocket.poll(
-        fd, events: WebHostSocket.readEvents, timeoutMilliseconds: Self.headReadTimeoutMilliseconds)
+        fd, events: WebHostSocket.readEvents, timeoutMilliseconds: remaining)
       {
       case .ready:
         break
@@ -466,7 +508,9 @@ final class WebHostLoopbackConnection: Sendable {
         return nil
       }
       let count = WebHostSocket.receive(fd, into: &buffer)
-      guard count > 0 else {
+      guard count > 0, count <= Self.headByteLimit - bytes.count,
+        ContinuousClock.now < headDeadline.end
+      else {
         return nil
       }
       bytes.append(contentsOf: buffer.prefix(count))

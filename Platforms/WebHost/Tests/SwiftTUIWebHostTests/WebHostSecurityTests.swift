@@ -61,6 +61,33 @@ struct WebHostSecurityTests {
 
   private enum TestFailure: Error { case unexpectedUpgrade }
 
+  @Test("closing or upgrading releases handshake capacity for another request")
+  func handshakeAdmission() {
+    var budget = WebHostHandshakeBudget(limit: 1)
+    let first = NSObject()
+    let second = NSObject()
+    let admittedFirst = budget.admit(ObjectIdentifier(first))
+    let admittedWhenFull = budget.admit(ObjectIdentifier(second))
+    #expect(admittedFirst)
+    #expect(!admittedWhenFull)
+    budget.release(ObjectIdentifier(first))
+    let admittedAfterRelease = budget.admit(ObjectIdentifier(second))
+    #expect(admittedAfterRelease)
+    budget.release(ObjectIdentifier(first))
+    let admittedAfterStaleRelease = budget.admit(ObjectIdentifier(first))
+    #expect(!admittedAfterStaleRelease)
+  }
+
+  @Test("successive head reads use the original deadline")
+  func requestHeadDeadline() {
+    let start = ContinuousClock.now
+    let deadline = WebHostSocketDeadline(milliseconds: 100, now: start)
+    #expect(deadline.remainingMilliseconds(at: start) == 100)
+    #expect(deadline.remainingMilliseconds(at: start + .milliseconds(60)) == 40)
+    #expect(deadline.remainingMilliseconds(at: start + .microseconds(99_500)) == 1)
+    #expect(deadline.remainingMilliseconds(at: start + .milliseconds(100)) == nil)
+  }
+
   @Test("token-protected endpoints reject missing and wrong tokens")
   func tokenProtectedEndpointsRejectMissingAndWrongTokens() async throws {
     try await withServer { session in
