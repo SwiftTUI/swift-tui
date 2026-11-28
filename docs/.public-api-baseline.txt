@@ -905,6 +905,7 @@ SwiftTUIGraph.RuntimeIssue.Code.State.duplicateSlotClaim
 SwiftTUIGraph.RuntimeIssue.Code.State.imperativeSeedFallback
 SwiftTUIGraph.RuntimeIssue.Code.Structure
 SwiftTUIGraph.RuntimeIssue.Code.Structure.declaredChildTraversalMismatch
+SwiftTUIGraph.RuntimeIssue.Code.Structure.parentCycle
 SwiftTUIGraph.RuntimeIssue.Code.Style
 SwiftTUIGraph.RuntimeIssue.Code.Style.duplicateContent
 SwiftTUIGraph.RuntimeIssue.Code.Style.duplicateRoute

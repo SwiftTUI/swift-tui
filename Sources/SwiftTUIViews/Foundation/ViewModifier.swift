@@ -494,10 +494,7 @@ where Content: View, Modifier: ViewModifier {
     if let entityModifier = modifier as? any EntityRouteProvidingModifier {
       return entityModifier.resolveEntityRouteIdentity(in: context)
     }
-    if let entityContent = content as? any EntityRouteProvidingView {
-      return entityContent.resolveEntityRouteIdentity(in: context)
-    }
-    return nil
+    return contentEntityRouteProvider?.resolveEntityRouteIdentity(in: context)
   }
 
   package var providesHostEscapingEntityRoute: Bool {
@@ -506,10 +503,19 @@ where Content: View, Modifier: ViewModifier {
     if let entityModifier = modifier as? any EntityRouteProvidingModifier {
       return entityModifier.providesHostEscapingEntityRoute
     }
-    if let entityContent = content as? any EntityRouteProvidingView {
-      return entityContent.providesHostEscapingEntityRoute
+    return contentEntityRouteProvider?.providesHostEscapingEntityRoute ?? false
+  }
+
+  private var contentEntityRouteProvider: (any EntityRouteProvidingView)? {
+    // A transition body mounts its content below a TransitionContent node.
+    // Forwarding the content's .id to the body root would let the content
+    // reclaim that same graph node from inside the boundary (STUI-1606).
+    if let registration = modifier as? TransitionRegistrationModifier,
+      registration.transition.bodyBox != nil
+    {
+      return nil
     }
-    return false
+    return content as? any EntityRouteProvidingView
   }
 }
 

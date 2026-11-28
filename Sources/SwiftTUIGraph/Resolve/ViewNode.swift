@@ -1150,11 +1150,27 @@ package final class ViewNode {
     resolved: ResolvedNode,
     children: [ViewNode]
   ) {
+    var resolved = resolved
+    var children = children
+    // Check changed parent links before stamping either representation.
+    // Both the full apply and the same-children reclaim below can reparent.
+    // A self-pair is a transparent-chain collapse and never sets a parent.
+    if parent != nil {
+      for index in children.indices.reversed() {
+        let child = children[index]
+        guard child !== self, child.parent !== self,
+          !structuralAncestorsSatisfy({ $0 !== child })
+        else { continue }
+        recordParentCycle("Refused to adopt ancestor \(child.viewNodeID) as a child.")
+        children.remove(at: index)
+        resolved.children.remove(at: index)
+      }
+    }
     refreshChildResolvedMetadata(
       from: resolved.children,
       children: children
     )
-    var resolved = resolvedWithRuntimeNodeIDs(
+    resolved = resolvedWithRuntimeNodeIDs(
       resolved,
       children: children
     )
@@ -2314,17 +2330,29 @@ package final class ViewNode {
   }
 
   package var participatesInStructuralLifecycle: Bool {
-    guard !suppressesStructuralLifecycle else {
-      return false
-    }
+    !suppressesStructuralLifecycle
+      && structuralAncestorsSatisfy { $0.committed.indexedChildSource == nil }
+  }
+
+  private func structuralAncestorsSatisfy(_ predicate: (ViewNode) -> Bool) -> Bool {
     var ancestor = parent
+    var visited: Set<ObjectIdentifier> = []
     while let current = ancestor {
-      if current.committed.indexedChildSource != nil {
+      guard visited.insert(ObjectIdentifier(current)).inserted else {
+        recordParentCycle("Encountered a repeated parent \(current.viewNodeID).")
         return false
       }
+      guard predicate(current) else { return false }
       ancestor = current.parent
     }
     return true
+  }
+
+  private func recordParentCycle(_ message: String) {
+    ownerGraph?.recordFrameRuntimeIssue(
+      RuntimeIssue(
+        severity: .error, code: .Structure.parentCycle, message: message, identity: identity)
+    )
   }
 
   /// Seam-bridging variant of `isDescendant(of:)` for reuse-denial checks:

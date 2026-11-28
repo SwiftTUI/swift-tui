@@ -110,6 +110,8 @@ extension RuntimeIssue {
     public enum Structure {
       public static let declaredChildTraversalMismatch = Code(
         rawValue: "structure.declaredChildTraversalMismatch")
+      /// A proposed or existing parent link would make a node its own ancestor.
+      public static let parentCycle = Code(rawValue: "structure.parentCycle")
     }
 
     public enum Style {
