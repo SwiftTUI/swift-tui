@@ -157,7 +157,7 @@ package struct PromptActionDismissal: Sendable, Equatable {
     source = {
       Source(
         activation: isPresented.wrappedValue ? AnyID(true) : nil,
-        writeIdentity: isPresented.valueIdentity?())
+        writeIdentity: Self.writeIdentity(of: isPresented))
     }
     self.dismiss = dismiss
   }
@@ -172,9 +172,19 @@ package struct PromptActionDismissal: Sendable, Equatable {
     source = {
       Source(
         activation: item.wrappedValue.map { AnyID($0.id) },
-        writeIdentity: item.valueIdentity?())
+        writeIdentity: Self.writeIdentity(of: item))
     }
     self.dismiss = dismiss
+  }
+
+  /// Only a whole storage slot can identify a write to this presentation.
+  /// An element or member inherits its owner's currency, which also changes
+  /// when an action writes a sibling. Its activation is checked directly.
+  @MainActor private static func writeIdentity<Value>(of binding: Binding<Value>)
+    -> StateValueIdentity?
+  {
+    guard let source = binding.bindingSourceID, source == source.derivationRoot else { return nil }
+    return binding.valueIdentity?()
   }
 
   /// Runs `action`, then dismisses the prompt unless the action changed it.

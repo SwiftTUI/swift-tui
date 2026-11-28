@@ -1092,13 +1092,13 @@ private struct AppearProbePaletteBody: View {
 @MainActor
 @Suite(.serialized)
 struct PromptActionDismissalTests {
-  @Test(arguments: [false, true])
-  func customActionDismissesBooleanPrompt(dialog: Bool) throws {
+  @Test(arguments: [false, true], [false, true])
+  func customActionDismissesBooleanPrompt(dialog: Bool, projected: Bool) throws {
     let log = PromptActionDismissalLog()
     let h = try StressRuntimeHarness(
       rootIdentity: testIdentity("w4fd-prompt", dialog ? "dialog" : "alert"),
       size: .init(width: 50, height: 14)
-    ) { PromptActionBooleanRoot(dialog: dialog, log: log) }
+    ) { PromptActionBooleanRoot(dialog: dialog, log: log, projected: projected) }
     defer { h.shutdown() }
     _ = try h.clickText("Open")
     try #require(h.frame.contains("Apply"), "\(h.frame)")
@@ -1109,13 +1109,13 @@ struct PromptActionDismissalTests {
     #expect(log.dismissals == 1)
   }
 
-  @Test(arguments: [false, true])
-  func customActionDismissesItemPrompt(dialog: Bool) throws {
+  @Test(arguments: [false, true], [false, true])
+  func customActionDismissesItemPrompt(dialog: Bool, projected: Bool) throws {
     let log = PromptActionDismissalLog()
     let h = try StressRuntimeHarness(
       rootIdentity: testIdentity("w4fd-prompt-item", dialog ? "dialog" : "alert"),
       size: .init(width: 50, height: 14)
-    ) { PromptActionItemRoot(dialog: dialog, log: log) }
+    ) { PromptActionItemRoot(dialog: dialog, log: log, projected: projected) }
     defer { h.shutdown() }
     _ = try h.clickText("Open")
     try #require(h.frame.contains("Apply a"), "\(h.frame)")
@@ -1137,6 +1137,18 @@ struct PromptActionDismissalTests {
     _ = try h.clickText("Next")
     #expect(h.frame.contains("Apply b"), "\(h.frame)")
     #expect(h.frame.contains("item b"), "\(h.frame)")
+  }
+
+  @Test func actionRepresentingTheDirectBooleanBindingKeepsIt() throws {
+    let log = PromptActionDismissalLog()
+    let h = try StressRuntimeHarness(
+      rootIdentity: testIdentity("prompt-represent"), size: .init(width: 50, height: 14)
+    ) { PromptActionBooleanRoot(dialog: false, log: log) }
+    defer { h.shutdown() }
+    _ = try h.clickText("Open")
+    _ = try h.clickText("Keep")
+    #expect(h.frame.contains("Apply"))
+    #expect(log.dismissals == 0)
   }
 
   // An action that dismisses the prompt itself dismisses it once.
@@ -1176,26 +1188,39 @@ private final class PromptActionDismissalLog {
 private struct PromptActionBooleanRoot: View {
   let dialog: Bool
   let log: PromptActionDismissalLog
-  @State private var presented = false
+  var projected = false
+  @State private var direct = false
+  @State private var model = PromptActionModel()
+  private var presentation: Binding<Bool> { projected ? $model.presented : $direct }
 
   var body: some View {
     let base = VStack(alignment: .leading, spacing: 0) {
-      Text("presented \(presented)")
-      Button("Open") { presented = true }
+      Text("presented \(presentation.wrappedValue)")
+      Button("Open") { presentation.wrappedValue = true }
     }
     if dialog {
       base.confirmationDialog(
-        "Confirm", isPresented: $presented, onDismiss: { log.dismissals += 1 }
+        "Confirm", isPresented: presentation, onDismiss: { log.dismissals += 1 }
       ) {
-        Button("Apply") { log.applied += 1 }
-        Button("Close it") { presented = false }
+        Button("Apply") {
+          model.count += 1
+          log.applied += 1
+        }
+        Button("Close it") { presentation.wrappedValue = false }
       } message: {
         Text("dialog body")
       }
     } else {
-      base.alert("Heads up", isPresented: $presented, onDismiss: { log.dismissals += 1 }) {
-        Button("Apply") { log.applied += 1 }
-        Button("Close it") { presented = false }
+      base.alert("Heads up", isPresented: presentation, onDismiss: { log.dismissals += 1 }) {
+        Button("Keep") {
+          presentation.wrappedValue = false
+          presentation.wrappedValue = true
+        }
+        Button("Apply") {
+          model.count += 1
+          log.applied += 1
+        }
+        Button("Close it") { presentation.wrappedValue = false }
       } message: {
         Text("alert body")
       }
@@ -1207,29 +1232,44 @@ private struct PromptActionItem: Identifiable, Sendable {
   var id: String
 }
 
+private struct PromptActionModel {
+  var count = 0
+  var presented = false
+  var item: PromptActionItem?
+}
+
 private struct PromptActionItemRoot: View {
   let dialog: Bool
   let log: PromptActionDismissalLog
-  @State private var item: PromptActionItem?
+  var projected = false
+  @State private var direct: PromptActionItem?
+  @State private var model = PromptActionModel()
+  private var presentation: Binding<PromptActionItem?> { projected ? $model.item : $direct }
 
   var body: some View {
     let base = VStack(alignment: .leading, spacing: 0) {
-      Text("item \(item?.id ?? "none")")
-      Button("Open") { item = PromptActionItem(id: "a") }
+      Text("item \(presentation.wrappedValue?.id ?? "none")")
+      Button("Open") { presentation.wrappedValue = PromptActionItem(id: "a") }
     }
     if dialog {
       base.confirmationDialog(
-        "Confirm", item: $item, onDismiss: { log.dismissals += 1 }
+        "Confirm", item: presentation, onDismiss: { log.dismissals += 1 }
       ) { current in
-        Button("Apply \(current.id)") { log.applied += 1 }
-        Button("Next") { item = PromptActionItem(id: "b") }
+        Button("Apply \(current.id)") {
+          model.count += 1
+          log.applied += 1
+        }
+        Button("Next") { presentation.wrappedValue = PromptActionItem(id: "b") }
       } message: { current in
         Text("dialog \(current.id)")
       }
     } else {
-      base.alert("Heads up", item: $item, onDismiss: { log.dismissals += 1 }) { current in
-        Button("Apply \(current.id)") { log.applied += 1 }
-        Button("Next") { item = PromptActionItem(id: "b") }
+      base.alert("Heads up", item: presentation, onDismiss: { log.dismissals += 1 }) { current in
+        Button("Apply \(current.id)") {
+          model.count += 1
+          log.applied += 1
+        }
+        Button("Next") { presentation.wrappedValue = PromptActionItem(id: "b") }
       } message: { current in
         Text("alert \(current.id)")
       }
