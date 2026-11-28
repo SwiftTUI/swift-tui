@@ -149,6 +149,7 @@ public struct Binding<Value> {
   public var wrappedValue: Value {
     get { getter() }
     nonmutating set {
+      defer { BindingWriteObservation.didWrite?(bindingSourceID) }
       guard shouldApplyStoredTransaction else {
         setter(newValue)
         return
@@ -229,6 +230,24 @@ public struct Binding<Value> {
       projected.valueIdentity = valueIdentity
     }
     return projected
+  }
+}
+
+/// An action can write a projected binding directly or mutate its containing
+/// state. Synchronous observers see each completed store, including nested
+/// actions, without extending observation into work scheduled by the action.
+@MainActor
+enum BindingWriteObservation {
+  private(set) static var didWrite: ((AnyID?) -> Void)?
+
+  static func observe(_ onWrite: @escaping (AnyID?) -> Void, during action: () -> Void) {
+    let previous = didWrite
+    didWrite = { source in
+      previous?(source)
+      onWrite(source)
+    }
+    defer { didWrite = previous }
+    action()
   }
 }
 

@@ -418,6 +418,7 @@ public struct State<Value> {
     nonmutating set {
       if let location = activeLocation() {
         location.setValue(newValue)
+        BindingWriteObservation.didWrite?(location.bindingSourceID)
         return
       }
       // A carried capture that missed names an owner whose committed removal
@@ -453,6 +454,7 @@ public struct State<Value> {
       } else {
         box.updateSeedValue(newValue)
       }
+      BindingWriteObservation.didWrite?(AnyID(ObjectIdentifier(box)))
     }
   }
 

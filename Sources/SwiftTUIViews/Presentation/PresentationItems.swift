@@ -144,6 +144,7 @@ package struct PromptActionDismissal: Sendable, Equatable {
   }
 
   private let portalEntryID: PortalEntryID
+  private let bindingSourceID: AnyID?
   private let source: @MainActor @Sendable () -> Source
   private let dismiss: @MainActor @Sendable () -> Void
 
@@ -154,6 +155,7 @@ package struct PromptActionDismissal: Sendable, Equatable {
     dismiss: @escaping @MainActor @Sendable () -> Void
   ) {
     self.portalEntryID = portalEntryID
+    bindingSourceID = isPresented.bindingSourceID
     source = {
       Source(
         activation: isPresented.wrappedValue ? AnyID(true) : nil,
@@ -169,6 +171,7 @@ package struct PromptActionDismissal: Sendable, Equatable {
     dismiss: @escaping @MainActor @Sendable () -> Void
   ) where Item.ID: Sendable {
     self.portalEntryID = portalEntryID
+    bindingSourceID = item.bindingSourceID
     source = {
       Source(
         activation: item.wrappedValue.map { AnyID($0.id) },
@@ -191,7 +194,24 @@ package struct PromptActionDismissal: Sendable, Equatable {
   @MainActor
   package func perform(_ action: () -> Void) {
     let before = source()
-    action()
+    if let bindingSourceID, bindingSourceID != bindingSourceID.derivationRoot {
+      let root = bindingSourceID.derivationRoot
+      var changedPresentation = false
+      BindingWriteObservation.observe(
+        { written in
+          guard !changedPresentation else { return }
+          if written == bindingSourceID {
+            changedPresentation = true
+          } else if written == root {
+            // A write through the model can dismiss and re-present within the
+            // action. Check the presentation after each store at its owner.
+            changedPresentation = self.source().activation != before.activation
+          }
+        }, during: action)
+      if changedPresentation { return }
+    } else {
+      action()
+    }
     guard before.activation != nil else {
       return
     }

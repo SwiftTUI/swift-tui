@@ -1127,11 +1127,11 @@ struct PromptActionDismissalTests {
   }
 
   // An action that presents a different item keeps that item presented.
-  @Test func actionPresentingAnotherItemKeepsIt() throws {
+  @Test(arguments: [false, true]) func actionPresentingAnotherItemKeepsIt(projected: Bool) throws {
     let log = PromptActionDismissalLog()
     let h = try StressRuntimeHarness(
       rootIdentity: testIdentity("w4fd-prompt-next"), size: .init(width: 50, height: 14)
-    ) { PromptActionItemRoot(dialog: false, log: log) }
+    ) { PromptActionItemRoot(dialog: false, log: log, projected: projected) }
     defer { h.shutdown() }
     _ = try h.clickText("Open")
     _ = try h.clickText("Next")
@@ -1139,15 +1139,29 @@ struct PromptActionDismissalTests {
     #expect(h.frame.contains("item b"), "\(h.frame)")
   }
 
-  @Test func actionRepresentingTheDirectBooleanBindingKeepsIt() throws {
+  @Test(arguments: [false, true]) func actionRepresentingBooleanBindingKeepsIt(projected: Bool)
+    throws
+  {
     let log = PromptActionDismissalLog()
     let h = try StressRuntimeHarness(
       rootIdentity: testIdentity("prompt-represent"), size: .init(width: 50, height: 14)
-    ) { PromptActionBooleanRoot(dialog: false, log: log) }
+    ) { PromptActionBooleanRoot(dialog: false, log: log, projected: projected) }
     defer { h.shutdown() }
     _ = try h.clickText("Open")
     _ = try h.clickText("Keep")
     #expect(h.frame.contains("Apply"))
+    #expect(log.dismissals == 0)
+  }
+
+  @Test(arguments: [false, true]) func actionRepresentingSameItemKeepsIt(projected: Bool) throws {
+    let log = PromptActionDismissalLog()
+    let h = try StressRuntimeHarness(
+      rootIdentity: testIdentity("prompt-represent-item"), size: .init(width: 50, height: 14)
+    ) { PromptActionItemRoot(dialog: false, log: log, projected: projected) }
+    defer { h.shutdown() }
+    _ = try h.clickText("Open")
+    _ = try h.clickText("Keep")
+    #expect(h.frame.contains("Apply a"))
     #expect(log.dismissals == 0)
   }
 
@@ -1268,6 +1282,15 @@ private struct PromptActionItemRoot: View {
         Button("Apply \(current.id)") {
           model.count += 1
           log.applied += 1
+        }
+        Button("Keep") {
+          if projected {
+            model.item = nil
+            model.item = current
+          } else {
+            direct = nil
+            direct = current
+          }
         }
         Button("Next") { presentation.wrappedValue = PromptActionItem(id: "b") }
       } message: { current in
