@@ -43,7 +43,7 @@ package struct PlacedNodeResolvedMetadata: Equatable, Sendable {
   package var layoutBehavior: LayoutBehavior
   package var isTransient: Bool
   package var matchedGeometry: MatchedGeometryConfig?
-  /// Text transitions and tinted painting nodes retain authored animation intent after layout.
+  /// Layout-realized presentation properties retain their authored animation intent after layout.
   package var presentationAnimationTransaction: TransactionSnapshot?
 
   package init(
@@ -103,6 +103,8 @@ package struct PlacedNodeResolvedMetadata: Equatable, Sendable {
       isTransient: resolved.isTransient,
       matchedGeometry: resolved.matchedGeometry,
       presentationAnimationTransaction: resolved.drawEffects.hasPlacement
+        || resolved.drawMetadata.baseStyle.explicitOpacity != nil
+        || resolved.kind == .view(.offset)
         || resolved.drawMetadata.contentTransition != nil
         || (resolved.drawPayload != .none && resolved.environmentSnapshot.style.tintStyle != nil)
         ? resolved.transactionSnapshot : nil

@@ -948,7 +948,7 @@ are omitted even when SwiftUI exposes a corresponding API.
   body writes for each sample as well, so the result trails the data; scope
   such a modifier with `animation(_:value:)` or `transaction(value:_:)`
   instead. A conformer inside the rows of a lazy stack gets its new value at
-  once, as every animated change there does (STUI-1376). A conformer inside
+  once. A conformer inside
   a custom `Transition` body animates through the insertion and the removal;
   the transition entry below has the rules.
 - **Scoped `body:` forms include environment-carried foreground and tint.**
@@ -1290,13 +1290,14 @@ are omitted even when SwiftUI exposes a corresponding API.
   transition, and the text snaps. Both branches are the output of the view's
   one node, so the switch reads as a content change. The same conditional
   inside a `VStack` in that body animates (STUI-1350).
-- **Animated changes inside lazy rows snap.** *Gap.* Rows of a lazy stack or
-  a data-backed `List` are realized from their source during layout, outside
-  the tree the animation pass compares. An `opacity`, an `offset` or another
-  animated modifier on row content takes its new value at once under
-  `withAnimation`, `.animation(_:value:)` and an animating `.transaction`
-  alike, while the same content in an eager `VStack` animates. Content
-  transitions and `tint` styles still animate in those rows (STUI-1376).
+- **Animation inside lazy rows.** *Provisional.* Visible rows of a lazy
+  stack or data-backed `List` animate their opacity and offset under
+  `withAnimation`, `animation(_:value:)` and an animating `transaction`.
+  Content transitions and tint styles also animate. The animation controller
+  keeps presentation targets for the realized window. A row that scrolls
+  back onscreen starts at its current value. Size-changing layout modifiers
+  and custom `Animatable` bodies in those rows still take their new values
+  immediately.
 - **`withAnimation` does not animate `@Observable` writes.** *Gap.* A write to
   an `@Observable` model inside `withAnimation` updates the views that read
   it without animation, and a `.transaction` transform in them reads no

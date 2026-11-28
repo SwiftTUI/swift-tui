@@ -4267,12 +4267,14 @@ package final class AnimationController: Sendable {
     at timestamp: MonotonicInstant, surfaceSize: CellSize? = nil
   ) -> (
     textRolls: [Identity: TextRollValue], tintStyles: [Identity: AnyShapeStyle],
-    placements: [Identity: CellPlacementContext]
+    placements: [Identity: CellPlacementContext],
+    opacities: [Identity: Double], offsets: [Identity: PlacedAnimationOverlayOffset]
   ) {
     var targets: [AnimationKey: AnyAnimatable] = [:]
     var owners: [Identity: Identity] = [:]
     var samples: [AnimationKey: AnyAnimatable] = [:]
     var baselineTints: [Identity: AnyShapeStyle] = [:]
+    var offsetChildren: [Identity: Identity] = [:]
     var pending: [(PlacedNode, Identity?, CellPlacementParent?)] = [(placed, nil, nil)]
     while let (node, inheritedOwner, parent) = pending.popLast() {
       guard !node.isTransient else { continue }
@@ -4283,6 +4285,15 @@ package final class AnimationController: Sendable {
         origin: node.bounds.origin)
       pending.append(contentsOf: node.children.map { ($0, owner, space) })
       var values: [AnimatableSlot: AnyAnimatable] = [:]
+      if !isResolved {
+        if let opacity = node.drawMetadata.baseStyle.explicitOpacity {
+          values[.opacity] = AnyAnimatable(opacity)
+        }
+        if case .offset(let x, let y) = node.layoutBehavior, let child = node.children.first {
+          values[.offset] = AnyAnimatable(AnimatablePair(x, y))
+          offsetChildren[node.identity] = child.identity
+        }
+      }
       if node.drawEffects.hasPlacement {
         values[.cellPlacement] = AnyAnimatable(
           CellPlacementValue(
@@ -4323,6 +4334,15 @@ package final class AnimationController: Sendable {
         if transaction.animationRequest == .inherit {
           transaction.animationRequest = frameTransaction.animationRequest
           transaction.animationBatchID = frameTransaction.animationBatchID
+        }
+        if slot == .opacity,
+          let scope = transaction.customValues[ObjectIdentifier(OpacityAnimationScopeKey.self)]?
+            .unwrap(as: ScopedStyleAnimationIntent.self)
+        {
+          // Opacity and its content can have different transaction scopes.
+          transaction.animationRequest =
+            scope.request == .inherit ? frameTransaction.animationRequest : scope.request
+          transaction.animationBatchID = scope.batchID ?? frameTransaction.animationBatchID
         }
         if slot == .tintShapeStyle,
           let intent = transaction.customValues[ObjectIdentifier(ScopedTintStyleAnimationKey.self)]?
@@ -4409,8 +4429,26 @@ package final class AnimationController: Sendable {
     var rolls: [Identity: TextRollValue] = [:]
     var tints: [Identity: AnyShapeStyle] = [:]
     var placements: [Identity: CellPlacementContext] = [:]
+    var opacities: [Identity: Double] = [:]
+    var offsets: [Identity: PlacedAnimationOverlayOffset] = [:]
     for (key, sample) in samples {
-      if key.scope == .property(.cellPlacement) {
+      if key.scope == .property(.opacity) {
+        if let value = sample.unwrap(as: Double.self),
+          value != targets[key]?.unwrap(as: Double.self)
+        {
+          opacities[key.identity] = value
+        }
+      } else if key.scope == .property(.offset) {
+        if let child = offsetChildren[key.identity],
+          let sample = sample.unwrap(as: AnimatablePair<Int, Int>.self),
+          let target = targets[key]?.unwrap(as: AnimatablePair<Int, Int>.self), sample != target
+        {
+          offsets[child] = .init(
+            identity: child,
+            dx: SaturatingConversion.subtracting(sample.first, target.first),
+            dy: SaturatingConversion.subtracting(sample.second, target.second))
+        }
+      } else if key.scope == .property(.cellPlacement) {
         if let value = sample.unwrap(as: CellPlacementValue.self), let prior = value.previous {
           placements[key.identity] = .init(
             previousFrame: prior, currentFrame: value.current,
@@ -4424,7 +4462,7 @@ package final class AnimationController: Sendable {
         tints[key.identity] = tint
       }
     }
-    return (rolls, tints, placements)
+    return (rolls, tints, placements, opacities, offsets)
   }
 
   private func retainBatch(_ batchID: AnimationBatchID?) {

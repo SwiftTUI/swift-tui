@@ -64,6 +64,8 @@ struct DefaultRendererFrameTailCoordinator: Sendable {
     animationOverlaySnapshot.placements = samples.placements
     animationOverlaySnapshot.textRolls = samples.textRolls
     animationOverlaySnapshot.tintStyles = samples.tintStyles
+    animationOverlaySnapshot.opacities = samples.opacities
+    animationOverlaySnapshot.rowOffsets = samples.offsets
     return (placed, animationOverlaySnapshot)
   }
 

@@ -36,6 +36,8 @@ package struct PlacedAnimationOverlaySnapshot: Sendable {
   /// Current text samples, including at-rest values that clear a cached roll.
   package var textRolls: [Identity: TextRollValue]
   package var placements: [Identity: CellPlacementContext] = [:]
+  package var opacities: [Identity: Double] = [:]
+  package var rowOffsets: [Identity: PlacedAnimationOverlayOffset] = [:]
   package var tintStyles: [Identity: AnyShapeStyle]
 
   package init(
@@ -68,7 +70,7 @@ package struct PlacedAnimationOverlaySnapshot: Sendable {
       || !insertionScales.isEmpty
       || !matchedGeometryOffsets.isEmpty
       || textRolls.values.contains(where: \.isRolling)
-      || !tintStyles.isEmpty
+      || !tintStyles.isEmpty || !opacities.isEmpty || !rowOffsets.isEmpty
   }
 }
 
@@ -138,8 +140,13 @@ package func applyPlacedAnimationOverlaySnapshot(
   _ snapshot: PlacedAnimationOverlaySnapshot,
   to tree: inout PlacedNode
 ) {
-  if !snapshot.textRolls.isEmpty || !snapshot.tintStyles.isEmpty || !snapshot.placements.isEmpty {
-    func applyText(to node: inout PlacedNode) {
+  if !snapshot.rowOffsets.isEmpty {
+    tree = translatePlacedNodesByIdentity(tree: tree, offsets: snapshot.rowOffsets)
+  }
+  if !snapshot.textRolls.isEmpty || !snapshot.tintStyles.isEmpty || !snapshot.placements.isEmpty
+    || !snapshot.opacities.isEmpty
+  {
+    func applyPaint(to node: inout PlacedNode) {
       if let placement = snapshot.placements[node.identity], node.drawEffects.hasPlacement {
         node.drawEffects.ordered = node.drawEffects.ordered.map { effect in
           guard case .cellLayer(let pass) = effect, case .placement(let make) = pass.shader.program
@@ -147,15 +154,18 @@ package func applyPlacedAnimationOverlaySnapshot(
           return .cellLayer(.init(make(placement), offset: pass.offset))
         }
       }
+      if let opacity = snapshot.opacities[node.identity] {
+        node.drawMetadata.baseStyle.explicitOpacity = opacity
+      }
       if let roll = snapshot.textRolls[node.identity] {
         node.drawMetadata.textRoll = roll
       }
       if let tint = snapshot.tintStyles[node.identity] {
         node.environmentSnapshot.style.tintStyle = tint
       }
-      for index in node.children.indices { applyText(to: &node.children[index]) }
+      for index in node.children.indices { applyPaint(to: &node.children[index]) }
     }
-    applyText(to: &tree)
+    applyPaint(to: &tree)
   }
   // Adoption first: every later channel's offset is a delta relative to a
   // node's own rect, so a traveling exit overlay or a live insertion offset
