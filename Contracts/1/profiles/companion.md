@@ -7,11 +7,14 @@ This profile uses the host wire without changing the in-process Swift values.
 
 The launch URL contains a per-server token. Authenticated GET `/` serves the
 entry page; `/scene-manifest.json` serves the canonical ordered scene catalog;
-declared asset paths serve the bundle. An accepted query token sets the
-HttpOnly, SameSite=Strict `SwiftTUIWebHostToken` cookie. A present query token
-takes precedence over the cookie, including an incorrect query token. Plain
-authenticated responses are `Cache-Control: no-store`. Unknown paths/methods
-return 404; missing or invalid authorization returns 403. Tokens must not be
+declared asset paths serve the bundle. The entry page, catalog and scene
+socket require the launch token in the query. Packaged static assets are
+public. A custom bundle's entry page sets a port-named HttpOnly, SameSite=Strict
+cookie containing an independent credential accepted only for that bundle's
+static files. An explicit query token takes precedence. Plain successful
+responses use `Cache-Control: no-store` and `Referrer-Policy: no-referrer`.
+Unknown paths/methods return 404; missing or invalid required authorization
+returns 403. Tokens must not be
 published in persistent conformance reports.
 
 GET `/ws/scene/<id>` upgrades a known scene. HTTP/1.1, a nonempty Host,

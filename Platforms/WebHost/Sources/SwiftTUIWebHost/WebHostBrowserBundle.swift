@@ -39,19 +39,6 @@ package struct WebHostBrowserBundle: Sendable {
     )
   }
 
-  package func indexHTML(
-    token: WebHostToken
-  ) throws -> Data {
-    let resource = try resource(for: "/")
-    guard var html = String(data: resource.data, encoding: .utf8) else {
-      return resource.data
-    }
-
-    html = html.replacingOccurrences(of: ".js\"", with: ".js?token=\(token.rawValue)\"")
-    html = html.replacingOccurrences(of: ".css\"", with: ".css?token=\(token.rawValue)\"")
-    return Data(html.utf8)
-  }
-
   package func contentType(
     for path: String
   ) -> String {

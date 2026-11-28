@@ -115,16 +115,11 @@ struct AdversarialSetAWebProtocolBoundaryTests {
     #expect(status(routes().route(head)) == 403)
   }
 
-  @Test func setA987CookieTokenNameMatchingIsExactAndCaseSensitive() {
-    // Hypothesis: cookie scanning treats a similarly named or lowercased cookie as the authorization token.
+  @Test func setA987LegacyCookieDoesNotAuthorizeAWebSocket() {
     var head = upgradeHead()
     head.query = [:]
-    head.headers.append(("Cookie", "xSwiftTUIWebHostToken=secret; swifttuiwebhosttoken=secret"))
+    head.headers.append(("Cookie", "SwiftTUIWebHostToken=secret"))
     #expect(status(routes().route(head)) == 403)
-    head.headers.append(("Unused", "secret"))
-    head.headers.removeAll { $0.name == "Cookie" }
-    head.headers.append(("Cookie", "other=a=b; SwiftTUIWebHostToken=secret"))
-    #expect(status(routes().route(head)) == 101)
   }
 
   @Test func setA988ResponseLengthCountsBodyBytesIncludingNULAndEmoji() throws {

@@ -86,7 +86,8 @@ package struct WebHostLoopbackServer: WebHostServer {
       scenes: scenes,
       port: port,
       maxMessageBytes: Self.maxMessageBytes,
-      browserBundle: WebHostBrowserBundle(directory: configuration.browserAssetsPath)
+      browserBundle: WebHostBrowserBundle(directory: configuration.browserAssetsPath),
+      customAssetToken: configuration.browserAssetsPath == nil ? nil : WebHostToken()
     )
     let coordinator = WebHostConnectionCoordinator(
       listenerFD: listenerFD,
@@ -632,14 +633,14 @@ final class WebHostLoopbackConnection: Sendable {
 /// The four routes the browser bundle uses, plus token and origin policy.
 /// Pure request-to-response mapping; no IO.
 struct WebHostRouteTable: Sendable {
-  static let cookieName = "SwiftTUIWebHostToken"
-
   var bind: String
   var token: WebHostToken
   var scenes: [WebHostSceneDescriptor]
   var port: Int
   var maxMessageBytes: Int
   var browserBundle: WebHostBrowserBundle = .bundled
+  var customAssetToken: WebHostToken?
+  private var assetCookieName: String { "SwiftTUIWebHostAssets-\(port)" }
 
   enum RoutedRequest: Equatable, Sendable {
     case plain(WebHostHTTPResponse)
@@ -657,33 +658,43 @@ struct WebHostRouteTable: Sendable {
       return webSocketUpgrade(head, sceneID: scene.id)
     }
 
-    return .plain(
-      authorizedResponse(for: head) {
-        switch head.path {
-        case "/":
-          do {
-            return .ok(
-              body: Array(try browserBundle.indexHTML(token: token)),
-              contentType: "text/html; charset=utf-8"
-            )
-          } catch {
-            return .notFound()
-          }
-        case "/scene-manifest.json":
-          return .ok(
-            body: Array(Self.sceneManifest(scenes).utf8),
-            contentType: "application/json; charset=utf-8"
-          )
-        default:
-          do {
-            let resource = try browserBundle.resource(for: head.path)
-            return .ok(body: Array(resource.data), contentType: resource.contentType)
-          } catch {
-            return .notFound()
-          }
-        }
+    var response: WebHostHTTPResponse
+    switch head.path {
+    case "/":
+      guard isAuthorized(head) else { return .plain(.forbidden()) }
+      response = resourceResponse(for: "/")
+      if let customAssetToken, response.status == 200 {
+        // Cookies cross ports. Only custom static resources accept this independent
+        // value, and each listener uses a separate cookie name.
+        response.headers.append(
+          (
+            "Set-Cookie",
+            "\(assetCookieName)=\(customAssetToken.rawValue); Path=/; SameSite=Strict; HttpOnly"
+          ))
       }
-    )
+    case "/scene-manifest.json":
+      guard isAuthorized(head) else { return .plain(.forbidden()) }
+      response = .ok(
+        body: Array(Self.sceneManifest(scenes).utf8), contentType: "application/json; charset=utf-8"
+      )
+    default:
+      if let customAssetToken, !isAuthorized(head), !hasAssetCookie(head, token: customAssetToken) {
+        return .plain(.forbidden())
+      }
+      response = resourceResponse(for: head.path)
+    }
+    response.headers.append(("Cache-Control", "no-store"))
+    response.headers.append(("Referrer-Policy", "no-referrer"))
+    return .plain(response)
+  }
+
+  private func resourceResponse(for path: String) -> WebHostHTTPResponse {
+    do {
+      let resource = try browserBundle.resource(for: path)
+      return .ok(body: Array(resource.data), contentType: resource.contentType)
+    } catch {
+      return .notFound()
+    }
   }
 
   private func webSocketUpgrade(
@@ -728,49 +739,20 @@ struct WebHostRouteTable: Sendable {
     )
   }
 
-  func isAuthorized(
-    _ head: WebHostHTTPRequestHead
-  ) -> Bool {
-    if let queryToken = head.query["token"] {
-      return constantTimeEquals(queryToken, token.rawValue)
-    }
-    guard let cookie = cookieToken(from: head) else {
-      return false
-    }
-    return constantTimeEquals(cookie, token.rawValue)
+  private func isAuthorized(_ head: WebHostHTTPRequestHead) -> Bool {
+    guard let queryToken = head.query["token"] else { return false }
+    return constantTimeEquals(queryToken, token.rawValue)
   }
 
-  private func authorizedResponse(
-    for head: WebHostHTTPRequestHead,
-    response: () -> WebHostHTTPResponse
-  ) -> WebHostHTTPResponse {
-    guard isAuthorized(head) else {
-      return .forbidden()
-    }
-    var response = response()
-    response.headers.append(("Cache-Control", "no-store"))
-    if let queryToken = head.query["token"], constantTimeEquals(queryToken, token.rawValue) {
-      response.headers.append(
-        ("Set-Cookie", "\(Self.cookieName)=\(token.rawValue); Path=/; SameSite=Strict; HttpOnly"))
-    }
-    return response
-  }
-
-  private func cookieToken(
-    from head: WebHostHTTPRequestHead
-  ) -> String? {
-    guard let cookie = head.headerValue("Cookie") else {
-      return nil
-    }
-    for field in cookie.split(separator: ";") {
+  private func hasAssetCookie(_ head: WebHostHTTPRequestHead, token: WebHostToken) -> Bool {
+    guard head.query["token"] == nil, let cookie = head.headerValue("Cookie") else { return false }
+    return cookie.split(separator: ";").contains { field in
       let parts = field.split(separator: "=", maxSplits: 1).map {
         $0.trimmingCharacters(in: .whitespaces)
       }
-      if parts.count == 2, parts[0] == Self.cookieName {
-        return parts[1]
-      }
+      return parts.count == 2 && parts[0] == assetCookieName
+        && constantTimeEquals(parts[1], token.rawValue)
     }
-    return nil
   }
 
   static func sceneManifest(_ scenes: [WebHostSceneDescriptor]) -> String {

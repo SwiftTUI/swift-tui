@@ -36,7 +36,7 @@ struct WebHostServerTests {
     try await withServer(browserAssetsPath: browser.path) { session in
       let (data, response) = try await serverData(from: session.url(path: "/"))
       #expect(try statusCode(from: response) == 200)
-      #expect(String(decoding: data, as: UTF8.self).contains("dom.js?token=test-token"))
+      #expect(String(decoding: data, as: UTF8.self).contains("./dom.js"))
       let (script, scriptResponse) = try await serverData(from: session.url(path: "/dom.js"))
       #expect(try statusCode(from: scriptResponse) == 200)
       #expect(String(decoding: script, as: UTF8.self) == "custom DOM entrypoint")
@@ -87,7 +87,7 @@ struct WebHostServerTests {
       #expect(try statusCode(from: response) == 200)
       let html = String(decoding: data, as: UTF8.self)
       #expect(html.contains("<main id=\"webhost-root\"></main>"))
-      #expect(html.contains("?token=test-token"))
+      #expect(!html.contains("test-token"))
     }
   }
 

@@ -32,17 +32,6 @@ struct WebHostBrowserBundleTests {
     }
   }
 
-  @Test("browser bundle index injects tokenized asset URLs")
-  func browserBundleIndexInjectsTokenizedAssetURLs() throws {
-    let html = String(
-      decoding: try WebHostBrowserBundle.bundled.indexHTML(
-        token: WebHostToken(rawValue: "test-token")),
-      as: UTF8.self
-    )
-
-    #expect(html.contains("?token=test-token"))
-  }
-
   @Test("default browser bundle excludes the experimental DOM painter and fonts")
   func browserBundleIsCanvasOnly() throws {
     let paths = try WebHostBrowserBundle.bundled.assetPaths()

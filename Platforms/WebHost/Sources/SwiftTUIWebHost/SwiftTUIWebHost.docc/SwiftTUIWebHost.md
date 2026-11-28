@@ -33,8 +33,11 @@ close bodies are validated before classification. These rules follow
 
 Browser resources must appear in the bundle inventory with exact spelling,
 including on case-insensitive volumes. Hidden paths and files outside the
-bundle are excluded. Authenticated plain responses use `Cache-Control:
-no-store`, including the token-bearing index page.
+bundle are excluded. The entry page, scene catalog and WebSocket require the
+launch URL's query token. Packaged static assets are public. For app-owned
+bundles, the authenticated entry page sets an independent, port-named cookie
+that authorizes static files. Every plain success carries `Cache-Control:
+no-store` and `Referrer-Policy: no-referrer`.
 
 An origin's omitted port means its scheme's default port. A wildcard IPv4
 listener permits interface-address origins at its listening port, with the

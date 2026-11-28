@@ -87,18 +87,12 @@ struct AdversarialSetBWebHostTests {
     }
   }
 
-  // The index response embeds the bearer token in its asset URLs, so it must
-  // not be cacheable.
-  @Test func setB334TokenBearingIndexResponseIsNotCacheable() throws {
+  @Test func setB334IndexResponseKeepsTheSessionTokenPrivate() throws {
     let routed = setBRoutes().route(setBHead("/", query: ["token": setBToken.rawValue]))
     let response = try #require(setBPlainResponse(routed))
     #expect(response.status == 200)
-    #expect(
-      String(decoding: response.body, as: UTF8.self).contains("?token=\(setBToken.rawValue)"))
-    let cookie = try #require(setBHeader("Set-Cookie", in: response))
-    #expect(cookie.contains("HttpOnly"), "\(cookie)")
-    #expect(cookie.contains("SameSite=Strict"), "\(cookie)")
-    #expect(cookie.contains("Path=/"), "\(cookie)")
+    #expect(!String(decoding: response.body, as: UTF8.self).contains(setBToken.rawValue))
+    #expect(setBHeader("Set-Cookie", in: response) == nil)
     let wire = String(decoding: response.serialized(), as: UTF8.self)
     #expect(wire.contains("\r\nContent-Length: \(response.body.count)\r\n"))
     #expect(wire.contains("\r\nConnection: close\r\n"))
@@ -185,14 +179,10 @@ struct AdversarialSetBWebHostTests {
     await client.shutdown()
   }
 
-  // A wrong or empty query token refuses even when a valid cookie rides along,
-  // a valid cookie alone authorizes without a new Set-Cookie, and token
-  // comparison is exact in case and length.
-  @Test func setB338QueryTokenTakesPrecedenceOverTheCookieAndComparesExactly() throws {
+  @Test func setB338TheSessionRequiresAnExactQueryToken() throws {
     let routes = setBRoutes()
     let token = setBToken.rawValue
-    let cookieName = WebHostRouteTable.cookieName
-    let cookie = (name: "Cookie", value: "theme=dark; \(cookieName)=\(token)")
+    let cookie = (name: "Cookie", value: "theme=dark; SwiftTUIWebHostToken=\(token)")
     func status(
       _ path: String, query: [String: String] = [:],
       headers: [(name: String, value: String)] = []
@@ -200,7 +190,7 @@ struct AdversarialSetBWebHostTests {
       setBPlainResponse(routes.route(setBHead(path, query: query, headers: headers)))?.status
     }
     let viaCookie = try #require(setBPlainResponse(routes.route(setBHead("/", headers: [cookie]))))
-    #expect(viaCookie.status == 200)
+    #expect(viaCookie.status == 403)
     #expect(setBHeader("Set-Cookie", in: viaCookie) == nil)
     #expect(status("/", query: ["token": "wrong"], headers: [cookie]) == 403)
     #expect(status("/", query: ["token": ""], headers: [cookie]) == 403)
@@ -208,12 +198,10 @@ struct AdversarialSetBWebHostTests {
     #expect(status("/", query: ["token": token + "x"]) == 403)
     #expect(status("/", query: ["token": String(token.dropLast())]) == 403)
     #expect(status("/", query: ["TOKEN": token]) == 403)
-    #expect(status("/", headers: [("Cookie", "\(cookieName)=\"\(token)\"")]) == 403)
-    #expect(status("/", headers: [("Cookie", "\(cookieName.lowercased())=\(token)")]) == 403)
     let missing = try #require(
       setBPlainResponse(routes.route(setBHead("/missing.js", query: ["token": token]))))
     #expect(missing.status == 404)
-    #expect(setBHeader("Set-Cookie", in: missing) != nil)
+    #expect(setBHeader("Set-Cookie", in: missing) == nil)
   }
 
   // Scene ids and titles survive the manifest and the socket route: hostile
