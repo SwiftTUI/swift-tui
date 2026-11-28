@@ -104,6 +104,9 @@ package enum EnvironmentValuesStorage {
 }
 
 /// The inherited environment available while resolving a view subtree.
+///
+/// Values can be read and written on any actor. Access from within synchronous
+/// view evaluation also records dependencies on the evaluating node.
 public struct EnvironmentValues: Equatable, Sendable {
   private var storage: [ObjectIdentifier: EnvironmentValueBox]
   // Provenance of the values captured by this context, not merely live writers.
@@ -162,8 +165,8 @@ public struct EnvironmentValues: Equatable, Sendable {
   public subscript<K: EnvironmentKey>(key: K.Type) -> K.Value {
     get {
       let identifier = ObjectIdentifier(key)
-      MainActor.assumeIsolated {
-        ViewNodeContext.current?.recordEnvironmentRead(identifier)
+      ViewNodeContext.withEvaluatingNode {
+        $0.recordEnvironmentRead(identifier)
       }
       guard let boxed = storage[identifier] else {
         let defaultValue = K.defaultValue
@@ -199,10 +202,9 @@ public struct EnvironmentValues: Equatable, Sendable {
       // main-actor closure is a `sending` violation. Only the
       // `ObjectIdentifier` crosses — the same shape the getter above uses.
       if EnvironmentKeyReuseClassification.isReaderAttributedOnly(key) {
-        authoredEnvironmentWriters[identifier] = MainActor.assumeIsolated {
-          let node = ViewNodeContext.current
-          node?.recordEnvironmentWrite(identifier)
-          return node?.viewNodeID
+        authoredEnvironmentWriters[identifier] = ViewNodeContext.withEvaluatingNode { node in
+          node.recordEnvironmentWrite(identifier)
+          return node.viewNodeID
         }
       }
       storage[identifier] = EnvironmentValueBox(key: key, base: newValue)
@@ -297,8 +299,8 @@ public struct EnvironmentValues: Equatable, Sendable {
       return
     }
     let observableID = ObjectIdentifier(observable)
-    MainActor.assumeIsolated {
-      ViewNodeContext.current?.recordObservableRead(observableID)
+    ViewNodeContext.withEvaluatingNode {
+      $0.recordObservableRead(observableID)
     }
   }
 }
@@ -413,8 +415,8 @@ extension EnvironmentValues {
     guard let key = runtimeFocusStateDependencyKey(for: keyPath) else {
       return
     }
-    MainActor.assumeIsolated {
-      ViewNodeContext.current?.recordEnvironmentRead(key)
+    ViewNodeContext.withEvaluatingNode {
+      $0.recordEnvironmentRead(key)
     }
   }
 }

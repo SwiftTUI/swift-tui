@@ -49,6 +49,21 @@ struct EnvironmentTests {
     #expect(values[TestKey.self] == 99)
   }
 
+  @Test("Sendable environment values and resolve contexts are usable on a detached task")
+  func detachedEnvironment() async {
+    let model = ObjectEnvironmentModel()
+    await Task.detached {
+      var values = EnvironmentValues()
+      #expect(values[TestKey.self] == 42)
+      values[TestKey.self] = 99
+      values[ObjectEnvironmentModel.self] = model
+      let context = ResolveContext(environmentValues: values)
+      #expect(context.environmentValues[TestKey.self] == 99)
+      #expect(context.environmentValues[ObjectEnvironmentModel.self] === model)
+      #expect(!context.environmentValues.isFocused)
+    }.value
+  }
+
   @Test("environment values are equatable")
   func environmentValuesEquatable() {
     let a = EnvironmentValues()

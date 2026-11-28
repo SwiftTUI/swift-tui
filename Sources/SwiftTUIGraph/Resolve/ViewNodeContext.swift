@@ -13,6 +13,14 @@ package enum ViewNodeContext {
     stackLeanResolveProfile ? (leanCurrent ?? taskLocalCurrent) : taskLocalCurrent
   }
 
+  @discardableResult
+  nonisolated package static func withEvaluatingNode<Result: Sendable>(
+    _ body: @MainActor (ViewNode) -> Result
+  ) -> Result? {
+    guard ViewEvaluationThreadScope.isActive else { return nil }
+    return MainActor.assumeIsolated { current.map(body) }
+  }
+
   @MainActor
   package static func withValue<Result>(
     _ node: ViewNode?,
@@ -30,6 +38,9 @@ package enum ViewNodeContext {
     _ node: ViewNode?,
     _ apply: () -> Result
   ) -> Result {
+    let isOutermost = !ViewEvaluationThreadScope.isActive
+    if isOutermost { ViewEvaluationThreadScope.setActive(true) }
+    defer { if isOutermost { ViewEvaluationThreadScope.setActive(false) } }
     node?.openStateSlotClaimWindowIfIdle()
     if stackLeanResolveProfile {
       let saved = leanCurrent

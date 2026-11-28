@@ -536,8 +536,8 @@ extension EnvironmentValues {
       // WHOLESALE focus-move coverage — record the runtime focus dependency
       // (the same key `@Environment(\.isFocused)` maps to), not just the
       // side-field sentinel.
-      MainActor.assumeIsolated {
-        ViewNodeContext.current?.recordEnvironmentRead(
+      ViewNodeContext.withEvaluatingNode {
+        $0.recordEnvironmentRead(
           ObjectIdentifier(FocusedIdentityKey.self)
         )
       }
@@ -594,8 +594,8 @@ extension EnvironmentValues {
   /// override plumbing) use the raw `_focusedIdentity` field instead, so
   /// they do not flag every node.
   private func recordRuntimeFocusSideFieldRead() {
-    MainActor.assumeIsolated {
-      ViewNodeContext.current?.recordEnvironmentRead(
+    ViewNodeContext.withEvaluatingNode {
+      $0.recordEnvironmentRead(
         Self.runtimeFocusSideFieldReadDependencyKey
       )
     }
@@ -637,13 +637,9 @@ extension EnvironmentValues {
   private func recordTargetScopedRuntimeFocusRead(
     _ targets: Set<Identity>
   ) {
-    MainActor.assumeIsolated {
-      if let reader = ViewNodeContext.current {
-        reader.recordEnvironmentRead(
-          Self.runtimeFocusTargetScopedReadDependencyKey
-        )
-        reader.recordFocusComparisonTargets(targets)
-      }
+    ViewNodeContext.withEvaluatingNode { reader in
+      reader.recordEnvironmentRead(Self.runtimeFocusTargetScopedReadDependencyKey)
+      reader.recordFocusComparisonTargets(targets)
     }
   }
 
