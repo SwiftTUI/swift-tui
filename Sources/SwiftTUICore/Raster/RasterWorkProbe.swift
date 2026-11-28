@@ -16,6 +16,8 @@ package struct RasterWorkCounters: Equatable, Sendable {
   /// only eight lines out of a two-thousand-line document are visible in the
   /// viewport, the counter should only record visits to those 8 visible lines.
   package var textLineVisits = 0
+  /// Cells allocated for the primary curved-shape canvas after surface and clip intersection.
+  package var brailleCanvasCells = 0
   /// Cells the walk considered (the geometry test ran for each).
   package var visitedCells = 0
   /// Radial-gradient samples computed.
@@ -38,6 +40,7 @@ package struct RasterWorkCounters: Equatable, Sendable {
     lhs.cellEffectCaptures += rhs.cellEffectCaptures
     lhs.fills += rhs.fills
     lhs.textLineVisits += rhs.textLineVisits
+    lhs.brailleCanvasCells += rhs.brailleCanvasCells
     lhs.visitedCells += rhs.visitedCells
     lhs.radialSamples += rhs.radialSamples
     lhs.zeroAlphaSkips += rhs.zeroAlphaSkips

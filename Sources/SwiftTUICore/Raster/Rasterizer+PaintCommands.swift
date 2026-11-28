@@ -722,22 +722,33 @@ extension Rasterizer {
     presentationRecorder: RasterPresentationLayerRecorder? = nil,
     presentationEffects: [DrawEffect] = []
   ) {
+    guard let rowWindow = fillWalkRect(shapeBounds: shapeBounds, clip: clip, cells: cells) else {
+      return
+    }
+    let surfaceWidth = cells[rowWindow.origin.y..<rowWindow.maxY].lazy.map(\.count).max() ?? 0
+    guard
+      let visible = rowWindow.intersection(
+        CellRect(
+          origin: .zero, size: CellSize(width: surfaceWidth, height: cells.count)))
+    else { return }
     let cellW = shapeBounds.size.width
     let cellH = shapeBounds.size.height
-    guard cellW > 0, cellH > 0 else {
-      return
+    let subW = SaturatingConversion.multiplying(cellW, 2)
+    let subH = SaturatingConversion.multiplying(cellH, 4)
+    let offset = CellPoint(
+      x: SaturatingConversion.multiplying(visible.origin.x - shapeBounds.origin.x, 2),
+      y: SaturatingConversion.multiplying(visible.origin.y - shapeBounds.origin.y, 4))
+    var canvas = BrailleCanvas(width: visible.size.width, height: visible.size.height)
+    if let probe = RasterWorkProbe.active() {
+      var counters = RasterWorkCounters()
+      counters.brailleCanvasCells = canvas.width * canvas.height
+      probe.record(counters)
     }
-
-    var canvas = BrailleCanvas(width: cellW, height: cellH)
-    let subW = canvas.subpixelWidth
-    let subH = canvas.subpixelHeight
-    guard subW > 0, subH > 0 else {
-      return
-    }
-    // Center the shape in the subpixel grid.  `(subW - 1) / 2` keeps
-    // the anchor on an integer subpixel even for odd/even widths.
     let cx = (subW - 1) / 2
     let cy = (subH - 1) / 2
+    let sampleWindow = Rect(
+      origin: Point(x: Double(offset.x), y: Double(offset.y)),
+      size: Size(width: Double(canvas.subpixelWidth), height: Double(canvas.subpixelHeight)))
 
     // A dash or a trim keeps part of the outline. The stroke is rasterized as
     // it always was, and the mask then clears the lit subpixels it turns off,
@@ -761,13 +772,15 @@ extension Rasterizer {
       let rx = max(0, radii.rx - 1)
       let ry = max(0, radii.ry - 1)
       if stroke {
-        canvas.strokeEllipse(centerX: cx, centerY: cy, radiusX: rx, radiusY: ry)
+        canvas.strokeShapeEllipse(
+          centerX: cx - offset.x, centerY: cy - offset.y, radiusX: rx, radiusY: ry)
         if needsOutline {
           outline = .ellipse(
-            centerX: cx, centerY: cy, radiusX: rx, radiusY: ry, aspectRatio: aspectRatio)
+            centerX: cx, centerY: cy, radiusX: rx, radiusY: ry, aspectRatio: aspectRatio,
+            samplingWindow: sampleWindow)
         }
       } else {
-        canvas.fillEllipse(centerX: cx, centerY: cy, radiusX: rx, radiusY: ry)
+        canvas.fillEllipse(centerX: cx - offset.x, centerY: cy - offset.y, radiusX: rx, radiusY: ry)
       }
     case .ellipse:
       // Compute semi-axes in pixel space, then convert back to sub-pixel
@@ -780,37 +793,43 @@ extension Rasterizer {
       let rx = max(0, radii.rx - 1)
       let ry = max(0, radii.ry - 1)
       if stroke {
-        canvas.strokeEllipse(centerX: cx, centerY: cy, radiusX: rx, radiusY: ry)
+        canvas.strokeShapeEllipse(
+          centerX: cx - offset.x, centerY: cy - offset.y, radiusX: rx, radiusY: ry)
         if needsOutline {
           outline = .ellipse(
-            centerX: cx, centerY: cy, radiusX: rx, radiusY: ry, aspectRatio: aspectRatio)
+            centerX: cx, centerY: cy, radiusX: rx, radiusY: ry, aspectRatio: aspectRatio,
+            samplingWindow: sampleWindow)
         }
       } else {
-        canvas.fillEllipse(centerX: cx, centerY: cy, radiusX: rx, radiusY: ry)
+        canvas.fillEllipse(centerX: cx - offset.x, centerY: cy - offset.y, radiusX: rx, radiusY: ry)
       }
     case .capsule:
-      drawCapsule(into: &canvas, stroke: stroke, metrics: environment.cellPixelMetrics)
+      drawCapsule(
+        into: &canvas, subW: subW, subH: subH, offset: offset, stroke: stroke,
+        metrics: environment.cellPixelMetrics)
       if needsOutline, subW > 1, subH > 1 {
         let cap = Self.capsuleCapParameters(
           subpixelWidth: subW, subpixelHeight: subH, metrics: environment.cellPixelMetrics)
         outline = .capsule(
           subpixelWidth: subW, subpixelHeight: subH,
           isHorizontal: cap.isHorizontal, radiusX: cap.radiusX, radiusY: cap.radiusY,
-          aspectRatio: aspectRatio)
+          aspectRatio: aspectRatio, samplingWindow: sampleWindow)
       }
     case .path(let boxed, let rule):
       if stroke {
         if strokeBorder {
-          strokeBorderPath(boxed.path, rule: rule, into: &canvas)
+          strokeBorderPath(
+            boxed.path, rule: rule, subW: subW, subH: subH, offset: offset, into: &canvas)
         } else {
-          strokePath(boxed.path, into: &canvas)
+          strokePath(boxed.path, subW: subW, subH: subH, offset: offset, into: &canvas)
         }
         if needsOutline {
           outline = .path(
-            boxed.path, subpixelWidth: subW, subpixelHeight: subH, aspectRatio: aspectRatio)
+            boxed.path, subpixelWidth: subW, subpixelHeight: subH, aspectRatio: aspectRatio,
+            samplingWindow: sampleWindow)
         }
       } else {
-        fillPath(boxed.path, rule: rule, into: &canvas)
+        fillPath(boxed.path, rule: rule, subW: subW, subH: subH, offset: offset, into: &canvas)
       }
     case .rectangle, .roundedRectangle, .trimmed:
       // Not reachable: the caller dispatches these to the cell-aligned
@@ -819,14 +838,14 @@ extension Rasterizer {
     }
 
     if let mask, let outline {
-      outline.apply(mask, to: &canvas)
+      outline.apply(mask, to: &canvas, offset: offset)
     }
 
     // Walk each Braille cell and emit the glyph with the shape's
     // resolved foreground color.  Empty cells (mask == 0) are skipped
     // so we don't overwrite anything already on the surface.
-    let originX = shapeBounds.origin.x
-    let originY = shapeBounds.origin.y
+    let originX = visible.origin.x
+    let originY = visible.origin.y
     let backgroundMode: ResolvedShapeColorMode? =
       backgroundStyle
       .flatMap { $0.backgroundStyle(for: .top) }
@@ -834,7 +853,7 @@ extension Rasterizer {
         resolvedColorMode(from: style, environment: environment, bounds: shapeBounds)
       }
 
-    for cellY in 0..<cellH {
+    for cellY in 0..<canvas.height {
       // Per-row cull (D70): skips the per-cell `resolveColor` — gradient and
       // mesh sampling included — for rows outside the exact damage. The Braille
       // subpixel work above touches only the local canvas, so this is the one
@@ -842,7 +861,7 @@ extension Rasterizer {
       if let dirtyRows, !dirtyRows.contains(originY + cellY) {
         continue
       }
-      for cellX in 0..<cellW {
+      for cellX in 0..<canvas.width {
         let cell = canvas.cell(x: cellX, y: cellY)
         guard cell.mask != 0 else {
           continue
@@ -886,17 +905,15 @@ extension Rasterizer {
   /// capsule has its semi-ellipses at the top and bottom.
   internal func drawCapsule(
     into canvas: inout BrailleCanvas,
-    stroke: Bool,
+    subW: Int, subH: Int, offset: CellPoint, stroke: Bool,
     metrics: CellPixelMetrics
   ) {
-    let subW = canvas.subpixelWidth
-    let subH = canvas.subpixelHeight
     guard subW > 0, subH > 0 else {
       return
     }
     if subW == 1 || subH == 1 {
       // Degenerate: just fill/stroke the whole strip.
-      canvas.fillRect(x: 0, y: 0, width: subW, height: subH)
+      canvas.fillRect(x: -offset.x, y: -offset.y, width: subW, height: subH)
       return
     }
 
@@ -907,9 +924,9 @@ extension Rasterizer {
 
     if cap.isHorizontal {
       // Wide capsule: caps on left/right, body connects horizontally.
-      let cy = (subH - 1) / 2
-      let leftCx = rx
-      let rightCx = subW - 1 - rx
+      let cy = (subH - 1) / 2 - offset.y
+      let leftCx = rx - offset.x
+      let rightCx = subW - 1 - rx - offset.x
       if stroke {
         strokeEllipseSegment(
           into: &canvas,
@@ -931,10 +948,8 @@ extension Rasterizer {
         }
         // Top and bottom body edges between the two centers.
         if rightCx > leftCx {
-          for x in leftCx...rightCx {
-            canvas.setPixel(x: x, y: cy - ry)
-            canvas.setPixel(x: x, y: cy + ry)
-          }
+          canvas.line(from: (leftCx, cy - ry), to: (rightCx, cy - ry))
+          canvas.line(from: (leftCx, cy + ry), to: (rightCx, cy + ry))
         }
       } else {
         canvas.fillEllipse(centerX: leftCx, centerY: cy, radiusX: rx, radiusY: ry)
@@ -943,7 +958,7 @@ extension Rasterizer {
           let bodyWidth = rightCx - leftCx + 1
           canvas.fillRect(
             x: leftCx,
-            y: max(0, cy - ry),
+            y: max(-offset.y, cy - ry),
             width: bodyWidth,
             height: min(subH, 2 * ry + 1)
           )
@@ -951,9 +966,9 @@ extension Rasterizer {
       }
     } else {
       // Tall capsule: caps on top/bottom, body connects vertically.
-      let cx = (subW - 1) / 2
-      let topCy = ry
-      let bottomCy = subH - 1 - ry
+      let cx = (subW - 1) / 2 - offset.x
+      let topCy = ry - offset.y
+      let bottomCy = subH - 1 - ry - offset.y
       if stroke {
         strokeEllipseSegment(
           into: &canvas,
@@ -974,10 +989,8 @@ extension Rasterizer {
           y >= bottomCy
         }
         if bottomCy > topCy {
-          for y in topCy...bottomCy {
-            canvas.setPixel(x: cx - rx, y: y)
-            canvas.setPixel(x: cx + rx, y: y)
-          }
+          canvas.line(from: (cx - rx, topCy), to: (cx - rx, bottomCy))
+          canvas.line(from: (cx + rx, topCy), to: (cx + rx, bottomCy))
         }
       } else {
         canvas.fillEllipse(centerX: cx, centerY: topCy, radiusX: rx, radiusY: ry)
@@ -985,7 +998,7 @@ extension Rasterizer {
         if bottomCy > topCy {
           let bodyHeight = bottomCy - topCy + 1
           canvas.fillRect(
-            x: max(0, cx - rx),
+            x: max(-offset.x, cx - rx),
             y: topCy,
             width: min(subW, 2 * rx + 1),
             height: bodyHeight
@@ -1004,7 +1017,8 @@ extension Rasterizer {
     include: (Int, Int) -> Bool
   ) {
     var ellipse = BrailleCanvas(width: canvas.width, height: canvas.height)
-    ellipse.strokeEllipse(centerX: centerX, centerY: centerY, radiusX: radiusX, radiusY: radiusY)
+    ellipse.strokeShapeEllipse(
+      centerX: centerX, centerY: centerY, radiusX: radiusX, radiusY: radiusY)
 
     for y in 0..<ellipse.subpixelHeight {
       for x in 0..<ellipse.subpixelWidth where include(x, y) {

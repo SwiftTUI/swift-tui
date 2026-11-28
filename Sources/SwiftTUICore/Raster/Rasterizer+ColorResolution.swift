@@ -3,16 +3,16 @@ extension Rasterizer {
   static func capsuleCapParameters(
     subpixelWidth: Int, subpixelHeight: Int, metrics: CellPixelMetrics
   ) -> (isHorizontal: Bool, radiusX: Int, radiusY: Int) {
-    let cellWidth = max(1, (subpixelWidth + 1) / 2)
-    let cellHeight = max(1, (subpixelHeight + 3) / 4)
-    let pixelWidth = cellWidth * metrics.width
-    let pixelHeight = cellHeight * metrics.height
+    let cellWidth = max(1, (Int128(subpixelWidth) + 1) / 2)
+    let cellHeight = max(1, (Int128(subpixelHeight) + 3) / 4)
+    let pixelWidth = cellWidth * Int128(metrics.width)
+    let pixelHeight = cellHeight * Int128(metrics.height)
     let capRadius = min(pixelWidth, pixelHeight) / 2
     // Preserve the inclusive-bound clamp used by the Braille renderer.
     return (
       pixelWidth >= pixelHeight,
-      max(0, capRadius / max(1, metrics.width / 2) - 1),
-      max(0, capRadius / max(1, metrics.height / 4) - 1)
+      Int(clamping: max(0, capRadius / Int128(max(1, metrics.width / 2)) - 1)),
+      Int(clamping: max(0, capRadius / Int128(max(1, metrics.height / 4)) - 1))
     )
   }
 

@@ -63,7 +63,7 @@ package struct SampledStrokeTrack: Equatable, Sendable {
   ///   - samplingWindow: The subpixel region whose lit subpixels the track
   ///     will be asked about. A segment longer than the sampling cap is
   ///     sampled only near this window; without one it contributes just its
-  ///     end point. Shorter segments are sampled in full either way.
+  ///     end point. With a window, shorter segments also skip distant samples.
   ///   - scale: A power of two the polylines and the window are already
   ///     multiplied by. The sampling step and the window's margin scale alike,
   ///     so the track is the exact image of the unscaled one.
@@ -104,7 +104,12 @@ package struct SampledStrokeTrack: Equatable, Sendable {
             at: travelled + segment * t)
         }
         let stepCount = (raw / maximumStep).rounded(.up)
-        if stepCount <= Double(Self.maximumSegmentSamples) {
+        if stepCount <= Double(Self.maximumSegmentSamples),
+          window.map({
+            min(a.x, b.x) >= $0.minX && max(a.x, b.x) <= $0.maxX
+              && min(a.y, b.y) >= $0.minY && max(a.y, b.y) <= $0.maxY
+          }) ?? true
+        {
           let steps = max(1, Int(stepCount))
           for step in 1...steps {
             sample(at: Double(step) / Double(steps))
@@ -182,7 +187,8 @@ package struct SampledStrokeTrack: Equatable, Sendable {
   }
 
   /// Clears the lit subpixels the mask turns off.
-  package func apply(_ mask: StrokeMask, to canvas: inout BrailleCanvas) {
+  package func apply(_ mask: StrokeMask, to canvas: inout BrailleCanvas, offset: CellPoint = .zero)
+  {
     guard !mask.isSolid, !points.isEmpty else {
       return
     }
@@ -193,7 +199,11 @@ package struct SampledStrokeTrack: Equatable, Sendable {
         guard canvas.cell(x: x / 2, y: y / 4).contains(x: x % 2, y: y % 4) else {
           continue
         }
-        if !mask.isOn(at: position(nearestToX: x, y: y), trackLength: length) {
+        if !mask.isOn(
+          at: position(
+            nearestToX: SaturatingConversion.adding(x, offset.x),
+            y: SaturatingConversion.adding(y, offset.y)), trackLength: length)
+        {
           canvas.clearPixel(x: x, y: y)
         }
       }
@@ -219,7 +229,8 @@ extension SampledStrokeTrack {
 
   /// An ellipse, from its trailing point, clockwise.
   package static func ellipse(
-    centerX: Int, centerY: Int, radiusX: Int, radiusY: Int, aspectRatio: Double
+    centerX: Int, centerY: Int, radiusX: Int, radiusY: Int, aspectRatio: Double,
+    samplingWindow: Rect? = nil
   ) -> SampledStrokeTrack {
     SampledStrokeTrack(
       polylines: [
@@ -228,7 +239,7 @@ extension SampledStrokeTrack {
           radiusX: Double(radiusX), radiusY: Double(radiusY),
           from: 0, to: 2 * .pi)
       ],
-      aspectRatio: aspectRatio)
+      aspectRatio: aspectRatio, samplingWindow: samplingWindow)
   }
 
   /// A capsule, from the middle of its trailing edge, clockwise. The cap
@@ -236,7 +247,7 @@ extension SampledStrokeTrack {
   package static func capsule(
     subpixelWidth: Int, subpixelHeight: Int,
     isHorizontal: Bool, radiusX: Int, radiusY: Int,
-    aspectRatio: Double
+    aspectRatio: Double, samplingWindow: Rect? = nil
   ) -> SampledStrokeTrack {
     let rx = Double(radiusX)
     let ry = Double(radiusY)
@@ -266,24 +277,30 @@ extension SampledStrokeTrack {
         centerX: cx, centerY: topCy, radiusX: rx, radiusY: ry, from: .pi, to: 2 * .pi)
       outline.append(Point(x: cx + rx, y: (topCy + bottomCy) / 2))
     }
-    return SampledStrokeTrack(polylines: [outline], aspectRatio: aspectRatio)
+    return SampledStrokeTrack(
+      polylines: [outline], aspectRatio: aspectRatio, samplingWindow: samplingWindow)
   }
 
   /// A custom path, mapped onto the subpixel grid as `strokePath` maps it,
   /// at the same power-of-two scale when its subpixel image would overflow.
   package static func path(
-    _ unitPath: Path, subpixelWidth: Int, subpixelHeight: Int, aspectRatio: Double
+    _ unitPath: Path, subpixelWidth: Int, subpixelHeight: Int, aspectRatio: Double,
+    samplingWindow: Rect? = nil
   ) -> SampledStrokeTrack {
     let route = unitPath.subpixelPolylines(
       sx: Double(max(1, subpixelWidth - 1)), sy: Double(max(1, subpixelHeight - 1)))
-    return SampledStrokeTrack(
-      polylines: route.polylines,
-      aspectRatio: aspectRatio,
-      samplingWindow: Rect(
+    let window =
+      samplingWindow
+      ?? Rect(
         origin: .zero,
         size: Size(
-          width: Double(max(0, subpixelWidth - 1)) * route.scale,
-          height: Double(max(0, subpixelHeight - 1)) * route.scale)),
+          width: Double(max(0, subpixelWidth - 1)), height: Double(max(0, subpixelHeight - 1))))
+    return SampledStrokeTrack(
+      polylines: route.polylines, aspectRatio: aspectRatio,
+      samplingWindow: Rect(
+        origin: Point(x: window.origin.x * route.scale, y: window.origin.y * route.scale),
+        size: Size(width: window.size.width * route.scale, height: window.size.height * route.scale)
+      ),
       scale: route.scale)
   }
 }

@@ -12,10 +12,8 @@ extension Rasterizer {
   internal func fillPath(
     _ unitPath: Path,
     rule: FillRule,
-    into canvas: inout BrailleCanvas
+    subW: Int, subH: Int, offset: CellPoint, into canvas: inout BrailleCanvas
   ) {
-    let subW = canvas.subpixelWidth
-    let subH = canvas.subpixelHeight
     guard subW > 0, subH > 0 else {
       return
     }
@@ -23,8 +21,7 @@ extension Rasterizer {
     scanlineFillSubpixels(
       polylines,
       rule: rule,
-      subpixelWidth: subW,
-      subpixelHeight: subH,
+      offset: offset,
       into: &canvas)
   }
 
@@ -33,10 +30,8 @@ extension Rasterizer {
   /// polylines.
   internal func strokePath(
     _ unitPath: Path,
-    into canvas: inout BrailleCanvas
+    subW: Int, subH: Int, offset: CellPoint, into canvas: inout BrailleCanvas
   ) {
-    let subW = canvas.subpixelWidth
-    let subH = canvas.subpixelHeight
     guard subW > 0, subH > 0 else {
       return
     }
@@ -64,8 +59,14 @@ extension Rasterizer {
         let start = route.subpixels(segment.start)
         let end = route.subpixels(segment.end)
         canvas.line(
-          from: (x: roundToInt(start.x), y: roundToInt(start.y)),
-          to: (x: roundToInt(end.x), y: roundToInt(end.y)))
+          from: (
+            SaturatingConversion.subtracting(roundToInt(start.x), offset.x),
+            SaturatingConversion.subtracting(roundToInt(start.y), offset.y)
+          ),
+          to: (
+            SaturatingConversion.subtracting(roundToInt(end.x), offset.x),
+            SaturatingConversion.subtracting(roundToInt(end.y), offset.y)
+          ))
       }
     }
   }
@@ -107,20 +108,18 @@ extension Rasterizer {
   internal func strokeBorderPath(
     _ unitPath: Path,
     rule: FillRule,
-    into canvas: inout BrailleCanvas
+    subW: Int, subH: Int, offset: CellPoint, into canvas: inout BrailleCanvas
   ) {
-    let subW = canvas.subpixelWidth
-    let subH = canvas.subpixelHeight
     guard subW > 0, subH > 0 else {
       return
     }
     var fillMask = BrailleCanvas(width: canvas.width, height: canvas.height)
-    fillPath(unitPath, rule: rule, into: &fillMask)
+    fillPath(unitPath, rule: rule, subW: subW, subH: subH, offset: offset, into: &fillMask)
     var strokeMask = BrailleCanvas(width: canvas.width, height: canvas.height)
-    strokePath(unitPath, into: &strokeMask)
+    strokePath(unitPath, subW: subW, subH: subH, offset: offset, into: &strokeMask)
 
-    for sy in 0..<subH {
-      for sx in 0..<subW {
+    for sy in 0..<canvas.subpixelHeight {
+      for sx in 0..<canvas.subpixelWidth {
         let cellX = sx / 2
         let cellY = sy / 4
         let dotX = sx % 2
@@ -173,12 +172,14 @@ extension Rasterizer {
   private func scanlineFillSubpixels(
     _ polylines: [[Point]],
     rule: FillRule,
-    subpixelWidth subW: Int,
-    subpixelHeight subH: Int,
+    offset: CellPoint,
     into canvas: inout BrailleCanvas
   ) {
-    _ = visitScanlineSpans(polylines, rule: rule, rows: 0..<subH) { start, end, row in
-      fillSpan(from: start, to: end, row: row, subpixelWidth: subW, into: &canvas)
+    let rows = offset.y..<SaturatingConversion.adding(offset.y, canvas.subpixelHeight)
+    _ = visitScanlineSpans(polylines, rule: rule, rows: rows) { start, end, row in
+      fillSpan(
+        from: start - Double(offset.x), to: end - Double(offset.x),
+        row: row - offset.y, subpixelWidth: canvas.subpixelWidth, into: &canvas)
       return false
     }
   }

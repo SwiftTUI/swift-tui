@@ -15,6 +15,65 @@ struct SampledStrokeTrackTests {
     return lit
   }
 
+  @Test("clipped curved shapes preserve visible masks and allocate only visible cells")
+  func clippedShapeCanvases() {
+    var path = Path()
+    path.move(to: Point(x: 0.5, y: 0))
+    path.addLine(to: Point(x: 1, y: 0.5))
+    path.addLine(to: Point(x: 0.5, y: 1))
+    path.addLine(to: Point(x: 0, y: 0.5))
+    path.closeSubpath()
+    let bounds = CellRect(origin: .zero, size: .init(width: 18, height: 32))
+    let clip = CellRect(origin: .init(x: 4, y: 7), size: .init(width: 10, height: 16))
+    let empty = Array(repeating: Array(repeating: RasterCell(), count: 18), count: 32)
+    for shape in [ShapeGeometry.circle, .ellipse, .capsule, .path(BoxedPath(path), .evenOdd)] {
+      for (stroke, border, style) in [
+        (false, false, nil as StrokeStyle?), (true, false, nil),
+        (true, true, nil), (true, false, StrokeStyle(dash: [2, 2])),
+      ] {
+        func paint(_ frame: CellRect, _ clip: CellRect?, cells: inout [[RasterCell]]) {
+          Rasterizer().paintBrailleShape(
+            geometry: shape, shapeBounds: frame, colorMode: .constant(.red), stroke: stroke,
+            strokeBorder: border, strokeStyle: style, environment: .init(appearance: .fallback),
+            cells: &cells, clip: clip)
+        }
+        var full = empty
+        paint(bounds, nil, cells: &full)
+        var cropped = empty
+        let probe = RasterWorkProbe()
+        Rasterizer.$workProbe.withValue(probe) { paint(bounds, clip, cells: &cropped) }
+        #expect(probe.snapshot().brailleCanvasCells == clip.size.width * clip.size.height)
+        for y in clip.origin.y..<clip.maxY {
+          #expect(cropped[y][clip.origin.x..<clip.maxX] == full[y][clip.origin.x..<clip.maxX])
+        }
+        var viewport = Array(
+          repeating: Array(repeating: RasterCell(), count: clip.size.width),
+          count: clip.size.height)
+        paint(
+          .init(origin: .init(x: -clip.origin.x, y: -clip.origin.y), size: bounds.size), nil,
+          cells: &viewport)
+        for row in viewport.indices {
+          #expect(viewport[row].elementsEqual(full[row + clip.origin.y][clip.origin.x..<clip.maxX]))
+        }
+      }
+    }
+  }
+
+  @Test("narrow viewports preserve the discrete samples at either tip of a flat ellipse")
+  func clippedEllipseSamples() {
+    var full = BrailleCanvas(width: 4320, height: 6)
+    full.strokeEllipse(centerX: 4316, centerY: 11, radiusX: 4314, radiusY: 9)
+    for originX in [0, 2156, 4310] {
+      var crop = BrailleCanvas(width: 8, height: 4)
+      crop.strokeShapeEllipse(centerX: 4316 - originX * 2, centerY: 7, radiusX: 4314, radiusY: 9)
+      for y in 0..<crop.height {
+        for x in 0..<crop.width {
+          #expect(crop.cell(x: x, y: y) == full.cell(x: x + originX, y: y + 1))
+        }
+      }
+    }
+  }
+
   /// A circle of radius 18 subpixels, centered in a 20 x 10 cell canvas.
   private func strokedCircle() -> BrailleCanvas {
     var canvas = BrailleCanvas(width: 20, height: 10)
