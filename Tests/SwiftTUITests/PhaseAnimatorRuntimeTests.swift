@@ -1,5 +1,6 @@
 import Foundation
 @_spi(Testing) import SwiftTUITestSupport
+import Synchronization
 import Testing
 
 @_spi(Testing) @testable import SwiftTUICore
@@ -196,4 +197,69 @@ private struct PhaseTabFixture: View {
       .tabViewStyle(.literalTabs)
     }
   }
+}
+
+extension PhaseAnimatorRuntimeTests {
+  @Test("A constant phase sequence stays idle and accepts input", arguments: [[0], [0, 0, 0]])
+  func constantLoopRemainsIdle(_ phases: [Int]) async throws {
+    let attempts = PhaseAttemptCount()
+    let harness = try RunLoopTestHarness(size: .init(width: 16, height: 3)) {
+      ConstantPhaseInput(phases: phases, attempts: attempts)
+    }
+    defer { harness.shutdown() }
+
+    // A queued main-actor job must run after mount. Cap the old tight loop
+    // in its animation callback so a regression fails without hanging CI.
+    await Task { @MainActor in }.value
+    try harness.press(.init(.character("x")))
+    #expect(harness.lines.contains { $0.contains("pressed") })
+    #expect(attempts.value.withLock { $0 } == 0)
+    #expect(harness.nextWake == nil)
+  }
+
+  @Test("Loop mode skips equal neighbors and advances to the next distinct phase")
+  func equalNeighborsAdvance() async throws {
+    let attempts = Mutex<[Int]>([])
+    let harness = try RunLoopTestHarness(size: .init(width: 16, height: 3)) {
+      PhaseAnimator([0, 0, 1]) { phase in
+        Text("phase \(phase)")
+      } animation: { phase in
+        attempts.withLock { $0.append(phase) }
+        return .linear(duration: .seconds(1))
+      }
+    }
+    defer { harness.shutdown() }
+    try await waitUntil { attempts.withLock { !$0.isEmpty } }
+    #expect(attempts.withLock { $0.first } == 1)
+  }
+}
+
+private struct ConstantPhaseInput: View {
+  let phases: [Int]
+  let attempts: PhaseAttemptCount
+  @State private var pressed = false
+
+  var body: some View {
+    PhaseAnimator(phases) { _ in
+      Text(pressed ? "pressed" : "ready")
+        .focusable()
+        .onKeyPress(.character("x")) { _ in
+          pressed = true
+          return .handled
+        }
+    } animation: { [attempts] _ in
+      let count = attempts.value.withLock {
+        $0 += 1
+        return $0
+      }
+      if count == 32 {
+        unsafe withUnsafeCurrentTask { unsafe $0?.cancel() }
+      }
+      return .linear(duration: .seconds(1))
+    }
+  }
+}
+
+private final class PhaseAttemptCount: Sendable {
+  let value = Mutex(0)
 }

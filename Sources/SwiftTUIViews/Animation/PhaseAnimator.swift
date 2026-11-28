@@ -161,6 +161,10 @@ public struct PhaseAnimator<Phase: Equatable & Sendable, Content: View>: View {
           self.lastRunTrigger = trigger
           await runCycleOnce()
         }
+    } else if phases.dropFirst().allSatisfy({ $0 == phases[0] }) {
+      // An unchanged state write completes inline. A constant sequence has
+      // nothing to animate and needs no lifecycle task.
+      phaseContent(phases[0])
     } else {
       phaseContent(currentPhase)
         .task { @MainActor in
@@ -184,12 +188,11 @@ public struct PhaseAnimator<Phase: Equatable & Sendable, Content: View>: View {
     while !Task.isCancelled {
       let nextIndex = (currentIndex + 1) % phases.count
       let nextPhase = phases[nextIndex]
-      let nextAnimation = animation(nextPhase)
-
-      await advance(to: nextPhase, with: nextAnimation)
-
-      if Task.isCancelled { break }
+      let previousPhase = phases[currentIndex]
       currentIndex = nextIndex
+      if nextPhase != previousPhase {
+        await advance(to: nextPhase, with: animation(nextPhase))
+      }
     }
   }
 
