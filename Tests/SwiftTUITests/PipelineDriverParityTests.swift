@@ -27,6 +27,25 @@ struct PipelineDriverParityTests {
     }
   }
 
+  @Test("Async renderers place a root with safe-area insets like the synchronous renderer")
+  func safeAreaRootParity() async throws {
+    var environment = EnvironmentValues()
+    environment.safeAreaInsets = .init(top: 1, leading: 2)
+    let context = ResolveContext(
+      identity: testIdentity("InsetRoot"), environmentValues: environment)
+    let proposal = ProposedSize(width: 24, height: 6)
+    let root = Text("inset")
+    let sync = DefaultRenderer().render(root, context: context, proposal: proposal)
+    let async = await DefaultRenderer().renderAsync(root, context: context, proposal: proposal)
+    let outcome = await DefaultRenderer().renderAsyncCancellable(
+      root, context: context, proposal: proposal, shouldCancelQueued: { false })
+    let cancellable = try #require(outcome.artifacts)
+    #expect(async.placedTree == sync.placedTree)
+    #expect(cancellable.placedTree == sync.placedTree)
+    #expect(async.rasterSurface == sync.rasterSurface)
+    #expect(cancellable.rasterSurface == sync.rasterSurface)
+  }
+
   /// Drives one frame through the synchronous `renderPendingFrames` entry
   /// point and one through the asynchronous `renderPendingFramesAsync` entry
   /// point over equivalent `RunLoop`s. Both entry points delegate to the same

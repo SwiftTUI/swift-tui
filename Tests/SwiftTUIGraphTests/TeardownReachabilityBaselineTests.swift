@@ -164,6 +164,7 @@ struct TeardownReachabilityBaselineTests {
 
     let previewTrace = TeardownBarrierTraceRecorder(caller: .preview)
     _ = graph.previewLifecycleEventPlan(
+      rootIdentity: rootIdentity,
       resolved: candidate,
       placed: nil,
       debugTeardownTrace: previewTrace
@@ -224,6 +225,7 @@ struct TeardownReachabilityBaselineTests {
 
     let previewTrace = TeardownBarrierTraceRecorder(caller: .preview)
     _ = graph.previewLifecycleEventPlan(
+      rootIdentity: rootIdentity,
       resolved: candidate,
       placed: nil,
       debugTeardownTrace: previewTrace

@@ -100,7 +100,8 @@ struct FlattenedStateOwnerClaimTests {
     #expect(authoredNode.hostsAuthoredStateSlots)
 
     // The finalize barrier is where an absorbed shadow is reclaimed.
-    _ = graph.previewLifecycleEventPlan(resolved: resolved, placed: nil)
+    _ = graph.previewLifecycleEventPlan(
+      rootIdentity: resolved.identity, resolved: resolved, placed: nil)
     #expect(graph.nodeForOwnerLifetimeID(ownerLifetime) === authoredNode)
 
     // The binding the body handed out is bound to that owner (the shape a

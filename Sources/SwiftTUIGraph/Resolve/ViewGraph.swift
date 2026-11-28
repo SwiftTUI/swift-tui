@@ -3578,20 +3578,10 @@ package final class ViewGraph {
   }
 
   package func previewLifecycleEventPlan(
-    resolved: ResolvedNode,
-    placed: ViewportVisibilitySummary?
-  ) -> ViewGraphFrameLifecycleEventPlan {
-    previewLifecycleEventPlan(
-      resolved: resolved,
-      placed: placed,
-      debugTeardownTrace: nil
-    )
-  }
-
-  package func previewLifecycleEventPlan(
+    rootIdentity: Identity,
     resolved: ResolvedNode,
     placed: ViewportVisibilitySummary?,
-    debugTeardownTrace: TeardownBarrierTraceRecorder?
+    debugTeardownTrace: TeardownBarrierTraceRecorder? = nil
   ) -> ViewGraphFrameLifecycleEventPlan {
     // The finalize-frame teardown barrier emits the departed subtrees'
     // cancel/disappear events (an entity-routed removal deferred out of the
@@ -3600,7 +3590,7 @@ package final class ViewGraph {
     // committed one. Both prunes are self-consuming — the later
     // `finalizeFrame` re-run is a no-op — and an aborted candidate rolls the
     // mutations back with the rest of the prepared frame state.
-    guard let candidateRootID = nodeIfExists(for: resolved.identity)?.viewNodeID else {
+    guard let candidateRootID = nodeIfExists(for: rootIdentity)?.viewNodeID else {
       preconditionFailure("lifecycle preview requires a stored candidate root")
     }
     let barrierResult = settleTeardownBarrier(

@@ -295,6 +295,7 @@ extension DefaultRenderer {
 
     let (planned, duration) = measurePhase(clock: draft.clock) {
       let lifecyclePlan = viewGraph.previewLifecycleEventPlan(
+        rootIdentity: draft.graphRootIdentity,
         resolved: canonicalResolved,
         placed: tail.placed.viewportVisibilitySummary
       )
