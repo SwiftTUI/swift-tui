@@ -1784,10 +1784,10 @@ package final class ViewGraph {
     // A new root has no surviving parent to diff the old root out. Retire its
     // subtree in the frame draft before the new evaluator adopts any identities.
     if let root, root.identity != rootIdentity {
+      // Entity homes belong to the departing root. Release them first so
+      // the removal walk retires those nodes along with their parents.
+      releaseInactiveEntityRoutes(activeEntities: [])
       removeSubtree(rootedAt: root)
-      // Descending through a routed entity normally defers its removal in
-      // case it moves elsewhere in this tree. No entity survives a root switch.
-      prunePendingEntityRoutedRemovals(activeEntities: [])
       self.root = nil
     }
     evaluationRootIdentity = rootIdentity
