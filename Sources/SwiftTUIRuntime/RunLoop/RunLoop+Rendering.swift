@@ -699,7 +699,9 @@ extension RunLoop {
           scheduledFrame: passScheduledFrame,
           frameInstant: frameInstant,
           currentState: currentState,
-          eventPump: eventPump,
+          // The signal flush gets one acquisition. Its owed presentation must
+          // survive a newer invalidation because there will be no retry.
+          allowsSupersession: eventPump != nil && drainPolicy != .signalExit,
           renderIntentDiagnostics: renderIntentDiagnostics,
           renderedFrames: renderedFrames,
           convergence: convergence

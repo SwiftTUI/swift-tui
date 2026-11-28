@@ -60,7 +60,9 @@ private final class SharedSceneSignalReader: @preconcurrency SignalSourceArming 
     let sources = [terminal?.events(), browser.events()].compactMap { $0 }
     return AsyncStream { continuation in
       let tasks = sources.map { source in
-        Task { @MainActor in
+        // Terminal rendering can hold MainActor between acquisitions. Forward
+        // already-delivered signals independently so the pump can service them.
+        Task.detached {
           for await signal in source { continuation.yield(signal) }
         }
       }

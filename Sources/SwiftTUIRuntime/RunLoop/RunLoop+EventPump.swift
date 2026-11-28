@@ -1,9 +1,5 @@
 import SwiftTUICore
 
-#if os(Android)
-  @_spi(MainActorUtilities) import _Concurrency
-#endif
-
 extension RunLoop {
   package struct EventPump {
     var stream: AsyncStream<Void>
@@ -53,11 +49,10 @@ extension RunLoop {
     let stream = AsyncStream<Void>(bufferingPolicy: .bufferingNewest(1)) { continuation in
       deadlineState.setContinuation(continuation)
 
-      // Stream copying must not inherit MainActor: synchronous rendering can
-      // otherwise keep already-buffered input out of the pump for a whole
-      // drain. These owned tasks only touch Sendable streams and locked pump
-      // state; dispatch and UI callbacks still run on MainActor. `cancel`
-      // below retains responsibility for ending the copy tasks.
+      // Synchronous rendering holds MainActor. Copy input and signals into
+      // the locked pump buffer independently so they are visible between
+      // frame acquisitions. UI dispatch stays on MainActor, and the pump
+      // cancels its owned copy tasks when the session ends.
       if let scopedReader = terminalInputReader as? any ScopedInputReading {
         let inputEvents = scopedReader.scopedInputEvents()
         inputTask = Task.detached {
@@ -158,7 +153,7 @@ extension RunLoop {
             ?? AsyncStream { continuation in
               continuation.finish()
             }
-          signalTask = Task.immediate { @MainActor in
+          signalTask = Task.detached {
             for await signalName in signalEvents {
               if buffer.enqueue(.signal(signalName)) {
                 continuation.yield()
@@ -173,7 +168,7 @@ extension RunLoop {
           ?? AsyncStream { continuation in
             continuation.finish()
           }
-        signalTask = Task {
+        signalTask = Task.detached {
           for await signalName in signalEvents {
             if buffer.enqueue(.signal(signalName)) {
               continuation.yield()

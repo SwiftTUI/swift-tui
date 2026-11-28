@@ -4,8 +4,8 @@ import SwiftTUIViews
 extension RunLoop {
   /// Strategy-specific artifact acquisition for the async driver. Renders
   /// one tree according to `renderMode`: a synchronous render for `.sync`,
-  /// `renderAsync` when no event pump is attached, otherwise the cancellable
-  /// frame-tail renderer. Cancelled-before-start and dropped-completed tail
+  /// an async render for startup and the final signal flush, otherwise the
+  /// cancellable frame-tail renderer. Cancelled-before-start and dropped-completed tail
   /// outcomes are reported, logged, have their accumulated focus-sync
   /// lifecycle carry-forward folded back into `deferredLifecycleCarryForward`,
   /// and are surfaced as `.skipped` here so the shared focus-sync loop and
@@ -19,7 +19,7 @@ extension RunLoop {
     scheduledFrame: ScheduledFrame,
     frameInstant: MonotonicInstant,
     currentState: State,
-    eventPump: EventPump?,
+    allowsSupersession: Bool,
     renderIntentDiagnostics: RenderIntentCoalescingDiagnostics,
     renderedFrames: Int,
     convergence: FocusSyncConvergenceState
@@ -28,7 +28,7 @@ extension RunLoop {
       scheduledFrame: scheduledFrame,
       frameInstant: frameInstant,
       currentState: currentState,
-      eventPump: eventPump,
+      allowsSupersession: allowsSupersession,
       renderIntentDiagnostics: renderIntentDiagnostics,
       renderedFrames: renderedFrames,
       convergence: convergence
@@ -64,7 +64,7 @@ extension RunLoop {
     scheduledFrame: ScheduledFrame,
     frameInstant: MonotonicInstant,
     currentState: State,
-    eventPump: EventPump?,
+    allowsSupersession: Bool,
     renderIntentDiagnostics: RenderIntentCoalescingDiagnostics,
     renderedFrames: Int,
     convergence: FocusSyncConvergenceState
@@ -93,7 +93,7 @@ extension RunLoop {
         return .elided
       }
     }
-    if eventPump == nil {
+    if !allowsSupersession {
       switch await renderer.renderAsyncEliding(
         viewBuilder(
           (

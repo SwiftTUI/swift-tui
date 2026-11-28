@@ -9,6 +9,43 @@ import Testing
 @MainActor
 @Suite("Termination requests")
 struct TerminationRequestTests {
+  @Test("SIGTERM enters the shared-scene pump while synchronous rendering owns MainActor")
+  func signalIngressDuringSynchronousFrame() throws {
+    let root = testIdentity("SignalIngress")
+    let signals = InProcessSignalReader()
+    let surface = TerminationTestTerminalHost()
+    let input = InjectedTerminalInputReader()
+    let endpoint = SharedSceneEndpoint(
+      descriptor: .init(id: "terminal", title: nil, isDefault: true),
+      resources: SceneSessionResources(
+        presentationSurface: surface, terminalInputReader: input, signalReader: signals),
+      isPrimary: true)
+    defer { endpoint.stop() }
+    let runLoop = RunLoop(
+      rootIdentity: root, presentationSurface: surface, terminalInputReader: input,
+      signalReader: endpoint.resources.signalReader, scheduler: FrameScheduler(),
+      stateContainer: StateContainer(initialState: 0, invalidationIdentities: [root]),
+      focusTracker: FocusTracker(invalidationIdentities: [root]),
+      viewBuilder: { _, _ in Text("Ready") })
+    let pump = runLoop.makeEventPump()
+    defer { pump.cancel() }
+    let enqueued = BlockingTestSignal()
+    let observer = Task.detached { [wakes = pump.stream] in
+      for await _ in wakes {
+        enqueued.signal()
+        return
+      }
+    }
+    defer { observer.cancel() }
+    signals.send(.terminate)
+    try #require(enqueued.wait())
+    let first = try #require(pump.drainEvents().first)
+    guard case .signal(.terminate) = first.event else {
+      Issue.record("Expected the queued SIGTERM")
+      return
+    }
+  }
+
   @Test(
     "termination raised by exit-flush callbacks is dispatched in both pumps",
     arguments: [false, true], [false, true])
@@ -65,6 +102,38 @@ struct TerminationRequestTests {
     #expect(exit == (cancelProgrammatic ? .userExit(exitKey) : .programmatic))
     #expect(recorder.requests == [.userExit(exitKey), .programmatic])
     #expect(!loop.hasPendingProgrammaticTermination)
+  }
+
+  @Test("the final signal frame presents pending input despite a newer invalidation")
+  func signalFlushCommitsOwedInput() async throws {
+    let root = testIdentity("SignalFinalFrame")
+    let surface = TerminationTestTerminalHost()
+    let scheduler = FrameScheduler()
+    let state = StateContainer(initialState: 0, invalidationIdentities: [root])
+    let loop = RunLoop(
+      rootIdentity: root, presentationSurface: surface,
+      terminalInputReader: InjectedTerminalInputReader(),
+      scheduler: scheduler, stateContainer: state,
+      focusTracker: FocusTracker(invalidationIdentities: [root]),
+      keyHandler: { _, _, state in
+        state.mutate { $0 += 1 }
+        return .handled
+      },
+      viewBuilder: { value, _ in Text("value \(value)") })
+    loop.renderMode = .async
+    state.invalidator = scheduler
+    let pump = loop.makeEventPump()
+    defer { pump.cancel() }
+    var frames = 0
+    scheduler.requestInvalidation(of: [root])
+    _ = try await loop.renderPendingFramesAsync(
+      renderedFrames: &frames, eventPump: nil, drainPolicy: .initialPresentation)
+    _ = loop.handle(.input(.key(.return)))
+    loop.frameClockDidAcquire = { _ in scheduler.requestInvalidation(of: [root]) }
+    _ = try await loop.renderPendingFramesAsync(
+      renderedFrames: &frames, eventPump: pump, drainPolicy: .signalExit)
+    #expect(frames == 2)
+    #expect(surface.frames.last?.contains("value 1") == true)
   }
 
   @Test("signal exit acquires at most one pending frame", arguments: [false, true])
