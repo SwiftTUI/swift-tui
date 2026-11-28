@@ -286,6 +286,25 @@ struct LazyStackViewportCacheTests {
     }
   }
 
+  @Test("an empty indexed stack leaves the viewport available to later rows")
+  func emptyIndexedStackLeavesViewportAvailable() throws {
+    let renderer = DefaultRenderer()
+    let identity = testIdentity("EmptyIndexedStack")
+    for offset in [0, 0, 5, 9] {
+      let snapshot = renderer.render(
+        ScrollView(position: .constant(ScrollCellOffset(y: offset))) {
+          VStack(spacing: 0) {
+            LazyVStack { ForEach(0..<0, id: \.self) { Text("empty \($0)") } }
+            LazyVStack { ForEach(0..<1000, id: \.self) { Text("row \($0)") } }
+          }
+        }, context: .init(identity: identity, invalidatedIdentities: [identity]),
+        proposal: .init(width: 40, height: 8))
+      let stack = try #require(placedLazyStacks(in: snapshot.placedTree).last)
+      let window = try #require(stack.lazyStackAllocationSnapshot?.measuredWindow)
+      #expect(window.count <= 40)
+    }
+  }
+
   // Cost neighbour: the repaired cache rule must not make a scroll-hosted
   // lazy stack realize or measure more per steady frame.
   @Test("scroll-hosted lazy stacks keep their per-frame layout work", arguments: [40, 1000])
@@ -502,7 +521,7 @@ private struct FramedOutlineProbe: View {
 
 /// A horizontal scroll view after a leading label: its first measure round
 /// has a zero-width viewport. The first LazyHStack's later cells are taller
-/// (its cross axis), at one width so the main-axis estimate is exact.
+/// (its cross axis), and wider (its main axis). The unchanged source keeps its observed extents.
 private struct HorizontalClaimProbe: View {
   var body: some View {
     HStack(alignment: .top, spacing: 0) {
@@ -512,7 +531,7 @@ private struct HorizontalClaimProbe: View {
           LazyHStack(alignment: .top, spacing: 1) {
             ForEach(0..<20, id: \.self) { index in
               VStack(alignment: .leading, spacing: 0) {
-                Text("a\(index % 10)")
+                Text("a\(index)")
                 if index >= 10 { Text("+") }
               }
             }

@@ -125,11 +125,11 @@ extension LayoutEngine {
   ) -> Bool {
     guard
       case .lazyStack(let axis, let spacing, let horizontal, let vertical) = node.layoutBehavior,
-      let source = node.indexedChildSource, let passContext,
+      let source = node.indexedChildSource, source.count > 0, let passContext,
       let candidate = passContext.currentMeasureViewportHint,
       axis == .vertical ? candidate.axes.contains(.vertical) : candidate.axes.contains(.horizontal),
       let scrollHint = passContext.claimCurrentMeasureViewportHint(for: node.identity),
-      mainDimension(of: scrollHint.viewportSize, for: axis) > 0, source.count > 0,
+      mainDimension(of: scrollHint.viewportSize, for: axis) > 0,
       (spacing ?? 0) >= 0
     else { return false }
     let hint = localLazyStackHint(scrollHint, for: node, axis: axis, passContext: passContext)
@@ -305,6 +305,12 @@ extension LayoutEngine {
         oldLengths[old.childIdentities[index]] = old.childMainLengths[index]
       }
     }
+    // A refined stride can narrow the sampled band even with an unchanged
+    // viewport. Keep earlier extents as estimates while every fresh sample
+    // agrees, including wider elements just outside the new band (STUI-1329).
+    let samplesAgree = summaries.allSatisfy { index, summary in
+      oldLengths[context.identities[index]] == summary.extent
+    }
     var offsets: [Int] = []
     var lengths: [Int] = []
     var fragments: [LazyStackFragmentAllocation] = []
@@ -335,7 +341,7 @@ extension LayoutEngine {
       // from current producers and proposals; identity equality is not currency.
       let length =
         summary?.extent
-        ?? ((index < knownStart || sample == nil)
+        ?? ((samplesAgree || index < knownStart || sample == nil)
           ? oldLengths[context.identities[index]].map { max(1, $0) } : nil)
         ?? estimate
       lengths.append(length)
