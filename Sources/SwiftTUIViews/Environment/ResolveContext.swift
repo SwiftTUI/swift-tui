@@ -289,10 +289,10 @@ public struct ResolveContext: Equatable, Sendable {
     get { propagated.imageAssetResolver }
     set { propagated.imageAssetResolver = newValue }
   }
-  /// See ``PropagatedRegistries/elementTransition``.
-  package var elementTransition: ElementTransition? {
-    get { propagated.elementTransition }
-    set { propagated.elementTransition = newValue }
+  /// See ``PropagatedRegistries/elementModifier``.
+  package var elementModifier: ElementModifierPassage? {
+    get { propagated.elementModifier }
+    set { propagated.elementModifier = newValue }
   }
   package var frameInputs: FrameResolveInputBox? {
     get { propagated.frameInputs }
@@ -929,7 +929,7 @@ extension ResolveContext {
     ///
     /// One reference, so that a context without one, which is nearly every
     /// context, copies nothing for it.
-    package var elementTransition: ElementTransition?
+    package var elementModifier: ElementModifierPassage?
 
     package init(
       resolveWorkTracker: ResolveWorkTracker? = nil,

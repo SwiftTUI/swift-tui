@@ -426,6 +426,50 @@ struct TransitionContentBoundaryTests {
         == ["FIRST-FIRST", "FIRST-FIRST", "SECOND", "SECOND", "BELOW"], "\(rows)")
   }
 
+  @Test("geometry and draw modifiers are applied to each declared view")
+  func aModifierAppliesToEachDeclaredView() {
+    func rows(_ name: String, _ view: some View) -> [String] {
+      Array(stagesReviewRows(name, Self.column { view }).prefix(3)).map(Self.trimmed)
+    }
+    #expect(
+      rows("padding", Self.pair.padding(.horizontal, 1))
+        == [" FIRST-FIRST", " SECOND", "BELOW"])
+    #expect(
+      rows("offset", Self.pair.offset(x: 2, y: 0))
+        == ["  FIRST-FIRST", "  SECOND", "BELOW"])
+    #expect(
+      rows("frame", Self.pair.frame(width: 14, alignment: .trailing))
+        == ["   FIRST-FIRST", "        SECOND", "BELOW"])
+    #expect(
+      rows("opacity", ForEach(["FIRST", "SECOND"], id: \.self) { Text($0) }.opacity(0))
+        == ["", "", "BELOW"])
+    #expect(rows("clip", Self.pair.clipShape(Rectangle().inset(by: 2))) == ["", "", "BELOW"])
+    let twice = stagesReviewRows(
+      "padded-twice",
+      Self.column { Self.pair.padding(.horizontal, 1).transition(BoundaryTwice()) })
+    #expect(
+      Array(twice.prefix(5)).map(Self.trimmed)
+        == [" FIRST-FIRST", " FIRST-FIRST", " SECOND", " SECOND", "BELOW"])
+  }
+
+  @Test("geometry wrappers pass through a child's layout priority")
+  func geometryWrappersPassPriority() {
+    let a = String(repeating: "a", count: 20)
+    let b = String(repeating: "b", count: 20)
+    func line(_ view: some View) -> String {
+      stagesReviewRows(
+        "wrapped-priority",
+        HStack(spacing: 0) {
+          Text(a)
+          view
+        })[0]
+    }
+    let plain = line(Text(b).layoutPriority(1))
+    #expect(line(Text(b).layoutPriority(1).padding(0)) == plain)
+    #expect(line(Text(b).layoutPriority(1).offset(x: 0, y: 0)) == plain)
+    #expect(line(Text(b).layoutPriority(1).padding(0).layoutPriority(0)) == line(Text(b)))
+  }
+
   @Test("a body that wraps content wraps each view of the content")
   func wrapperBodyWrapsEachView() {
     // The body is evaluated for each view, so its padding is around each

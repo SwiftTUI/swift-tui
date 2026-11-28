@@ -475,6 +475,11 @@ where Content: View, Modifier: PrimitiveViewModifier {
       base: content,
       authoringScope: authoringScope
     )
+    if let perElement = modifier as? any PerElementViewModifier,
+      perElement.distributesOverElements, viewEmitsSeveralViews(Content.self)
+    {
+      return perElement.distribute(inputs, in: context)
+    }
     return withDynamicPropertyUpdateScope(modifier, for: context) {
       modifier.makeResolveWork(content: inputs, in: context)
     }

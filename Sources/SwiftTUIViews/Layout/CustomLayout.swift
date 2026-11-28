@@ -54,7 +54,7 @@ public struct LayoutSubview {
 
   /// The child's declared layout priority.
   public var layoutPriority: Double {
-    child.withContainerLayoutMetadata { $0.layoutPriority }
+    child.containerLayoutPriority
   }
 
   /// Whether the child resists horizontal compression.

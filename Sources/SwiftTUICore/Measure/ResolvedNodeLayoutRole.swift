@@ -71,6 +71,23 @@ extension ResolvedNode {
     return body(layoutMetadata)
   }
 
+  /// Geometry wrappers preserve the child's priority unless the wrapper
+  /// itself declares one. Read it at layout time, including through live
+  /// transition boundaries, so a child can change the priority on its own.
+  package var containerLayoutPriority: Double {
+    var node = self
+    while node.layoutMetadata.authoredLayoutPriority == nil, node._storedChildren.count == 1 {
+      if !node.isTransitionContentBoundary {
+        switch node.layoutBehavior {
+        case .padding, .offset: break
+        default: return 0
+        }
+      }
+      node = node._storedChildren[0]
+    }
+    return node.layoutMetadata.layoutPriority
+  }
+
   /// Calls `body` with the node whose kind decides what this node is to the
   /// container that lays it out: the node itself, or the view behind a
   /// boundary.

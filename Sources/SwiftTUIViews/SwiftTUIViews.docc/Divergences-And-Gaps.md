@@ -982,8 +982,8 @@ are omitted even when SwiftUI exposes a corresponding API.
   that places `content` or a conformer inside a view that resolves during
   layout does not animate there, and a conformer modifier around several
   views that adds none of its own does not animate its data. A transition
-  with a body on several views that have a modifier or an `AnyView` around
-  them, or that are the `content` of a `ViewModifier`, takes them as one
+  with a body on several views erased by an `AnyView` or passed as the
+  `content` of a `ViewModifier` takes them as one
   view. A combination
   plays one animation where SwiftUI animates each part with its own. An
   offset or a move restarts at an interruption. A timing curve does not keep
@@ -1156,14 +1156,10 @@ are omitted even when SwiftUI exposes a corresponding API.
   view takes its own place in the container, as it does without the
   transition, has its own copy of the views the body adds, and is inserted
   and removed by itself: a row that joins or leaves a `ForEach` under one
-  `.transition(_:)` plays the transition alone. Whether content is several
-  views is read from its type, so three shapes are one view to a transition
-  with a body, which is then evaluated once around all the views, laid out
-  inside it as the body lays several views out: several views with a
-  modifier around them (`Group { … }.padding().transition(_:)`), several
-  views in an `AnyView`, and the `content` of a `ViewModifier` (STUI-1581).
-  Write the transition directly on the `Group` or the `ForEach`, or on each
-  view. A transition without a body has no such limit.
+  `.transition(_:)` plays the transition alone. Padding, frame, offset, opacity and clipping also
+  apply to each view. A transition outside those modifiers still runs once
+  per view. An `AnyView` or the `content` of a `ViewModifier` erases the
+  content type, so a transition with a body treats it as one view.
   *The layout role of the content.* A view under a custom transition is laid
   out as the same view is without one. Its container reads what the view
   declares through the body: a layout priority, a fixed size, a spacing

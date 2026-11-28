@@ -129,8 +129,8 @@ extension LayoutEngine {
     }
 
     let order = children.indices.sorted { lhs, rhs in
-      let leftPriority = children[lhs].withContainerLayoutMetadata { $0.layoutPriority }
-      let rightPriority = children[rhs].withContainerLayoutMetadata { $0.layoutPriority }
+      let leftPriority = children[lhs].containerLayoutPriority
+      let rightPriority = children[rhs].containerLayoutPriority
       if leftPriority != rightPriority {
         return leftPriority > rightPriority
       }
@@ -151,12 +151,10 @@ extension LayoutEngine {
     var groupEndPositions = [Int](repeating: order.count, count: order.count)
     var groupStart = 0
     while groupStart < order.count {
-      let priority = children[order[groupStart]].withContainerLayoutMetadata {
-        $0.layoutPriority
-      }
+      let priority = children[order[groupStart]].containerLayoutPriority
       var groupEnd = groupStart
       while groupEnd < order.count,
-        children[order[groupEnd]].withContainerLayoutMetadata({ $0.layoutPriority }) == priority
+        children[order[groupEnd]].containerLayoutPriority == priority
       {
         groupEnd += 1
       }

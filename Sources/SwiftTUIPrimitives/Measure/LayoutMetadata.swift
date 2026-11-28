@@ -1,5 +1,5 @@
 package struct LayoutMetadata: Sendable {
-  private var authoredLayoutPriority: Double?
+  package private(set) var authoredLayoutPriority: Double?
   package var layoutPriority: Double {
     get { authoredLayoutPriority ?? 0 }
     set { authoredLayoutPriority = newValue }

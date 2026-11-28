@@ -238,10 +238,10 @@ struct ResolveContextStorageTotalityTests {
         + "environment-snapshot currency by GestureAttachmentModifier",
       draft: .survives("resolve-scope currency, not a registration")
     ),
-    "elementTransition": notEquated(
-      "a transition on its way down to each view of several; its passage is mirrored "
+    "elementModifier": notEquated(
+      "a modifier on its way down to each declared view; its passage is mirrored "
         + "into equated private environment-snapshot currency by "
-        + "ResolveContext.distributing",
+        + "ResolveContext.carrying",
       draft: .survives("resolve-scope currency, not a registration")
     ),
     "requestDeadline": notEquated(
@@ -436,8 +436,8 @@ struct ResolveContextStorageTotalityTests {
     context.propagated.authoredFocusPressOverrides = [.focusedIdentity]
     context.propagated.authoredTransactionOverride = true
     context.gestureSuppressionScopes = [scopeIdentity]
-    let elementTransition = ElementTransition(.opacity)
-    context.elementTransition = elementTransition
+    let elementModifier = ElementModifierPassage(OffsetModifier(x: 1, y: 2), outer: nil)
+    context.elementModifier = elementModifier
 
     let replacement = RuntimeRegistrationSet.scratch()
     let replaced = context.replacingRuntimeRegistrations(replacement)
@@ -515,9 +515,9 @@ struct ResolveContextStorageTotalityTests {
             value as? [Identity] == [scopeIdentity],
             "\(name) must survive the draft swap"
           )
-        case "elementTransition":
+        case "elementModifier":
           #expect(
-            unwrappedObject(value) === elementTransition, "\(name) must survive the draft swap")
+            unwrappedObject(value) === elementModifier, "\(name) must survive the draft swap")
         default:
           Issue.record("no survivor assertion for \(name) — add one to this switch")
         }
