@@ -42,6 +42,7 @@ extension GIF {
 
   /// An error raised while decoding a GIF bytestream.
   public enum DecodingError: Error, Equatable, Sendable, CustomStringConvertible {
+    case resourceLimitExceeded(reason: String)
     /// The stream ended before the decoder finished reading the file.
     case truncated(stage: String)
     /// The file did not start with `GIF87a` or `GIF89a`.
@@ -69,6 +70,8 @@ extension GIF {
 
     public var description: String {
       switch self {
+      case .resourceLimitExceeded(let reason):
+        return "GIF: resource limit exceeded (\(reason))"
       case .truncated(let stage):
         return "GIF stream truncated during \(stage)"
       case .invalidSignature(let bytes):

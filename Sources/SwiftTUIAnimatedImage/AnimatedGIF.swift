@@ -6,23 +6,40 @@ public enum AnimatedGIF {
   public static func decode(
     contentsOf path: String
   ) throws -> AnimatedImageSequence {
-    let data = try Data(contentsOf: URL(fileURLWithPath: path))
-    return try decode(data: [UInt8](data))
+    try decode(contentsOf: path, byteLimit: GIF.DecodingLimits.standard.inputBytes)
+  }
+
+  static func decode(contentsOf path: String, byteLimit: Int) throws -> AnimatedImageSequence {
+    let url = URL(fileURLWithPath: path)
+    if let fileSize = try url.resourceValues(forKeys: [.fileSizeKey]).fileSize, fileSize > byteLimit
+    {
+      throw GIF.DecodingError.resourceLimitExceeded(reason: "input bytes")
+    }
+    let file = try FileHandle(forReadingFrom: url)
+    defer { try? file.close() }
+    var bytes: [UInt8] = []
+    // A file may grow or be replaced after the metadata check.
+    while let chunk = try file.read(upToCount: min(65536, byteLimit - bytes.count + 1)),
+      !chunk.isEmpty
+    {
+      guard chunk.count <= byteLimit - bytes.count else {
+        throw GIF.DecodingError.resourceLimitExceeded(reason: "input bytes")
+      }
+      bytes.append(contentsOf: chunk)
+    }
+    return try decode(data: bytes)
   }
 
   public static func decode(
     data: [UInt8]
   ) throws -> AnimatedImageSequence {
-    var source = GIFByteSource(bytes: data)
-    let image = try GIF.Image.decompress(stream: &source)
-    let frames = image.frames.indices.map { index in
-      AnimatedImageFrame(
-        width: image.size.x,
-        height: image.size.y,
-        pixels: image.composited(frameIndex: index, as: GIF.RGBA<UInt8>.self).map(
-          AnimatedImagePixel.init
-        )
-      )
+    let image = try GIF.Image.decompress(bytes: data)
+    var frames: [AnimatedImageFrame] = []
+    frames.reserveCapacity(image.frames.count)
+    image.forEachCompositedFrame(as: GIF.RGBA<UInt8>.self) { canvas in
+      frames.append(
+        AnimatedImageFrame(
+          width: image.size.x, height: image.size.y, pixels: canvas.map(AnimatedImagePixel.init)))
     }
     let delays = image.frames.map { frame in
       UInt64(normalizedGIFDelayMilliseconds(centiseconds: frame.delayCentiseconds))
@@ -85,23 +102,6 @@ public enum AnimatedGIF {
         frames: frames
       )
     )
-  }
-}
-
-private struct GIFByteSource: GIF.BytestreamSource {
-  var bytes: [UInt8]
-  var offset = 0
-
-  mutating func read(
-    count: Int
-  ) -> [UInt8]? {
-    guard count >= 0, offset < bytes.count else {
-      return nil
-    }
-    let end = min(offset + count, bytes.count)
-    let chunk = Array(bytes[offset..<end])
-    offset = end
-    return chunk
   }
 }
 

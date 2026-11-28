@@ -86,6 +86,9 @@ extension GIF {
           continue
         }
 
+        guard output.count < expectedCount else {
+          throw .malformedLZWStream(reason: "more indices than frame pixels")
+        }
         if prevCode == -1 {
           // First non-clear code must be a singleton; output it.
           guard code < clearCode else {
@@ -126,6 +129,9 @@ extension GIF {
           if c < 0 {
             throw .malformedLZWStream(reason: "broken dictionary chain")
           }
+        }
+        guard top < stack.count, top < expectedCount - output.count else {
+          throw .malformedLZWStream(reason: "dictionary entry exceeds the remaining frame pixels")
         }
         // c is now a literal.
         stack[top] = UInt8(c)

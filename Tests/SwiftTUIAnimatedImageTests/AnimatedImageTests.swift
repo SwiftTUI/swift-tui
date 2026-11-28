@@ -8,6 +8,20 @@ import Testing
 @MainActor
 @Suite
 struct AnimatedImageTests {
+  @Test("file decoding enforces the input limit at the file boundary")
+  func gifFileByteLimit() throws {
+    let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: url) }
+    let frame = AnimatedImageFrame(width: 1, height: 1, pixels: [.init(red: 1, green: 2, blue: 3)])
+    let sequence = AnimatedImageSequence(frames: [frame], framesPerSecond: 10)
+    let bytes = try AnimatedGIF.encode(sequence)
+    try Data(bytes).write(to: url)
+    #expect(try AnimatedGIF.decode(contentsOf: url.path, byteLimit: bytes.count).frames == [frame])
+    #expect(throws: (any Error).self) {
+      try AnimatedGIF.decode(contentsOf: url.path, byteLimit: bytes.count - 1)
+    }
+  }
+
   @Test("GIF encoding and decoding round-trips pre-composed frames and delays")
   func gifEncodingAndDecodingRoundTripsFramesAndDelays() throws {
     let sequence = AnimatedImageSequence(

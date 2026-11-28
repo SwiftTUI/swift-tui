@@ -30,10 +30,21 @@ extension GIF {
     public let disposal: Disposal
   }
 
+  package struct DecodingLimits: Sendable {
+    package static let standard = Self()
+    package var inputBytes = 16 * 1024 * 1024
+    var dimension = 8192
+    var canvasPixels = 4 * 1024 * 1024
+    var frames = 512
+    var compositedPixels = 16 * 1024 * 1024
+  }
+
   /// Stateful GIF decoder. Loads the entire bytestream and parses blocks
   /// in sequence until the trailer is reached.
   struct Decoder {
     var bytes: [UInt8]
+    let limits: DecodingLimits
+    private var canvasPixels = 0
     var pos: Int = 0
 
     // Logical screen state.
@@ -55,8 +66,9 @@ extension GIF {
     /// `nil` while none has been seen.
     var loopCount: Int? = nil
 
-    init(bytes: [UInt8]) {
+    init(bytes: [UInt8], limits: DecodingLimits = .standard) {
       self.bytes = bytes
+      self.limits = limits
     }
 
     mutating func decode() throws(GIF.DecodingError) -> (
@@ -66,6 +78,9 @@ extension GIF {
       loopCount: Int?,
       frames: [Frame]
     ) {
+      guard bytes.count <= limits.inputBytes else {
+        throw .resourceLimitExceeded(reason: "input bytes")
+      }
       try parseHeader()
       try parseLogicalScreenDescriptor()
 
@@ -136,6 +151,12 @@ extension GIF {
     mutating func parseLogicalScreenDescriptor() throws(GIF.DecodingError) {
       screenWidth = try readUInt16LE(stage: "logical screen width")
       screenHeight = try readUInt16LE(stage: "logical screen height")
+      guard screenWidth > 0, screenHeight > 0 else { throw .emptyImage }
+      let (area, overflow) = screenWidth.multipliedReportingOverflow(by: screenHeight)
+      guard !overflow, screenWidth <= limits.dimension, screenHeight <= limits.dimension,
+        area <= limits.canvasPixels
+      else { throw .resourceLimitExceeded(reason: "logical screen dimensions or pixels") }
+      canvasPixels = area
       let packed = try readByte(stage: "logical screen packed flags")
       backgroundIndex = Int(try readByte(stage: "background color index"))
       _ = try readByte(stage: "pixel aspect ratio")  // ignored
@@ -221,10 +242,15 @@ extension GIF {
         return
       }
 
-      let subBlocks = try readSubBlockList(stage: "application extension body")
-      for block in subBlocks where block.count >= 3 && block[0] == 0x01 {
-        loopCount = Int(block[1]) | (Int(block[2]) << 8)
-        return
+      while true {
+        let count = Int(try readByte(stage: "application extension body"))
+        if count == 0 { return }
+        let block = try readBytes(count: count, stage: "application extension body")
+        if block.count >= 3, block[0] == 0x01 {
+          loopCount = Int(block[1]) | (Int(block[2]) << 8)
+          try skipSubBlocks(stage: "application extension body")
+          return
+        }
       }
     }
 
@@ -265,21 +291,6 @@ extension GIF {
       }
     }
 
-    /// Reads sub-blocks until the zero terminator, keeping each block's
-    /// bytes separate.
-    ///
-    /// Application extensions key on the first byte of an *individual*
-    /// sub-block, which the concatenation ``readSubBlocks(stage:)``
-    /// performs would blur into whatever preceded it.
-    mutating func readSubBlockList(stage: String) throws(GIF.DecodingError) -> [[UInt8]] {
-      var out: [[UInt8]] = []
-      while true {
-        let n = Int(try readByte(stage: stage))
-        if n == 0 { return out }
-        out.append(try readBytes(count: n, stage: stage))
-      }
-    }
-
     /// Reads sub-blocks until the zero terminator and concatenates them.
     mutating func readSubBlocks(stage: String) throws(GIF.DecodingError) -> [UInt8] {
       var out: [UInt8] = []
@@ -311,6 +322,16 @@ extension GIF {
         throw .frameOutOfBounds(left: left, top: top, width: width, height: height)
       }
 
+      guard frames.count < limits.frames else {
+        throw .resourceLimitExceeded(reason: "frame count")
+      }
+      // Division bounds the next full canvas without multiplying attacker-supplied dimensions.
+      guard frames.count < limits.compositedPixels / canvasPixels else {
+        throw .resourceLimitExceeded(reason: "total composited pixels")
+      }
+      // The containing screen's checked area bounds this frame on every architecture.
+      let pixelCount = width * height
+
       let lctFlag = (packed & 0b1000_0000) != 0
       let interlaced = (packed & 0b0100_0000) != 0
       // bit 5: sort flag (ignored)
@@ -334,17 +355,16 @@ extension GIF {
       let raw = try LZW.decode(
         bytes: compressed,
         minCodeSize: minCodeSize,
-        expectedCount: width * height
+        expectedCount: pixelCount
       )
 
       // Validate output length and indices.
-      guard raw.count >= width * height else {
-        throw .truncated(stage: "LZW image data (got \(raw.count), expected \(width * height))")
+      guard raw.count == pixelCount else {
+        throw .truncated(stage: "LZW image data (got \(raw.count), expected \(pixelCount))")
       }
-      let trimmed = Array(raw.prefix(width * height))
 
       // Validate indices: any value beyond the palette is a corruption.
-      for v in trimmed {
+      for v in raw {
         if Int(v) >= palette.count {
           if let t = pendingTransparentIndex, Int(v) == t {
             // Transparent index may exceed palette size; that's fine.
@@ -356,8 +376,8 @@ extension GIF {
 
       let pixels =
         interlaced
-        ? deinterlace(indices: trimmed, width: width, height: height)
-        : trimmed
+        ? deinterlace(indices: raw, width: width, height: height)
+        : raw
 
       frames.append(
         Frame(

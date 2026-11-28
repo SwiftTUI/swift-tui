@@ -44,8 +44,14 @@ extension GIF {
     public static func decompress<Source>(
       stream: inout Source
     ) throws -> GIF.Image where Source: GIF.BytestreamSource {
-      let bytes = GIF.Image.loadAllBytes(from: &stream)
-      var decoder = GIF.Decoder(bytes: bytes)
+      try decompress(
+        bytes: loadAllBytes(from: &stream, limit: GIF.DecodingLimits.standard.inputBytes))
+    }
+
+    package static func decompress(
+      bytes: [UInt8], limits: GIF.DecodingLimits = .standard
+    ) throws -> GIF.Image {
+      var decoder = GIF.Decoder(bytes: bytes, limits: limits)
       let result = try decoder.decode()
       return GIF.Image(
         size: (result.screenWidth, result.screenHeight),
@@ -79,36 +85,33 @@ extension GIF {
         (0..<frames.count).contains(i),
         "frame index \(i) out of bounds (count \(frames.count))"
       )
-      let total = size.x * size.y
-      var canvas = [GIF.RGBA<T>](
-        repeating: GIF.RGBA<T>(0, 0, 0, GIF.RGBA<T>.clearAlpha),
-        count: total
-      )
-      // For frame 0 we just paint over a transparent canvas.
-      // For later frames, replay the chain.
-      for k in 0...i {
-        let f = frames[k]
-        // Capture pre-frame state for `previous` disposal.
-        let preFrameSnapshot = canvas
+      return composite(through: i, as: type) { _ in }
+    }
 
-        paintFrame(f, into: &canvas, as: type)
+    /// Visits each displayed canvas once, before applying its disposal.
+    package func forEachCompositedFrame<T>(
+      as type: GIF.RGBA<T>.Type, _ visit: ([GIF.RGBA<T>]) -> Void
+    ) where T: FixedWidthInteger & UnsignedInteger {
+      _ = composite(through: frames.count - 1, as: type, visit)
+    }
 
-        if k < i {
-          // Apply this frame's disposal before painting the next.
-          switch f.disposal {
-          case .unspecified, .keep:
-            break
-          case .background:
-            clearRect(
-              into: &canvas,
-              left: f.left, top: f.top,
-              width: f.width, height: f.height,
-              background: backgroundColor,
-              as: type
-            )
-          case .previous:
-            canvas = preFrameSnapshot
-          }
+    private func composite<T>(
+      through last: Int, as type: GIF.RGBA<T>.Type, _ visit: ([GIF.RGBA<T>]) -> Void
+    ) -> [GIF.RGBA<T>] where T: FixedWidthInteger & UnsignedInteger {
+      var canvas = [GIF.RGBA<T>](repeating: GIF.RGBA<T>(0, 0, 0, 0), count: size.x * size.y)
+      for index in 0...last {
+        let frame = frames[index]
+        let previous = frame.disposal == .previous && index < last ? canvas : nil
+        paintFrame(frame, into: &canvas, as: type)
+        visit(canvas)
+        if index == last { break }
+        if let previous {
+          canvas = previous
+        } else if frame.disposal == .background {
+          clearRect(
+            into: &canvas, left: frame.left, top: frame.top, width: frame.width,
+            height: frame.height,
+            background: backgroundColor, as: type)
         }
       }
       return canvas
@@ -174,14 +177,19 @@ extension GIF {
 
     /// Reads as many bytes as the source will provide, with adaptive
     /// chunk sizing (matching the JPEG/PNG vendor decoders).
-    static func loadAllBytes<S: GIF.BytestreamSource>(from source: inout S) -> [UInt8] {
+    static func loadAllBytes<S: GIF.BytestreamSource>(
+      from source: inout S, limit: Int
+    ) throws(GIF.DecodingError) -> [UInt8] {
       var data: [UInt8] = []
-      let chunkSize = 4096
-      while let chunk = source.read(count: chunkSize) {
-        data.append(contentsOf: chunk)
-      }
-      while let byte = source.read(count: 1) {
-        data.append(byte[0])
+      for requestSize in [4096, 1] {
+        while let chunk = source.read(count: min(requestSize, limit - data.count + 1)),
+          !chunk.isEmpty
+        {
+          guard chunk.count <= limit - data.count else {
+            throw .resourceLimitExceeded(reason: "input bytes")
+          }
+          data.append(contentsOf: chunk)
+        }
       }
       return data
     }

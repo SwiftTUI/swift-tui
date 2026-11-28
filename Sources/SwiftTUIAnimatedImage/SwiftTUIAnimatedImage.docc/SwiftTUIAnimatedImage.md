@@ -32,6 +32,12 @@ struct GIFPlayer: View {
 }
 ```
 
+GIF import accepts up to 16 MiB of input, 8,192 pixels per screen axis,
+4,194,304 pixels per canvas, and 512 frames. The sum of full canvas areas
+across all frames must fit within 16,777,216 pixels, including for partial
+frames. A file or animation over a limit throws a decoding error. Each frame
+is composited once, with GIF disposal applied before the next frame.
+
 The throwing initializers `AnimatedImage(gifData:)` and
 `AnimatedImage(gifContentsOf:)` collapse the decode step when you do not
 need the sequence value itself. Decoding normalizes GIF timing: a zero
