@@ -2067,6 +2067,7 @@ package final class ViewGraph {
     // Latch this frame's reconciliation-soundness sampling decision from the
     // monotonic frame counter (no clock/RNG). Cheap when the probe is off.
     SoundnessProbeConfiguration.beginFrame(frameID: currentFrameID)
+    invalidationParents = InvalidationIdentityParents()
     frameRuntimeIssues.removeAll(keepingCapacity: true)
     frameOrder.removeAll(keepingCapacity: true)
     evaluatedNodeIDsThisFrame.removeAll(keepingCapacity: true)
@@ -2110,6 +2111,11 @@ package final class ViewGraph {
   /// changed node and the decision taken for it.
   private var preferenceDeltaEscalationRequested = false
   package private(set) var preferenceDeltaNotesThisFrame: [String] = []
+
+  /// Only lexical identity components, independent of graph topology. A restore
+  /// within the frame can keep these while every ancestor lookup rechecks the index.
+  private var invalidationParents = InvalidationIdentityParents()
+
   /// The nodes this graph had evaluated on this frame when the frame head
   /// began to evaluate some of them again, after the frontier that evaluated
   /// them had unwound (``reevaluatingThisFrame(_:)``). `nil` at any other
@@ -4633,12 +4639,12 @@ package final class ViewGraph {
   /// all (an `.id`-rebased subtree that departed wholesale) — there is no
   /// node an evaluation could target, and the caller drops the identity.
   private func nearestLiveAncestorNodeID(for identity: Identity) -> ViewNodeID? {
-    var candidate = identity.parent
-    while let current = candidate {
-      if let viewNodeID = viewNodeID(for: current) {
+    var child = identity
+    while let parent = invalidationParents.parent(of: child) {
+      if let viewNodeID = viewNodeID(for: parent) {
         return viewNodeID
       }
-      candidate = current.parent
+      child = parent
     }
     return nil
   }
@@ -4877,5 +4883,31 @@ package final class ViewGraph {
       structuralTaskCancelEvents: structuralTaskCancelEvents,
       structuralDisappearEvents: structuralDisappearEvents
     )
+  }
+}
+
+/// A departed invalidation can be checked against many candidate subtrees in one
+/// frame. Reuse the lexical parent values whose construction copies and hashes
+/// every component. The graph still checks current membership at every step.
+struct InvalidationIdentityParents {
+  private(set) var parents: [Identity: Identity] = [:]
+  private var remainingComponents: Int
+
+  init(componentBudget: Int = 16_384) {
+    remainingComponents = componentBudget
+  }
+
+  mutating func parent(of child: Identity) -> Identity? {
+    if let cached = parents[child] { return cached }
+    guard let parent = child.parent else { return nil }
+
+    // Charge for both arrays. Bounding component slots also bounds retention
+    // for unusually deep identities, where an entry count alone would not.
+    let depth = child.typedComponents.count
+    if depth <= remainingComponents / 2 {
+      parents[child] = parent
+      remainingComponents -= 2 * depth
+    }
+    return parent
   }
 }

@@ -247,6 +247,80 @@ struct ViewGraphTests {
     #expect(result.diagnostics.droppedInvalidatedIdentityCount == 0)
   }
 
+  @Test("departed invalidations select the nearest currently mounted parent after restore")
+  func departedInvalidationRechecksRestoredAncestors() {
+    let graph = ViewGraph()
+    let root = testIdentity("Root")
+    let interior = root.child(.named("Interior"))
+    let departed = interior.child(.named("Row")).child(.named("Field"))
+    let empty = graph.makeCheckpoint()
+
+    _ = graph.applySnapshot(ResolvedNode(identity: root, kind: .root))
+    graph.setEvaluator(for: root) {}
+    graph.beginFrame()
+    let coarse = graph.makeCheckpoint()
+
+    seedContainerGraph(graph: graph, rootIdentity: root, containerIdentity: interior)
+    graph.setEvaluator(for: interior) {}
+    graph.beginFrame()
+    let nested = graph.makeCheckpoint()
+
+    for (checkpoint, expected) in [(coarse, root), (nested, interior), (coarse, root)] {
+      graph.restoreCheckpoint(checkpoint)
+      graph.invalidateAndQueueDirty([departed])
+      let result = graph.selectiveDirtyEvaluationPlanWithDiagnostics(
+        invalidatedIdentities: [departed])
+      #expect(result.plan?.frontierIdentities == [expected])
+    }
+    graph.restoreCheckpoint(empty)
+    #expect(!graph.hasLiveInvalidationTarget(for: departed))
+    graph.restoreCheckpoint(nested)
+    #expect(graph.hasLiveInvalidationTarget(for: departed))
+  }
+
+  @Test("cached identity parents use the live structural owner after a reparent")
+  func departedInvalidationRechecksReparentedSubtree() throws {
+    let graph = ViewGraph()
+    let root = testIdentity("Root")
+    let a = root.child(.named("A"))
+    let b = root.child(.named("B"))
+    let rebased = ResolvedNode(identity: testIdentity("Rebased"), kind: .view(.group))
+    let departed = rebased.identity.child(.named("Row")).child(.named("Field"))
+
+    func snapshot(underA: Bool) -> ResolvedNode {
+      ResolvedNode(
+        identity: root, kind: .root,
+        children: [
+          ResolvedNode(identity: a, kind: .view(.group), children: underA ? [rebased] : []),
+          ResolvedNode(identity: b, kind: .view(.group), children: underA ? [] : [rebased]),
+        ])
+    }
+    _ = graph.applySnapshot(snapshot(underA: true))
+    let first = graph.makeCheckpoint()
+    _ = graph.applySnapshot(snapshot(underA: false))
+    let second = graph.makeCheckpoint()
+    for (checkpoint, underA) in [(first, true), (second, false), (first, true)] {
+      graph.restoreCheckpoint(checkpoint)
+      let node = try #require(graph.nodeForIdentity(a))
+      #expect(
+        graph.memoSubtreeHasInvalidation(node, identity: a, invalidatedIdentities: [departed])
+          == underA)
+    }
+  }
+
+  @Test("the parent cache retains only identities within its component budget")
+  func invalidationParentBudget() {
+    var cache = InvalidationIdentityParents(componentBudget: 6)
+    let deep = testIdentity("Root", "Interior", "Leaf", "Deep")
+    let leaf = testIdentity("Root", "Interior", "Leaf")
+    #expect(cache.parent(of: deep) == leaf)
+    #expect(cache.parents.isEmpty)
+    #expect(cache.parent(of: leaf) == leaf.parent)
+    #expect(cache.parent(of: leaf) == leaf.parent)
+    #expect(cache.parent(of: deep) == leaf)
+    #expect(cache.parents.count == 1)
+  }
+
   @Test("unmapped invalidation whose nearest live ancestor is the root remaps to the root")
   func unmappedInvalidationWithOnlyRootLiveRemapsToRoot() {
     let graph = ViewGraph()

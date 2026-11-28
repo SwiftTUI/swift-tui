@@ -170,6 +170,7 @@ struct ViewGraphCheckpointTotalityTests {
           "preferenceDeltaEscalationRequested",
           "preferenceDeltaNotesThisFrame",
           "declaredChildRecompositionOwners",
+          "invalidationParents",  // immutable lexical edges only, no graph membership
         ])
     )
     // Diagnostic history is a separately checkpointed DEBUG-only sidecar;
