@@ -147,8 +147,8 @@ where C: MutableCollection & RandomAccessCollection {
   // collection's, keyed the way the row relocates.
   projected.transaction = collection.transaction
   projected.valueIdentity = lookup.rowValueIdentity
-  projected.bindingSourceID = collection.elementBindingSource(
-    ForEachBindingRowKey(elementID: elementID, occurrence: occurrence))
+  projected.deriveElementIdentity(
+    from: collection, key: ForEachBindingRowKey(elementID: elementID, occurrence: occurrence))
   return projected
 }
 

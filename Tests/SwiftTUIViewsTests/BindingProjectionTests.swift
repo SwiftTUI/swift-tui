@@ -163,11 +163,15 @@ struct BindingProjectionTests {
       }
     }
     let box = Box()
-    let base = Binding(get: { box.items }, set: { box.items = $0 }).withBindingSource("items")
+    var base = Binding(get: { box.items }, set: { box.items = $0 }).withBindingSource("items")
+    base.bindingDeclarationID = AnyID("declared items")
     let root = try #require(base.bindingSourceID)
 
     // Positional element bindings are index-denominated, as in SwiftUI.
     let first = base[0]
+    #expect(first.bindingDeclarationID?.derivationRoot == base.bindingDeclarationID)
+    #expect(first.bindingDeclarationID != base[1].bindingDeclarationID)
+    #expect(first.count.bindingDeclarationID?.derivationRoot == base.bindingDeclarationID)
     #expect(first.bindingSourceID != nil)
     #expect(first.bindingSourceID == base[0].bindingSourceID)
     #expect(first.bindingSourceID != base[1].bindingSourceID)
@@ -186,9 +190,13 @@ struct BindingProjectionTests {
     let rows = rowSources()
     #expect(rows.count == 2 && rows.allSatisfy { $0 != nil } && rows[0] != rows[1], "\(rows)")
     #expect(rows.allSatisfy { $0?.derivationRoot == root })
+    let declarations = box.rows.map(\.bindingDeclarationID)
+    #expect(declarations.allSatisfy { $0?.derivationRoot == base.bindingDeclarationID })
+    #expect(declarations[0] != declarations[1])
     #expect(rowSources() == rows)
     box.items.reverse()
     #expect(rowSources() == [rows[1], rows[0]])
+    #expect(box.rows.map(\.bindingDeclarationID) == [declarations[1], declarations[0]])
     #expect(rows[0] != first.bindingSourceID)
 
     // A collection binding without a source gives its elements none.

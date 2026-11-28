@@ -2246,14 +2246,16 @@ extension DormantTabStateTests {
 
   /// STUI-1307: an item destination's surface identity must not embed the
   /// presentation binding's owner lifetime, which tab dormancy renews.
-  @Test("an item navigation destination inside a tab keeps its state across round trips")
-  func itemDestinationKeepsStateAcrossRoundTrips() throws {
+  @Test(
+    "direct and row-bound destinations inside a tab keep state across round trips",
+    arguments: [false, true])
+  func itemDestinationKeepsStateAcrossRoundTrips(rowBinding: Bool) throws {
     let model = DormantTabModel()
     let harness = try StressRuntimeHarness(
       rootIdentity: testIdentity("DormantTabsItemDestination"),
       size: .init(width: 40, height: 10)
     ) {
-      DormantItemDestinationFixture(model: model)
+      DormantItemDestinationFixture(model: model, rowBinding: rowBinding)
     }
     defer { harness.shutdown() }
     _ = try harness.clickText("Open")
@@ -2402,10 +2404,13 @@ private struct DormantDestinationItem: Identifiable, Sendable {
 @MainActor
 private struct DormantItemDestinationFixture: View {
   let model: DormantTabModel
+  let rowBinding: Bool
 
   var body: some View {
     TabView(selection: model.selectionBinding) {
-      Tab("A", value: "A") { DormantItemDestinationSource() }
+      Tab("A", value: "A") {
+        if rowBinding { DormantRowDestinationSource() } else { DormantItemDestinationSource() }
+      }
       Tab("B", value: "B") { Text("plain-B") }
     }
     .tabViewStyle(.literalTabs)
@@ -2420,6 +2425,26 @@ private struct DormantItemDestinationSource: View {
     NavigationStack {
       Button("Open") { item = DormantDestinationItem() }
         .navigationDestination(item: $item) { _ in DormantDestinationCounter() }
+    }
+  }
+}
+
+@MainActor
+private struct DormantRowDestinationSource: View {
+  struct Row: Identifiable, Sendable {
+    let id = 1
+    var open = false
+  }
+  @State private var rows = [Row()]
+
+  var body: some View {
+    NavigationStack {
+      VStack {
+        ForEach($rows) { row in
+          Button("Open") { row.wrappedValue.open = true }
+            .navigationDestination(isPresented: row.open) { DormantDestinationCounter() }
+        }
+      }
     }
   }
 }

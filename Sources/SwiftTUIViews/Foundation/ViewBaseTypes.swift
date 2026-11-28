@@ -257,10 +257,18 @@ private struct BindingElementSource: AnyIDDerivation {
 }
 
 extension Binding {
-  /// The source of this collection binding's element binding keyed by
-  /// `element`, or `nil` when this binding has no source.
-  func elementBindingSource<Key: Hashable & Sendable>(_ element: Key) -> AnyID? {
-    bindingSourceID.map { AnyID(BindingElementSource(base: $0, element: AnyID(element))) }
+  /// Derive both identities using the same row key. The source follows the
+  /// mounted owner, while the declaration survives a tab's owner renewal.
+  mutating func deriveElementIdentity<CollectionValue, Key: Hashable & Sendable>(
+    from collection: Binding<CollectionValue>, key: Key
+  ) {
+    let element = AnyID(key)
+    bindingSourceID = collection.bindingSourceID.map {
+      AnyID(BindingElementSource(base: $0, element: element))
+    }
+    bindingDeclarationID = collection.bindingDeclarationID.map {
+      AnyID(BindingElementSource(base: $0, element: element))
+    }
   }
 }
 

@@ -54,7 +54,7 @@ extension Binding: @MainActor Collection where Value: MutableCollection {
     // binding, and writes funnel through this binding's setter either way.
     projected.transaction = transaction
     if let offset = position as? Int {
-      projected.bindingSourceID = elementBindingSource(BindingPositionKey(position: offset))
+      projected.deriveElementIdentity(from: self, key: BindingPositionKey(position: offset))
     }
     return projected
   }
