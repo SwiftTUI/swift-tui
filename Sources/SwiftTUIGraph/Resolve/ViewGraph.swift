@@ -1781,6 +1781,12 @@ package final class ViewGraph {
     rootIdentity: Identity,
     _ evaluate: @escaping @MainActor () -> Void
   ) {
+    // A new root has no surviving parent to diff the old root out. Retire its
+    // subtree in the frame draft before the new evaluator adopts any identities.
+    if let root, root.identity != rootIdentity {
+      removeSubtree(rootedAt: root)
+      self.root = nil
+    }
     evaluationRootIdentity = rootIdentity
     rootEvaluator = evaluate
   }
