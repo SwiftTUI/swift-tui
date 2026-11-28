@@ -168,7 +168,11 @@ struct ResolvedNodeComparatorTotalityTests {
     #expect(fields.count >= 25, "parser found implausibly few stored fields: \(fields)")
 
     let source = try SourceParsingTestSupport.sourceText(relativePath: Self.equivalencePath)
-    let body = SourceParsingTestSupport.functionBodyText(named: comparator, in: source)
+    var body = SourceParsingTestSupport.functionBodyText(named: comparator, in: source)
+    if comparator == "==" {
+      #expect(body.contains("haveEqualNodeFields(lhs, rhs)"))
+      body = SourceParsingTestSupport.functionBodyText(named: "haveEqualNodeFields", in: source)
+    }
     #expect(!body.isEmpty, "could not locate \(comparator) in ResolvedNodeEquivalence.swift")
 
     let exempt = (Self.exemptions[comparator] ?? [:])

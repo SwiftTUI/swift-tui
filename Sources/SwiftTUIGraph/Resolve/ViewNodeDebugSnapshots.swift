@@ -36,7 +36,7 @@ extension ViewNode {
     package var invalidatorInstalled: Bool
     package var ownerGraphInstalled: Bool
     package var parentIdentity: Identity?
-    package var committed: ResolvedNode
+    @CheckpointCommittedValue package var committed: ResolvedNode
     package var isCommittedSnapshotFresh: Bool
     package var hasStaleIslandDescendant: Bool
     package var hasForeignParentedChild: Bool
@@ -73,5 +73,33 @@ extension ViewNode {
     package var preparedFrameID: UInt64
     package var visitedFrameID: UInt64
     package var evaluatorInstalled: Bool
+  }
+}
+
+/// Restoring a graph rewrites each node's committed value. If both snapshots
+/// retained the same child array, every element in that array is the same
+/// value on both sides of the restore. Compare the two roots normally without
+/// walking that shared subtree again for each ancestor in the graph.
+@propertyWrapper
+package struct CheckpointCommittedValue: Equatable {
+  package var wrappedValue: ResolvedNode
+
+  package init(wrappedValue: ResolvedNode) {
+    self.wrappedValue = wrappedValue
+  }
+
+  package static func == (lhs: Self, rhs: Self) -> Bool {
+    let before = lhs.wrappedValue
+    let after = rhs.wrappedValue
+    let sharesChildStorage = before.children.withUnsafeBufferPointer { before in
+      after.children.withUnsafeBufferPointer { after in
+        unsafe before.baseAddress == after.baseAddress
+      }
+    }
+    if sharesChildStorage {
+      // The node-field comparison also checks the two logical child counts.
+      return ResolvedNode.haveEqualNodeFields(before, after)
+    }
+    return before == after
   }
 }

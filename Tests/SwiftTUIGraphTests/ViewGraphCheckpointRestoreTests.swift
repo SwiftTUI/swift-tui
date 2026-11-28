@@ -15,6 +15,27 @@ import Testing
 @MainActor
 @Suite("ViewGraph gen-gated checkpoint restore")
 struct ViewGraphCheckpointRestoreTests {
+  @Test("checkpoint snapshots compare root fields and independently stored descendants")
+  func retainedCommittedChildrenPreserveSnapshotEquality() throws {
+    let graph = ViewGraph()
+    let leaf = ResolvedNode(identity: testIdentity("Root", "Child", "Leaf"), kind: .view(.text))
+    let child = ResolvedNode(
+      identity: testIdentity("Root", "Child"), kind: .view(.group), children: [leaf])
+    let root = ResolvedNode(identity: testIdentity("Root"), kind: .root, children: [child])
+    _ = graph.applySnapshot(root)
+
+    let baseline = try #require(graph.root).debugTotalStateSnapshot()
+    var changed = baseline
+    changed.committed.kind = .view(.group)
+    #expect(changed != baseline)
+
+    changed = baseline
+    changed.committed.children[0].children[0].kind = .view(.group)
+    #expect(changed != baseline)
+    changed.committed.children[0].children[0].kind = .view(.text)
+    #expect(changed == baseline)
+  }
+
   @Test("restore lands exactly on baseline and reports the restored count")
   func restoreLandsOnBaseline() throws {
     let graph = ViewGraph()

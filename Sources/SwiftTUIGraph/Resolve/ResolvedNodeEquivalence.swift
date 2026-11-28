@@ -467,42 +467,49 @@ extension ResolvedNode {
   public static func == (lhs: Self, rhs: Self) -> Bool {
     var pending: [(Self, Self)] = [(lhs, rhs)]
     while let (lhs, rhs) = pending.popLast() {
-      guard
-        lhs.identity == rhs.identity,
-        lhs.structuralPath == rhs.structuralPath,
-        lhs.structuralEdgeRole == rhs.structuralEdgeRole,
-        lhs.entityIdentity == rhs.entityIdentity,
-        lhs.entityStructuralPath == rhs.entityStructuralPath,
-        lhs.declarationOwnerEdge == rhs.declarationOwnerEdge,
-        lhs.kind == rhs.kind,
-        Self.typeDiscriminatorsCompatible(lhs.typeDiscriminator, rhs.typeDiscriminator),
-        lhs.children.count == rhs.children.count,
-        lhs.environmentSnapshot == rhs.environmentSnapshot,
-        lhs.transactionSnapshot == rhs.transactionSnapshot,
-        lhs.layoutBehavior == rhs.layoutBehavior,
-        lhs.layoutMetadata == rhs.layoutMetadata,
-        lhs.layoutRealizedContent?.equivalenceSignature
-          == rhs.layoutRealizedContent?.equivalenceSignature,
-        lhs.drawMetadata == rhs.drawMetadata,
-        lhs.drawEffects == rhs.drawEffects,
-        lhs.surfaceComposition == rhs.surfaceComposition,
-        lhs.semanticMetadata == rhs.semanticMetadata,
-        lhs.lifecycleMetadata == rhs.lifecycleMetadata,
-        lhs.handlerInventory == rhs.handlerInventory,
-        lhs.drawPayload == rhs.drawPayload,
-        lhs.intrinsicSize == rhs.intrinsicSize,
-        lhs.indexedChildSource?.measurementSignature
-          == rhs.indexedChildSource?.measurementSignature,
-        lhs.preferenceValues == rhs.preferenceValues,
-        lhs.supportsRetainedReuse == rhs.supportsRetainedReuse,
-        lhs.matchedGeometry == rhs.matchedGeometry,
-        lhs.isTransient == rhs.isTransient
-      else {
-        return false
-      }
+      guard haveEqualNodeFields(lhs, rhs) else { return false }
       for index in lhs.children.indices.reversed() {
         pending.append((lhs.children[index], rhs.children[index]))
       }
+    }
+    return true
+  }
+
+  /// Compares one node, including its child count. Exact tree equality and
+  /// checkpoint snapshots both use this field list.
+  static func haveEqualNodeFields(_ lhs: Self, _ rhs: Self) -> Bool {
+    guard
+      lhs.identity == rhs.identity,
+      lhs.structuralPath == rhs.structuralPath,
+      lhs.structuralEdgeRole == rhs.structuralEdgeRole,
+      lhs.entityIdentity == rhs.entityIdentity,
+      lhs.entityStructuralPath == rhs.entityStructuralPath,
+      lhs.declarationOwnerEdge == rhs.declarationOwnerEdge,
+      lhs.kind == rhs.kind,
+      Self.typeDiscriminatorsCompatible(lhs.typeDiscriminator, rhs.typeDiscriminator),
+      lhs.children.count == rhs.children.count,
+      lhs.environmentSnapshot == rhs.environmentSnapshot,
+      lhs.transactionSnapshot == rhs.transactionSnapshot,
+      lhs.layoutBehavior == rhs.layoutBehavior,
+      lhs.layoutMetadata == rhs.layoutMetadata,
+      lhs.layoutRealizedContent?.equivalenceSignature
+        == rhs.layoutRealizedContent?.equivalenceSignature,
+      lhs.drawMetadata == rhs.drawMetadata,
+      lhs.drawEffects == rhs.drawEffects,
+      lhs.surfaceComposition == rhs.surfaceComposition,
+      lhs.semanticMetadata == rhs.semanticMetadata,
+      lhs.lifecycleMetadata == rhs.lifecycleMetadata,
+      lhs.handlerInventory == rhs.handlerInventory,
+      lhs.drawPayload == rhs.drawPayload,
+      lhs.intrinsicSize == rhs.intrinsicSize,
+      lhs.indexedChildSource?.measurementSignature
+        == rhs.indexedChildSource?.measurementSignature,
+      lhs.preferenceValues == rhs.preferenceValues,
+      lhs.supportsRetainedReuse == rhs.supportsRetainedReuse,
+      lhs.matchedGeometry == rhs.matchedGeometry,
+      lhs.isTransient == rhs.isTransient
+    else {
+      return false
     }
     return true
   }
