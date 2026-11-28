@@ -191,6 +191,8 @@ extension RunLoop {
     _ renderedArtifacts: FrameArtifacts,
     convergence: inout FocusSyncConvergenceState
   ) throws -> FocusSyncIterationOutcome {
+    let previousModalFocusScopePath = activeModalFocusScopePath(
+      in: latestSemanticSnapshot.focusRegions)
     let previousScrollRoutes = latestSemanticSnapshot.scrollRoutes
     let previousScrollTargets = latestSemanticSnapshot.scrollTargets
     latestSemanticSnapshot = renderedArtifacts.semanticSnapshot
@@ -256,7 +258,6 @@ extension RunLoop {
       localGestureRegistry.removeDepartedRecognizers(departedActiveGestureIdentities)
     }
 
-    let previousModalFocusScopePath = currentModalFocusScopePath()
     let nextModalFocusScopePath = activeModalFocusScopePath(
       in: renderedArtifacts.semanticSnapshot.focusRegions
     )
@@ -525,16 +526,6 @@ extension RunLoop {
     case .focus(let identity):
       return focusTracker.setFocus(to: identity)
     }
-  }
-
-  private func currentModalFocusScopePath() -> [Identity]? {
-    guard
-      let focusedIdentity = focusTracker.currentFocusIdentity,
-      let focusedRegion = focusTracker.focusRegions.first(where: { $0.identity == focusedIdentity })
-    else {
-      return nil
-    }
-    return focusedRegion.modalFocusScopePath
   }
 
   private func activeModalFocusScopePath(
